@@ -1,0 +1,17 @@
+{
+  "name": "boomball",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Boomball, the traditional sport of the Giff. Co-op tactical match against AI.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "sweep": "vitest run --config vitest.sweep.config.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

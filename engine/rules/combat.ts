@@ -1,0 +1,148 @@
+/**
+ * Swinging the blast-bat, and shoving people off their line.
+ *
+ * Every contested roll in the sport has the same shape: a d20, a bonus from the
+ * role and Tier table, and a number to beat. It lives here once so an attack, a
+ * thrown Payload and a shot at a Furnace cannot drift apart.
+ */
+
+import type { Arena } from '../arena.js';
+import { BAT_RECOIL_CELLS } from '../constants.js';
+import type { DiceRoll } from '../events.js';
+import { inBounds, type Point } from '../geometry.js';
+import type { Rng } from '../rng.js';
+import { statsFor } from '../stats.js';
+import { activeUnits, type MatchState, type Unit } from '../types.js';
+
+export interface AttackOutcome {
+  readonly roll: DiceRoll;
+  readonly hit: boolean;
+}
+
+/**
+ * One d20 against a target number. `against` is carried in the result because a
+ * client must never have to work out what the roll was measured against: that
+ * is exactly what makes a miss feel arbitrary at the table.
+ */
+export function rollAgainst(
+  rng: Rng,
+  bonus: number,
+  against: number,
+  mode: 'normal' | 'advantage' | 'disadvantage' = 'normal',
+): AttackOutcome {
+  const rolled = rng.d20With(mode);
+  const total = rolled + bonus;
+  return {
+    roll: { die: 20, rolled, bonus, total, against, mode },
+    hit: total >= against,
+  };
+}
+
+/** A defender in the Dodge stance is harder to hit. */
+export function attackMode(target: Unit): 'normal' | 'disadvantage' {
+  return target.dodging ? 'disadvantage' : 'normal';
+}
+
+export interface OpposedOutcome {
+  readonly challengerRoll: DiceRoll;
+  readonly defenderRoll: DiceRoll;
+  readonly success: boolean;
+}
+
+/**
+ * Two d20s and two flat bonuses, the challenger first. Ties go to the defender,
+ * as a contested check does in 5e.
+ *
+ * Both sides carry the other's total in `against`, so a client never has to
+ * work out which roll it lost to. Shared by the Shove and by a pass snatched
+ * out of the air, which are the same contest with different columns.
+ */
+export function opposedRoll(
+  rng: Rng,
+  challengerBonus: number,
+  defenderBonus: number,
+): OpposedOutcome {
+  const challengerRolled = rng.d20();
+  const defenderRolled = rng.d20();
+  const challengerTotal = challengerRolled + challengerBonus;
+  const defenderTotal = defenderRolled + defenderBonus;
+
+  return {
+    challengerRoll: {
+      die: 20,
+      rolled: challengerRolled,
+      bonus: challengerBonus,
+      total: challengerTotal,
+      against: defenderTotal,
+      mode: 'normal',
+    },
+    defenderRoll: {
+      die: 20,
+      rolled: defenderRolled,
+      bonus: defenderBonus,
+      total: defenderTotal,
+      against: challengerTotal,
+      mode: 'normal',
+    },
+    success: challengerTotal > defenderTotal,
+  };
+}
+
+/**
+ * A contested check: the shover's Athletics against the best defence the target
+ * can muster. A Breaker resists on strength, a Trajector on agility, and taking
+ * the better of the two is what stops the Shove from simply deleting Trajectors.
+ */
+export function resolveShove(rng: Rng, shover: Unit, target: Unit): {
+  readonly shoverRoll: DiceRoll;
+  readonly targetRoll: DiceRoll;
+  readonly success: boolean;
+} {
+  const targetStats = statsFor(target.role, target.tier);
+  const outcome = opposedRoll(
+    rng,
+    statsFor(shover.role, shover.tier).might,
+    Math.max(targetStats.might, targetStats.agility),
+  );
+
+  return {
+    shoverRoll: outcome.challengerRoll,
+    targetRoll: outcome.defenderRoll,
+    success: outcome.success,
+  };
+}
+
+/**
+ * Where the blast-bat's recoil throws the attacker.
+ *
+ * Ten feet directly away from what it hit. This is forced movement, so it
+ * provokes nothing, but it can tear the attacker off its own anchor, which is
+ * the price of swinging. It stops short rather than pushing into terrain or
+ * into another player.
+ */
+export function recoilDestination(
+  arena: Arena,
+  state: MatchState,
+  attacker: Unit,
+  target: Point,
+): Point {
+  const step = {
+    x: Math.sign(attacker.x - target.x),
+    y: Math.sign(attacker.y - target.y),
+  };
+  if (step.x === 0 && step.y === 0) return { x: attacker.x, y: attacker.y };
+
+  const occupied = new Set(
+    activeUnits(state)
+      .filter((u) => u.id !== attacker.id)
+      .map((u) => `${u.x},${u.y}`),
+  );
+
+  let landing: Point = { x: attacker.x, y: attacker.y };
+  for (let i = 0; i < BAT_RECOIL_CELLS; i++) {
+    const next = { x: landing.x + step.x, y: landing.y + step.y };
+    if (!inBounds(next) || arena.isSolid(next) || occupied.has(`${next.x},${next.y}`)) break;
+    landing = next;
+  }
+  return landing;
+}

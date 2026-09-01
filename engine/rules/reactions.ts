@@ -1,0 +1,134 @@
+/**
+ * Reactions: what a player does on somebody else's turn.
+ *
+ * Three exist. The Bulwark's block lives in `payload.ts` because it belongs to
+ * the shot it answers. The other two are here: the opportunity attack, and
+ * snatching a pass out of the air.
+ *
+ * **They are taken automatically, and that is a deliberate MVP decision.**
+ * Asking a player mid-way through someone else's turn means a suspended turn, a
+ * second clock and a modal, in a game whose dimensioning mode is one human
+ * against thirteen AI units. So the engine decides, under a policy stated here
+ * rather than buried in a handler:
+ *
+ *   - A pass crossing a defended lane is **always** contested. Taking the ball
+ *     off an opponent is worth more than any use the Reaction has later.
+ *   - An opportunity attack is taken **unless the bat's recoil would leave the
+ *     swinger without a grip**. That is the one cost that is not worth a d8:
+ *     the swinger would drop at the start of its next turn and lose its
+ *     position as well as hit points.
+ *   - The goalkeeper never chases a pass. Its Reaction is worth ten points at
+ *     its own Furnace, and without that exception a pass across the goalmouth
+ *     would be the cheapest way to strip the block before shooting.
+ *
+ * This file works out **who may react**. It rolls no dice and changes no state:
+ * `reduce` does that.
+ */
+
+import type { Arena } from '../arena.js';
+import { BULWARK_BLOCK_RANGE_CELLS } from '../constants.js';
+import { distance, type Point } from '../geometry.js';
+import { recoilDestination } from './combat.js';
+import { rangeToFurnace } from './payload.js';
+import { activeUnits, type MatchState, type Unit } from '../types.js';
+
+/**
+ * The opponents whose reach `mover` leaves by stepping from one cell to the
+ * next. Entering a reach costs nothing; only walking out of one does.
+ *
+ * Ordered by unit id, which is safe here in a way it is not for the Crackers:
+ * every candidate is on the same team, so a stable order carries no bias.
+ */
+export function opportunityAttackers(
+  state: MatchState,
+  mover: Unit,
+  from: Point,
+  to: Point,
+): Unit[] {
+  return activeUnits(state)
+    .filter((u) => u.team !== mover.team && u.reactionAvailable)
+    .filter((u) => distance(u, from) === 1 && distance(u, to) > 1)
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Every opponent a whole route would provoke, for an interface that wants to
+ * warn before the player commits and for an AI that wants to price a detour.
+ *
+ * A preview, not a resolution: it reads the board as it stands, so it cannot
+ * know that the first swing will shove its own attacker out of the next one.
+ */
+export function provokedAlong(state: MatchState, mover: Unit, path: readonly Point[]): Unit[] {
+  const found: Unit[] = [];
+  const seen = new Set<string>();
+  let from: Point = { x: mover.x, y: mover.y };
+
+  for (const step of path) {
+    for (const watcher of opportunityAttackers(state, mover, from, step)) {
+      if (seen.has(watcher.id)) continue;
+      seen.add(watcher.id);
+      found.push(watcher);
+    }
+    from = step;
+  }
+
+  return found;
+}
+
+/**
+ * Whether the recoil of an opportunity attack would leave the swinger hanging
+ * in open air. This is the whole of the guard on the automatic policy.
+ *
+ * A recoil that cannot move at all, because terrain or another player is in the
+ * way, changes nothing and is therefore never a reason to hold back.
+ */
+export function keepsGripAfterRecoil(
+  arena: Arena,
+  state: MatchState,
+  attacker: Unit,
+  target: Point,
+): boolean {
+  const landing = recoilDestination(arena, state, attacker, target);
+  if (landing.x === attacker.x && landing.y === attacker.y) return true;
+  return arena.isAnchorable(landing);
+}
+
+/**
+ * The opponents in position to snatch a pass, in the order the ball reaches
+ * them. The fiche says a pass crossing an adjacent cell can be stolen; a player
+ * the ball flies straight through is read as covered by the same rule, since
+ * being on the line is not less of an opportunity than being beside it.
+ *
+ * Each of them gets one attempt, and the first to win it takes the ball, which
+ * is what makes a long throw across a crowded Scramble a real gamble.
+ */
+export function passInterceptors(
+  arena: Arena,
+  state: MatchState,
+  thrower: Unit,
+  flight: readonly Point[],
+): Unit[] {
+  const enemies = activeUnits(state).filter(
+    (u) => u.team !== thrower.team && u.reactionAvailable && !guardsItsFurnace(arena, u),
+  );
+
+  const found: Unit[] = [];
+  const seen = new Set<string>();
+
+  for (const cell of flight) {
+    for (const enemy of enemies) {
+      if (seen.has(enemy.id)) continue;
+      if (distance(enemy, cell) > 1) continue;
+      seen.add(enemy.id);
+      found.push(enemy);
+    }
+  }
+
+  return found;
+}
+
+/** A Bulwark close enough to its own Furnace to be holding its Reaction for a shot. */
+function guardsItsFurnace(arena: Arena, unit: Unit): boolean {
+  if (unit.role !== 'bulwark') return false;
+  return rangeToFurnace(unit, arena.furnaceOf(unit.team)) <= BULWARK_BLOCK_RANGE_CELLS;
+}
