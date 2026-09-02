@@ -46,7 +46,14 @@ engine/          TypeScript pur. Les règles. Aucune dépendance.
 
 ai/              Consomme engine. Décide, ne résout jamais.
 
-server/          Edge Function Supabase. Autorité, persistance, diffusion.
+server/          La logique d'autorité, en TypeScript pur et testée.
+  ├── session    propriété d'une unité, chrono, résolution du bloc IA
+  └── seed       le seed SQL généré depuis le moteur
+
+supabase/        Ce qui est propre à la plateforme.
+  ├── migrations schéma, enums, RLS
+  ├── seed.sql   généré, tenu contre le moteur par un test
+  └── functions/ l'Edge Function, qui n'est qu'une coquille autour de server/
 
 client/          React + Vite. Affiche, envoie des intentions.
 ```
@@ -128,6 +135,10 @@ divergeront sur le premier jet de dé.
 
 ### La surface
 
+**La logique vit dans `server/session.ts`, pas dans la fonction.** L'Edge Function charge, appelle,
+écrit et diffuse ; elle ne décide rien. C'est ce qui permet de tester au complet la partie
+intéressante, la résolution d'un bloc de treize tours IA derrière un seul clic, sans base ni réseau.
+
 Une seule Edge Function, `resolve-action`.
 
 ```
@@ -168,6 +179,15 @@ navigateur en veille ne peut donc pas geler la partie.
 
 **Row Level Security dès le premier jour.** Un joueur lit et écrit ses équipes, et lit les matchs
 auxquels il participe. Le rattraper après coup coûte toujours plus cher.
+
+**Aucune policy d'écriture sur les tables de match.** `matches`, `match_participants`,
+`match_events` et `match_state` sont en lecture seule pour tout client. Toute écriture passe par
+`resolve-action`, qui détient la clé service. C'est le pendant en base du principe de la porte
+unique : un client capable d'insérer dans `match_events` serait un client capable de s'écrire un but.
+
+**`role_stats` et `arenas.layout` sont des miroirs du moteur, et un miroir dérive.** Ils sont donc
+générés par `server/seed.ts` et tenus contre le moteur par `server/seed.test.ts`, jamais écrits à la
+main.
 
 **`match_events.seq` est un entier strictement croissant par match.** C'est lui qui permet à un
 client de dire « j'en suis à 47, donne moi la suite » après une coupure, plutôt que de recharger

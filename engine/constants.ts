@@ -49,9 +49,23 @@ export const FALL_DAMAGE_DIE = 6;
 // -- The Payload ------------------------------------------------------------
 
 export const PAYLOAD_PASS_AC = 12;
-export const PAYLOAD_RANGE_CELLS = 6;
+/**
+ * Forty-five feet clean, and the long band beyond it.
+ *
+ * It was thirty. The two Furnaces sit fourteen cells apart on the same catwalk,
+ * so a thirty foot clean band meant the carrier spent almost every turn in the
+ * long band shooting at disadvantage: measured, the ball-holder averaged ten
+ * cells from the hatch and only a fifth of its turns were a clean shot.
+ */
+export const PAYLOAD_RANGE_CELLS = 9;
 export const PAYLOAD_LONG_RANGE_CELLS = 12;
-export const FURNACE_AC = 18;
+/**
+ * Eighteen was the fiche's number and it was set against a keeper's block that
+ * turned out to be permanent rather than occasional. With the block cut to what
+ * it is now, fifteen puts a Rookie Striker's clean shot near one in two and a
+ * Star's near seven in ten, which is what a sport needs to produce a scoreline.
+ */
+export const FURNACE_AC = 15;
 export const GOAL_POINTS = 10;
 
 /** A missed pass scatters 1d4 cells in a direction rolled on a d8. */
@@ -73,10 +87,25 @@ export const BULWARK_BLOCK_RANGE_CELLS = 2;
  * scale with you. The Furnace does not rise, because a hatch in a wall does not
  * get better at keeping goal, and that gap is where a higher league is felt.
  */
+/**
+ * The keeper's Reaction, and the single number that was strangling the sport.
+ *
+ * Arbitrage 2 priced this as an occasional save: the first shot of a round
+ * draws the Reaction, the second one goes in, and the counter to a great
+ * goalkeeper is a second shooter. Measured, **96 to 98 % of all shots in a
+ * match were blocked**, because both teams together were managing under three
+ * shots a match and a second shot in the same round essentially never
+ * happened. A once-a-round Reaction that is never drawn twice is a permanent
+ * +4 to +8, and it held the hit rate at 30 % when a clean shot should be one
+ * in two.
+ *
+ * Halved. The keeper is still worth ten to fifteen points of hit rate, so it is
+ * still a goalkeeper, but it no longer decides on its own that nobody scores.
+ */
 export const BULWARK_BLOCK_BONUS: Readonly<Record<Tier, number>> = {
-  rookie: 4,
-  veteran: 6,
-  star: 8,
+  rookie: 2,
+  veteran: 3,
+  star: 4,
 };
 
 // -- The Crackers -----------------------------------------------------------
@@ -106,9 +135,27 @@ export const SPARK_SPAWN_MIN_DISTANCE = 4;
 /** Zone index it enters in: 1 is The Scramble, the middle band. */
 export const SPARK_SPAWN_ZONE = 1;
 
-export const SPARK_MOVE_CELLS = 12;
+/**
+ * Six, against a player's eight. Twelve made it structurally uncatchable: it
+ * outran the field, so nobody could ever close on it and every catch was an
+ * accident of where it happened to stop.
+ */
+export const SPARK_MOVE_CELLS = 6;
 export const SPARK_CATCH_DC = 20;
-export const SPARK_POINTS = 150;
+/**
+ * Five goals. It was a hundred and fifty and it ended the match on the spot,
+ * which made it the only thing on the field worth playing for.
+ *
+ * The sweep says this number matters far less than it looks. Scored over the
+ * same 600 matches at every value from 10 to 150, the count of matches whose
+ * winner the Spark changes barely moves: 28 of 33 at ten points, 29 of 33 at a
+ * hundred and fifty. A prize of any size settles a match that would otherwise
+ * have finished nil-nil, and at 0.8 goals a match most of them do. The Spark
+ * will stop deciding matches when the Payload starts deciding them, not when
+ * this constant comes down. So it is set at the bottom of the validated range,
+ * which costs nothing measurable now and ages best as the goal rate rises.
+ */
+export const SPARK_POINTS = 50;
 
 // -- Initiative -------------------------------------------------------------
 

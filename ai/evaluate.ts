@@ -14,7 +14,12 @@
  */
 
 import type { Arena, Furnace } from '../engine/arena.js';
-import { ARENA_HEIGHT, CRACKER_MOVE_CELLS, PAYLOAD_RANGE_CELLS } from '../engine/constants.js';
+import {
+  ARENA_HEIGHT,
+  CRACKER_MOVE_CELLS,
+  PAYLOAD_RANGE_CELLS,
+  SPARK_CATCH_DC,
+} from '../engine/constants.js';
 import { distance, type Point } from '../engine/geometry.js';
 import type { LegalActions } from '../engine/legalActions.js';
 import {
@@ -24,7 +29,13 @@ import {
   throwRangeOver,
 } from '../engine/rules/payload.js';
 import { statsFor } from '../engine/stats.js';
-import { activeUnits, type MatchState, type Unit, type UnitId } from '../engine/types.js';
+import {
+  activeUnits,
+  sparkIsLive,
+  type MatchState,
+  type Unit,
+  type UnitId,
+} from '../engine/types.js';
 import { findOrder, type AllyOrder } from './orders.js';
 import type { RoleWeights } from './roles/index.js';
 
@@ -163,6 +174,13 @@ export function positionValue(board: Board, cell: Point): number {
     value += w.carryToFurnace * scoringNearness(cell, board.targetFurnace);
   } else if (state.payload.carriedBy === null) {
     value += w.chaseLoosePayload * nearness(cell, state.payload);
+    // The cell the ball is actually lying in is worth the pickup, not one more
+    // step of gradient. Without this the last cell gains `chaseLoosePayload/45`,
+    // about one point, and a unit will stand beside a loose Payload for the
+    // whole match rather than step onto it. A proximity term cannot express
+    // "and then I may have the ball": only the value of the action it unlocks
+    // can, and `grabPayload` is free, so nothing is being double counted.
+    if (cell.x === state.payload.x && cell.y === state.payload.y) value += w.grabPayload;
   } else if (board.carrier && board.carrier.team === unit.team) {
     value += w.screenCarrier * nearness(cell, board.carrier);
     value += w.supportAttack * scoringNearness(cell, board.targetFurnace);
@@ -170,7 +188,18 @@ export function positionValue(board: Board, cell: Point): number {
     value += w.pressCarrier * nearness(cell, board.carrier);
   }
 
-  if (state.spark.inPlay) value += w.chaseSpark * nearness(cell, state.spark);
+  // `chaseSpark` is the switch for the whole Spark hunt, and it is zero for
+  // every role but the Trajector. A Striker that finds itself in the Spark's
+  // cell still catches it, because that is free; it just never walks there.
+  if (sparkIsLive(state.spark) && w.chaseSpark > 0) {
+    value += w.chaseSpark * nearness(cell, state.spark);
+    // Same defect as the loose Payload, same cure: standing in the Spark's cell
+    // is what makes the catch legal, so the cell has to carry the catch's worth
+    // rather than one more step of gradient.
+    if (cell.x === state.spark.x && cell.y === state.spark.y) {
+      value += w.catchSpark * chance(statsFor(unit.role, unit.tier).agility, SPARK_CATCH_DC);
+    }
+  }
 
   value += w.guardFurnace * furnaceNearness(cell, board.ownFurnace);
 

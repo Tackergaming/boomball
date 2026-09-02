@@ -21,8 +21,8 @@ export const STRIKER: RoleWeights = {
   stripCarrier: 35,
   batCracker: 18,
 
-  catchSpark: 400,
-  chaseSpark: 30,
+  catchSpark: 300,
+  chaseSpark: 0,
 
   guardFurnace: 6,
   screenCarrier: 14,

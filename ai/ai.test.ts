@@ -4,7 +4,9 @@ import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
 import { FLY_SPEED_FEET, SPARK_CATCH_DC } from '../engine/constants.js';
 import { distance, type Point } from '../engine/geometry.js';
-import { openMatch } from '../engine/reduce.js';
+import type { Action } from '../engine/actions.js';
+import type { MatchEvent } from '../engine/events.js';
+import { openMatch, reduce } from '../engine/reduce.js';
 import { battedCrackerRun } from '../engine/rules/ordnance.js';
 import { createMatch } from '../engine/setup.js';
 import type { MatchState, Unit, UnitId } from '../engine/types.js';
@@ -46,6 +48,38 @@ function giveTurnTo(state: MatchState, unitId: UnitId): MatchState {
 
 function unit(state: MatchState, id: UnitId): Unit {
   return state.units.find((u) => u.id === id)!;
+}
+
+/**
+ * The actions that spend the Action, as opposed to the movement or the one
+ * free object interaction. Only these compete with each other, so only these
+ * are worth ranking against one another.
+ */
+const SPENDS_THE_ACTION: ReadonlySet<Action['kind']> = new Set([
+  'attack',
+  'shove',
+  'batCracker',
+  'catchSpark',
+  'pass',
+  'shoot',
+]);
+
+/** Drives one unit's whole turn the way `selfPlay` does, and hands back the log. */
+function playOutTurn(start: MatchState, unitId: UnitId): MatchEvent[] {
+  const events: MatchEvent[] = [];
+  let state = start;
+
+  for (let i = 0; i < 60; i++) {
+    const action = chooseAction(arena, state, unitId);
+    if (action.kind === 'endTurn') break;
+    const result = reduce(arena, state, { unitId, action });
+    if (!result.ok) throw new Error(`refused: ${result.reason}`);
+    events.push(...result.events);
+    state = result.state;
+    if (!state.turn || state.turn.unitId !== unitId) break;
+  }
+
+  return events;
 }
 
 function carrying(state: MatchState, id: UnitId): MatchState {
@@ -147,19 +181,34 @@ describe('the priority tables', () => {
     expect(chooseAction(arena, state, OPENER).kind).toBe('grabPayload');
   });
 
-  it('takes the Spark when it is standing in it, whatever else is going on', () => {
+  it('spends its Action on the Spark ahead of anything else that wants it', () => {
     const trajector = 'A-trajector-7';
     const start = giveTurnTo(put(board(), trajector, { x: 7, y: 22 }), trajector);
-    const state: MatchState = { ...start, spark: { inPlay: true, x: 7, y: 22 } };
+    const state: MatchState = { ...start, spark: { state: 'live', x: 7, y: 22, heading: 1 } };
 
-    const chosen = chooseAction(arena, state, trajector);
-    expect(chosen.kind).toBe('catchSpark');
+    const ranked = rankActions(arena, state, trajector);
+    const spendsAction = ranked.filter((c) => SPENDS_THE_ACTION.has(c.action.kind));
 
-    // The Payload is loose in that same cell, so this is the Spark outranking
-    // the ball rather than the Spark being the only thing on offer.
-    expect(state.payload.carriedBy).toBeNull();
-    expect(rankActions(arena, state, trajector)[0]!.why).toMatch(/Spark/);
+    expect(spendsAction[0]?.action.kind).toBe('catchSpark');
+    expect(spendsAction[0]!.why).toMatch(/Spark/);
     expect(SPARK_CATCH_DC).toBe(20);
+  });
+
+  it('pockets the loose Payload and the Spark in the one turn, both being on offer', () => {
+    // They never competed: the ball costs the object interaction and the Spark
+    // costs the Action. Which one the ranking names first decides nothing, so
+    // what is worth asserting is that the turn ends with both done.
+    const trajector = 'A-trajector-7';
+    const start = giveTurnTo(put(board(), trajector, { x: 7, y: 22 }), trajector);
+    const state: MatchState = {
+      ...start,
+      spark: { state: 'live', x: 7, y: 22, heading: 1 },
+      payload: { carriedBy: null, x: 7, y: 22 },
+    };
+
+    const done = playOutTurn(state, trajector);
+    expect(done.some((e) => e.kind === 'payloadGrabbed')).toBe(true);
+    expect(done.some((e) => e.kind === 'sparkCaught')).toBe(true);
   });
 
   it('shoves the carrier rather than swinging at it, because only a Shove strips', () => {

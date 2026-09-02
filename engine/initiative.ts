@@ -30,6 +30,7 @@ import {
   TEAMS,
   activeUnitsOf,
   isHuman,
+  sparkIsLive,
   type MatchState,
   type TeamId,
   type TurnSlot,
@@ -67,7 +68,7 @@ export function buildTurnOrder(state: MatchState): TurnSlot[] {
     });
   }
 
-  if (state.spark.inPlay) {
+  if (sparkIsLive(state.spark)) {
     slots.push({
       count: 10,
       priority: SLOT_PRIORITY.spark,

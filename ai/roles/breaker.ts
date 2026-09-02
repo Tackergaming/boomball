@@ -24,8 +24,8 @@ export const BREAKER: RoleWeights = {
   stripCarrier: 80,
   batCracker: 70,
 
-  catchSpark: 400,
-  chaseSpark: 14,
+  catchSpark: 300,
+  chaseSpark: 0,
 
   guardFurnace: 8,
   screenCarrier: 26,

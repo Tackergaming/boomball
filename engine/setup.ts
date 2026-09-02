@@ -68,7 +68,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     payload: { carriedBy: null, x: ordnance.x, y: ordnance.y },
     crackers,
     // The Spark stays off the field until the start of round 6.
-    spark: { inPlay: false, x: ordnance.x, y: ordnance.y },
+    spark: { state: 'pending', x: ordnance.x, y: ordnance.y, heading: null },
     score: { A: 0, B: 0 },
     bench: { A: BENCH_SIZE, B: BENCH_SIZE },
     rngSeed: rng.seed,

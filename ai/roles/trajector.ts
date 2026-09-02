@@ -2,9 +2,10 @@
  * The Trajector moves the ball and chases the Spark.
  *
  * It has the worst melee bonus and the best agility in the game, so it plays
- * the two things agility buys: the throw, and the hundred and fifty points
- * floating around The Scramble from round six. It is the only role that will
- * cross the whole silo to be near the Spark.
+ * the two things agility buys: the throw, and the Spark drifting through The
+ * Scramble from round six. It is the only role that will cross the whole silo
+ * to be near the Spark, and since lot 3 slowed the thing down to six cells a
+ * round, that trip actually arrives.
  *
  * It is also the easiest role to kill, hence the largest `keepGrip` and the
  * readiest Dodge.
@@ -24,7 +25,7 @@ export const TRAJECTOR: RoleWeights = {
   stripCarrier: 20,
   batCracker: 14,
 
-  catchSpark: 400,
+  catchSpark: 300,
   chaseSpark: 75,
 
   guardFurnace: 6,

@@ -1,0 +1,239 @@
+/**
+ * The server's half of a match, with no server in it.
+ *
+ * This is the whole of what `resolve-action` does, minus the database and the
+ * broadcast: check that the caller owns the unit and that it is its turn, put
+ * the action through `reduce`, then **play every AI turn that follows until a
+ * human is up again**. That last step is the real work of the layer. In solo
+ * there are thirteen AI units against one human, so a single click routinely
+ * has to resolve ten or more turns, and they are resolved here in one pass and
+ * shipped as one batch of events rather than one round trip per unit.
+ *
+ * It is kept free of Supabase on purpose. Everything that can go wrong in the
+ * server's logic, an AI loop that never reaches a human, a turn clock that
+ * skips the wrong player, a match that ends mid-block, is a bug that a test can
+ * catch here in milliseconds. The Edge Function on top of it is then only
+ * loading, persisting and broadcasting.
+ *
+ * No rule lives here. Legality is `reduce`'s business and nothing re-decides
+ * it: the checks below are about **ownership and the clock**, which are the two
+ * things the engine deliberately knows nothing about.
+ */
+
+import type { Action } from '../engine/actions.js';
+import type { Arena } from '../engine/arena.js';
+import { TURN_TIMER_SECONDS } from '../engine/constants.js';
+import type { MatchEvent } from '../engine/events.js';
+import { openMatch, reduce } from '../engine/reduce.js';
+import { isHuman, unitById, type HumanId, type MatchState, type UnitId } from '../engine/types.js';
+import { chooseAction } from '../ai/chooseAction.js';
+import type { AllyOrder } from '../ai/orders.js';
+
+/**
+ * A match plus the one thing about it that is not a rule: when the turn on the
+ * table stops being the player's.
+ *
+ * The deadline lives here and not in `MatchState` because the engine has no
+ * clock and must not grow one. It is null whenever no human is on the clock,
+ * which is every moment the AI is resolving and every moment after the final
+ * whistle.
+ */
+export interface Session {
+  readonly state: MatchState;
+  /** Epoch milliseconds. Null when nobody human is on the clock. */
+  readonly turnDeadline: number | null;
+}
+
+export interface SessionStep {
+  readonly session: Session;
+  /** Everything that happened, in order, ready to append to `match_events`. */
+  readonly events: readonly MatchEvent[];
+}
+
+export interface ActionRequest {
+  readonly humanId: HumanId;
+  readonly unitId: UnitId;
+  readonly action: Action;
+}
+
+export type SessionResult = { readonly ok: true; readonly step: SessionStep } | Refusal;
+
+export interface Refusal {
+  readonly ok: false;
+  readonly reason: string;
+}
+
+/**
+ * A hard stop on the AI loop.
+ *
+ * Thirteen units, each taking a walk, a swing and another walk, is nowhere near
+ * this. The guard exists so that a future scoring bug that leaves an AI wanting
+ * the same action forever fails loudly on the first request instead of hanging
+ * an Edge Function until its own timeout.
+ */
+const AI_ACTION_LIMIT = 60 * 14 * 14;
+
+// -- Opening ----------------------------------------------------------------
+
+/**
+ * Kick-off through to the first human decision.
+ *
+ * A match whose ladder opens on the enemy block has to resolve that block
+ * before anybody is asked for anything, so opening is not merely `openMatch`.
+ */
+export function openSession(
+  arena: Arena,
+  state: MatchState,
+  now: number,
+  orders: readonly AllyOrder[] = [],
+): SessionStep {
+  const opened = openMatch(arena, state);
+  return advance(arena, { state: opened.state, turnDeadline: null }, [...opened.events], now, orders);
+}
+
+// -- The one entry point ----------------------------------------------------
+
+/**
+ * One human action, then the AI up to the next human.
+ *
+ * The refusals are deliberately specific. A client that sends an action for the
+ * wrong unit is a bug in the client, and "not your turn" is the message that
+ * finds it; a client whose action `reduce` rejects is usually a stale board,
+ * and passing the engine's own reason back is what makes that legible.
+ */
+export function submitAction(
+  arena: Arena,
+  session: Session,
+  request: ActionRequest,
+  now: number,
+  orders: readonly AllyOrder[] = [],
+): SessionResult {
+  const { state } = session;
+
+  if (state.phase === 'finished') return { ok: false, reason: 'the match is over' };
+  if (!state.turn) return { ok: false, reason: 'no turn is open' };
+
+  if (state.turn.unitId !== request.unitId) {
+    return { ok: false, reason: `it is not ${request.unitId}'s turn` };
+  }
+
+  const unit = unitById(state, request.unitId);
+  if (unit.controller.kind !== 'human' || unit.controller.humanId !== request.humanId) {
+    return { ok: false, reason: `${request.humanId} does not control ${request.unitId}` };
+  }
+
+  const result = reduce(arena, state, { unitId: request.unitId, action: request.action });
+  if (!result.ok) return { ok: false, reason: result.reason };
+
+  const events = [...result.events];
+  return {
+    ok: true,
+    step: advance(arena, { ...session, state: result.state }, events, now, orders),
+  };
+}
+
+// -- The clock --------------------------------------------------------------
+
+/**
+ * Whether the human on the clock has run out of it.
+ *
+ * Asked by the first request that touches the match, whoever sends it. The
+ * clock is not guarded by a timer on anyone's machine, so a laptop that goes to
+ * sleep mid-turn cannot freeze the other two players' game.
+ */
+export function isExpired(session: Session, now: number): boolean {
+  return session.turnDeadline !== null && now >= session.turnDeadline;
+}
+
+/**
+ * Spends an expired turn on Dodge and moves on.
+ *
+ * Dodge rather than a forfeited turn, per the locked product decision: a player
+ * who loses their connection should not also be punished for it, and standing
+ * ready to dodge is the least damaging thing a Giff can do with a turn.
+ *
+ * Returns null when the clock has not run out, so a caller can treat this as
+ * "settle anything overdue, then carry on".
+ */
+export function expireIfDue(
+  arena: Arena,
+  session: Session,
+  now: number,
+  orders: readonly AllyOrder[] = [],
+): SessionStep | null {
+  if (!isExpired(session, now)) return null;
+
+  const { state } = session;
+  if (state.phase === 'finished' || !state.turn) return null;
+
+  const unitId = state.turn.unitId;
+  const events: MatchEvent[] = [];
+  let current = state;
+
+  // Dodge is refused once the Action is spent, which is the common case for a
+  // player who acted and then went quiet. Ending the turn is the part that has
+  // to happen either way.
+  const dodged = reduce(arena, current, { unitId, action: { kind: 'dodge' } });
+  if (dodged.ok) {
+    events.push(...dodged.events);
+    current = dodged.state;
+  }
+
+  const ended = reduce(arena, current, { unitId, action: { kind: 'endTurn' } });
+  if (!ended.ok) throw new Error(`a turn could not be ended on the clock: ${ended.reason}`);
+  events.push(...ended.events);
+
+  return advance(arena, { ...session, state: ended.state }, events, now, orders);
+}
+
+// -- Running the machine ----------------------------------------------------
+
+/**
+ * Plays out everything nobody human has to decide.
+ *
+ * The hazards need no help: `reduce` resolves the Crackers' count and the
+ * Spark's dart itself as the ladder passes over them. What is left is the AI
+ * units, and each one is driven exactly the way a client drives a human: ask
+ * for one action, send it, repeat until the turn passes to somebody else.
+ */
+function advance(
+  arena: Arena,
+  session: Session,
+  events: MatchEvent[],
+  now: number,
+  orders: readonly AllyOrder[],
+): SessionStep {
+  let current = session.state;
+  let spent = 0;
+
+  while (current.phase !== 'finished' && current.turn) {
+    const unit = unitById(current, current.turn.unitId);
+    if (isHuman(unit)) break;
+
+    if (spent++ >= AI_ACTION_LIMIT) {
+      throw new Error(`the AI did not reach a human turn within ${AI_ACTION_LIMIT} actions`);
+    }
+
+    const action = chooseAction(arena, current, unit.id, orders);
+    const result = reduce(arena, current, { unitId: unit.id, action });
+
+    // The AI only ever sends what `legalActions` offered, so a refusal here is
+    // a disagreement between the generator and the door, not a bad move. It
+    // must surface rather than be skipped, or the match would silently stall.
+    if (!result.ok) throw new Error(`the AI sent an illegal action: ${result.reason}`);
+
+    events.push(...result.events);
+    current = result.state;
+  }
+
+  return {
+    session: { state: current, turnDeadline: deadlineFor(current, now) },
+    events,
+  };
+}
+
+/** The clock only runs while a human is being asked for something. */
+function deadlineFor(state: MatchState, now: number): number | null {
+  if (state.phase === 'finished' || !state.turn) return null;
+  return isHuman(unitById(state, state.turn.unitId)) ? now + TURN_TIMER_SECONDS * 1000 : null;
+}

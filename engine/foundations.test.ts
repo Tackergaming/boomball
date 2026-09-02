@@ -6,8 +6,9 @@ import { ARENA_HEIGHT, ARENA_WIDTH, CELL_FEET, ZONE_CROSSING_FEET } from './cons
 import {
   directionFromD8,
   distance,
+  d8FromDirection,
   lineTo,
-  reflectedPath,
+  reflectedRun,
   stepCostFeet,
   straightPath,
   zoneOf,
@@ -43,26 +44,43 @@ describe('geometry', () => {
     expect(directionFromD8(3)).toEqual({ x: 1, y: 0 });
   });
 
+  it('reads a direction back as the d8 face that produced it', () => {
+    for (let face = 1; face <= 8; face++) {
+      expect(d8FromDirection(directionFromD8(face))).toBe(face);
+    }
+    expect(() => d8FromDirection({ x: 0, y: 0 })).toThrow();
+  });
+
   it('bounces the Spark off a wall instead of letting it leave the arena', () => {
-    const path = reflectedPath({ x: 13, y: 22 }, { x: 1, y: 0 }, 4);
-    expect(path).toEqual([
+    const run = reflectedRun({ x: 13, y: 22 }, { x: 1, y: 0 }, 4);
+    expect(run.path).toEqual([
       { x: 14, y: 22 },
       { x: 13, y: 22 },
       { x: 12, y: 22 },
       { x: 11, y: 22 },
     ]);
-    expect(path.every((p) => p.x >= 0 && p.x < ARENA_WIDTH)).toBe(true);
+    expect(run.path.every((p) => p.x >= 0 && p.x < ARENA_WIDTH)).toBe(true);
   });
 
-  it('keeps a bounced Spark inside the arena over a full 12-cell move', () => {
-    const path = reflectedPath({ x: 2, y: 2 }, { x: -1, y: -1 }, 12);
-    expect(path).toHaveLength(12);
-    for (const p of path) {
+  it('hands back the heading the bounce left it on, so the Spark can keep it', () => {
+    // Due east into the east wall comes back due west, and stays west.
+    expect(reflectedRun({ x: 13, y: 22 }, { x: 1, y: 0 }, 4).heading).toEqual({ x: -1, y: 0 });
+    // Nothing in the way, nothing turned.
+    expect(reflectedRun({ x: 7, y: 22 }, { x: 0, y: 1 }, 4).heading).toEqual({ x: 0, y: 1 });
+    // A corner turns both axes at once.
+    expect(reflectedRun({ x: 1, y: 1 }, { x: -1, y: -1 }, 3).heading).toEqual({ x: 1, y: 1 });
+  });
+
+  it('keeps a bounced Spark inside the arena over a long move', () => {
+    const run = reflectedRun({ x: 2, y: 2 }, { x: -1, y: -1 }, 12);
+    expect(run.path).toHaveLength(12);
+    for (const p of run.path) {
       expect(p.x).toBeGreaterThanOrEqual(0);
       expect(p.x).toBeLessThan(ARENA_WIDTH);
       expect(p.y).toBeGreaterThanOrEqual(0);
       expect(p.y).toBeLessThan(ARENA_HEIGHT);
     }
+    expect(() => d8FromDirection(run.heading)).not.toThrow();
   });
 
   it('walks a Cracker toward its target one cell at a time, destination included', () => {

@@ -44,12 +44,32 @@ export interface RoleWeights {
 
   // -- The Spark ------------------------------------------------------------
   /**
-   * A hundred and fifty points and the match ends on the spot. Weighted above
-   * everything else in all four tables on purpose: even a one-in-three grab is
-   * worth more than a Payload in the hand, because it is the whole match.
+   * Five goals in one Action, and no whistle any more. The same number in all
+   * four tables because the Spark does not care what role picks it up: it is
+   * `SPARK_POINTS / GOAL_POINTS` goals priced at what a goal is worth to the
+   * middle of the four roles. It stays the largest single appetite in the file
+   * because it is still four goals, but it no longer buries the Payload game
+   * the way a hundred and fifty and an instant win did.
+   *
+   * Above a threshold the exact figure barely matters: this appetite is only
+   * ever read by a unit already standing on the Spark, where almost nothing
+   * competes. What governs how often that happens is `chaseSpark`.
    */
   readonly catchSpark: number;
-  /** Being where it is going to be. */
+  /**
+   * Being where it is going to be, and the switch that says whether this role
+   * hunts the Spark at all. **Zero in three of the four tables on purpose**,
+   * arbitrated 2026-09-01: the Trajector is the only role that leaves its job
+   * to go and get it.
+   *
+   * Once the Spark became genuinely catchable, a whole field that wanted it was
+   * caught in 44 to 61 % of matches and settled a quarter of them. Two hunters
+   * on fourteen shirts is what keeps it a prize rather than a scramble, and it
+   * hands the Trajector back the speciality its stat line was built for.
+   *
+   * A role with zero here still takes the catch when it happens to be standing
+   * in the Spark's cell: that is free. What it will not do is walk there.
+   */
   readonly chaseSpark: number;
 
   // -- Position -------------------------------------------------------------

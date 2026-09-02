@@ -18,8 +18,8 @@ disait pas.
 | # | Règle de table | Règle v2 | Raison |
 |---|---|---|---|
 | 1 | Un Shove fait tomber de 15 pieds. Un défaut d'ancrage fait tomber de 50 pieds avant que le grappin ne rattrape | Deux événements distincts. **Shove** : chute contrôlée de 3 cases, sans dégâts sauf impact. **Défaut d'ancrage** : chute libre jusqu'à impact, ou grappin à 10 cases | Les deux nombres ne se contredisent pas, ils décrivent deux choses. Les séparer supprime la contradiction sans rien perdre |
-| 2 | Un tir bloqué par le Bulwark se résout contre son AC | Le blocage devient une **Réaction, une fois par round**, utilisable si le Bulwark est à 2 cases ou moins de sa Furnace. Réaction dépensée, les tirs suivants du round visent l'AC 18 de la Furnace | AC 25 en Tier 3 contre +4 au meilleur Striker demande un 21 sur un d20. Tes chiffres sont conservés, mais le contre devient le jeu d'équipe |
-| 3 | Le Spark bouge de 60 pieds, d6 pour la zone et d8 pour la direction | Le d6 disparaît. Seul le d8 subsiste, dans le plan vertical | En vue de profil, monter d'une zone est déjà l'un des huit résultats du d8. Le jet de zone était une rustine de la version à trois cartes |
+| 2 | Un tir bloqué par le Bulwark se résout contre son AC | Le blocage devient une **Réaction, une fois par round**, utilisable si le Bulwark est à 2 cases ou moins de sa Furnace. Réaction dépensée, les tirs suivants du round visent l'AC de la Furnace | AC 25 en Tier 3 contre +4 au meilleur Striker demande un 21 sur un d20. Tes chiffres sont conservés, mais le contre devient le jeu d'équipe. Les valeurs numériques ont été refaites, voir les écarts 21 à 23 |
+| 3 | Le Spark bouge de 60 pieds, d6 pour la zone et d8 pour la direction | Le d6 disparaît. Seul le d8 subsiste, dans le plan vertical, et il n'est tiré qu'une fois, à l'entrée | En vue de profil, monter d'une zone est déjà l'un des huit résultats du d8. Le jet de zone était une rustine de la version à trois cartes. Le cap ensuite persiste, voir l'écart 19 |
 | 4 | Un Cracker redirigé ne détonne que sur son propre tour | Un Cracker redirigé explose immédiatement sur la première unité de sa trajectoire | En l'état, envoyer un Cracker dans la figure d'un adversaire ne fait rien pendant un round entier, ce qui vide le Breaker de sa raison d'être |
 | 5 | La grille fait 15x15 cases, vue de dessus, trois cartes côte à côte | 15x15 cases par zone, **vue de profil**, trois zones empilées | Tes trois brouillons de carte sont des coupes verticales. C'est ce qui rend cohérente la règle du bord haut, la chute et l'ancrage |
 
@@ -27,10 +27,15 @@ disait pas.
 
 | # | Règle de table | Règle v2 | Raison |
 |---|---|---|---|
-| 6 | Le Spark est en jeu dès le round 1 | Il entre au **round 6**, sur une case aléatoire de la Zone 2, à 4 cases ou plus de toute unité | À 150 points contre 10, il décidait seul du match, et une position d'entrée fixe se camperait |
+| 6 | Le Spark est en jeu dès le round 1 | Il entre au **round 6**, sur une case aléatoire de la Zone 2, à 4 cases ou plus de toute unité | À 150 points contre 10 il décidait seul du match, et une position d'entrée fixe se camperait. Le prix a depuis été ramené à 30, voir l'écart 20, mais l'entrée tardive reste : elle laisse cinq rounds de Payload avant que le Spark n'existe |
 | 7 | Un joueur à 0 HP est éliminé du match | Un **humain** reprend son remplaçant après 2 rounds, même rôle, même Tier, HP pleins | À la table, un joueur éliminé reste à la table. Devant un écran, il regarde huit rounds sans rien faire |
 | 8 | Le MJ groupe les PNJ ennemis en deux blocs d'initiative | Les coéquipiers IA ont aussi leur bloc, placé **juste après le dernier humain** | Ta fiche ne prévoit pas de coéquipiers IA, ils n'existaient pas à la table. Les faire jouer après les humains garantit qu'un ordre donné pendant ton tour est exécuté dans le même round |
 | 9 | Rien sur la profondeur de banc | **3 remplaçants par équipe**, au Tier de l'équipe | Ta fiche dit « si l'équipe a gardé des remplaçants de ce calibre » sans jamais donner le nombre. Un banc fini garde une tension d'attrition |
+| 19 | Le Spark parcourt 12 cases, direction retirée au `d8` chaque round | **6 cases**, et il garde son cap d'un round sur l'autre. Nouveau cap seulement quand un mur le renvoie, par réflexion | Il allait 12 cases quand un joueur en fait 8, donc il ne se poursuivait pas, et son cap changeait chaque round, donc il ne s'anticipait pas. Sur 600 matchs il ne provoquait que 0,4 tentative par match. Ce n'était pas un objectif, c'était un billet de loterie |
+| 20 | Capture du Spark : 150 points et fin immédiate | **50 points, et le match continue.** Le Spark est retiré du terrain pour de bon | Devenu réellement attrapable, un objet à 150 points et fin immédiate serait la seule chose à jouer. Le prix se ramasse une fois et il reste des rounds pour jouer le Payload |
+| 21 | Blocage du Bulwark : +4 / +6 / +8 sur l'AC de la Furnace | **+2 / +3 / +4** | 96 à 98 % des tirs d'un match étaient bloqués. Le contre prévu, un second tireur dans le même round, ne se produisait jamais faute de volume de tir, donc la Réaction se comportait comme un bonus permanent et tenait le taux de réussite à 30 % |
+| 22 | Furnace AC 18 | **AC 15** | Écrite contre un blocage qu'on croyait occasionnel. Avec le blocage ramené à sa vraie fréquence, 15 place le tir propre d'un Striker Rookie à une chance sur deux |
+| 23 | Portée propre du lancer : 30 pieds | **45 pieds**, la portée longue reste à 60 | Les deux Furnaces sont à 14 cases l'une de l'autre sur la même passerelle. À 30 pieds, le porteur mesurait en moyenne 10 cases de la Furnace visée et ne tirait proprement que sur un cinquième de ses tours |
 
 ## A3. Trous comblés, la fiche ne disait rien
 
@@ -130,7 +135,7 @@ Un round descend du compte 20 au compte 1.
 **Chrono de 60 secondes par tour humain.** À expiration, l'unité passe automatiquement en Dodge
 plutôt que de perdre son tour, ce qui évite de punir une coupure réseau.
 
-Le match dure **10 rounds**, sauf capture du Spark.
+Le match dure **10 rounds**. Rien ne l'interrompt : la capture du Spark ne siffle plus la fin.
 
 ## B5. Actions
 
@@ -166,20 +171,27 @@ rencontré en chemin. L'unité est ancrée à l'arrivée.
 ## B7. Le Payload
 
 - **Ramasser** : gratuit en entrant sur sa case.
-- **Passer** : attaque à distance contre AC 12. Portée 6 cases, jusqu'à 12 avec désavantage,
+- **Passer** : attaque à distance contre AC 12. Portée 9 cases, jusqu'à 12 avec désavantage,
   jamais au delà. Touché, le coéquipier attrape. Manqué, le Payload dévie de `1d4` cases dans une
   direction tirée au `d8`.
-- **Tirer au but** : contre AC 18, à tous les Tiers. Si le Bulwark adverse dépense sa Réaction de
-  blocage, ce blocage **ajoute** à l'AC de la Furnace au lieu de la remplacer : **+4 en Rookie, +6 en
-  Veteran, +8 en Star**. *(Arbitrage du 2026-09-01. L'AC du Bulwark était écrite pour encaisser un
-  coup de batte : au Star, AC 25 contre un bras à +4 demandait un 21 sur un d20, donc le but était
-  arithmétiquement fermé. L'arbitrage 2 survit intact, le blocage reste une Réaction une fois par
-  round et le contre reste le second tireur.)*
+- **Tirer au but** : contre **AC 15**, à tous les Tiers. Portée propre **9 cases, soit 45 pieds**,
+  jusqu'à 12 avec désavantage. Si le Bulwark adverse dépense sa Réaction de blocage, ce blocage
+  **ajoute** à l'AC de la Furnace au lieu de la remplacer : **+2 en Rookie, +3 en Veteran, +4 en
+  Star**.
+
+  *(Arbitrage du 2026-09-01, second passage. L'arbitrage 2 survit dans sa forme, le blocage reste une
+  Réaction une fois par round et le contre reste le second tireur. Mais ses nombres reposaient sur
+  une hypothèse fausse. Mesuré sur 600 matchs, **96 à 98 % des tirs du match étaient bloqués** : les
+  deux équipes réunies produisaient moins de trois tirs par match, donc un second tir dans le même
+  round n'arrivait jamais, et une Réaction jamais tirée deux fois est un +4 à +8 permanent. Le
+  blocage est divisé par deux et la Furnace descend de 18 à 15. La portée propre passe de 30 à 45
+  pieds parce que les deux Furnaces sont distantes de 14 cases sur la même passerelle : à 30 pieds,
+  le porteur passait presque tous ses tours à tirer en désavantage.)*
 
   **Le principe qui fixe ces nombres** : ce qui est fixe dans le décor devient plus facile avec le
   palier, ce qui est incarné par un adversaire de ton palier reste à parité. La Furnace ne monte pas,
-  le gardien monte. Résultat : tir libre à 50 / 60 / 70 %, tir bloqué à 30 % aux trois paliers, et
-  « sortir le blocage puis marquer » à 65 / 72 / 79 %.
+  le gardien monte. Résultat : tir libre à 55 / 70 / 80 %, tir bloqué à 45 / 55 / 60 %, et le match
+  produit 3,6 à 4,5 buts pour moins de 1 % de matchs sans but.
 - **Marquer** : 10 points. Le Payload est incinéré, un neuf apparaît immédiatement dans les mains
   du Bulwark qui défend, ou sur la case devant la Furnace si ce Bulwark est hors jeu.
 - **Voler** : par Bousculade, ou en Réaction par un jet d'Acrobaties opposé si une passe traverse
@@ -212,11 +224,14 @@ Deux Crackers, hasard neutre pour les deux équipes.
 - **Entre au début du round 6**, sur une case aléatoire de la Zone 2 située à 4 cases ou plus de
   toute unité. Si aucune case ne satisfait la contrainte, on retient celle qui maximise la distance
   à l'unité la plus proche, pour que la règle ne bloque jamais.
-- Sur le **compte 10**, il parcourt 12 cases dans une des huit directions du plan, tirée au `d8`.
-  Il rebondit par réflexion sur les murs, le sol et le plafond, en consommant le mouvement restant.
-  Il ignore le terrain.
-- **Attraper** : Action, sur la même case, `DC 20` Dextérité, Escamotage ou Acrobaties. 150 points
-  et fin immédiate du match.
+- Son cap est tiré au `d8` **une seule fois, à l'entrée**.
+- Sur le **compte 10**, il parcourt **6 cases** sur ce cap. Il rebondit par réflexion sur les murs,
+  le sol et le plafond, poursuit son mouvement sur le nouveau cap, et **conserve ce cap pour les
+  rounds suivants**. Il ignore le terrain. Aucun autre dé n'est jeté : entre deux murs, le Spark est
+  une bille sur un tapis, et le couper est une décision qui se lit sur le plateau.
+- **Attraper** : Action, sur la même case, `DC 20` Dextérité, Escamotage ou Acrobaties. **50 points.
+  Le match ne s'arrête pas.** Réussi, le Spark quitte le terrain définitivement et ne réapparaît
+  pas. Manqué, l'Action est dépensée et le Spark reste en jeu.
 
 ## B10. Élimination
 
@@ -229,9 +244,11 @@ Deux Crackers, hasard neutre pour les deux équipes.
 
 ## B11. Fin de match
 
-- Capture du Spark : 150 points et fin immédiate.
-- Sinon, fin au terme du round 10, le plus haut score gagne.
-- Égalité : deux rounds de mort subite, le premier score gagne. Toujours à égalité, match nul.
+- Fin au terme du round 10, le plus haut score gagne. La capture du Spark ne met pas fin au match,
+  elle met 50 points au tableau.
+- Égalité : deux rounds de mort subite, le premier score gagne. En mort subite, la capture du Spark
+  met fin au match comme n'importe quel score, par la règle de la mort subite et non par celle du
+  Spark. Toujours à égalité, match nul.
 
 ---
 

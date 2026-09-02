@@ -94,7 +94,7 @@ describe('kick-off', () => {
 
   it('keeps the Spark off the field at kick-off', () => {
     const state = createMatch(base);
-    expect(state.spark.inPlay).toBe(false);
+    expect(state.spark.state).toBe('pending');
     expect(state.round).toBeLessThan(SPARK_ENTRY_ROUND);
   });
 
@@ -237,7 +237,7 @@ describe('the initiative ladder', () => {
   });
 
   it('darts the Spark before the slow block that shares its count', () => {
-    const state = { ...fullMatch(), spark: { inPlay: true, x: 7, y: 22 } };
+    const state = { ...fullMatch(), spark: { state: 'live' as const, x: 7, y: 22, heading: 1 } };
     const tens = buildTurnOrder(state).filter((s) => s.count === 10);
     expect(tens[0]?.actor.kind).toBe('spark');
   });

@@ -10,6 +10,7 @@ import {
   CRACKER_DAMAGE_DIE,
   CRACKER_MOVE_CELLS,
   SPARK_ENTRY_ROUND,
+  SPARK_MOVE_CELLS,
   SPARK_POINTS,
   SPARK_SPAWN_MIN_DISTANCE,
   SPARK_SPAWN_ZONE,
@@ -417,9 +418,11 @@ describe('where the Spark drops in', () => {
     expect(clearance).toBe(SPARK_SPAWN_MIN_DISTANCE - 1);
   });
 
-  it('keeps a full twelve-cell dart inside the silo', () => {
-    for (let seed = 1; seed < 60; seed++) {
-      for (const cell of sparkRun({ x: 1, y: 43 }, new Rng(seed)).path) {
+  it('keeps a dart inside the silo from a corner, on every heading', () => {
+    for (let heading = 1; heading <= 8; heading++) {
+      const run = sparkRun({ x: 1, y: 43 }, heading);
+      expect(run.path).toHaveLength(SPARK_MOVE_CELLS);
+      for (const cell of run.path) {
         expect(cell.x).toBeGreaterThanOrEqual(0);
         expect(cell.x).toBeLessThan(ARENA_WIDTH);
         expect(cell.y).toBeGreaterThanOrEqual(0);
@@ -427,20 +430,42 @@ describe('where the Spark drops in', () => {
       }
     }
   });
+
+  it('travels on the heading it was given and hands back the one it leaves on', () => {
+    // Due south from mid-field: nothing in the way, so the heading is unchanged
+    // and the landing is exactly six cells on. That is what makes it readable.
+    const clear = sparkRun({ x: 7, y: 22 }, 5);
+    expect(clear.direction).toBe(5);
+    expect(clear.heading).toBe(5);
+    expect(clear.landing).toEqual({ x: 7, y: 22 - SPARK_MOVE_CELLS });
+
+    // Due east into the east wall: it comes back, and it comes back west.
+    const bounced = sparkRun({ x: ARENA_WIDTH - 2, y: 22 }, 3);
+    expect(bounced.direction).toBe(3);
+    expect(bounced.heading).toBe(7);
+  });
+
+  it('throws no dice, so the same heading gives the same run every time', () => {
+    const once = sparkRun({ x: 3, y: 12 }, 2);
+    const twice = sparkRun({ x: 3, y: 12 }, 2);
+    expect(twice).toEqual(once);
+  });
 });
 
 describe('the Spark in a match', () => {
   it('stays off the field and off the ladder until round 6', () => {
     const before = until(opened().state, (s) => s.round === SPARK_ENTRY_ROUND - 1);
 
-    expect(before.spark.inPlay).toBe(false);
+    expect(before.spark.state).toBe('pending');
     expect(before.turnOrder.some((slot) => slot.actor.kind === 'spark')).toBe(false);
   });
 
   it('arrives at the top of round 6 and takes its rung on count 10', () => {
     const arrived = until(opened().state, (s) => s.round === SPARK_ENTRY_ROUND);
 
-    expect(arrived.spark.inPlay).toBe(true);
+    expect(arrived.spark.state).toBe('live');
+    expect(arrived.spark.heading).toBeGreaterThanOrEqual(1);
+    expect(arrived.spark.heading).toBeLessThanOrEqual(8);
     expect(zoneOf(arrived.spark)).toBe(SPARK_SPAWN_ZONE);
     expect(arrived.turnOrder.find((slot) => slot.actor.kind === 'spark')?.count).toBe(10);
   });
@@ -458,6 +483,24 @@ describe('the Spark in a match', () => {
     expect(moved).toBeDefined();
     expect({ x: state.spark.x, y: state.spark.y }).toEqual((moved as { to: Point }).to);
   });
+
+  it('carries its heading from one dart to the next unless a wall turns it', () => {
+    let state = until(opened().state, (s) => s.round === SPARK_ENTRY_ROUND);
+    const darts: { direction: number; headingAfter: number }[] = [];
+
+    for (let i = 0; i < 4000 && darts.length < 3; i++) {
+      const step = must(state, { kind: 'endTurn' });
+      state = step.state;
+      const moved = step.events.find((e) => e.kind === 'sparkMoved');
+      if (moved) darts.push({ direction: moved.direction, headingAfter: state.spark.heading! });
+    }
+
+    expect(darts).toHaveLength(3);
+    // Every dart leaves on the heading the next one travels on. A reroll every
+    // round is exactly what this rules out.
+    expect(darts[1]!.direction).toBe(darts[0]!.headingAfter);
+    expect(darts[2]!.direction).toBe(darts[1]!.headingAfter);
+  });
 });
 
 describe('catching the Spark', () => {
@@ -465,7 +508,7 @@ describe('catching the Spark', () => {
   function staged(seed = 5): MatchState {
     const { state } = opened((s) => s, seed);
     const actor = state.units.find((u) => u.id === state.turn!.unitId)!;
-    return { ...state, spark: { inPlay: true, x: actor.x, y: actor.y } };
+    return { ...state, spark: { state: 'live', x: actor.x, y: actor.y, heading: 1 } };
   }
 
   it('is offered from the Spark cell and nowhere else', () => {
@@ -473,7 +516,7 @@ describe('catching the Spark', () => {
     expect(legalActions(arena, here)!.catchSpark).not.toBeNull();
     expect(legalActions(arena, here)!.simple).toContainEqual({ kind: 'catchSpark' });
 
-    const elsewhere: MatchState = { ...here, spark: { inPlay: true, x: 7, y: 15 } };
+    const elsewhere: MatchState = { ...here, spark: { state: 'live', x: 7, y: 15, heading: 1 } };
     expect(legalActions(arena, elsewhere)!.catchSpark).toBeNull();
 
     const result = run(elsewhere, { kind: 'catchSpark' });
@@ -488,18 +531,49 @@ describe('catching the Spark', () => {
     expect(result.ok === false && result.reason).toMatch(/not on the field/);
   });
 
-  it('ends the match on the spot, for a hundred and fifty points', () => {
+  it('scores its points and leaves the match running', () => {
     for (let seed = 1; seed < 400; seed++) {
       const state = staged(seed);
       const actor = state.units.find((u) => u.id === state.turn!.unitId)!;
       const { state: after, events } = must(state, { kind: 'catchSpark' });
       if (!events.some((e) => e.kind === 'sparkCaught' && e.caught)) continue;
 
+      expect(after.score[actor.team]).toBe(SPARK_POINTS);
+      expect(after.spark.state).toBe('caught');
+      // The whole of what changed in lot 3: no whistle. There is still a
+      // Payload on the field and rounds left to play it in.
+      expect(after.phase).toBe('playing');
+      expect(after.result).toBeNull();
+      expect(events.some((e) => e.kind === 'matchEnded')).toBe(false);
+      return;
+    }
+    throw new Error('no seed in range caught the Spark');
+  });
+
+  it('ends the match anyway when it is caught in sudden death', () => {
+    for (let seed = 1; seed < 400; seed++) {
+      const state: MatchState = { ...staged(seed), phase: 'suddenDeath' };
+      const actor = state.units.find((u) => u.id === state.turn!.unitId)!;
+      const { state: after, events } = must(state, { kind: 'catchSpark' });
+      if (!events.some((e) => e.kind === 'sparkCaught' && e.caught)) continue;
+
       expect(after.phase).toBe('finished');
       expect(after.result).toEqual({ winner: actor.team });
-      expect(after.score[actor.team]).toBe(SPARK_POINTS);
-      expect(after.spark.inPlay).toBe(false);
       expect(events.some((e) => e.kind === 'matchEnded')).toBe(true);
+      return;
+    }
+    throw new Error('no seed in range caught the Spark');
+  });
+
+  it('is gone for good and does not drop back in at the top of a round', () => {
+    for (let seed = 1; seed < 400; seed++) {
+      const state = staged(seed);
+      const { state: after, events } = must(state, { kind: 'catchSpark' });
+      if (!events.some((e) => e.kind === 'sparkCaught' && e.caught)) continue;
+
+      const later = until(after, (s) => s.round >= after.round + 2);
+      expect(later.spark.state).toBe('caught');
+      expect(later.turnOrder.some((slot) => slot.actor.kind === 'spark')).toBe(false);
       return;
     }
     throw new Error('no seed in range caught the Spark');
@@ -511,7 +585,7 @@ describe('catching the Spark', () => {
       if (!events.some((e) => e.kind === 'sparkCaught' && !e.caught)) continue;
 
       expect(state.phase).toBe('playing');
-      expect(state.spark.inPlay).toBe(true);
+      expect(state.spark.state).toBe('live');
       expect(state.turn!.actionUsed).toBe(true);
       return;
     }

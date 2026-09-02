@@ -82,10 +82,27 @@ export interface Cracker {
 }
 
 export interface Spark {
-  /** False until the start of round 6. */
-  readonly inPlay: boolean;
+  /**
+   * `pending` until the start of round 6, `caught` for good once somebody has
+   * a hand on it. Three states rather than a flag because catching it no
+   * longer ends the match: a spent Spark has to be told apart from one that
+   * has not arrived, or it would drop back in at the top of the next round.
+   */
+  readonly state: 'pending' | 'live' | 'caught';
   readonly x: number;
   readonly y: number;
+  /**
+   * The d8 face it is travelling on, kept from one round to the next and
+   * changed only by a bounce. Null while it is pending. A heading rerolled
+   * every round is a heading nobody can play around, which is what made the
+   * Spark a lottery ticket rather than an objective.
+   */
+  readonly heading: number | null;
+}
+
+/** On the field and still there to be had. */
+export function sparkIsLive(spark: Spark): boolean {
+  return spark.state === 'live';
 }
 
 // -- Turn order -------------------------------------------------------------

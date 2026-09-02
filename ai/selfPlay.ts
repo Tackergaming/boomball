@@ -12,6 +12,7 @@
  */
 
 import { Arena, type ArenaSpec } from '../engine/arena.js';
+import { GOAL_POINTS } from '../engine/constants.js';
 import type { MatchEvent } from '../engine/events.js';
 import { openMatch, reduce } from '../engine/reduce.js';
 import { createMatch, type MatchSetup } from '../engine/setup.js';
@@ -78,13 +79,42 @@ export interface SweepReport {
   readonly matches: number;
   readonly wins: Readonly<Record<TeamId, number>>;
   readonly draws: number;
-  /** Goals only, so the Spark's 150 does not drown the Payload game. */
+  /** Goals only, so the Spark's points do not drown the Payload game. */
   readonly meanGoals: number;
   readonly goallessMatches: number;
+  /** Matches in which somebody got a hand on it. */
   readonly sparkCaught: number;
+  /**
+   * Reaches for it per match, caught or missed. This is the one that reads
+   * whether the Spark is an objective at all: a catch rate can only ever be a
+   * third to a half of this, so a low figure here means nobody is chasing it,
+   * whatever the DC says.
+   */
+  readonly meanSparkAttempts: number;
+  /**
+   * Matches whose winner changes when the Spark's points are taken back out.
+   * The whole question of what it should be worth is this number.
+   */
+  readonly sparkDecided: number;
   /** Mean players still off the field when the whistle goes. */
   readonly meanEvacuated: number;
   readonly meanActions: number;
+}
+
+/**
+ * Who would have won on the Payload alone.
+ *
+ * Compared against the real winner, this is what says whether the Spark
+ * settled the match or merely padded a scoreline that was already decided.
+ * It is deliberately blind to the Spark's own points rather than subtracting
+ * them, so it stays right whatever the constant is set to.
+ */
+function winnerOnGoalsAlone(goalEvents: readonly MatchEvent[]): TeamId | 'draw' {
+  const score: Record<TeamId, number> = { A: 0, B: 0 };
+  for (const e of goalEvents) if (e.kind === 'scored') score[e.team] += e.points;
+
+  if (score.A === score.B) return 'draw';
+  return score.A > score.B ? 'A' : 'B';
 }
 
 /**
@@ -98,6 +128,8 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
   let goals = 0;
   let goalless = 0;
   let sparkCaught = 0;
+  let sparkAttempts = 0;
+  let sparkDecided = 0;
   let evacuated = 0;
   let actions = 0;
 
@@ -109,11 +141,17 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     if (winner === 'draw' || winner === undefined) draws++;
     else wins[winner]++;
 
-    const goalsHere = played.events.filter((e) => e.kind === 'scored' && e.points === 10).length;
-    goals += goalsHere;
-    if (goalsHere === 0) goalless++;
+    const goalEvents = played.events.filter(
+      (e) => e.kind === 'scored' && e.points === GOAL_POINTS,
+    );
+    goals += goalEvents.length;
+    if (goalEvents.length === 0) goalless++;
 
-    if (played.events.some((e) => e.kind === 'sparkCaught' && e.caught)) sparkCaught++;
+    sparkAttempts += played.events.filter((e) => e.kind === 'sparkCaught').length;
+    if (played.events.some((e) => e.kind === 'sparkCaught' && e.caught)) {
+      sparkCaught++;
+      if (winnerOnGoalsAlone(goalEvents) !== (winner ?? 'draw')) sparkDecided++;
+    }
 
     evacuated += state.units.filter((u) => u.status === 'evacuated').length;
     actions += played.actions;
@@ -127,6 +165,8 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     meanGoals: goals / matches,
     goallessMatches: goalless,
     sparkCaught,
+    meanSparkAttempts: sparkAttempts / matches,
+    sparkDecided,
     meanEvacuated: evacuated / matches,
     meanActions: actions / matches,
   };

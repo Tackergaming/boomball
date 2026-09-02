@@ -10,8 +10,11 @@
  *   - **meanGoals and goallessMatches.** The plan's third verification
  *     criterion is that the Payload game decides matches before the Spark
  *     arrives on round 6. A pile of goalless matches says it does not.
- *   - **sparkCaught.** A hundred and fifty points against ten. If this is the
- *     usual way a match is settled, the Payload is decoration.
+ *   - **sparkCaught, tries/match and decided.** Tries say whether anyone is
+ *     chasing it at all, and `decided` counts the matches whose winner changes
+ *     once the Spark's points come back out. That last one is what the Spark's
+ *     value has to be set against: if it settles most of the matches it turns
+ *     up in, the Payload is decoration.
  *   - **wins.** A and B share everything but their side of the silo, so a split
  *     far off even is the arena being asymmetric.
  */
@@ -40,6 +43,8 @@ describe('balance', () => {
           `goals/match ${report.meanGoals.toFixed(2)}`.padEnd(20),
           `goalless ${report.goallessMatches}`.padEnd(15),
           `spark ${report.sparkCaught}`.padEnd(12),
+          `tries/match ${report.meanSparkAttempts.toFixed(2)}`.padEnd(20),
+          `decided ${report.sparkDecided}`.padEnd(14),
           `evacuated ${report.meanEvacuated.toFixed(2)}`,
         ].join(' '),
       );

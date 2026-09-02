@@ -26,7 +26,7 @@ import { blockingBulwark, rangeToFurnace, shotTarget, throwRangeOver } from './r
 import { reachableCells, type Reachable } from './rules/movement.js';
 import { throwRange } from './rules/payload.js';
 import { statsFor } from './stats.js';
-import { activeUnits, type MatchState, type Unit, type UnitId } from './types.js';
+import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from './types.js';
 
 /** The d8 rolls, 1..8, derived from the direction table so the two cannot drift. */
 const D8_DIRECTIONS: readonly number[] = DIRECTIONS.map((_, i) => i + 1);
@@ -150,7 +150,7 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
       : [];
 
   const catchSpark: CatchOption | null =
-    hasAction && state.spark.inPlay && state.spark.x === unit.x && state.spark.y === unit.y
+    hasAction && sparkIsLive(state.spark) && state.spark.x === unit.x && state.spark.y === unit.y
       ? { against: SPARK_CATCH_DC, mode: 'normal' }
       : null;
 

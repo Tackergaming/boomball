@@ -24,8 +24,8 @@ export const BULWARK: RoleWeights = {
   stripCarrier: 70,
   batCracker: 20,
 
-  catchSpark: 400,
-  chaseSpark: 6,
+  catchSpark: 300,
+  chaseSpark: 0,
 
   guardFurnace: 95,
   screenCarrier: 8,

@@ -198,7 +198,7 @@ describe('what it offers against whom', () => {
     };
     const second = legalActions(arena, spent)!.shoot!;
     expect(second.blockedBy).toBeNull();
-    expect(second.against).toBe(18);
+    expect(second.against).toBe(FURNACE_AC);
   });
 
   it('offers no shot from beyond sixty feet of the Furnace', () => {

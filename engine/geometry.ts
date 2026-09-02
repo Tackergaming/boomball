@@ -79,6 +79,17 @@ export function directionFromD8(roll: number): Point {
   return dir;
 }
 
+/**
+ * The inverse: the d8 face a unit step corresponds to. The Spark keeps its
+ * heading from one round to the next, so a bounce has to be written back as a
+ * face rather than a vector.
+ */
+export function d8FromDirection(dir: Point): number {
+  const face = DIRECTIONS.findIndex((d) => d.x === dir.x && d.y === dir.y);
+  if (face < 0) throw new Error(`not one of the eight directions: ${dir.x},${dir.y}`);
+  return face + 1;
+}
+
 /** The eight neighbours of a cell that lie inside the arena. */
 export function neighbours(p: Point): Point[] {
   return DIRECTIONS.map((d) => ({ x: p.x + d.x, y: p.y + d.y })).filter(inBounds);
@@ -89,13 +100,23 @@ export function neighbours(p: Point): Point[] {
 /**
  * The cells a projectile crosses travelling `steps` cells in a fixed direction,
  * bouncing off the walls, the floor and the ceiling. A bounce inverts the axis
- * that would have left the arena and consumes the remaining movement, which is
- * how the Spark behaves on initiative count 10.
+ * that would have left the arena and the travel continues on the new heading
+ * for whatever movement is left, which is how the Spark behaves on count 10.
+ *
+ * The heading it leaves on is returned alongside the path, because the Spark
+ * keeps it into the next round: that is the whole of what makes the thing
+ * anticipatable. One of the two components is always non-zero after a bounce,
+ * since an axis can only invert when a step along it would leave the arena and
+ * a zero component never can.
  *
  * The starting cell is not included. The path is returned in travel order so a
  * caller can stop at the first unit it meets.
  */
-export function reflectedPath(from: Point, direction: Point, steps: number): Point[] {
+export function reflectedRun(
+  from: Point,
+  direction: Point,
+  steps: number,
+): { readonly path: Point[]; readonly heading: Point } {
   const path: Point[] = [];
   let { x, y } = from;
   let dx = direction.x;
@@ -105,15 +126,12 @@ export function reflectedPath(from: Point, direction: Point, steps: number): Poi
     if (x + dx < 0 || x + dx >= ARENA_WIDTH) dx = -dx;
     if (y + dy < 0 || y + dy >= ARENA_HEIGHT) dy = -dy;
 
-    // A corner inverts both axes, which can leave the step going nowhere.
-    if (dx === 0 && dy === 0) break;
-
     x += dx;
     y += dy;
     path.push({ x, y });
   }
 
-  return path;
+  return { path, heading: { x: dx, y: dy } };
 }
 
 /**

@@ -2,7 +2,7 @@
  * The two neutral hazards: the Crackers and the Spark.
  *
  * Neither belongs to a team, and that is the whole of their design. A Cracker
- * homes in on whoever is nearest, friend or foe, and the Spark is worth fifteen
+ * homes in on whoever is nearest, friend or foe, and the Spark is worth three
  * goals to whichever side gets a hand on it. They are the reason the sport is
  * not a positional stalemate.
  *
@@ -20,10 +20,11 @@ import {
   SPARK_SPAWN_ZONE,
 } from '../constants.js';
 import {
+  d8FromDirection,
   directionFromD8,
   distance,
   lineTo,
-  reflectedPath,
+  reflectedRun,
   straightPath,
   zoneOf,
   type Point,
@@ -100,7 +101,7 @@ function stopAtFirstUnit(state: MatchState, from: Point, path: readonly Point[])
  * Where the Spark drops in at the start of round 6.
  *
  * A random cell of The Scramble, four cells clear of everyone, so that nobody
- * simply happens to be standing on a hundred and fifty points. The fallback
+ * simply happens to be standing on the prize. The fallback
  * matters more than it looks: written as a hard constraint the rule could find
  * no cell in a crowded Scramble and stall the round, so it gives ground and
  * takes the emptiest cell there is.
@@ -125,18 +126,31 @@ export function sparkEntryCell(arena: Arena, state: MatchState, rng: Rng): Point
 }
 
 /**
- * Count 10. Twelve cells on a d8, reflecting off the walls, the floor and the
- * ceiling, and spending the rest of the move on the new heading.
+ * Count 10. Six cells along the heading it already had, reflecting off the
+ * walls, the floor and the ceiling, and spending the rest of the move on the
+ * new heading.
+ *
+ * No dice. The d8 is rolled once, when it drops in; after that the Spark is a
+ * ball on a table and the only thing that turns it is a wall. That is what a
+ * player is meant to read off the board and cut across, and it is why this
+ * function no longer takes an rng.
  *
  * Nothing it crosses matters. The Spark is not a projectile and hits nobody:
  * the only thing that ever happens to it is being caught.
  */
-export function sparkRun(from: Point, rng: Rng): {
+export function sparkRun(from: Point, heading: number): {
+  /** The face it travelled on this round. */
   readonly direction: number;
   readonly path: readonly Point[];
   readonly landing: Point;
+  /** The face it will travel on next round, turned by any bounce. */
+  readonly heading: number;
 } {
-  const direction = rng.die(8);
-  const path = reflectedPath(from, directionFromD8(direction), SPARK_MOVE_CELLS);
-  return { direction, path, landing: path[path.length - 1] ?? from };
+  const run = reflectedRun(from, directionFromD8(heading), SPARK_MOVE_CELLS);
+  return {
+    direction: heading,
+    path: run.path,
+    landing: run.path[run.path.length - 1] ?? from,
+    heading: d8FromDirection(run.heading),
+  };
 }

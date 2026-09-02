@@ -1,7 +1,10 @@
 # État des lieux
 
 > Point de reprise du projet Boomball. À lire en premier dans une nouvelle session.
-> Dernière mise à jour : 2026-09-01, lots d'équilibrage 1 et 2 appliqués. **Lot 3, le Spark, reste à faire.**
+> Dernière mise à jour : 2026-09-02. L'équilibrage est clos, le nombre de buts est à l'objectif
+> (3,6 à 4,5 par match, 0 à 2 matchs sans but sur 200, voir « Le lot 4 »). **La phase 4 est
+> commencée** : la couche serveur est écrite et testée, le schéma Postgres et le seed sont posés.
+> Reste l'Edge Function à déployer et tout le client.
 
 ## Le projet en trois lignes
 
@@ -31,7 +34,7 @@ seule arène au MVP. **Ordinateur uniquement, 1280 px minimum, pas de mobile.** 
 
 ## Ce qui est construit et testé
 
-**210 tests au vert, environ 7800 lignes.** Plus `npm run sweep` pour le rapport d'équilibrage. `npm test` et `npx tsc --noEmit` depuis `boomball/`.
+**235 tests au vert, environ 8600 lignes.** Plus `npm run sweep` pour le rapport d'équilibrage. `npm test` et `npx tsc --noEmit` depuis `boomball/`.
 
 | Module | État |
 |---|---|
@@ -42,7 +45,7 @@ seule arène au MVP. **Ordinateur uniquement, 1280 px minimum, pas de mobile.** 
 | `rules/movement`, `rules/falling` | Chemins, cases atteignables, `pathTo`, les deux modes de chute |
 | `rules/combat`, `rules/payload` | Jets contestés, jet opposé, recul, portées, blocage du gardien, dispersion |
 | `rules/reactions` | Qui a le droit de réagir. Attaque d'opportunité, garde-fou d'ancrage, couloir de passe |
-| `rules/ordnance` | Où vont les deux hasards. Ciblage des Crackers, trajectoire d'un Cracker frappé, case d'entrée du Spark, dart à réflexion |
+| `rules/ordnance` | Où vont les deux hasards. Ciblage des Crackers, trajectoire d'un Cracker frappé, case d'entrée du Spark, dart à réflexion. Le dart ne jette plus de dé, il suit le cap qu'on lui passe |
 | `reduce` | La porte unique. Mouvement, Dash, Dodge, Disengage, attaque, bousculade, ramassage, passe, tir, Crackers, Spark, Réactions, fin de tour, rounds, mort subite, élimination, remplaçants |
 | `legalActions` | Le générateur unique qui nourrit l'interface et l'IA |
 | `ai/roles/*` | Les quatre tables de priorités, en données pures |
@@ -50,6 +53,10 @@ seule arène au MVP. **Ordinateur uniquement, 1280 px minimum, pas de mobile.** 
 | `ai/chooseAction` | Le choix. Énumère les candidats de `legalActions`, les note, rend le meilleur |
 | `ai/orders` | Le canal d'ordres alliés : demander la passe, marquer une cible, tenir une zone |
 | `ai/selfPlay` | Le match sans écran, et le harnais d'équilibrage |
+| `server/session` | La logique du serveur, sans serveur. Propriété d'une unité, chrono de tour, et la résolution de tous les tours IA jusqu'au prochain humain |
+| `server/seed` | Le seed SQL généré depuis le moteur, pour que `role_stats` et l'arène ne dérivent pas |
+| `supabase/migrations/0001_init.sql` | Le schéma, les enums et la RLS. Pas encore appliqué à un projet |
+| `supabase/functions/resolve-action` | L'Edge Function. **Écrite, jamais exécutée**, voir plus bas |
 
 ## Décisions d'ingénierie prises en cours de route
 
@@ -97,6 +104,18 @@ où aller, donc sans cette lecture, se poser sur un Cracker le désamorcerait po
 capture en se tenant sur sa case, et un Spark né dans une poutrelle serait incapturable jusqu'à ce
 qu'il en dérive.
 
+**Le Spark a trois états, pas un booléen.** `pending`, `live`, `caught`. C'est le lot 3 qui l'a
+imposé : tant que la capture sifflait la fin, un Spark ramassé et un Spark pas encore arrivé étaient
+également « hors du terrain » et personne ne les distinguait. Sans le troisième état, le Spark
+attrapé au round 7 redescendait au round 8, parce que la garde d'entrée lisait « pas en jeu ».
+
+**Le cap du Spark vit dans son état et le dart ne jette aucun dé.** Le `d8` est tiré une fois, à
+l'entrée. `reflectedRun` rend le cap de sortie en même temps que le chemin, et c'est lui qui est
+rangé pour le round suivant. Conséquence à connaître avant de toucher aux seeds : `resolveSpark` ne
+consomme plus de `rngSeed`, donc tous les tirages postérieurs au round 6 sont décalés par rapport aux
+sweeps d'avant le lot 3. Les comparaisons de seed à seed avec les anciens rapports ne valent rien,
+seules les moyennes se comparent.
+
 **Escamotage ou Acrobaties, la question ne se pose pas.** Les deux tombent dans la même colonne
 d'agilité de la table de stats, donc rien à demander au joueur.
 
@@ -141,6 +160,17 @@ tenait les maillots.
 
 **Un appel rend une action, pas un tour.** Un tour, c'est marcher, frapper, remarcher. L'appelant
 boucle jusqu'à recevoir `endTurn`, exactement comme une interface boucle sur les clics.
+
+**Une case doit valoir les actions qu'elle débloque, pas seulement sa distance à l'objectif.**
+C'est la leçon la plus chère du projet, elle a coûté deux lots d'équilibrage à trouver et elle se
+reproduira. `positionValue` note une case, et une action qui n'existe que depuis une case précise est
+invisible pour elle. Le ramassage du Payload vaut 90, mais il n'est proposé qu'à une unité **déjà
+debout** sur le ballon ; l'évaluateur de déplacement, lui, ne voyait que `chaseLoosePayload ×
+proximité`, et franchir la dernière case rapportait `55/45`, soit 1,2 point. Résultat mesuré en
+traçant les matchs : le ballon restait au sol sur la même case pendant dix rounds **avec une unité à
+une case de distance**, tour après tour. Le correctif ajoute la valeur du ramassage à la case du
+ballon elle-même. Même défaut et même correctif sur le Spark. À vérifier pour tout nouvel objectif
+qu'on ajoutera au jeu.
 
 **`endTurn` vaut zéro et tous les appétits sont positifs.** Une unité s'arrête donc dès que rien sur
 le plateau ne vaut mieux que de ne rien faire, au lieu de gigoter parce qu'il lui reste du
@@ -198,15 +228,30 @@ donc un écart de victoires est un biais des règles ou de l'arène, jamais des 
 | Départ | 0,27 | 0,21 | **0,07** |
 | + lot 1, colonne Jet et blocage additif | 0,29 | 0,29 | **0,32** |
 | + lot 2, Bousculade sans chute, péage à 10 | 0,24 | 0,34 | 0,34 |
-| + correctif d'IA, le porteur se débarrasse du ballon | **0,70** | **0,79** | **0,81** |
+| + correctif d'IA, le porteur se débarrasse du ballon | 0,70 | 0,79 | 0,81 |
+| + lot 3, le Spark | **0,56** | **0,74** | **0,82** |
+
+Le rapport porte deux colonnes ajoutées au lot 3, parce que les anciennes ne pouvaient pas répondre
+à la question posée. **Tentatives/match** compte les mains tendues vers le Spark, réussies ou non :
+une capture ne peut jamais valoir qu'un tiers à une moitié de ce nombre, donc c'est lui qui dit si
+quelqu'un chasse le Spark, quoi qu'en dise le DC. **Décidés** compte les matchs dont le vainqueur
+change quand on retire les points du Spark du tableau.
 
 **État actuel, 200 matchs par Tier :**
 
-| Tier | A | B | Nuls | Buts/match | Sans but | Spark capturé | Évacués/match |
-|---|---|---|---|---|---|---|---|
-| Rookie | 55 | 36 | 109 | 0,70 | 111 / 200 | 17 | 2,00 |
-| Veteran | 61 | 48 | 91 | 0,79 | 102 / 200 | 26 | 1,53 |
-| Star | 57 | 64 | 79 | 0,81 | 90 / 200 | 24 | 1,28 |
+| Tier | A | B | Nuls | Buts/match | Sans but | Spark capturé | Tentatives/match | Décidés | Évacués/match |
+|---|---|---|---|---|---|---|---|---|---|
+| Rookie | 94 | 103 | 3 | **3,60** | **2 / 200** | 78 | 1,24 | 41 | 1,78 |
+| Veteran | 103 | 95 | 2 | **4,09** | **1 / 200** | 101 | 1,22 | 54 | 1,43 |
+| Star | 108 | 91 | 1 | **4,45** | **0 / 200** | 130 | 1,12 | 76 | 1,07 |
+
+**L'objectif du plan est atteint** : 3 à 5 buts par match et bien moins de 15 % de matchs sans but.
+La cible que Jérôme a fixée le 2026-09-01, moins de 6 matchs sans but sur 100, est tenue aux trois
+paliers. Le Spark décide 20 % / 27 % / 38 % des matchs, arbitré acceptable en l'état.
+
+**Les trois états précédents, pour la trajectoire :** au départ 0,27 / 0,21 / 0,07 but ; après les
+lots 1, 2 et le premier correctif d'IA 0,70 / 0,79 / 0,81 ; après le lot 3 0,56 / 0,74 / 0,82 avec
+122 / 103 / 94 matchs sans but sur 200.
 
 **Ce qu'il faut retenir de la série.**
 
@@ -230,38 +275,185 @@ dessus. Deux causes, toutes deux corrigées dans `ai/chooseAction.ts` :
 Après correctif : le Breaker tombe à 1815 tours de portage et passe 95 fois contre 2 bousculades, le
 Striker monte à 3510 tours et tire 82 fois au lieu de 46.
 
-**Reste ouvert.** L'objectif visé était 3 à 5 buts par match et moins de 15 % de matchs sans but. On
-est à 0,8 but et 45 à 55 % de matchs sans but. C'est trois fois mieux qu'au départ et la courbe par
-Tier est enfin dans le bon sens, mais ce n'est pas encore le but visé. À reprendre après le lot 3.
+**Ce qui restait ouvert a été traité par le lot 4**, plus bas. Cette série de sweeps s'arrête ici :
+l'objectif de 3 à 5 buts est atteint.
 
-## Le lot 3, validé et pas encore fait
+## Le lot 3, fait, et ce qu'il a appris
 
-Jérôme a validé les trois lots le 2026-09-01. Le troisième n'est pas implémenté.
+Les trois changements validés sont implémentés, testés et versés au règlement, écarts 19 et 20.
 
-**Constat mesuré sur 600 matchs.** Le Spark se fait attraper deux à trois rounds après son entrée,
-médiane autour du round 8 ou 9, étalé sur toute la fenêtre : personne ne campe sur sa case
-d'apparition, l'arbitrage 6 fonctionne. Mais il n'y a que **0,34 à 0,43 tentative par match** sur
-sept rounds de présence avec quatorze joueurs. Le DC 20 n'y est pour rien, une tentative réussit une
-fois sur trois au Rookie et une sur deux au Star. Le goulot est uniquement de se trouver sur sa case.
+1. **6 cases par round au lieu de 12.** `SPARK_MOVE_CELLS`
+2. **Cap persistant.** Le `d8` est tiré une seule fois, à l'entrée. `reflectedRun` rend le cap de
+   sortie avec le chemin, et il est rangé dans l'état du Spark pour le round suivant. Entre deux
+   murs le Spark est désormais une bille sur un tapis : il se lit et il se coupe
+3. **Valeur baissée et plus de fin immédiate.** Posée à 30 au lot 3, portée à **50** au lot 4 quand
+   le nombre de buts a été réparé. Le Spark quitte le terrain pour de bon une fois pris,
+   et le match va au bout de ses rounds. En mort subite il siffle la fin comme n'importe quel score,
+   par la règle de la mort subite et non par la sienne
 
-**C'est structurel.** Il va 12 cases par round quand un joueur en fait 8, donc il ne se poursuit pas.
-Sa direction est un d8 tiré à neuf, donc il ne s'anticipe pas. Il file en ligne droite avec rebond,
-donc il finit loin. **Ce n'est pas un objectif, c'est un billet de loterie**, et il décide 8 à 13 %
-des matchs sans récompenser aucune décision.
+Le poids `catchSpark` des quatre tables d'IA est passé de 400 à 240.
 
-**Les trois changements validés :**
+**Ce que ça a donné.** Les changements 1 et 2 font ce qu'on leur demandait. Les tentatives montent
+de 0,40 à 0,51 au Rookie et de 0,38 à 0,47 au Veteran, les captures de 17 à 33 et de 24 à 39 sur
+200 matchs. Le Spark est devenu un objectif qu'on va chercher.
 
-1. **6 cases par round au lieu de 12** (`SPARK_MOVE_CELLS`), pour qu'un joueur à 8 cases puisse se
-   rabattre dessus
-2. **Direction persistante d'un round sur l'autre**, nouveau d8 seulement quand il rebondit. Ça
-   demande de stocker le cap dans `Spark` et de faire remonter à `reflectedPath` la direction de
-   sortie
-3. **Valeur revue à la baisse et fin immédiate supprimée.** Un objet devenu attrapable à 150 points
-   et fin immédiate déciderait tout. Ordre de grandeur visé 30 à 50 points, **le chiffre exact se
-   fixe au sweep**, pas à la table
+**Quatre choses valent d'être connues avant le prochain réglage.**
 
-Conséquence à ne pas oublier : le poids `catchSpark` des quatre tables d'IA vaut 400, calibré sur
-150 points plus une victoire immédiate. Il devra suivre la nouvelle valeur.
+**Le prix du Spark ne pilote rien, et c'est la vraie découverte du lot.** Le même lot de 600 matchs
+rejoué et compté à chaque valeur candidate donne une courbe plate : à 10 points le Spark décide 28
+des 33 matchs où il est pris au Rookie, à 150 points il en décide 29. Au Star, 22 sur 39 à 10 points
+contre 29 sur 39 à 40. La raison est arithmétique et pas ludique : à 0,8 but par match, la moitié
+des rencontres finissent 0-0 ou 1-0, et **n'importe quel prix retourne un score pareil**. Le Spark
+cessera de décider les matchs quand le Payload commencera à les décider, pas quand cette constante
+baissera.
+
+**Suite au lot 4, cette conclusion tient toujours mais son contexte a changé.** Le nombre de buts est
+passé à 3,6-4,5, donc un match moyen pèse 36 à 45 points et une capture ne l'emporte plus
+mécaniquement. La valeur a été portée à 50 par Jérôme, et ce qui limite désormais l'influence du
+Spark n'est toujours pas son prix mais le nombre de mains qui le cherchent : une seule, celle du
+Trajector.
+
+**Le poids `catchSpark` ne pilote presque rien non plus.** Un sweep complet à 400 et un sweep
+complet à 240 rendent les mêmes chiffres à un match près. C'est logique après coup : ce poids n'est
+lu que par une unité déjà debout sur la case du Spark, où presque rien ne lui dispute l'Action. Le
+levier qui décide de la fréquence des captures, c'est `chaseSpark`, qui est un poids de position.
+
+**Le lot 3 a coûté des buts au Rookie sur le moment**, 0,70 à 0,56. Un Spark réellement atteignable
+détournait des unités du ballon. Réglé au lot 4 en réservant la chasse au Trajector.
+
+**Une hypothèse à vérifier avant de tirer une conclusion du Star.** Ses tentatives n'ont pas bougé,
+0,35 à 0,36, alors que ses captures montent de 24 à 39. Le taux de réussite passerait donc de 34 %
+à 54 % sans qu'aucune règle de jet n'ait changé. Ça peut être le décalage du flux de dés décrit plus
+haut plus le bruit d'un échantillon de 200, ou un effet réel du Spark ralenti, qu'on peut désormais
+retenter après une main manquée, ce qui était impossible quand il filait douze cases. À trancher en montant le sweep à 1000 matchs, pas en raisonnant dessus.
+
+**La valeur du Spark a été tranchée au lot 4 : 50 points.**
+
+## Le lot 4 : pourquoi personne ne marquait
+
+C'est la section à lire avant de retoucher quoi que ce soit à l'équilibrage.
+
+Après le lot 3 le jeu produisait **0,56 à 0,82 but par match et près d'un match sur deux finissait
+nil-nil**, contre 3 à 5 buts visés. Question posée par Jérôme : est-ce que l'IA ne sait pas marquer,
+ou est-ce que la règle est cassée ? **Les deux, et dans cet ordre d'importance.**
+
+### Comment on a trouvé
+
+En comptant le tunnel qu'un but doit descendre, tour par tour, sur 120 matchs par palier :
+possession, arrivée à portée, tir pris, gardien battu. Deux chiffres ont sauté aux yeux.
+
+**96 à 98 % de tous les tirs du match étaient bloqués par le gardien.** Et **le ballon passait 40 à
+57 % des tours au sol**, sans personne pour le ramasser.
+
+Ensuite, en isolant les matchs sans but : ils n'étaient pas des matchs malchanceux au tir, c'étaient
+des matchs **sans possession du tout**. Le ballon y était porté 2,3 tours contre 13,4 en moyenne, et
+les deux tiers d'entre eux ne contenaient **aucun tir**. Une trace round par round a donné la scène
+exacte : le ballon immobile au sol sur la même case pendant dix rounds, avec `nearest=1` à chaque
+round, c'est à dire une unité debout à une case de lui qui ne monte jamais dessus.
+
+### Les quatre changements
+
+**1. Le correctif d'IA, et c'est le vrai coupable.** Détaillé dans les décisions d'IA plus haut :
+`positionValue` ne voyait pas qu'une case peut débloquer une action. Franchir la dernière case vers
+le ballon valait 1,2 point quand le ramassage en vaut 90. Corrigé dans `ai/evaluate.ts`, pour le
+Payload et pour le Spark.
+
+**2. Le blocage du gardien, divisé par deux**, de +4/+6/+8 à +2/+3/+4. L'arbitrage 2 tarifait ce
+blocage comme occasionnel, le second tireur du round devant passer. Mais les deux équipes réunies
+produisaient moins de trois tirs par match : un second tir dans le même round n'arrivait jamais, donc
+la Réaction se comportait comme un bonus permanent. La forme de l'arbitrage 2 survit, ses nombres non.
+
+**3. Furnace AC 18 → 15.** Elle était écrite contre un blocage supposé occasionnel.
+
+**4. Portée propre du lancer, 30 → 45 pieds.** Les deux Furnaces sont à 14 cases l'une de l'autre sur
+la même passerelle. À 30 pieds le porteur mesurait en moyenne 10 cases de la Furnace visée, donc
+passait presque tous ses tours en désavantage.
+
+Le match reste en **10 rounds** et l'AC de passe reste à 12 : testés, ils ne sont pas nécessaires.
+
+### Le Spark
+
+Le correctif d'IA s'appliquait aussi à lui, et il est devenu attrapable dans 44 à 61 % des matchs,
+décidant un quart à un tiers des rencontres. **Arbitré par Jérôme : `chaseSpark` n'appartient qu'au
+Trajector**, il vaut zéro dans les trois autres tables. Un rôle à zéro attrape quand même le Spark
+s'il se trouve sur sa case, c'est gratuit ; simplement il n'ira jamais. Valeur du Spark fixée à
+**50 points**.
+
+Effet mesuré : deux chasseurs sur quatorze au lieu de quatorze, mais **le taux de capture ne baisse
+presque pas**, de 87/96/122 à 78/101/130 sur 200. Un seul Trajector dédié suffit contre un Spark à
+6 cases. Le Spark décide donc 20 % / 27 % / 38 % des matchs, **arbitré acceptable par Jérôme**.
+
+Deux leviers ont été mesurés au cas où ça changerait, et ils sont disponibles si tu veux y revenir :
+porter le Spark à 8 cases par round donne 68/94/126 captures, et monter le `DC` de capture de 20 à 24
+donne 26/61/104. Le second est efficace mais très pentu d'un palier à l'autre, parce qu'il multiplie
+un jet de dé au lieu de jouer sur la géométrie.
+
+### Ce qu'on a mesuré et écarté
+
+- **Allonger le match** est un levier faible et trompeur. 20 rounds au lieu de 10 ne donnaient pas
+  le double de buts mais 1,14 contre 0,74 : le temps gagné partait en ballon au sol
+- **Réduire la dérive du ballon manqué** (`SCATTER_DIE` de 4 à 1) ne valait rien, +0,1 but
+- **Faire réclamer les arrêts par le gardien**, au lieu de laisser le ballon rebondir libre, marchait
+  bien (le temps au sol tombait de 61 à 40 tours) mais **est devenu inutile une fois le correctif
+  d'IA en place**. Écarté pour ne pas changer une règle sans nécessité. À ressortir si on cherche du
+  temps de jeu utile plus tard
+- **Monter les poids `chaseLoosePayload`** ne réglait rien : le problème n'était pas l'envie d'aller
+  au ballon, c'était le dernier pas
+
+## La phase 4, commencée
+
+### Ce qui est fait et testé
+
+**`server/session.ts`, la logique du serveur sans le serveur.** C'est le vrai travail de la couche
+et il est volontairement séparé de Supabase, pour qu'il soit testable en millisecondes. Il fait
+trois choses, et aucune n'est une règle du jeu :
+
+- **La propriété.** Est-ce bien le tour de cette unité, et est-ce bien ce joueur qui la contrôle. La
+  légalité du coup, elle, n'est pas revérifiée : c'est `reduce` qui tranche et sa raison de refus
+  est renvoyée telle quelle. Une seule porte, y compris ici
+- **Le chrono.** L'échéance vit dans la session et pas dans `MatchState`, parce que le moteur n'a pas
+  d'horloge et ne doit pas en gagner une. Un tour expiré se dépense en Dodge à la première requête
+  qui le constate, donc un portable en veille ne gèle pas la partie des deux autres
+- **La résolution du bloc IA.** Un clic humain déclenche couramment dix tours ou plus, résolus en une
+  passe et renvoyés en un seul lot d'événements. Les hasards n'ont besoin de rien : `reduce` résout
+  le compte des Crackers et le dart du Spark tout seul quand l'échelle passe dessus
+
+13 tests, dont un match solo complet joué de bout en bout **par la seule porte du serveur**, un match
+entier mené uniquement par expiration du chrono, et le déterminisme à graine égale.
+
+**Le schéma, `supabase/migrations/0001_init.sql`.** Les neuf tables de l'architecture, en enums
+plutôt qu'en texte libre, avec la RLS active dès la première migration. Deux points à connaître :
+le Tier est une **colonne générée** à partir des victoires, donc personne ne peut le saisir à la
+main ; et il n'y a **aucune policy d'écriture** sur `matches`, `match_events`, `match_participants`
+et `match_state`. Ce n'est pas un oubli : toute écriture passe par l'Edge Function, qui détient la
+clé service. Un client capable d'insérer un événement serait un client capable de s'écrire un but.
+
+**Le seed, généré et gardé.** `role_stats` et `arenas.layout` existent en base pour que l'interface
+lise une ligne de stats et dessine une grille sans importer le moteur. C'est un miroir, et un miroir
+dérive. Donc `supabase/seed.sql` est **généré** depuis `engine/stats.ts` et `engine/arenas/`, et
+`server/seed.test.ts` tient le fichier contre le moteur : change une stat, le test casse. Vérifié en
+le cassant volontairement.
+
+### Ce qui est écrit mais n'a jamais tourné
+
+**`supabase/functions/resolve-action/index.ts`.** Elle ne contient aucune décision, elle charge,
+appelle `server/session.ts`, écrit et diffuse. Elle n'est ni typée par le `tsc` du projet, ni
+déployée, ni exécutée une seule fois.
+
+**Un obstacle connu avant qu'elle puisse tourner.** Le moteur importe ses modules en `./types.js`
+alors que les fichiers sur le disque sont en `.ts`, ce qui est la convention TypeScript de tout le
+dépôt et que **Deno ne résout pas**. Il faut donc bundler `engine`, `ai` et `server` en un seul
+fichier ESM avec esbuild et l'importer depuis la fonction. C'est une étape de build à ajouter, pas
+une réécriture.
+
+**Et il faut un projet Supabase.** Rien n'est appliqué nulle part : ni la migration, ni le seed, ni
+la fonction. Il me faut un projet et ses identifiants pour aller plus loin de ce côté.
+
+### Ce qui reste de la phase 4
+
+Le client React et Vite en entier. La grille SVG posée sur l'art de la zone active, la piste
+d'initiative, la barre d'actions pilotée par `legalActions`, le panneau d'ordres alliés, et
+l'abonnement Realtime avec reprise depuis le dernier `seq` connu.
 
 ## Ce qui attend Jérôme
 
@@ -275,4 +467,11 @@ sur les dessins. À faire avant le playtest, pas avant.
 
 **Le prompt 2 de Claude Design** n'a pas été lancé : connexion, hub d'équipe, lobby, résultats.
 
-**Rien n'est commité.** `boomball/` est entièrement en untracked.
+**Le prompt 2 de Claude Design, que je ne peux pas lancer à ta place.** Il est écrit dans
+`03-brief-claude-design.md` et couvre connexion, hub d'équipe, lobby et résultats.
+
+**Un projet Supabase.** La migration, le seed et l'Edge Function sont écrits et n'ont été appliqués
+nulle part. Sans projet ni identifiants, la phase 4 s'arrête au code.
+
+**L'équilibrage est clos.** Si tu veux le rouvrir, la section « Le lot 4 » liste les leviers déjà
+mesurés et ce qu'ils valent, pour ne pas refaire ces sweeps.

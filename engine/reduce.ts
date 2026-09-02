@@ -67,6 +67,7 @@ import { statsFor } from './stats.js';
 import {
   activeUnits,
   opposingTeam,
+  sparkIsLive,
   type Cracker,
   type MatchResult,
   type MatchState,
@@ -578,8 +579,17 @@ function respawnCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): Ma
 // -- The Spark --------------------------------------------------------------
 
 /**
- * Catching the Spark. One Action, from its own cell, against DC 20, and the
- * match is over on the spot for a hundred and fifty points.
+ * Catching the Spark. One Action, from its own cell, against DC 20, for four
+ * goals' worth of points and no whistle.
+ *
+ * It used to end the match on the spot for a hundred and fifty. Now that it is
+ * catchable on purpose rather than by accident, an instant win would have made
+ * it the only thing worth playing: the points go on the board and the match
+ * runs its rounds out. It is gone for good either way, so the prize is there
+ * to be taken once and the field has to fight over the Payload for the rest.
+ *
+ * In sudden death it ends the match like any other score, because that is the
+ * sudden-death rule and not the Spark's.
  *
  * The fiche offers Sleight of Hand or Acrobatics. Both sit in the same agility
  * column of the stat table, so there is nothing to ask the player: a Trajector
@@ -589,7 +599,7 @@ function applyCatchSpark(ctx: TurnCtx): ReduceResult {
   const { state, unit } = ctx;
   const turn = state.turn!;
   if (turn.actionUsed) return { ok: false, reason: `${unit.name} has already acted` };
-  if (!state.spark.inPlay) return { ok: false, reason: 'the Spark is not on the field' };
+  if (!sparkIsLive(state.spark)) return { ok: false, reason: 'the Spark is not on the field' };
   if (state.spark.x !== unit.x || state.spark.y !== unit.y) {
     return { ok: false, reason: 'the Spark is not in this cell' };
   }
@@ -604,24 +614,30 @@ function applyCatchSpark(ctx: TurnCtx): ReduceResult {
   ctx.log.push({ kind: 'scored', team: unit.team, points: SPARK_POINTS });
   const caught: MatchState = {
     ...next,
-    spark: { ...next.spark, inPlay: false },
+    spark: { ...next.spark, state: 'caught', heading: null },
     score: { ...next.score, [unit.team]: next.score[unit.team] + SPARK_POINTS },
   };
 
-  return done(ctx, finish(caught, ctx.log));
+  if (caught.phase === 'suddenDeath') return done(ctx, finish(caught, ctx.log));
+  return done(ctx, caught);
 }
 
 /**
- * Count 10. Twelve cells on a d8, bouncing off the shell of the silo. It hits
- * nobody and nothing on the way: the only thing that happens to the Spark is
- * being caught, which is why it is worth chasing rather than avoiding.
+ * Count 10. Six cells along the heading it is already on, bouncing off the
+ * shell of the silo and keeping whatever heading the bounce leaves it with.
+ *
+ * No dice are thrown here, which is deliberate: a Spark whose heading is
+ * rerolled every round cannot be cut off, only stumbled into. Read off the
+ * board it is now a ball on a table, and closing on it is a decision.
+ *
+ * It hits nobody and nothing on the way: the only thing that happens to the
+ * Spark is being caught, which is why it is worth chasing rather than avoiding.
  */
 function resolveSpark(state: MatchState, log: MatchEvent[]): MatchState {
-  if (!state.spark.inPlay) return state;
+  if (!sparkIsLive(state.spark) || state.spark.heading === null) return state;
 
-  const rng = new Rng(state.rngSeed);
   const from = { x: state.spark.x, y: state.spark.y };
-  const run = sparkRun(from, rng);
+  const run = sparkRun(from, state.spark.heading);
 
   log.push({
     kind: 'sparkMoved',
@@ -633,24 +649,31 @@ function resolveSpark(state: MatchState, log: MatchEvent[]): MatchState {
 
   return {
     ...state,
-    spark: { ...state.spark, x: run.landing.x, y: run.landing.y },
-    rngSeed: rng.seed,
+    spark: { ...state.spark, x: run.landing.x, y: run.landing.y, heading: run.heading },
   };
 }
 
 /**
- * The Spark drops in at the top of round 6. Holding it back that long is what
- * keeps a hundred and fifty points from deciding the match before anyone has
- * scored a goal.
+ * The Spark drops in at the top of round 6, on a cell and a heading rolled
+ * once and for all. Holding it back that long is what keeps it from deciding
+ * the match before anyone has had a chance to score a goal.
+ *
+ * The guard is on `pending` rather than on being off the field, because a
+ * caught Spark is also off the field and must not drop back in next round.
  */
 function enterSpark(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
-  if (state.spark.inPlay || state.round < SPARK_ENTRY_ROUND) return state;
+  if (state.spark.state !== 'pending' || state.round < SPARK_ENTRY_ROUND) return state;
 
   const rng = new Rng(state.rngSeed);
   const at = sparkEntryCell(arena, state, rng);
+  const heading = rng.die(8);
   log.push({ kind: 'sparkEntered', at, round: state.round });
 
-  return { ...state, spark: { inPlay: true, x: at.x, y: at.y }, rngSeed: rng.seed };
+  return {
+    ...state,
+    spark: { state: 'live', x: at.x, y: at.y, heading },
+    rngSeed: rng.seed,
+  };
 }
 
 // -- The ball ---------------------------------------------------------------
