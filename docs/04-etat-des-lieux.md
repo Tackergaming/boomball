@@ -1,20 +1,19 @@
 # État des lieux
 
 > Point de reprise du projet Boomball. À lire en premier dans une nouvelle session.
-> Dernière mise à jour : 2026-09-02, après trois tests en local de Jérôme. L'équilibrage est clos,
-> le nombre de buts est à l'objectif (3,6 à 4,5 par match, 0 à 2 matchs sans but sur 200, voir
-> « Le lot 4 »).
+> Dernière mise à jour : 2026-09-02, après cinq tests en local de Jérôme et les deux arbitrages qui
+> suivaient le passage au terrain vertical.
 > **La phase 4 est écrite de bout en bout.** Projet Supabase en ligne, quatre migrations appliquées,
 > RLS vérifiée sur de vrais utilisateurs, les deux Edge Functions déployées, un match entier joué à
-> travers elles, et **le client React construit et servi en local**. Ses trois tests ont produit
-> trois lots de correctifs : le CORS qui bloquait le lobby, dix retours d'ergonomie de match, puis
-> deux trous fonctionnels, les victoires que rien n'enregistrait et le canal d'ordres alliés que rien
-> ne branchait. Les trois sections sont plus bas, à lire dans l'ordre.
-> Le quatrième test a produit deux correctifs d'écran, le token qui porte enfin nom et points de
-> vie, et la carte d'annonce qui ne se fait plus compresser sous la seconde, plus **une question de
-> règle en attente d'arbitrage** sur les Crackers qui ne quittent pas la Scramble. Section « Le
-> quatrième test en local » : ils décrochent du match au round 4, et le levier est leur vitesse.
-> **261 tests.** Ce qui reste est du playtest, pas de la construction.
+> travers elles, et le client React construit et servi en local.
+> **Le terrain court désormais d'un bout à l'autre du silo**, une Furnace dans le sol de la Zone 1
+> pour l'équipe A, une dans le plafond de la Zone 3 pour B, et le ballon circule enfin dans les
+> trois zones. Les deux arbitrages ouverts sont tranchés : l'initiative se départage au dé, ce qui
+> était un défaut et non un réglage, et le Spark vaut 20 points. Le jeu produit 1,66 à 2,29 buts par
+> match, dans la cible, et les trois Tiers sont équilibrés.
+> **273 tests.** Ce qui reste est du playtest et deux écritures en base, pas de la construction.
+> Les sections à lire en priorité sont les comptes rendus de test en local, dans l'ordre, et la
+> dernière, « L'initiative se départage au dé, et le Spark vaut deux buts ».
 
 ## Le projet en trois lignes
 
@@ -44,7 +43,7 @@ seule arène au MVP. **Ordinateur uniquement, 1280 px minimum, pas de mobile.** 
 
 ## Ce qui est construit et testé
 
-**254 tests au vert, environ 9000 lignes.** Plus `npm run sweep` pour le rapport d'équilibrage.
+**273 tests au vert, environ 9000 lignes.** *(Ce nombre a longtemps traine derriere le code. Les mentions de 254 et de 261 plus bas datent leur propre section et ne sont pas corrigees.)* Plus `npm run sweep` pour le rapport d'équilibrage.
 `npm test` et `npm run typecheck` depuis `boomball/`. Le typecheck lance désormais **deux** tsconfig,
 celui de la racine et celui de `scripts/`, pour la raison expliquée plus bas.
 
@@ -1189,65 +1188,220 @@ journal dont on ne peut pas rejouer le match n'est pas la verite que ce projet p
 - **Le seed est regenere mais pas applique** au projet en ligne
 - **Le durcissement du client** contre `ZONE_COUNT`, prevu au plan et pas encore fait
 
+*(Cette liste est traitee : voir la section suivante. Seul le seed reste a appliquer en ligne, et il
+demande la main de Jerome. Les deux prompts sont ecrits, les images restent a generer.)*
+
+## L'initiative se départage au dé, et le Spark vaut deux buts
+
+Les deux arbitrages qui restaient ouverts au terme du chantier vertical sont tranchés, et le premier
+n'était pas le réglage qu'on croyait : c'était un défaut.
+
+### Le biais A/B était un départage alphabétique
+
+Le sweep du terrain vertical donnait 129 à 66 en Veteran et 126 à 68 en Star, alors que B marquait
+plus de buts partout. Le diagnostic écrit alors, « A joue en premier à chaque round », était juste
+sur l'effet et muet sur la cause.
+
+**La cause est dans le tri.** Sans humain, les deux équipes résolvent sur les comptes 15 et 10, donc
+chaque slot d'un camp est à égalité avec un slot de l'autre. `sortSlots` départageait ces égalités
+sur `actorKey`, une clé stable qui commence par le `blockId`, c'est à dire par la lettre d'équipe.
+`"a-fast"` passe avant `"b-fast"`, à chaque compte, de chaque round, de chaque match. La colonne du
+premier ballon disait 200 sur 200 et c'était la signature d'un tri, pas d'une règle.
+
+**C'est le défaut déjà corrigé une fois dans ce projet**, pour la cible d'un Cracker : « un départage
+par identifiant se résoudrait toujours dans le même sens, et comme l'identifiant porte la lettre
+d'équipe, il viserait systématiquement le même camp ». La leçon n'avait pas été portée à
+l'initiative.
+
+**Deuxième conséquence, et elle vaut pour tout sweep futur : le harnais ne mesurait pas le régime de
+jeu.** En solo, l'équipe du joueur tire une initiative individuelle et ses alliés IA se placent juste
+après le dernier humain ; seule la maison est en blocs. Qui touche le Spark en premier dépend alors
+du `d20` du joueur. Le 200 sur 200 était une propriété du harnais.
+
+### Le correctif : un dé au coup d'envoi, puis alternance
+
+`MatchState` porte un `initiativeNonce`, tiré une fois au coup d'envoi. À égalité de compte, le camp
+qui passe devant est donné par `(nonce + round) % 2`, et `actorKey` ne départage plus qu'à
+l'intérieur d'un même camp.
+
+**Une alternance à départ fixe ne suffisait pas, et c'est le piège de ce correctif.** Le Spark entre
+au round 6, un round fixe. Si A ouvrait les rounds impairs, B aurait le premier accès au Spark sur
+200 matchs sur 200 : on aurait remplacé un biais permanent par son image en miroir. Le départ doit
+être tiré.
+
+**Un dé plutôt qu'un par round**, parce que 200 matchs donnent alors exactement 100 ouvertures du
+round 6 par camp au lieu d'un tirage binomial bruité, et que le sweep a besoin d'être lisible. Coût
+connu : le tirage décale le flux de dés, donc les comparaisons seed à seed avec les rapports
+antérieurs ne valent plus rien. Seules les moyennes se comparent, comme après le lot 3.
+
+**Ce que ça donne**, 200 matchs par Tier, à changement unique :
+
+| Tier | Avant | Après | Buts/match | Sans but |
+|---|---|---|---|---|
+| Rookie | 88 / 95 | 94 / 95 | 1,54 vers 1,64 | 38 vers 31 |
+| Veteran | **129 / 66** | 91 / 104 | 1,75 vers 1,89 | 30 vers 25 |
+| Star | **126 / 68** | 103 / 95 | 2,15 vers 2,25 | 29 vers **14** |
+
+L'écart Veteran passe de 63 victoires à 13, soit de quatre écarts-types et demi à moins d'un. Les
+buts montent légèrement au passage et les matchs sans but tombent de moitié au Star.
+
+**Trois tests tiennent la propriété** dans `setup.test.ts` : l'alternance round par round, l'ordre
+inversé quand le dé tombe de l'autre côté, et une mesure sur 200 graines exigeant que chaque camp
+ouvre le round d'entrée du Spark entre 40 et 60 % du temps.
+
+**Deux tests de `reduce.test.ts` ont dû être réparés**, et le motif vaut d'être connu : ils faisaient
+avancer l'unité active d'un pas vers le bas, en dur. C'était légal tant que l'unité active était
+toujours de l'équipe A ; depuis le terrain vertical, un pas vers le bas depuis la ligne de mise en
+jeu de B tombe sur sa passerelle. Ils demandent maintenant à l'arène de quel côté la case est libre.
+**Tout test qui code une direction en dur est désormais suspect**, le terrain étant un miroir.
+
+### Le Spark passe de 50 à 20 points
+
+Le biais réparé, le prix redevient un choix éditorial et non un correctif. Mesuré sur de **vrais
+sweeps à chaque prix**, et non sur un recompte : le score décide de la mort subite, donc un prix
+différent joue réellement un match différent dans les égalités, et un recompte l'aurait masqué.
+
+| Prix | Veteran A/B | Nuls | Décidés | Star A/B | Nuls | Décidés |
+|---|---|---|---|---|---|---|
+| 10 | 85 / 101 | 14 | 46 (23 %) | 98 / 91 | 11 | 52 (26 %) |
+| **20** | 83 / 104 | 13 | **66 (33 %)** | 96 / 90 | 14 | **71 (36 %)** |
+| 30 | 89 / 103 | 8 | 72 (36 %) | 100 / 95 | 5 | 81 (41 %) |
+| 50 | 91 / 104 | 5 | 78 (39 %) | 103 / 95 | 2 | 88 (44 %) |
+
+**Trois choses à retenir de ce tableau.** L'équilibre A/B tient à tous les prix, donc le départage a
+réglé le biais indépendamment de cette constante. Les buts, les captures et la circulation du ballon
+ne bougent pas d'un pouce, l'IA ne lisant jamais `SPARK_POINTS`. Et ce qui varie réellement, c'est la
+part de matchs que le Spark décide **et le nombre de nuls**, qu'un Spark cher écrase.
+
+**Arbitré à 20 par Jérôme.** C'est le prix qui reproduit le régime qu'il avait déjà jugé acceptable,
+20 / 27 / 38 % de matchs décidés, à une époque où le terrain donnait quatre buts par match. Deux buts
+dans un jeu qui en produit deux, c'est un coup qui vaut le match moyen : ça justifie le détour du
+Trajector sans emporter la rencontre.
+
+**Sweep de contrôle à 20**, 200 matchs par Tier :
+
+| Tier | A / B | Nuls | Buts/match | Sans but | Spark pris | Décidés | Ballon Z1/Z2/Z3 | Gardien |
+|---|---|---|---|---|---|---|---|---|
+| Rookie | 95 / 91 | 14 | 1,66 | 31 | 96 | 51 (26 %) | 27/45/28 % | 10 % |
+| Veteran | 83 / 104 | 13 | 1,93 | 25 | 118 | 66 (33 %) | 30/43/27 % | 12 % |
+| Star | 96 / 90 | 14 | 2,29 | 14 | 154 | 71 (36 %) | 31/43/26 % | 14 % |
+
+Le Veteran à 83/104 est le moins net des trois, à un écart-type et demi, et **son signe est inversé
+par rapport au biais d'origine**, ce qui est la raison de le lire comme du bruit et non comme un
+reste.
+
+**`catchSpark` reste à 240 et ne suit délibérément pas le prix.** Les deux nombres répondent à deux
+questions : le prix dit ce que vaut une capture au tableau, ce poids dit si une unité **déjà debout**
+sur le Spark doit y dépenser son Action, et la réponse est oui à tout prix que ce jeu poserait. Le
+descendre proportionnellement le mettrait près de `pickUpPayload` à 90, qui est le seul cas où le
+choix est réel. Un sweep complet à 400 et un à 240 rendent d'ailleurs les mêmes chiffres.
+
+### Le reste du chantier vertical
+
+**Le règlement v2 est à jour.** Écarts 24 et 25 pour le terrain et pour le dé d'initiative, B1 pour
+les deux bouches et le miroir autour de `y = 22`, B2 pour la mise en jeu par moitiés, B4 pour le
+départage et pour le chrono à 120 secondes, B9 et B11 pour le prix, B10 pour le point d'entrée des
+remplaçants. Les écarts 15 et 18 sont corrigés. Les deux chiffres de B7 qui datent d'avant le terrain
+vertical portent leur note plutôt que d'être réécrits : les Furnaces ne sont plus à 14 cases mais à
+44, et le match ne produit plus 3,6 à 4,5 buts.
+
+**Les prompts d'images sont écrits, les images restent à générer.** La Zone 3 est réécrite en miroir
+vertical de la Zone 1, une seule bouche au centre du plafond, et **sa seule référence est désormais
+la Zone 1 finie** : `boomball up.png` dessine exactement la géométrie qu'on abandonne et le joindre
+ramènerait les deux portes latérales. La Zone 2 passe de quatre passerelles à deux, une par moitié,
+crochets descendus sur la ligne médiane.
+
+**Le prompt de la Zone 1 avait un mot faux**, `four` au lieu de `three`. L'image livrée montre trois
+paires de passerelles et le layout en code trois : le modèle avait laissé tomber la quatrième. Le mot
+est corrigé sans rien régénérer, parce que la Zone 3 doit être le miroir exact de ce que la Zone 1
+montre réellement.
+
+**Le client ne compare plus à `3` en dur.** Quatre endroits lisaient un nombre de zones littéral : la
+borne du bouton de zone, la garde du bandeau voisin, et les deux calculs de zone depuis une hauteur.
+
+**Ce qui reste, et qui demande la main de Jérôme** : le seed régénéré n'est pas appliqué en ligne, et
+le match de démonstration n'est pas supprimé. Les deux écritures ont été refusées par le contrôle
+automatique des actions destructives du harnais, qu'une autorisation en conversation ne lève pas.
+
+### Ce que la base contient réellement
+
+Vérifié le 2026-09-02. **Quatre matchs, pas un.** L'état des lieux n'en annonçait qu'un parce que
+seul le match de démonstration y avait été consigné.
+
+- **Bombast**, `908c92d2-bfd9-42ce-b90f-0db66ac68fb5`, équipe « The Powder Kegs », 0 victoire :
+  l'utilisateur jetable de `live-match.ts`, et son match `b8fa8b66` est le match de démonstration.
+  C'est lui, et lui seul, que la suppression vise. Tout cascade avec lui
+- **Tacker**, `6eb5302a-ba82-4f2e-9ae6-a8acbfe469df`, équipe « Shrapnel oath » : le compte de Jérôme,
+  avec ses trois parties de test du 2026-09-02, toutes terminées et toutes gagnées, 50-30, 20-10 et
+  40-0. **À ne pas toucher**
+
+**Et un point à vérifier : « Shrapnel oath » porte une victoire pour trois matchs gagnés.**
+L'explication probable est que la migration `0003_record_win.sql` a été appliquée entre la deuxième
+et la troisième partie, ce qui serait le comportement normal, mais la date d'application n'est pas
+lisible depuis le projet. **À trancher à la prochaine partie gagnée** : si le compteur ne bouge pas,
+c'est un vrai défaut et il est invisible autrement qu'en gagnant.
+
+**L'arène en base porte toujours l'ancien layout**, `y0` et `y44` sans bouche, ce qui confirme que le
+seed n'a pas été appliqué.
+
 ## Ce qui attend Jérôme
 
-**La zone 1 est bonne, et ce document a longtemps prétendu le contraire.** Vérifié le 2026-09-02 en
-lisant les en-têtes des fichiers : `zone-1-trench.jpeg` fait **2048 x 2048**, exactement comme les
-deux autres. Le seul fichier en 1024 de tout le dossier est
-`assets/arena/_rejected/zone-2-duplicate-of-zone-1.jpeg`, une image écartée, et c'est cette
-confusion qui a produit le reproche.
+**Deux écritures en base, et elles demandent ta main.** Les deux ont été refusées par le contrôle
+automatique des actions destructives du harnais, qu'une autorisation donnée en conversation ne lève
+pas : il faut soit une règle de permission dans `settings.json`, soit que tu lances les commandes
+toi-même. Depuis la racine du workspace, après `set -a && . ./.env && set +a` :
 
-Les deux autres reproches ne tiennent pas mieux. Sa palette tire plus chaud que celles des zones 2
-et 3, mais **c'est la fosse de la Furnace qui brûle en bas de l'image**, donc la fiction de la zone
-et pas une dérive d'étalonnage : la Trench est le niveau du sol, elle est censée être la seule
-éclairée par le feu. Et la structure est bien symétrique, passerelle pour passerelle aux trois
-niveaux ; il ne reste d'asymétrie que dans le placement des échelles, ce qui ne touche à rien
-puisque **le terrain jouable est le layout ASCII de `arenas/kill-silo.ts` et jamais le dessin**.
+1. **Appliquer le seed régénéré.** L'arène en base porte encore l'ancien layout, sans bouche en `y0`
+   ni en `y44`. Depuis `boomball/` : `node scripts/apply-migration.mjs supabase/seed.sql`. Le fichier
+   est idempotent et généré depuis le moteur, `server/seed.test.ts` le tient
+2. **Supprimer le match de démonstration**, en supprimant l'utilisateur jetable qui le porte, tout
+   cascadant avec lui : `DELETE /auth/v1/admin/users/908c92d2-bfd9-42ce-b90f-0db66ac68fb5`. **Vérifié
+   avant de te le proposer** : cet utilisateur est Bombast, il ne possède que « The Powder Kegs » à
+   zéro victoire et le match `b8fa8b66`. Tes trois parties, sous Tacker et « Shrapnel oath », sont
+   sur un autre compte et ne bougent pas
 
-Rien à régénérer, donc. Le prompt reste dans `01-prompts-arene.md` si tu veux quand même une autre
-version.
+**Les images des Zones 2 et 3.** Les deux prompts sont écrits et prêts à coller dans
+`docs/01-prompts-arene.md`. La Zone 1 n'a rien à faire. Pour la Zone 3, **ne joins que ta Zone 1
+finie** : `boomball up.png` dessine les deux portes latérales qu'on vient d'abandonner et le donner
+en référence les ramènerait.
 
 **Le relevé de l'arène.** Le terrain de `arenas/kill-silo.ts` respecte ce que montrent les images au
-niveau des hauteurs de passerelles et des colonnes, mais ce n'est pas encore un tracé case par case
-sur les dessins. À faire avant le playtest, pas avant.
+niveau des hauteurs de passerelles et des colonnes, mais ce n'est toujours pas un tracé case par
+case. Le layout se déclare lui-même provisoire. À faire quand les deux nouvelles images seront
+validées, en retraçant contre elles.
 
-**Le design est complet, les deux prompts sont livrés.** Les écrans de coque du prompt 2 sont dans
-le même `design/Boomball Interface.html`, sous la section « Out-of-match screens », ancres `#2a` à
-`#2e` : Sign in, Team hub, Lobby, Results, Seat panel states. `design/README.md` a longtemps
-prétendu le contraire, il ne documentait que la vérification du prompt 1.
+**Une décision toujours ouverte sur les Crackers.** Ils décrochent du match au round 4 : dès le
+round 6, neuf unités sur dix sont au Sommet et neuf Crackers vivants sur dix sont encore dans la
+Scramble. La règle que tu as formulée est déjà celle qui tourne, le levier est la vitesse.
+Recommandation inchangée : `CRACKER_MOVE_CELLS` de 6 à 10, un joueur en parcourant 8. Les chiffres
+sont dans « Le quatrième test en local ». **Attention, ils datent du terrain horizontal** : le
+diagnostic tient, puisque le terrain vertical éloigne encore plus le peloton du point de renaissance,
+mais les colonnes exactes se remesureront sur le terrain actuel avant d'appliquer.
 
-**Rien, côté design.** Les deux prompts sont livrés et vérifiés.
-
-**Le projet Supabase est en ligne, et rien ne t'attend dessus.** Région eu-west-3, ref
-`tckaybbmnjyitavypqtq`, schéma et seed appliqués, fonction déployée. Deux choses à savoir tout de
-même. Il y a maintenant **deux projets dans l'org**, `boomball` et `projet test`, ce qui est le
-plafond du plan gratuit : supprime `projet test` si tu en veux un troisième. Et un **match de
-démonstration** est conservé en base avec l'utilisateur jetable qui le porte, ids dans « L'Edge
-Function tourne », à effacer quand tu l'auras regardé. À part lui, la base est vide.
-
-**Une décision à prendre sur les Crackers.** Ils décrochent du match au round 4 : dès le round 6, neuf
-unités sur dix sont au Sommet et neuf Crackers vivants sur dix sont encore dans la Scramble. La règle
-que tu as formulée est déjà celle qui tourne, le levier est la vitesse. Recommandation :
-`CRACKER_MOVE_CELLS` de 6 à 10, un joueur en parcourant 8. Les chiffres sont dans « Le quatrième test
-en local », le nombre de buts n'en bouge pas.
+**Un compteur à surveiller.** « Shrapnel oath » porte une victoire pour trois matchs gagnés. C'est
+probablement la migration `0003_record_win.sql` appliquée entre ta deuxième et ta troisième partie,
+mais ça ne se vérifie qu'en gagnant : regarde le compteur après ta prochaine victoire.
 
 **Rejouer une partie, et c'est la prochaine chose.** `npm run dev` depuis `boomball/client`, puis
-`http://localhost:5173`. Les deuxième et troisième lots sont largement de l'écran, et **rien de ce
-qui touche à l'écran n'a été regardé** : il n'y a pas de navigateur pilotable dans cet
-environnement. Le rythme du rejeu, la carte d'annonce, la scène carrée, la barre grisée, le
-briefing, le maillot ambre, le bouton d'appel de balle et la bannière de reprise se jugent en
-jouant. La mise en ligne ne vient qu'après.
+`http://localhost:5173`. **Rien de ce qui touche à l'écran n'a été regardé**, il n'y a pas de
+navigateur pilotable dans cet environnement. Le token qui porte nom et points de vie, la carte
+d'annonce rallongée, le rythme du rejeu, la scène carrée, le briefing, le maillot ambre, le bouton
+d'appel de balle et la bannière de reprise se jugent en jouant.
 
-**Une revue de sécurité, à lancer par toi.** `/security-review` sur le dépôt, avant la mise en
-ligne. C'est ta commande, je ne peux pas la déclencher. Le client existe maintenant, donc la surface
-qu'elle a à regarder existe aussi : un jeton dans un navigateur, une clé anon dans un bundle, et
-deux fonctions qui écrivent avec la clé service.
+**Une revue de sécurité, à lancer par toi.** `/security-review` sur le dépôt, avant la mise en ligne.
+C'est ta commande, je ne peux pas la déclencher. Un jeton dans un navigateur, une clé anon dans un
+bundle, et deux fonctions qui écrivent avec la clé service.
 
 **L'hébergement Vercel, quand tu auras joué.** Le jeton est en place et vérifié, compte
-`montigny-8072`. **Rien n'est connecté à GitHub et il ne faut pas le faire** : l'intégration
-donnerait à Vercel un accès en lecture sur tout le dépôt, dont `campagne-vault/`, `context/` et le
-`CLAUDE.md` racine. Le projet se créera et se déploiera par l'API, en envoyant les fichiers
-construits, sans que Vercel voie jamais le dépôt.
+`montigny-8072`. **Rien n'est connecté à GitHub et il ne faut pas le faire** : l'intégration donnerait
+à Vercel un accès en lecture sur tout le dépôt, dont `campagne-vault/`, `context/` et le `CLAUDE.md`
+racine. Le projet se créera et se déploiera par l'API, en envoyant les fichiers construits, sans que
+Vercel voie jamais le dépôt.
 
-**L'équilibrage est clos.** Si tu veux le rouvrir, la section « Le lot 4 » liste les leviers déjà
-mesurés et ce qu'ils valent, pour ne pas refaire ces sweeps.
+**L'équilibrage est clos, et il a été rouvert deux fois pour de bonnes raisons.** La section « Le lot
+4 » liste les leviers déjà mesurés sur le terrain horizontal et ce qu'ils valent. La section sur le
+départage dit ce qu'il faut savoir avant de lire un sweep : les comparaisons seed à seed avec les
+rapports antérieurs au dé d'initiative ne valent rien, seules les moyennes se comparent.
+
+**Deux projets dans l'org Supabase**, `boomball` et `projet test`, ce qui est le plafond du plan
+gratuit : supprime `projet test` si tu en veux un troisième.
