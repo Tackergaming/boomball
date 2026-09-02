@@ -135,6 +135,38 @@ Avoid: text, letters, numbers, labels, watermark, user interface, borders, frame
 
 ---
 
+## Ce que la génération du 2026-09-02 a appris
+
+Les Zones 2 et 3 ont été régénérées avec les prompts ci-dessus. Les deux sont gardées. Ce qui suit
+est ce qu'elles ont appris, à relire avant de retoucher un prompt d'arène.
+
+**La Zone 3 est un succès et la méthode du miroir marche.** Ne joindre que la Zone 1 finie, et lui
+demander explicitement de la retourner, a rendu une image cohérente : bouche au centre du plafond,
+chaîne qui y monte, aucune porte latérale, aucune lanterne. Ses trois passerelles tombent à 33, 60 et
+76 % de la hauteur mesurée depuis le plafond, contre 37, 63 et 79 % depuis le sol pour la Zone 1,
+soit une demi-case d'écart sur quinze. **Une image de référence et un ordre de retournement valent
+mieux que trois phrases de description.**
+
+**Le modèle ramène les passerelles vers le centre, et c'est reproductible.** Le prompt de la Zone 2
+demandait une passerelle « at roughly one quarter of the frame height from the bottom » et son miroir
+en haut, soit 25 et 75 %. L'image rend 37 et 63 %, donc **quatre cases de séparation là où le layout
+en code huit**, `y18` et `y26`. La Zone 1 montre la même dérive plus discrète : le layout code sa
+passerelle médiane à 50 % et le dessin la place à 63 %. Une fraction énoncée en toutes lettres n'est
+pas tenue ; **si une hauteur compte pour le jeu, il faut la donner en cases comptées depuis un bord
+et vérifier l'image à la règle**, pas la formuler en quarts.
+
+**Le compte des petits objets n'est pas tenu non plus.** Quatre crochets demandés, six dessinés, trois
+de chaque côté. Même famille de défaut que la quatrième passerelle perdue de la Zone 1. Un nombre
+n'est fiable dans ces prompts que pour les éléments structurants, et les crochets n'en sont pas.
+
+**Aucun de ces deux écarts n'est bloquant, et c'est important de savoir pourquoi.** Le terrain jouable
+est le layout ASCII de `arenas/kill-silo.ts` et jamais le dessin : une case vaut ce que le layout en
+dit, quoi que montre le JPEG. Les écarts ne coûtent que de la superposition, un joueur dessiné à côté
+d'une passerelle plutôt que dessus. Ils se règlent au relevé au pixel, qui reste à faire, et c'est là
+qu'on décidera dans quel sens : redessiner, ou déplacer les rangées du layout. Déplacer les rangées
+n'est pas gratuit, les lignes de mise en jeu `y19` et `y25` sont posées juste au-dessus des
+passerelles et les rapprocher de l'axe change la distance au ballon au coup d'envoi.
+
 ## Après génération
 
 **Sortie carrée**, 2048 x 2048 au minimum. À 15 cases de côté, ça fait 136 pixels par case, large

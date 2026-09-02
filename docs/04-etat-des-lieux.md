@@ -11,7 +11,8 @@
 > trois zones. Les deux arbitrages ouverts sont tranchés : l'initiative se départage au dé, ce qui
 > était un défaut et non un réglage, et le Spark vaut 20 points. Le jeu produit 1,66 à 2,29 buts par
 > match, dans la cible, et les trois Tiers sont équilibrés.
-> **273 tests.** Ce qui reste est du playtest et deux écritures en base, pas de la construction.
+> **Le seed et les deux nouvelles images sont en place**, et la base ne porte plus que le compte de
+> Jérôme. **273 tests.** Ce qui reste est du playtest, pas de la construction.
 > Les sections à lire en priorité sont les comptes rendus de test en local, dans l'ordre, et la
 > dernière, « L'initiative se départage au dé, et le Spark vaut deux buts ».
 
@@ -1305,7 +1306,18 @@ remplaçants. Les écarts 15 et 18 sont corrigés. Les deux chiffres de B7 qui d
 vertical portent leur note plutôt que d'être réécrits : les Furnaces ne sont plus à 14 cases mais à
 44, et le match ne produit plus 3,6 à 4,5 buts.
 
-**Les prompts d'images sont écrits, les images restent à générer.** La Zone 3 est réécrite en miroir
+**Les images des Zones 2 et 3 sont générées et en place**, les anciennes écartées dans
+`assets/arena/_rejected/`, les trois en 2048x2048. La Zone 3 est un succès : la méthode du miroir,
+ne joindre que la Zone 1 finie et demander explicitement de la retourner, rend une image dont les
+trois passerelles tombent à une demi-case des hauteurs attendues. **La Zone 2 porte deux écarts au
+layout**, consignés dans `01-prompts-arene.md` : ses passerelles sont à 37 et 63 % de la hauteur au
+lieu de 23 et 77 %, donc séparées de quatre cases là où le layout en code huit, et elle dessine six
+crochets contre quatre codés. Aucun n'est bloquant, le terrain jouable étant le layout ASCII et
+jamais le dessin, mais les deux se règlent au relevé au pixel. **Le modèle ramène les passerelles
+vers le centre, c'est reproductible et la Zone 1 le montre aussi** : une fraction énoncée en toutes
+lettres n'est pas tenue, une hauteur qui compte se donne en cases et se vérifie à la règle.
+
+**Ce que les prompts disent**, et qui reste vrai pour toute régénération : La Zone 3 est réécrite en miroir
 vertical de la Zone 1, une seule bouche au centre du plafond, et **sa seule référence est désormais
 la Zone 1 finie** : `boomball up.png` dessine exactement la géométrie qu'on abandonne et le joindre
 ramènerait les deux portes latérales. La Zone 2 passe de quatre passerelles à deux, une par moitié,
@@ -1319,9 +1331,18 @@ montre réellement.
 **Le client ne compare plus à `3` en dur.** Quatre endroits lisaient un nombre de zones littéral : la
 borne du bouton de zone, la garde du bandeau voisin, et les deux calculs de zone depuis une hauteur.
 
-**Ce qui reste, et qui demande la main de Jérôme** : le seed régénéré n'est pas appliqué en ligne, et
-le match de démonstration n'est pas supprimé. Les deux écritures ont été refusées par le contrôle
-automatique des actions destructives du harnais, qu'une autorisation en conversation ne lève pas.
+**Les deux écritures en base sont faites**, par Jérôme lui-même le 2026-09-02, le contrôle
+automatique du harnais refusant les écritures destructives en ligne. Vérifié depuis : l'arène en base
+porte le nouveau layout et son miroir autour de `y = 22` est confirmé ligne par ligne, `role_stats`
+tient ses douze lignes, et il ne reste qu'un compte, Tacker, avec son équipe et ses trois parties.
+Bombast, son équipe vide et le match de démonstration ont disparu en cascade.
+
+`scripts/apply-migration.mjs` **charge désormais le `.env` du workspace lui-même**, par
+`process.loadEnvFile`, avec un chemin résolu depuis l'emplacement du script et non depuis le
+répertoire courant. La consigne `set -a && . ../.env && set +a` était une syntaxe bash sur une
+machine dont le shell est PowerShell, et l'oublier ressemblait exactement à une clé manquante : le
+script échouait avant le réseau avec un message qui accusait l'environnement. Ce qui est déjà exporté
+gagne toujours.
 
 ### Ce que la base contient réellement
 
@@ -1346,29 +1367,22 @@ seed n'a pas été appliqué.
 
 ## Ce qui attend Jérôme
 
-**Deux écritures en base, et elles demandent ta main.** Les deux ont été refusées par le contrôle
-automatique des actions destructives du harnais, qu'une autorisation donnée en conversation ne lève
-pas : il faut soit une règle de permission dans `settings.json`, soit que tu lances les commandes
-toi-même. Depuis la racine du workspace, après `set -a && . ./.env && set +a` :
+**Rejouer une partie, et c'est la prochaine chose.** `npm run dev` depuis `boomball/client`, puis
+`http://localhost:5173`. **Rien de ce qui touche à l'écran n'a été regardé**, il n'y a pas de
+navigateur pilotable dans cet environnement. Le token qui porte nom et points de vie, la carte
+d'annonce rallongée, le rythme du rejeu, la scène carrée, le briefing, le maillot ambre, le bouton
+d'appel de balle et la bannière de reprise se jugent en jouant. Et cette partie sera la première sur
+le terrain de bout en bout, avec ses deux nouvelles images et le Spark à 20 points.
 
-1. **Appliquer le seed régénéré.** L'arène en base porte encore l'ancien layout, sans bouche en `y0`
-   ni en `y44`. Depuis `boomball/` : `node scripts/apply-migration.mjs supabase/seed.sql`. Le fichier
-   est idempotent et généré depuis le moteur, `server/seed.test.ts` le tient
-2. **Supprimer le match de démonstration**, en supprimant l'utilisateur jetable qui le porte, tout
-   cascadant avec lui : `DELETE /auth/v1/admin/users/908c92d2-bfd9-42ce-b90f-0db66ac68fb5`. **Vérifié
-   avant de te le proposer** : cet utilisateur est Bombast, il ne possède que « The Powder Kegs » à
-   zéro victoire et le match `b8fa8b66`. Tes trois parties, sous Tacker et « Shrapnel oath », sont
-   sur un autre compte et ne bougent pas
-
-**Les images des Zones 2 et 3.** Les deux prompts sont écrits et prêts à coller dans
-`docs/01-prompts-arene.md`. La Zone 1 n'a rien à faire. Pour la Zone 3, **ne joins que ta Zone 1
-finie** : `boomball up.png` dessine les deux portes latérales qu'on vient d'abandonner et le donner
-en référence les ramènerait.
-
-**Le relevé de l'arène.** Le terrain de `arenas/kill-silo.ts` respecte ce que montrent les images au
-niveau des hauteurs de passerelles et des colonnes, mais ce n'est toujours pas un tracé case par
-case. Le layout se déclare lui-même provisoire. À faire quand les deux nouvelles images seront
-validées, en retraçant contre elles.
+**Le relevé de l'arène, et c'est le vrai chantier restant.** Le terrain de `arenas/kill-silo.ts` se
+déclare lui-même provisoire, et les trois images sont maintenant finales, donc le relevé au pixel
+peut se faire. Les écarts connus sont mesurés : la Zone 2 dessine ses deux passerelles à 37 et 63 %
+de la hauteur quand le layout les code à 23 et 77 %, et la Zone 1 place sa passerelle médiane à 63 %
+quand le layout dit 50 %. **Le sens de la correction est une décision et pas une évidence** :
+redessiner coûte une génération, déplacer les rangées du layout n'est pas gratuit non plus, les
+lignes de mise en jeu `y19` et `y25` étant posées juste au-dessus des passerelles et les rapprocher
+de l'axe changeant la distance au ballon au coup d'envoi. À trancher après avoir joué, quand on saura
+si l'écart se voit à l'écran.
 
 **Une décision toujours ouverte sur les Crackers.** Ils décrochent du match au round 4 : dès le
 round 6, neuf unités sur dix sont au Sommet et neuf Crackers vivants sur dix sont encore dans la
@@ -1381,12 +1395,6 @@ mais les colonnes exactes se remesureront sur le terrain actuel avant d'applique
 **Un compteur à surveiller.** « Shrapnel oath » porte une victoire pour trois matchs gagnés. C'est
 probablement la migration `0003_record_win.sql` appliquée entre ta deuxième et ta troisième partie,
 mais ça ne se vérifie qu'en gagnant : regarde le compteur après ta prochaine victoire.
-
-**Rejouer une partie, et c'est la prochaine chose.** `npm run dev` depuis `boomball/client`, puis
-`http://localhost:5173`. **Rien de ce qui touche à l'écran n'a été regardé**, il n'y a pas de
-navigateur pilotable dans cet environnement. Le token qui porte nom et points de vie, la carte
-d'annonce rallongée, le rythme du rejeu, la scène carrée, le briefing, le maillot ambre, le bouton
-d'appel de balle et la bannière de reprise se jugent en jouant.
 
 **Une revue de sécurité, à lancer par toi.** `/security-review` sur le dépôt, avant la mise en ligne.
 C'est ta commande, je ne peux pas la déclencher. Un jeton dans un navigateur, une clé anon dans un
@@ -1405,3 +1413,9 @@ rapports antérieurs au dé d'initiative ne valent rien, seules les moyennes se 
 
 **Deux projets dans l'org Supabase**, `boomball` et `projet test`, ce qui est le plafond du plan
 gratuit : supprime `projet test` si tu en veux un troisième.
+
+**Les écritures en base passent par toi.** Le contrôle automatique du harnais refuse les écritures
+destructives en ligne, et une autorisation donnée en conversation ne le lève pas. Soit tu lances la
+commande, soit tu ajoutes une règle de permission dans `settings.json`. La lecture, elle, passe : je
+peux vérifier l'état du projet après coup, et c'est comme ça que le seed et la suppression ont été
+confirmés.

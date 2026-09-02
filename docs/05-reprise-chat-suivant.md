@@ -34,26 +34,23 @@ Sept choses à savoir tout de suite.
    terrain donnait quatre buts par match et qu'il en donne deux. Le jeu produit
    1,66 à 2,29 buts par match, dans la cible.
 
-4. DEUX ÉCRITURES EN BASE M'ATTENDENT ET ELLES DEMANDENT MA MAIN. Le contrôle
-   automatique du harnais refuse les écritures destructives en ligne, et une
-   autorisation donnée en conversation ne le lève pas : il faut une règle de
-   permission dans settings.json, ou que je lance les commandes moi-même.
-   - Appliquer le seed régénéré. L'arène en base porte encore l'ancien layout.
-     Depuis boomball/, après `set -a && . ../.env && set +a` :
-     `node scripts/apply-migration.mjs supabase/seed.sql`
-   - Supprimer le match de démonstration, en supprimant l'utilisateur jetable qui
-     le porte : `DELETE /auth/v1/admin/users/908c92d2-bfd9-42ce-b90f-0db66ac68fb5`.
-     Vérifié : cet utilisateur est Bombast et ne possède que ce match. Mes trois
-     parties, sous Tacker et « Shrapnel oath », sont sur un autre compte
+4. La base en ligne est à jour et propre. Le seed est appliqué, l'arène porte
+   le terrain vertical et son miroir est vérifié, et il ne reste qu'un compte,
+   le mien, avec mes trois parties de test. Le match de démonstration et son
+   utilisateur jetable sont supprimés. Attention : le contrôle automatique du
+   harnais refuse les écritures destructives en ligne, donc c'est moi qui les
+   lance. La lecture passe, tu peux vérifier l'état après coup.
 
-5. Ce qui reste, en dehors de ça :
-   - Les images des Zones 2 et 3 à générer. Les deux prompts sont écrits et prêts
-     à coller dans docs/01-prompts-arene.md. La Zone 1 n'a rien à faire. Pour la
-     Zone 3, ne joindre QUE la Zone 1 finie : `boomball up.png` dessine les deux
-     portes latérales qu'on vient d'abandonner
-   - Le relevé de l'arène au pixel, contre les nouvelles images, une fois
-     validées. Le layout se déclare lui-même provisoire
-   - Une décision sur les Crackers, toujours ouverte : `CRACKER_MOVE_CELLS` de 6
+5. Les trois images d'arène sont finales, en 2048x2048, les anciennes dans
+   assets/arena/_rejected/. Ce qui reste :
+   - Le relevé de l'arène au pixel, et c'est le vrai chantier restant. Le layout
+     se déclare provisoire. Deux écarts sont déjà mesurés : la Zone 2 dessine
+     ses passerelles à 37 et 63 % de la hauteur quand le layout les code à 23 et
+     77 %, et la Zone 1 place sa médiane à 63 % quand le layout dit 50 %. Le
+     sens de la correction est une décision, pas une évidence : déplacer les
+     rangées rapprocherait les lignes de mise en jeu de l'axe et changerait la
+     distance au ballon au coup d'envoi. À trancher après avoir joué
+   - Une décision sur les Crackers, toujours ouverte : CRACKER_MOVE_CELLS de 6
      à 10. Les chiffres datent du terrain horizontal et se remesureront
    - Un compteur à surveiller : « Shrapnel oath » porte 1 victoire pour 3 matchs
      gagnés. Probablement la migration 0003 appliquée en cours de route, mais ça
@@ -61,12 +58,13 @@ Sept choses à savoir tout de suite.
 
 6. Les commandes. Depuis boomball/ : `npm test`, `npm run typecheck`,
    `npm run sweep`. Depuis boomball/client/ : `npm run dev` sur
-   http://localhost:5173, et `npm run build`. Pour redéployer les fonctions,
-   depuis boomball/ : `set -a && . ../.env && set +a` puis
-   `npm run deploy:function`. Pour une migration ou le seed :
-   `node scripts/apply-migration.mjs <fichier.sql>`. Deux contrôles en ligne,
-   depuis la racine du workspace, après `set -a && . ./.env && set +a` :
-   `python boomball/supabase/checks/rls-check.py` et
+   http://localhost:5173, et `npm run build`. Pour une migration ou le seed,
+   depuis boomball/ : `node scripts/apply-migration.mjs <fichier.sql>`, qui
+   charge le .env du workspace tout seul, dans n'importe quel shell. Les autres
+   scripts veulent encore leurs variables à la main, et cette ligne est du bash
+   alors que mon shell est PowerShell : `set -a && . ../.env && set +a` depuis
+   boomball/ avant `npm run deploy:function`, ou `set -a && . ./.env && set +a`
+   depuis la racine avant `python boomball/supabase/checks/rls-check.py` et
    `python boomball/supabase/checks/browser-path.py`. Un match complet en
    ligne : `node scripts/run-ts.mjs scripts/live-match.ts` depuis boomball/.
 
@@ -83,6 +81,6 @@ Attention : il n'y a pas de navigateur pilotable dans l'environnement, donc tout
 ce qui touche à l'écran n'a jamais été regardé, seulement typechecké et
 construit. C'est ce que mes tests servent à trouver.
 
-La suite prévue, dans l'ordre : j'applique les deux écritures en base, je génère
-les deux images, je rejoue, puis je lance /security-review moi-même, puis tu
-crées le projet Vercel par l'API et tu déploies.
+La suite prévue, dans l'ordre : je rejoue une partie, la première sur le terrain
+de bout en bout, on traite ce qu'elle révèle, puis je lance /security-review
+moi-même, puis tu crées le projet Vercel par l'API et tu déploies.
