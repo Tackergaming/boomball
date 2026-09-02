@@ -23,7 +23,7 @@ import type { Point } from '../../../engine/geometry.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
 import { pathTo } from '../../../engine/rules/movement.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
-import { ARENA_WIDTH, arena, spec, ZONE_ART, zoneOf } from '../lib/arena.js';
+import { ARENA_WIDTH, arena, spec, ZONE_ART, ZONE_COUNT, zoneOf } from '../lib/arena.js';
 
 const ZONE_ROWS = 15;
 
@@ -98,7 +98,7 @@ export function Board({
         zone={zone + 1}
         state={state}
         own={own}
-        onClick={() => zone < 3 && onZone(zone + 1)}
+        onClick={() => zone < ZONE_COUNT && onZone(zone + 1)}
         side="above"
       />
 
@@ -555,7 +555,7 @@ function Strip({
 }) {
   const [hover, setHover] = useState(false);
 
-  if (zone < 1 || zone > 3) {
+  if (zone < 1 || zone > ZONE_COUNT) {
     return (
       <div style={{ ...S.strip, background: 'var(--void)', cursor: 'default' }}>
         <span className="label" style={{ ...S.stripLabel, color: 'var(--text-faint)' }}>

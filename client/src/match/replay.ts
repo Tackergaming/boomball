@@ -22,7 +22,7 @@
  * sentence: who acted, what they tried, what the dice said.
  */
 
-import { ZONE_HEIGHT } from '../../../engine/constants.js';
+import { ZONE_COUNT, ZONE_HEIGHT } from '../../../engine/constants.js';
 import type { Point } from '../../../engine/geometry.js';
 import type { DiceRoll, MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId, Unit, UnitId } from '../../../engine/types.js';
@@ -473,7 +473,7 @@ function label(crackerId: string): string {
  * is the numbering every other surface of this client uses.
  */
 function zoneName(y: number): string {
-  const zone = Math.min(3, Math.max(1, Math.floor(y / ZONE_HEIGHT) + 1));
+  const zone = Math.min(ZONE_COUNT, Math.max(1, Math.floor(y / ZONE_HEIGHT) + 1));
   return ZONE_NAMES[zone] ?? `Zone ${zone}`;
 }
 
