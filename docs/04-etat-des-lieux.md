@@ -1,10 +1,11 @@
 # État des lieux
 
 > Point de reprise du projet Boomball. À lire en premier dans une nouvelle session.
-> Dernière mise à jour : 2026-09-02. L'équilibrage est clos, le nombre de buts est à l'objectif
-> (3,6 à 4,5 par match, 0 à 2 matchs sans but sur 200, voir « Le lot 4 »). **La phase 4 est
-> commencée** : la couche serveur est écrite et testée, le schéma Postgres et le seed sont posés.
-> Reste l'Edge Function à déployer et tout le client.
+> Dernière mise à jour : 2026-09-02, après le câblage Supabase. L'équilibrage est clos, le nombre de
+> buts est à l'objectif (3,6 à 4,5 par match, 0 à 2 matchs sans but sur 200, voir « Le lot 4 »).
+> **Le dos de l'application est en ligne** : projet Supabase créé, schéma et seed appliqués, RLS
+> vérifiée sur de vrais utilisateurs, Edge Function déployée, et **un match entier joué à travers
+> elle**. Il ne reste de la phase 4 que le client React.
 
 ## Le projet en trois lignes
 
@@ -34,7 +35,9 @@ seule arène au MVP. **Ordinateur uniquement, 1280 px minimum, pas de mobile.** 
 
 ## Ce qui est construit et testé
 
-**235 tests au vert, environ 8600 lignes.** Plus `npm run sweep` pour le rapport d'équilibrage. `npm test` et `npx tsc --noEmit` depuis `boomball/`.
+**235 tests au vert, environ 8600 lignes.** Plus `npm run sweep` pour le rapport d'équilibrage.
+`npm test` et `npm run typecheck` depuis `boomball/`. Le typecheck lance désormais **deux** tsconfig,
+celui de la racine et celui de `scripts/`, pour la raison expliquée plus bas.
 
 | Module | État |
 |---|---|
@@ -55,8 +58,12 @@ seule arène au MVP. **Ordinateur uniquement, 1280 px minimum, pas de mobile.** 
 | `ai/selfPlay` | Le match sans écran, et le harnais d'équilibrage |
 | `server/session` | La logique du serveur, sans serveur. Propriété d'une unité, chrono de tour, et la résolution de tous les tours IA jusqu'au prochain humain |
 | `server/seed` | Le seed SQL généré depuis le moteur, pour que `role_stats` et l'arène ne dérivent pas |
-| `supabase/migrations/0001_init.sql` | Le schéma, les enums et la RLS. Pas encore appliqué à un projet |
-| `supabase/functions/resolve-action` | L'Edge Function. **Écrite, jamais exécutée**, voir plus bas |
+| `supabase/migrations/*.sql` | Le schéma, les enums et la RLS. **Appliqués au projet**, `0002` corrige la lecture d'une équipe par son propriétaire |
+| `supabase/checks/rls-check.py` | 24 assertions de RLS contre le projet vivant, deux utilisateurs et de vrais JWT. Hors `npm test`, il lui faut le réseau |
+| `supabase/functions/resolve-action` | L'Edge Function. **Déployée et éprouvée sur un match complet** |
+| `scripts/build-edge-function.mjs` | Le bundle esbuild qui lève l'obstacle Deno. `npm run build:function` |
+| `scripts/deploy-edge-function.mjs` | Le déploiement par l'API Management. `npm run deploy:function` |
+| `scripts/live-match.ts` | Un match entier joué contre la fonction déployée, en HTTP, de bout en bout |
 
 ## Décisions d'ingénierie prises en cours de route
 
@@ -434,24 +441,99 @@ dérive. Donc `supabase/seed.sql` est **généré** depuis `engine/stats.ts` et 
 `server/seed.test.ts` tient le fichier contre le moteur : change une stat, le test casse. Vérifié en
 le cassant volontairement.
 
-### Ce qui est écrit mais n'a jamais tourné
+### Le projet Supabase est en ligne
 
-**`supabase/functions/resolve-action/index.ts`.** Elle ne contient aucune décision, elle charge,
-appelle `server/session.ts`, écrit et diffuse. Elle n'est ni typée par le `tsc` du projet, ni
-déployée, ni exécutée une seule fois.
+Créé le 2026-09-02, région **eu-west-3 (Paris)**, ref **`tckaybbmnjyitavypqtq`**, dans
+`Jerome's Org`. Le `.env` du workspace porte l'URL, la clé anon, la clé service role, le mot de
+passe de la base et le ref, sous le préfixe `SUPABASE_BOOMBALL_`. **Rien de tout ça n'est
+versionné**, et rien ne doit l'être.
 
-**Un obstacle connu avant qu'elle puisse tourner.** Le moteur importe ses modules en `./types.js`
-alors que les fichiers sur le disque sont en `.ts`, ce qui est la convention TypeScript de tout le
-dépôt et que **Deno ne résout pas**. Il faut donc bundler `engine`, `ai` et `server` en un seul
-fichier ESM avec esbuild et l'importer depuis la fonction. C'est une étape de build à ajouter, pas
-une réécriture.
+Ni la CLI `supabase` ni `psql` ne sont installés, et ils ne sont pas nécessaires : le Personal
+Access Token de `SUPABASE_API_KEY_BOOMBALL` ouvre l'API Management, qui crée les projets, exécute le
+SQL et déploie les fonctions. Tout ce qui suit est passé par là.
 
-**Et il faut un projet Supabase.** Rien n'est appliqué nulle part : ni la migration, ni le seed, ni
-la fonction. Il me faut un projet et ses identifiants pour aller plus loin de ce côté.
+**La migration et le seed sont appliqués.** Neuf tables, RLS active sur les neuf, `role_stats` à
+douze lignes et le Kill-Silo en base.
+
+**La RLS a été vérifiée pour de vrai**, par `supabase/checks/rls-check.py` : deux utilisateurs
+signés, de vrais JWT, 24 assertions sur ce que chacun voit et écrit. C'est un script et pas un test
+vitest parce qu'il lui faut un projet vivant et un aller-retour réseau, quand la suite doit rester
+en millisecondes. Il a trouvé deux choses le premier jour, et aucune n'était visible en lisant les
+policies.
+
+**Un vrai défaut, corrigé par `0002_team_read_owner.sql`.** `teams_read_member` était
+`using (is_team_member(id))`, et `is_team_member` répond en interrogeant `teams`. Une sous-requête
+dans une policy voit l'instantané du début de l'instruction, donc **la ligne qu'on est en train
+d'insérer lui est invisible**. Conséquence : `insert into teams` passait et
+`insert into teams ... returning id` était refusé. En termes PostgREST, un insert nu marchait et
+`.insert().select()` échouait avec un 42501 dont le message, « new row violates row-level security
+policy », désigne le mauvais coupable : ce n'est pas le `with check` de l'insert, c'est la policy de
+lecture au moment du `RETURNING`. C'est exactement ce que le lobby enverra. Le correctif lit `owner`
+sur la ligne évaluée au lieu d'aller la chercher, ce qui est aussi moins cher à chaque lecture.
+
+**Une fausse alerte, qui vaut d'être connue.** Un client qui tente `PATCH /matches` ou
+`DELETE /matches` reçoit **204**, pas 403. Sans aucune policy d'écriture, l'instruction ne
+correspond à aucune ligne au lieu de lever, et PostgREST répond 204 pour « rien à signaler », le
+même 204 qu'une écriture réussie. Le schéma était bon, c'est la première version du contrôle qui
+était fausse. **Toute vérification d'écriture relit donc la ligne** avec la clé service et juge sur
+ce que la base a gardé, jamais sur le code de retour.
+
+### L'Edge Function tourne
+
+**L'obstacle Deno est levé, et par une étape de build.** Le moteur importe ses modules en
+`./types.js` alors que les fichiers sont en `.ts` ; Deno exige que le spécificateur nomme un fichier
+qui existe, esbuild applique la règle TypeScript qui dit que le `.js` peut désigner le `.ts` d'à
+côté. `npm run build:function` produit donc `supabase/functions/resolve-action/dist/index.js`, un
+seul fichier ESM de 70 ko, le client Supabase restant en import d'URL et marqué externe. Rien dans
+`engine`, `ai`, `server` ni dans `index.ts` n'a changé, et le dépôt garde **une seule** convention
+d'import. `index.ts` reste la source à éditer, `dist/` est généré et ignoré par git.
+
+**`npm run deploy:function`** construit puis déploie par l'API Management,
+`POST /v1/projects/{ref}/functions/deploy`, avec `verify_jwt` actif : la fonction lit l'identité dans
+le JWT et refuse qui elle ne peut pas nommer, donc une requête non signée est mieux arrêtée à la
+passerelle que dans notre code. Déployée en version 1, statut ACTIVE.
+
+**Un match entier a été joué à travers elle**, par
+`node scripts/run-ts.mjs scripts/live-match.ts`. Vrai utilisateur, vrai JWT, vrai projet, chaque tour
+humain envoyé en HTTP. Le siège humain est piloté par `chooseAction`, donc la fonction rencontre des
+déplacements, des passes, des tirs et des coups de batte au lieu d'une file d'`endTurn`. Le script
+ne garde jamais le plateau entre deux tours : il relit `match_state` **à travers la RLS en tant que
+joueur**, qui est le chemin de lecture du client React.
+
+Ce que ça donne, deux fois de suite avec des identifiants différents et le même seed :
+
+| Mesure | Valeur |
+|---|---|
+| Requêtes à la fonction | 26 |
+| Événements rendus | 657, plus 27 à l'ouverture |
+| Refus | 0 |
+| Durée | 20 secondes |
+| Fin | round 10, `finished`, A 80 - B 0 |
+| Séquence des événements | 684 lignes, aucun trou |
+| Instantané | `seq` 683, sur le dernier événement |
+
+Le 80 se lit 3 buts à 10 plus le Spark à 50. Les deux runs sont identiques événement pour événement
+avec des ids différents, donc **le déterminisme à graine égale tient aussi à travers le réseau**.
+
+Un match est conservé en base pour être regardé, `f9f48c4b-e7e1-4b62-87c1-94e2afbff000`. Il part
+avec son joueur, `DELETE /auth/v1/admin/users/7da65fbe-3bbe-4581-8bc7-6274188e1608`, tout cascade.
+
+**Ce que ça a coûté en outillage.** `scripts/run-ts.mjs` bundle et exécute un script TypeScript qui
+importe le moteur, parce que Node 24 enlève les types mais ne résout pas plus `./types.js` que Deno.
+`scripts/tsconfig.json` typecheck les scripts à part : la racine ne donne à `engine`, `ai` et
+`server` que `lib: ES2022` sans types Node, donc une règle du jeu qui appellerait `fetch` ou
+`process.env` ne compilerait pas, et cette garantie vaut mieux qu'un tsconfig économisé.
+`npm run typecheck` lance les deux.
 
 ### Ce qui reste de la phase 4
 
-Le client React et Vite en entier. La grille SVG posée sur l'art de la zone active, la piste
+**Une seconde Edge Function, `create-match`.** Ouvrir un match écrit dans quatre tables sur
+lesquelles la RLS n'accorde aucune écriture, donc un navigateur ne peut pas le faire et ne le doit
+pas. `scripts/live-match.ts` s'en sort avec la clé service parce que c'est un script ; le lobby aura
+besoin d'une porte. Elle appelle `createMatch` puis `openSession` et pose les mêmes lignes que le
+script, qui sert de spécification.
+
+**Le client React et Vite en entier.** La grille SVG posée sur l'art de la zone active, la piste
 d'initiative, la barre d'actions pilotée par `legalActions`, le panneau d'ordres alliés, et
 l'abonnement Realtime avec reprise depuis le dernier `seq` connu.
 
@@ -472,11 +554,18 @@ prétendu le contraire, il ne documentait que la vérification du prompt 1.
 
 **Rien, côté design.** Les deux prompts sont livrés et vérifiés.
 
-**Le projet Supabase est à créer, et de quoi le faire est disponible.** Le `.env` du workspace porte
-`SUPABASE_API_KEY_BOOMBALL`, un **Personal Access Token** (préfixe `sbp_`), donc l'API Management
-permet de créer le projet, de récupérer ses clés et d'exécuter le SQL sans intervention manuelle. Ni
-la CLI `supabase` ni `psql` ne sont installés sur la machine : passer par l'API Management, ou
-installer la CLI. Il faudra choisir une région et un mot de passe de base de données.
+**Le projet Supabase est en ligne, et rien ne t'attend dessus.** Région eu-west-3, ref
+`tckaybbmnjyitavypqtq`, schéma et seed appliqués, fonction déployée. Deux choses à savoir tout de
+même. Il y a maintenant **deux projets dans l'org**, `boomball` et `projet test`, ce qui est le
+plafond du plan gratuit : supprime `projet test` si tu en veux un troisième. Et un **match de
+démonstration** est conservé en base avec l'utilisateur jetable qui le porte, ids dans « L'Edge
+Function tourne », à effacer quand tu l'auras regardé.
+
+**La création de match n'a pas encore de porte.** `scripts/live-match.ts` la fait en écrivant les
+lignes avec la clé service, ce qui va pour un script mais pas pour un client : le navigateur n'aura
+jamais cette clé. Il faudra une seconde Edge Function, `create-match`, qui appelle `createMatch` et
+`openSession` et pose les mêmes lignes. C'est le premier travail côté serveur qui reste, et il est
+petit.
 
 **L'équilibrage est clos.** Si tu veux le rouvrir, la section « Le lot 4 » liste les leviers déjà
 mesurés et ce qu'ils valent, pour ne pas refaire ces sweeps.

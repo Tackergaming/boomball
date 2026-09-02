@@ -7,11 +7,19 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "sweep": "vitest run --config vitest.sweep.config.ts"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p scripts",
+    "sweep": "vitest run --config vitest.sweep.config.ts",
+    "build:function": "node scripts/build-edge-function.mjs",
+    "deploy:function": "node scripts/build-edge-function.mjs && node scripts/deploy-edge-function.mjs"
   },
   "devDependencies": {
+    "@types/node": "^22.20.1",
+    "esbuild": "^0.24.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
+  },
+  "allowScripts": {
+    "esbuild@0.24.2": true,
+    "esbuild@0.21.5": true
   }
 }

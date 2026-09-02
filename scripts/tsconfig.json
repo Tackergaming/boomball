@@ -1,0 +1,15 @@
+{
+  // The scripts talk to the network and to the process, and the engine must
+  // not. The root tsconfig gives `engine`, `ai` and `server` nothing but
+  // ES2022, so a rule that reached for `fetch` or `process.env` would not
+  // compile; that guarantee is worth more than one tsconfig is worth saving.
+  // Hence a second one here, which adds exactly what a script needs.
+  //
+  // Checked by `npm run typecheck`, which runs both.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["."]
+}
