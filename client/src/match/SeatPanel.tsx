@@ -74,9 +74,15 @@ export function SeatPanel({
 
       <dl style={S.stats}>
         <Stat term="AC" value={stats.ac} />
-        <Stat term="Bat" value={`+${stats.might}`} />
-        <Stat term="Aim" value={`+${stats.aim}`} />
-        <Stat term="Agility" value={`+${stats.agility}`} />
+        {/* The same three names as the team sheet, for the same reason: Bat,
+            Aim and Agility name nothing a D&D player has ever rolled. Melee and
+            Throw name the roll the number is added to. The third is Dex and not
+            Dodge, because it is never added to the Dodge action: it carries
+            initiative, Dexterity saves, Acrobatics, an interception and a shove
+            resisted on agility. That is a whole ability score, not one move. */}
+        <Stat term="Melee" value={`+${stats.might}`} />
+        <Stat term="Throw" value={`+${stats.aim}`} />
+        <Stat term="Dex" value={`+${stats.agility}`} />
       </dl>
 
       <div style={S.flags}>

@@ -1,12 +1,16 @@
 # État des lieux
 
 > Point de reprise du projet Boomball. À lire en premier dans une nouvelle session.
-> Dernière mise à jour : 2026-09-02, après le câblage Supabase. L'équilibrage est clos, le nombre de
-> buts est à l'objectif (3,6 à 4,5 par match, 0 à 2 matchs sans but sur 200, voir « Le lot 4 »).
-> **La phase 4 est écrite de bout en bout.** Projet Supabase en ligne, schéma et seed appliqués,
+> Dernière mise à jour : 2026-09-02, après trois tests en local de Jérôme. L'équilibrage est clos,
+> le nombre de buts est à l'objectif (3,6 à 4,5 par match, 0 à 2 matchs sans but sur 200, voir
+> « Le lot 4 »).
+> **La phase 4 est écrite de bout en bout.** Projet Supabase en ligne, quatre migrations appliquées,
 > RLS vérifiée sur de vrais utilisateurs, les deux Edge Functions déployées, un match entier joué à
-> travers elles, et **le client React construit et servi en local**. Ce qui reste est du playtest,
-> pas de la construction.
+> travers elles, et **le client React construit et servi en local**. Ses trois tests ont produit
+> trois lots de correctifs : le CORS qui bloquait le lobby, dix retours d'ergonomie de match, puis
+> deux trous fonctionnels, les victoires que rien n'enregistrait et le canal d'ordres alliés que rien
+> ne branchait. Les trois sections sont plus bas, à lire dans l'ordre.
+> **261 tests.** Ce qui reste est du playtest, pas de la construction.
 
 ## Le projet en trois lignes
 
@@ -61,14 +65,20 @@ celui de la racine et celui de `scripts/`, pour la raison expliquée plus bas.
 | `server/seed` | Le seed SQL généré depuis le moteur, pour que `role_stats` et l'arène ne dérivent pas |
 | `server/lobby` | Qui a le droit d'ouvrir un match, et le coup d'envoi. Sans base, comme `session` |
 | `server/arenaRow` | La ligne `arenas` remise dans la forme du moteur. Partagée par les deux fonctions, testée en aller-retour contre `KILL_SILO` |
-| `supabase/migrations/*.sql` | Le schéma, les enums et la RLS. **Appliqués au projet**, `0002` corrige la lecture d'une équipe par son propriétaire |
+| `supabase/migrations/*.sql` | Le schéma, les enums et la RLS. **Les quatre sont appliqués au projet.** `0002` corrige la lecture d'une équipe par son propriétaire, `0003` enregistre une victoire, `0004` porte les ordres alliés |
+| `scripts/apply-migration.mjs` | Applique un fichier SQL par l'API Management. Pas un migrateur, pas de registre |
 | `supabase/checks/rls-check.py` | 24 assertions de RLS contre le projet vivant, deux utilisateurs et de vrais JWT. Hors `npm test`, il lui faut le réseau |
+| `supabase/checks/browser-path.py` | 16 assertions sur le parcours exact du navigateur, **préflight CORS compris**. Le seul contrôle qui voit ce que Node ne peut pas voir. Hors `npm test`, il lui faut le réseau |
+| `supabase/functions/_shared/cors.ts` | Les en-têtes CORS et la réponse au préflight, partagés par les deux fonctions |
 | `supabase/functions/resolve-action` | L'Edge Function du match. **Déployée et éprouvée sur un match complet** |
 | `supabase/functions/create-match` | La porte du lobby. **Déployée et éprouvée**, refus compris |
 | `scripts/build-edge-function.mjs` | Le bundle esbuild qui lève l'obstacle Deno. `npm run build:function` |
 | `scripts/deploy-edge-function.mjs` | Le déploiement par l'API Management. `npm run deploy:function` |
 | `scripts/live-match.ts` | Un match entier joué contre la fonction déployée, en HTTP, de bout en bout |
 | `client/` | React, Vite, TypeScript. Les cinq écrans du design, la grille SVG, la barre d'actions, la piste d'initiative, le journal |
+| `client/src/match/replay.ts` | Le rejeu tour par tour d'un lot d'événements. Transcrit, ne résout jamais. Tenu par `replay.test.ts` contre le plateau du serveur |
+| `client/src/match/Announce.tsx` | La carte qui dit ce qui vient d'arriver, jet de dés compris |
+| `client/src/match/Briefing.tsx` | L'explication d'ouverture, une fois par joueur |
 
 ## Décisions d'ingénierie prises en cours de route
 
@@ -648,6 +658,286 @@ inscription, écriture du profil, création d'équipe en `insert().select()`, le
 ouverture d'un match par `create-match`, lecture du plateau à travers la RLS, un tour envoyé à
 `resolve-action`, et le refus d'un but écrit à la main. 16 assertions, toutes vertes.
 
+## Ce que le test en local a trouvé
+
+Premier test de Jérôme dans un navigateur, le 2026-09-02. Un défaut bloquant et quatre reproches de
+texte. Tout est corrigé, et les fonctions sont redéployées.
+
+### Le bouton du lobby ne partait jamais, et c'était le CORS
+
+**Symptôme :** « Start match » affichait « Loading the silo » et n'en sortait plus. Rien à l'écran,
+pas de message, pas d'erreur. La partie ne commençait jamais.
+
+**Cause :** ni `create-match` ni `resolve-action` ne répondaient au préflight CORS. Un navigateur
+qui veut envoyer un `POST` avec un en-tête `Authorization` envoie d'abord un `OPTIONS`, et la
+passerelle Supabase le laisse passer sans jeton même avec `verify_jwt` actif, donc il arrivait bien
+jusqu'à la fonction. Les deux répondaient `405 POST only`, sans le moindre en-tête
+`Access-Control-Allow-Origin`. Le navigateur refusait alors d'envoyer la vraie requête et rejetait
+le `fetch` avec un `TypeError` nu.
+
+**Pourquoi personne ne l'avait vu, et c'est la leçon.** `scripts/live-match.ts` joue des matchs
+entiers à travers ces deux fonctions, en HTTP, contre le vrai projet. Il était vert. **Node ne fait
+pas de préflight, seul un navigateur en fait un.** Aucune quantité de tests réseau depuis Node ne
+pouvait attraper ce défaut, et 254 tests unitaires encore moins. D'où
+`supabase/checks/browser-path.py`, qui rejoue le parcours du lobby en portant un `Origin` et en
+vérifiant les en-têtes CORS de chaque réponse, en plus des lectures RLS que le bouton attend.
+
+**Deux correctifs, parce qu'il y avait deux défauts superposés.**
+
+- `supabase/functions/_shared/cors.ts` porte les en-têtes et la réponse au préflight, et les deux
+  fonctions le traversent : le préflight passe avant le contrôle de méthode, et `reply()` est le
+  seul endroit qui fabrique une `Response`, donc tout ce qui sort porte les en-têtes.
+  **L'origine est `*` et c'est délibéré** : l'identité est le JWT de l'en-tête `Authorization`,
+  aucune requête n'est envoyée avec `credentials: 'include'`, aucun cookie n'est lu. Une page d'une
+  autre origine ne peut pas obtenir le jeton d'un joueur, qui vit dans le stockage local de
+  l'origine de l'application ; tout ce qu'un joker donne à un attaquant, c'est le 401 que ces
+  fonctions rendent à quiconque n'est pas signé. Ce qu'il nous donne, c'est de ne pas redéployer
+  deux fonctions à chaque déménagement du front, URL de préversion Vercel comprises
+- **Un écran ne doit jamais pouvoir rester pendu**, et c'est le vrai défaut derrière le premier. Le
+  `fetch` rejeté n'était attrapé nulle part : `callFunction` le laissait remonter, `Lobby.start()`
+  n'avait pas de `try`, donc `busy` restait vrai pour toujours. Un CORS manquant, un réseau coupé,
+  une fonction non déployée et un projet déménagé échouent tous de la même façon, et aucun ne doit
+  pouvoir bloquer un écran. `callFunction` rend désormais un refus affichable au lieu de lever, et
+  les quatre boutons qui posent un verrou le relâchent dans un `finally` : `Lobby.start()`,
+  `useMatch.send()`, le formulaire de `SignIn` et celui de `FoundTeam`. Les trois derniers n'ont
+  jamais bloqué personne, ils avaient la même forme, et en plein match ce défaut coûterait au joueur
+  le reste de la partie au lieu du bouton du lobby
+
+**Vérifié**, `python boomball/supabase/checks/browser-path.py` : 16 assertions vertes, préflight,
+ouverture du match, relecture par la RLS et un tour envoyé. Les fonctions sont redéployées,
+`resolve-action` en version 3 et `create-match` en version 2.
+
+### Les textes des écrans
+
+Quatre reproches de Jérôme sur l'écran d'équipe, tous appliqués.
+
+- « Wins toward veteran » devient « Matches to win to level up to veteran ». Sa formulation était
+  la bonne idée, l'anglais en a été redressé
+- « Starting seven » devient « Composition of the team »
+- « Seven of seven fielded · rookie » est supprimé. Le Tier est déjà en haut à droite de l'écran
+- **`BAT`, `AIM` et `AGI` ne nommaient rien qu'un joueur de D&D ait jamais lancé.** Ils deviennent
+  `MELEE`, `THROW` et `DEX`
+
+**Le choix des trois noms, parce qu'il se rediscutera.** Jérôme a tranché `MELEE / THROW / DODGE`.
+Les deux premiers sont exacts : `might` alimente l'attaque de mêlée, `aim` alimente tous les lancers
+du Payload. Le troisième ne l'était pas. `agility` **n'est jamais ajouté à l'action Dodge** : il
+porte l'initiative, les sauvegardes de Dextérité, les Acrobaties, l'interception d'une passe et la
+résistance à une bousculade. C'est une caractéristique entière et pas un mouvement, donc `DEX`.
+Le même trio est appliqué au `SeatPanel` du match, qui affichait `Bat / Aim / Agility` : deux écrans
+qui nomment différemment la même colonne seraient pires que le vocabulaire de départ.
+
+## Le second test en local : rendre le match lisible
+
+Dix retours de Jérôme après avoir joué pour de vrai. Un seul portait sur une règle, tous les autres
+disaient la même chose sous dix formes : **le jeu se déroulait sans rien expliquer de ce qu'il
+faisait**. Tout est traité.
+
+### Le rejeu, qui est le vrai sujet
+
+En solo, un clic humain résout treize tours d'IA et revient en un lot de soixante événements.
+Appliqués en une image, tout le terrain se téléporte. Le retour exact était : « je suis obligé de
+remonter les logs pour voir que mon équipe a marqué un but sans même que je m'en rende compte ».
+
+**Arbitré par Jérôme : tour par tour, environ sept dixièmes de seconde par tour**, ce qui met un
+round de treize unités autour de dix secondes. Réglable en trois crans dans la barre du match, lent,
+normal, instantané, gardé dans le navigateur, plus un bouton pour passer le reste.
+
+`client/src/match/replay.ts` découpe le lot en **beats**, un beat étant le tour d'une unité ou les
+hasards d'un round, et projette un plateau par beat. `Announce.tsx` affiche la carte : qui a agi, ce
+qu'il a tenté, et **le jet de dés en clair**, `d20 10+7 = 17 vs 17`. Un but ou une évacuation tient
+deux fois plus longtemps. La dernière carte reste à l'écran jusqu'à la prochaine action, pour que le
+joueur lise son propre jet au lieu de le voir passer.
+
+**Le client ne résout toujours rien, et c'est vérifié plutôt qu'affirmé.** La projection ne fait que
+transcrire ce qu'un événement dit déjà : `moved` porte `from`, `to` et le chemin, `damaged` porte
+`hpAfter`, `scored` porte ses points. À la fin du rejeu, le snapshot du serveur est relu et remplace
+la projection en entier.
+
+`client/src/match/replay.test.ts` tient cette promesse : il joue de vrais tours à travers
+`server/session.ts`, projette les événements émis, et exige que les deux plateaux soient identiques
+sur tout ce qu'un joueur peut voir. **Il a trouvé quatre défauts, dont deux dans le moteur.**
+
+- **Une passe interceptée** donne le ballon au voleur. La projection l'ignorait
+- **Une passe ratée ou un tir arrêté** laisse le ballon libre, et le lanceur ne l'a plus. La
+  projection oubliait la seconde moitié et affichait un porteur qui venait de jeter le ballon
+- **Le suivi du ballon porté était une invention de ma part.** Le moteur estampille `payload.x/y`
+  quand le ballon change de mains et les laisse vieillir tant qu'il est porté, parce que le plateau
+  dessine un ballon porté sur son porteur et ne lit ces coordonnées que pour un ballon au sol.
+  Faire suivre le porteur paraissait plus propre et inventait un fait
+- **Deux trous dans le journal d'événements du moteur**, décrits juste en dessous
+
+### Deux événements ajoutés au moteur, et pourquoi c'était un vrai défaut
+
+`engine/events.ts` affirme qu'un match se rejoue depuis ses événements. Il ne se rejouait pas.
+
+**`payloadReset`, nouvel événement.** Un but incinère le ballon et en remet un neuf dans les mains
+du gardien qui vient d'encaisser, ou devant la Furnace si ce gardien est hors du terrain. `scored`
+dit que le score a bougé ; **rien ne disait où était parti le ballon**. Un lecteur qui reconstruisait
+le match depuis le journal se retrouvait avec le Payload encore dans les mains du buteur.
+
+**`substituteEntered` porte désormais `at`.** Un remplaçant rentre au point d'entrée de son équipe,
+et l'événement ne le disait pas, donc personne ne pouvait le placer.
+
+**Aucun des deux ne touche à une règle ni ne tire un dé**, ce sont deux `log.push`. L'équilibrage
+n'est pas concerné, les graines ne bougent pas, les 261 tests passent. Les fonctions sont
+redéployées, `resolve-action` en version 5 et `create-match` en version 4.
+
+### Le chrono, qui avait deux bugs
+
+**Il repartait à soixante à chaque action.** Un tour, c'est marcher, agir, remarcher, finir : quatre
+requêtes, et chacune recevait un `now + 60s` neuf. Un joueur qui cliquait n'était donc jamais sur un
+chrono, pendant que l'affichage repartait de soixante à chaque fois. `deadlineFor` ne fabrique plus
+d'échéance que lorsque le tour change de mains ; un tour qui continue garde la sienne. Deux tests
+dans `session.test.ts`, plus une assertion contre le vrai projet dans `browser-path.py`.
+
+**À zéro, il ne se passait rien.** L'échéance vit sur le serveur et se règle à la requête suivante,
+qui en solo n'arrive jamais : le joueur s'est tu, c'est toute la situation. L'écran de match frappe
+donc à la porte lui-même quand le compteur atteint zéro. Le serveur constate l'expiration, dépense
+le tour en Dodge, joue la maison, et **répond `accepted` avec `expired: true`** au lieu de refuser :
+une action arrivée après le chrono est en retard, pas illégale, et répondre « ce n'est pas ton tour »
+pour un tour que le serveur vient lui-même de retirer est un mensonge.
+
+### Le reste, un par un
+
+- **Le tour ne passait pas tout seul.** `onlyEndTurnLeft`, dans `engine/legalActions.ts`, dit quand
+  finir le tour est la seule chose qui reste. L'écran l'envoie alors seul, après une seconde qui
+  laisse lire la carte du jet. C'est dans le moteur et pas dans React : le jour où une action est
+  ajoutée à `LegalActions`, elle doit être comptée là ou l'interface sautera des tours qui avaient
+  encore quelque chose dedans
+- **Les actions apparaissaient et disparaissaient** selon la position, si bien qu'on n'apprenait
+  l'existence de Shove qu'en se trouvant par hasard à côté de quelqu'un. Elles gardent leur place et
+  se grisent, avec la phrase qui dit ce qui manque. La règle du générateur unique tient toujours :
+  ce qui est *possible* vient toujours de `legalActions` seul, un bouton gris ne se presse pas, et
+  seule la phrase est écrite dans le composant
+- **La grille couvrait moins de terrain que l'image.** Une zone fait quinze sur quinze, donc carrée,
+  et le cadre ne l'était pas : l'image le remplissait en `cover` pendant que le SVG s'y centrait en
+  `meet`. La scène est maintenant carrée, les deux couches coïncident
+- **Le gros point jaune au milieu**, que personne ne pouvait identifier, est le Payload et donc tout
+  le sport. Il pulse, porte un anneau et écrit son nom
+- **Rien ne disait que les bandes de zone étaient cliquables.** Ce sont des boutons, ils en ont
+  l'air, avec une flèche, le compte des joueurs présents et « click to look » au survol
+- **On était propulsé dans le match sans explications.** `Briefing.tsx` dit l'objectif, les trois
+  marqueurs, les trois zones et le tour, une fois par joueur, réouvrable par le bouton « Rules »
+- **Un but passait inaperçu.** La carte le crie, et le tableau de score se rallume quand il bouge
+- **Le texte de l'écran de connexion** est celui que Jérôme a écrit
+
+### Ce qui n'est pas vérifié
+
+Il n'y a pas de navigateur pilotable dans cet environnement, donc **rien de tout ça n'a été regardé à
+l'écran**. Ce qui est vérifié l'est par les 261 tests, les deux typechecks, le build du client et
+`browser-path.py` contre le vrai projet. La mise en page, le rythme réel du rejeu et la lisibilité
+des cartes se jugent en jouant.
+
+## Le troisième test en local : deux trous fonctionnels
+
+Sept retours. Deux d'entre eux n'étaient pas de l'ergonomie mais **des morceaux du jeu qui
+n'existaient pas**, tous les deux invisibles depuis le code parce qu'ils consistaient précisément en
+l'absence d'un appel.
+
+### Rien n'écrivait jamais les victoires
+
+`teams.wins` existe depuis la migration 0001, le Tier est une colonne générée qui le lit, le hub en
+dessine une échelle, et **aucune ligne de code ne l'écrivait**. Toute la progression décrite dans les
+décisions produit était donc inerte : une équipe pouvait gagner tous ses matchs et rester Rookie pour
+toujours. `Results.tsx` affirmait même en commentaire qu'une victoire écrivait la colonne.
+
+Ça ne se voyait qu'en gagnant, ce que Jérôme a fait.
+
+**Migration `0003_record_win.sql`**, une fonction `record_team_win` appelée par `resolve-action` à la
+**transition** vers `finished`, jamais sur un match déjà terminé. C'est une fonction et pas un update
+parce que `wins = wins + 1` ne s'exprime pas à travers PostgREST, et un lire-puis-écrire depuis la
+fonction serait une course le jour où deux matchs se terminent en même temps.
+
+**Elle n'est pas appelable par un client**, et c'est le sujet des `revoke` en bas du fichier : un
+joueur signé qui pourrait l'appeler s'offrirait Star en six requêtes, et le Tier d'une équipe est la
+difficulté à laquelle la maison est alignée contre elle. Vérifié dans `browser-path.py` : un joueur
+qui tente la RPC reçoit 403 et son compteur reste à zéro.
+
+**Vérifié de bout en bout** par `scripts/live-match.ts`, qui joue un match entier contre la fonction
+déployée et lit ensuite le compteur à travers la RLS, comme le hub : match gagné 30-10, `wins` à 1.
+Le script se plaint désormais si le compteur et le vainqueur ne s'accordent pas.
+
+### Le canal d'ordres n'était branché nulle part
+
+`ai/orders.ts` le dit dans son propre en-tête : en solo un humain pilote un joueur sur quatorze, donc
+le canal d'ordres n'est pas un confort, c'est l'essentiel de ce que fait le joueur, et six des sept
+maillots de son camp se conduisent par là. Il est écrit, `chooseAction` le lit, et **rien n'y a
+jamais mis un ordre** : aucun bouton dans l'interface, et l'Edge Function passait une liste vide à
+chaque requête. Le retour de Jérôme, « je n'ai jamais la balle », est exactement ce que produit un
+canal non câblé.
+
+**Migration `0004_match_orders.sql`**, une colonne `orders` sur `matches`. Elle n'est pas dans le
+snapshot parce que les ordres ne font pas partie de l'état du jeu : le moteur ignore leur existence,
+`reduce` ne les lit jamais, et un match rejoué depuis ses événements est le même avec ou sans eux.
+Ils ne biaisent que ce que l'IA choisit d'envoyer à la porte.
+
+**Un ordre ne coûte rien.** `resolve-action` accepte une requête qui ne porte que des ordres : rien
+n'est joué, aucun tour n'est dépensé, la liste est écrite et renvoyée. Appeler la balle ne doit pas
+coûter le tour pour lequel on l'appelait.
+
+**Les ordres sont validés contre le plateau, jamais crus.** Le destinataire doit être un coéquipier
+du camp de l'appelant, et pas l'unité qu'il pilote lui-même. Un ordre invalide est **refusé**, pas
+ignoré : un ordre silencieusement jeté ressemble exactement à une IA qui refuse de passer. Vérifié :
+ordonner à la maison rend 400.
+
+Côté écran, un bouton « Call for the ball » qui pose un `callForPass` sur les six coéquipiers IA
+d'un coup, avec le joueur comme receveur.
+
+### Le match durait dix rounds pendant que Jérôme en jouait quatre
+
+Le chrono lui prenait ses tours, et pour deux raisons superposées, aucune des deux visible depuis un
+test.
+
+**Le rejeu mangeait le temps de réflexion.** L'échéance est posée par le serveur à l'instant où il
+finit de résoudre, donc les dix à trente secondes de rejeu tombaient dedans.
+
+**Et le client comparait deux horloges différentes.** L'échéance est estampillée par le serveur et
+elle était comparée à `Date.now()` du navigateur. Une machine dont l'horloge avance de quelques
+minutes lit **tous** ses tours comme déjà expirés et les rend aussitôt.
+
+Trois correctifs. Les fonctions renvoient `serverNow` sur chaque réponse, d'où le client tire son
+décalage. Le compte à rebours affiché part du moment où le plateau redevient jouable, pas de
+l'estampille serveur. Et **le coup à la porte exige que les deux horloges soient d'accord** : le
+délai serveur dépassé une fois corrigé du décalage, *et* un chrono complet réellement écoulé devant
+l'écran depuis que la main est revenue. Chacune des deux conditions prise seule lui a coûté un tour
+qu'il n'avait pas eu.
+
+Le chrono passe par ailleurs à **120 secondes**, à sa demande. Il ne borne rien dans les règles et
+aucun sweep ne le lit. Les deux tests qui codaient soixante secondes en dur sont réécrits sur la
+constante.
+
+Enfin, un tour perdu au chrono s'affiche maintenant en bandeau sous le plateau, avec la raison. Il
+passait dans une note à côté de l'horloge.
+
+### Le reste
+
+- **Recharger la page ne jette plus dans le match.** Une équipe n'a qu'un match à la fois, donc un
+  match inachevé attend forcément, mais le hub le dit et propose d'y retourner au lieu de déposer le
+  joueur au milieu d'un round sans explication. Ouvrir un match depuis le lobby y entre directement,
+  puisque c'est le clic qu'on vient de faire
+- **Le Giff du joueur est ambre avec un chevron**, à part du cyan de son propre camp. Tous les
+  maillots alliés étaient de la même couleur, donc se trouver soi-même demandait de lire les noms
+- **Le rejeu ralentit encore** : un beat normal passe de 700 ms à 1,5 s, le cran lent à 2,5 s, et le
+  plafond du lot de 14 à 30 secondes. C'est ce que paie le chrono à 120 secondes, et le compte à
+  rebours ne court de toute façon pas pendant le rejeu
+
+### Outillage ajouté au passage
+
+`scripts/apply-migration.mjs` applique un fichier SQL par l'API Management. Les migrations 0001 et
+0002 avaient été appliquées à la main ; 0003 et 0004 en faisaient la deuxième fois, et une étape
+faite deux fois à la main est une étape qu'on finira par rater. **Ce n'est pas un migrateur** : pas
+de registre, pas d'ordre, il exécute le fichier qu'on lui donne.
+
+`browser-path.py` compte désormais 26 assertions et couvre les ordres, le refus d'un ordre adressé à
+la maison, et le fait qu'un joueur ne puisse pas s'attribuer une victoire.
+
+### Ce qui n'est toujours pas vérifié
+
+Toujours pas de navigateur pilotable ici. Ce qui touche à l'écran, la couleur ambre, le bandeau du
+chrono, le bouton d'appel, la bannière de reprise et le rythme du rejeu, **n'a pas été regardé**. Ce
+qui est vérifié l'est par les 261 tests, les deux typechecks, le build, `browser-path.py` et un match
+complet joué par `live-match.ts` contre les fonctions déployées.
+
 ## Ce qui attend Jérôme
 
 **La zone 1 est bonne, et ce document a longtemps prétendu le contraire.** Vérifié le 2026-09-02 en
@@ -684,9 +974,12 @@ plafond du plan gratuit : supprime `projet test` si tu en veux un troisième. Et
 démonstration** est conservé en base avec l'utilisateur jetable qui le porte, ids dans « L'Edge
 Function tourne », à effacer quand tu l'auras regardé. À part lui, la base est vide.
 
-**Jouer une partie en local, et c'est la prochaine chose.** `npm run dev` depuis `boomball/client`,
-puis `http://localhost:5173`. C'est le premier moment où quelqu'un voit le jeu, et le seul moyen de
-savoir si la barre d'actions se pilote au clic. La mise en ligne ne vient qu'après.
+**Rejouer une partie, et c'est la prochaine chose.** `npm run dev` depuis `boomball/client`, puis
+`http://localhost:5173`. Les deuxième et troisième lots sont largement de l'écran, et **rien de ce
+qui touche à l'écran n'a été regardé** : il n'y a pas de navigateur pilotable dans cet
+environnement. Le rythme du rejeu, la carte d'annonce, la scène carrée, la barre grisée, le
+briefing, le maillot ambre, le bouton d'appel de balle et la bannière de reprise se jugent en
+jouant. La mise en ligne ne vient qu'après.
 
 **Une revue de sécurité, à lancer par toi.** `/security-review` sur le dépôt, avant la mise en
 ligne. C'est ta commande, je ne peux pas la déclencher. Le client existe maintenant, donc la surface

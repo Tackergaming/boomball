@@ -28,46 +28,55 @@ export function SignIn({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * `busy` disables the button, so every path out of here clears it in the
+   * `finally`. The lobby learned that the hard way: one path that did not left
+   * a button reading "Loading the silo" with nothing on screen to explain it,
+   * and a sign-in form that hangs is the same dead end one screen earlier.
+   */
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
 
-    if (mode === 'in') {
-      const { error: failure } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      if (mode === 'in') {
+        const { error: failure } = await supabase.auth.signInWithPassword({ email, password });
+        if (failure) {
+          setError(failure.message);
+          return;
+        }
+        onDone();
+        return;
+      }
+
+      const { data, error: failure } = await supabase.auth.signUp({ email, password });
       if (failure) {
         setError(failure.message);
-        setBusy(false);
+        return;
+      }
+      if (!data.session) {
+        // The project has email confirmation on. Nothing more can be done here
+        // and saying so is better than a screen that appears to have hung.
+        setError('Check your email to confirm the account, then sign in.');
+        setMode('in');
+        return;
+      }
+
+      const { error: profileFailure } = await supabase
+        .from('profiles')
+        .insert({ id: data.user!.id, display_name: name.trim() || email.split('@')[0]! });
+      if (profileFailure) {
+        setError(profileFailure.message);
         return;
       }
       onDone();
-      return;
-    }
-
-    const { data, error: failure } = await supabase.auth.signUp({ email, password });
-    if (failure) {
-      setError(failure.message);
+    } catch (failure) {
+      console.error('sign in failed', failure);
+      setError('could not reach the server. Check your connection and try again.');
+    } finally {
       setBusy(false);
-      return;
     }
-    if (!data.session) {
-      // The project has email confirmation on. Nothing more can be done here
-      // and saying so is better than a screen that appears to have hung.
-      setError('Check your email to confirm the account, then sign in.');
-      setBusy(false);
-      setMode('in');
-      return;
-    }
-
-    const { error: profileFailure } = await supabase
-      .from('profiles')
-      .insert({ id: data.user!.id, display_name: name.trim() || email.split('@')[0]! });
-    if (profileFailure) {
-      setError(profileFailure.message);
-      setBusy(false);
-      return;
-    }
-    onDone();
   }
 
   return (
@@ -87,8 +96,7 @@ export function SignIn({ onDone }: { onDone: () => void }) {
             Boomball
           </h1>
           <p style={S.tagline}>
-            The gunpowder game of the Giff · seven a side, one standing silo, since the first mill
-            turned.
+            Welcome to the Galactic tournament of Boomball. The ancestral game of the Giff.
           </p>
         </div>
 

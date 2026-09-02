@@ -21,7 +21,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 
 import { ROLES, TEAM_COMPOSITION, type Role, type Tier } from '../../../engine/stats.js';
 import { supabase } from '../lib/supabase.js';
-import type { Team } from '../lib/useAccount.js';
+import type { LiveMatch, Team } from '../lib/useAccount.js';
 
 interface StatRow {
   role: Role;
@@ -44,12 +44,17 @@ export function TeamHub({
   userId,
   team,
   displayName,
+  live,
+  onResume,
   onCreated,
   onEnterLobby,
 }: {
   userId: string;
   team: Team | null;
   displayName: string;
+  /** An unfinished match, which there is at most one of. */
+  live: LiveMatch | null;
+  onResume: () => void;
   onCreated: () => void;
   onEnterLobby: () => void;
 }) {
@@ -94,9 +99,26 @@ export function TeamHub({
         </div>
       </header>
 
+      {live && (
+        <div style={S.resume}>
+          <div>
+            <p className="label" style={{ margin: 0, color: 'var(--brass)' }}>
+              A match is running
+            </p>
+            <p style={S.resumeLine}>
+              Round {live.round} of 10 · {live.score_a} to {live.score_b}. A battery plays one match
+              at a time, so this one has to finish before the next kicks off.
+            </p>
+          </div>
+          <button onClick={onResume} style={{ marginLeft: 'auto', flex: 'none' }}>
+            Back to the silo
+          </button>
+        </div>
+      )}
+
       <section style={S.ladderBlock}>
         <p className="label" style={{ margin: 0 }}>
-          {next ? `Wins toward ${next.tier}` : 'Top of the ladder'}
+          {next ? `Matches to win to level up to ${next.tier}` : 'Top of the ladder'}
         </p>
         <p style={{ margin: '4px 0 12px' }}>
           <span className="display" style={{ fontSize: 34 }}>
@@ -121,9 +143,8 @@ export function TeamHub({
       <section style={{ padding: '0 32px' }}>
         <div style={S.sectionHead}>
           <h2 className="display" style={{ margin: 0, fontSize: 24 }}>
-            Starting seven
+            Composition of the team
           </h2>
-          <span className="label">Seven of seven fielded · {team.tier}</span>
         </div>
 
         <div style={S.roster}>
@@ -136,7 +157,7 @@ export function TeamHub({
                 </p>
                 {line ? (
                   <p style={S.statLine}>
-                    HP {line.hp} · AC {line.ac} · BAT {line.might} · AIM {line.aim} · AGI{' '}
+                    HP {line.hp} · AC {line.ac} · MELEE +{line.might} · THROW +{line.aim} · DEX +
                     {line.agility}
                   </p>
                 ) : (
@@ -152,7 +173,7 @@ export function TeamHub({
           from the house pool. One Bulwark and one Trajector, ever.
         </p>
 
-        <button style={{ marginTop: 22 }} onClick={onEnterLobby}>
+        <button style={{ marginTop: 22 }} onClick={onEnterLobby} disabled={!!live}>
           To the lobby
         </button>
       </section>
@@ -170,19 +191,27 @@ function FoundTeam({ userId, onCreated }: { userId: string; onCreated: () => voi
     event.preventDefault();
     setBusy(true);
     setError(null);
-    // `.insert().select()` is the shape migration 0002 exists for: before it,
-    // the row went in and reading it back was refused by the select policy.
-    const { error: failure } = await supabase
-      .from('teams')
-      .insert({ owner: userId, name: name.trim() })
-      .select('id')
-      .single();
-    if (failure) {
-      setError(failure.message);
+    // Same discipline as the lobby and the sign-in form: the button is locked
+    // while this runs, so no path may leave without unlocking it.
+    try {
+      // `.insert().select()` is the shape migration 0002 exists for: before it,
+      // the row went in and reading it back was refused by the select policy.
+      const { error: failure } = await supabase
+        .from('teams')
+        .insert({ owner: userId, name: name.trim() })
+        .select('id')
+        .single();
+      if (failure) {
+        setError(failure.message);
+        return;
+      }
+      onCreated();
+    } catch (failure) {
+      console.error('the battery could not be raised', failure);
+      setError('could not reach the server. Check your connection and try again.');
+    } finally {
       setBusy(false);
-      return;
     }
-    onCreated();
   }
 
   return (
@@ -244,6 +273,22 @@ const S: Record<string, React.CSSProperties> = {
     color: 'var(--team-own)',
   },
   ladderBlock: { padding: '0 32px 26px' },
+  resume: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 18,
+    margin: '0 32px 22px',
+    padding: '14px 18px',
+    background: 'var(--panel-deep)',
+    border: '1px solid var(--brass-dim)',
+  },
+  resumeLine: {
+    margin: '5px 0 0',
+    fontSize: 12,
+    lineHeight: 1.6,
+    color: 'var(--text-dim)',
+    maxWidth: 620,
+  },
   ladder: { display: 'flex', gap: 10 },
   rung: { padding: '8px 14px', border: '1px solid var(--line)', background: 'var(--panel-deep)' },
   sectionHead: {

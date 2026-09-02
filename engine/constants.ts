@@ -167,8 +167,16 @@ export const INITIATIVE_ENEMY_SLOW = 10;
 export const MATCH_ROUNDS = 10;
 export const SUDDEN_DEATH_ROUNDS = 2;
 
-/** Seconds a human has to act before the turn auto-resolves as Dodge. */
-export const TURN_TIMER_SECONDS = 60;
+/**
+ * Seconds a human has to act before the turn auto-resolves as Dodge.
+ *
+ * Sixty was the fiche's number and it was too tight in practice: a turn is read
+ * the board, pick a route, pick an action, and Jérôme was losing turns to it.
+ * Raised to a hundred and twenty on 2026-09-02 at his call. It bounds nothing
+ * in the rules and no sweep reads it, so it is an ergonomics number living in a
+ * rules file only because that is where the match constants are.
+ */
+export const TURN_TIMER_SECONDS = 120;
 
 // -- Roster -----------------------------------------------------------------
 

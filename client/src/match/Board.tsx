@@ -17,10 +17,12 @@
  * every row here is flipped exactly once, in `rowOf`. Nowhere else.
  */
 
+import { useState } from 'react';
+
 import type { Point } from '../../../engine/geometry.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
 import { pathTo } from '../../../engine/rules/movement.js';
-import { activeUnits, sparkIsLive, type MatchState, type Unit } from '../../../engine/types.js';
+import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
 import { ARENA_WIDTH, arena, spec, ZONE_ART, zoneOf } from '../lib/arena.js';
 
 const ZONE_ROWS = 15;
@@ -36,6 +38,12 @@ export interface BoardProps {
   onMove: ((path: readonly Point[]) => void) | null;
   onSelectUnit: (unitId: string | null) => void;
   selected: string | null;
+  /** The one Giff this player drives, drawn apart from the rest of the side. */
+  yoursId?: UnitId | null;
+  /** The unit whose beat is being replayed, ringed so the eye finds it. */
+  spotlight?: UnitId | null;
+  /** The walk taken during that beat, drawn behind them. */
+  trail?: { unitId: UnitId; path: readonly Point[] } | null;
 }
 
 export function Board({
@@ -47,6 +55,9 @@ export function Board({
   onMove,
   onSelectUnit,
   selected,
+  yoursId = null,
+  spotlight = null,
+  trail = null,
 }: BoardProps) {
   const bottomY = (zone - 1) * ZONE_ROWS;
   const rowOf = (y: number) => ZONE_ROWS - 1 - (y - bottomY);
@@ -67,6 +78,12 @@ export function Board({
       />
 
       <div style={S.viewport}>
+        {/* A zone is fifteen by fifteen, so the stage is square. It used to be
+            whatever shape the layout left it, with the art filling that shape
+            in `cover` and the SVG letterboxed inside it by `meet`: the grid
+            then covered less ground than the picture, which is exactly the
+            mismatch Jérôme saw. One square, both layers, no discrepancy. */}
+        <div style={S.stage}>
         <img src={ZONE_ART[zone]} alt="" style={S.art} />
         <div style={S.wash} />
 
@@ -130,6 +147,23 @@ export function Board({
             />
           ))}
 
+          {/* The walk being replayed, so a Giff that crossed the zone reads as
+              having crossed it rather than as having appeared. */}
+          {trail && trail.path.some(inZone) && (
+            <polyline
+              points={trail.path
+                .filter(inZone)
+                .map((step) => `${step.x + 0.5},${rowOf(step.y) + 0.5}`)
+                .join(' ')}
+              fill="none"
+              stroke="rgba(201,180,137,.75)"
+              strokeWidth={0.09}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="0.28 0.18"
+            />
+          )}
+
           {/* Where this unit could stand. */}
           {reachable &&
             [...reachable.values()]
@@ -152,16 +186,53 @@ export function Board({
                 />
               ))}
 
-          {/* The loose Payload. Carried, it rides on its carrier instead. */}
+          {/* The loose Payload. Carried, it rides on its carrier instead.
+              It used to be a plain dot the same size as everything else on the
+              field, which is how a player ends up asking what the yellow
+              circle in the middle is. It is the whole point of the sport, so
+              it now pulses, wears a ring, and says its own name. */}
           {!state.payload.carriedBy && inZone(state.payload) && (
-            <circle
-              cx={state.payload.x + 0.5}
-              cy={rowOf(state.payload.y) + 0.5}
-              r={0.22}
-              fill="#c9b489"
-              stroke="#05070a"
-              strokeWidth={0.05}
-            />
+            <g>
+              <circle
+                cx={state.payload.x + 0.5}
+                cy={rowOf(state.payload.y) + 0.5}
+                r={0.44}
+                fill="none"
+                stroke="#c9b489"
+                strokeWidth={0.05}
+                opacity={0.75}
+              >
+                <animate
+                  attributeName="r"
+                  values="0.34;0.5;0.34"
+                  dur="1.8s"
+                  repeatCount="indefinite"
+                />
+                <animate
+                  attributeName="opacity"
+                  values="0.8;0.2;0.8"
+                  dur="1.8s"
+                  repeatCount="indefinite"
+                />
+              </circle>
+              <circle
+                cx={state.payload.x + 0.5}
+                cy={rowOf(state.payload.y) + 0.5}
+                r={0.24}
+                fill="#c9b489"
+                stroke="#05070a"
+                strokeWidth={0.05}
+              />
+              <text
+                x={state.payload.x + 0.5}
+                y={rowOf(state.payload.y) - 0.16}
+                textAnchor="middle"
+                fill="#c9b489"
+                style={{ font: `700 0.3px 'IBM Plex Mono', monospace`, letterSpacing: '0.02px' }}
+              >
+                PAYLOAD
+              </text>
+            </g>
           )}
 
           {state.crackers
@@ -206,6 +277,8 @@ export function Board({
               x={unit.x}
               row={rowOf(unit.y)}
               onTheClock={state.turn?.unitId === unit.id}
+              spotlit={spotlight === unit.id}
+              isYou={yoursId === unit.id}
               selected={selected === unit.id}
               carrying={state.payload.carriedBy === unit.id}
               onClick={() => onSelectUnit(selected === unit.id ? null : unit.id)}
@@ -213,7 +286,8 @@ export function Board({
           ))}
         </svg>
 
-        <ZoneTab zone={zone} />
+          <ZoneTab zone={zone} />
+        </div>
       </div>
 
       <Strip
@@ -233,6 +307,8 @@ function UnitMark({
   x,
   row,
   onTheClock,
+  spotlit,
+  isYou,
   selected,
   carrying,
   onClick,
@@ -242,24 +318,48 @@ function UnitMark({
   x: number;
   row: number;
   onTheClock: boolean;
+  /** The unit the replay is currently showing. */
+  spotlit: boolean;
+  /** The Giff this player drives. */
+  isYou: boolean;
   selected: boolean;
   carrying: boolean;
   onClick: () => void;
 }) {
-  const colour = unit.team === own ? '#3ce0f0' : '#ff56dc';
+  // Three colours, not two. Every shirt on your own side was one cyan, so the
+  // only way to find yourself was to read names off the sheet. Yours is amber,
+  // filled rather than outlined, and wears a chevron.
+  const colour = isYou ? '#ffc14d' : unit.team === own ? '#3ce0f0' : '#ff56dc';
   const hurt = unit.hp / unit.maxHp;
 
   return (
     <g style={{ cursor: 'pointer' }} onClick={onClick}>
+      {spotlit && (
+        <rect
+          x={x - 0.18}
+          y={row - 0.18}
+          width={1.36}
+          height={1.36}
+          fill="rgba(201,180,137,.14)"
+          stroke="var(--brass)"
+          strokeWidth={0.07}
+        />
+      )}
       <rect
         x={x + 0.08}
         y={row + 0.08}
         width={0.84}
         height={0.84}
-        fill="rgba(5,7,10,.78)"
+        fill={isYou ? 'rgba(255,193,77,.2)' : 'rgba(5,7,10,.78)'}
         stroke={colour}
-        strokeWidth={selected || onTheClock ? 0.11 : 0.06}
+        strokeWidth={isYou ? 0.13 : selected || onTheClock ? 0.11 : 0.06}
       />
+      {isYou && (
+        <polygon
+          points={`${x + 0.5},${row - 0.3} ${x + 0.32},${row - 0.02} ${x + 0.68},${row - 0.02}`}
+          fill={colour}
+        />
+      )}
       {onTheClock && (
         <rect
           x={x - 0.02}
@@ -301,7 +401,15 @@ function UnitMark({
   );
 }
 
-/** A neighbouring zone, as a band that shows who is up there or down there. */
+/**
+ * A neighbouring zone, as a band that shows who is up there or down there.
+ *
+ * **It is a button and now looks like one.** It always was clickable, and
+ * nothing said so: no cursor cue beyond the pointer, no label, no border that
+ * changed. A player who cannot see the rest of the shaft cannot plan a shot
+ * from the level above, so the affordance is spelled out rather than left to
+ * be discovered.
+ */
 function Strip({
   zone,
   state,
@@ -315,20 +423,37 @@ function Strip({
   onClick: () => void;
   side: 'above' | 'below';
 }) {
+  const [hover, setHover] = useState(false);
+
   if (zone < 1 || zone > 3) {
-    return <div style={{ ...S.strip, background: 'var(--void)', cursor: 'default' }} />;
+    return (
+      <div style={{ ...S.strip, background: 'var(--void)', cursor: 'default' }}>
+        <span className="label" style={{ ...S.stripLabel, color: 'var(--text-faint)' }}>
+          {side === 'above' ? 'Top of the silo' : 'Silo floor'}
+        </span>
+      </div>
+    );
   }
 
   const here = activeUnits(state).filter((unit) => zoneOf(unit.y) === zone);
 
   return (
-    <div style={S.strip} onClick={onClick} title={`Zone ${zone}`}>
+    <button
+      type="button"
+      style={{ ...S.strip, ...S.stripButton, ...(hover ? S.stripHover : null) }}
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title={`Look at zone ${zone}, ${ZONE_NAME[zone]}`}
+    >
       <img src={ZONE_ART[zone]} alt="" style={{ ...S.stripArt, objectPosition: side === 'above' ? 'bottom' : 'top' }} />
       <div style={S.stripWash} />
       <span className="label" style={S.stripLabel}>
+        <span style={{ color: 'var(--brass)', marginRight: 7 }}>{side === 'above' ? '▲' : '▼'}</span>
         Zone {zone} · {ZONE_NAME[zone]}
+        <span style={S.stripHint}>{hover ? 'click to look' : `${here.length} on this level`}</span>
       </span>
-      <div style={S.stripUnits}>
+      <span style={S.stripUnits}>
         {here.map((unit) => (
           <span
             key={unit.id}
@@ -341,8 +466,8 @@ function Strip({
             {unit.role[0]!.toUpperCase()}
           </span>
         ))}
-      </div>
-    </div>
+      </span>
+    </button>
   );
 }
 
@@ -375,9 +500,19 @@ const S: Record<string, React.CSSProperties> = {
     position: 'relative',
     flex: 1,
     minHeight: 0,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    background: 'var(--void)',
+  },
+  stage: {
+    position: 'relative',
+    aspectRatio: '1 / 1',
+    height: '100%',
+    maxWidth: '100%',
+    maxHeight: '100%',
     border: '1px solid var(--line)',
     overflow: 'hidden',
-    background: 'var(--void)',
   },
   art: {
     position: 'absolute',
@@ -408,6 +543,26 @@ const S: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     cursor: 'pointer',
   },
+  stripButton: {
+    display: 'block',
+    width: '100%',
+    padding: 0,
+    background: 'var(--void)',
+    textAlign: 'left',
+    font: 'inherit',
+    letterSpacing: 'normal',
+    textTransform: 'none',
+    color: 'inherit',
+    transition: 'border-color .12s',
+  },
+  stripHover: { borderColor: 'var(--brass)' },
+  stripHint: {
+    marginLeft: 10,
+    fontFamily: 'var(--mono)',
+    fontSize: 9,
+    letterSpacing: '.1em',
+    color: 'var(--text-faint)',
+  },
   stripArt: {
     position: 'absolute',
     inset: 0,
@@ -417,8 +572,15 @@ const S: Record<string, React.CSSProperties> = {
     filter: 'brightness(.3) saturate(.5)',
   },
   stripWash: { position: 'absolute', inset: 0, background: 'rgba(7,8,10,.5)' },
-  stripLabel: { position: 'absolute', left: 10, top: 6 },
-  stripUnits: { position: 'absolute', right: 10, top: 8, display: 'flex', gap: 5 },
+  stripLabel: {
+    position: 'absolute',
+    left: 10,
+    top: 6,
+    display: 'flex',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  stripUnits: { position: 'absolute', right: 10, top: 8, display: 'flex', gap: 5, zIndex: 1 },
   pip: {
     display: 'grid',
     placeItems: 'center',

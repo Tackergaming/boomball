@@ -329,8 +329,23 @@ console.log(
     `caught A ${sparksOf('A')}, B ${sparksOf('B')}`,
 );
 
+// Did the ladder move? `teams.wins` was written by nothing at all until
+// 2026-09-02, so a battery could win every match it ever played and stay
+// Rookie for ever. Read as the player, through RLS, which is how the hub reads
+// it and therefore what the player is actually shown.
+const ladder = await call('GET', `/rest/v1/teams?id=eq.${teamId}&select=wins,tier`, jwt);
+const wins = ladder.body?.[0]?.wins ?? null;
+const winner = row?.winner ?? (row?.is_draw ? 'draw' : null);
+console.log(`result                     ${winner ?? 'none'}, team wins now ${wins}`);
+
 const complaints: string[] = [];
 if (row?.phase !== 'finished') complaints.push('the match did not finish');
+if (winner === 'A' && wins !== 1) {
+  complaints.push(`the team won and the win counter reads ${wins}`);
+}
+if (winner !== 'A' && wins !== 0) {
+  complaints.push(`the team did not win and the win counter reads ${wins}`);
+}
 if (gaps.length > 0) complaints.push('the event sequence has gaps');
 if (seqs.length !== openingEvents + eventsFromFunction) {
   complaints.push(

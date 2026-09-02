@@ -169,7 +169,29 @@ export type MatchEvent =
       /** The goalkeeper who spent its Reaction to interpose, if any. */
       readonly blockedBy: UnitId | null;
     }
-  | { readonly kind: 'substituteEntered'; readonly unitId: UnitId; readonly round: number }
+  | {
+      readonly kind: 'substituteEntered';
+      readonly unitId: UnitId;
+      readonly round: number;
+      /** Where they come back on. Without it nobody reading the log can place them. */
+      readonly at: Point;
+    }
+  | {
+      /**
+       * A goal restarts play at once: the ball is incinerated and a fresh one is
+       * handed to the keeper who just conceded, or dropped in front of the
+       * Furnace when that keeper is off the field.
+       *
+       * It carries no dice and decides nothing, and it exists because without it
+       * the log is not replayable. `scored` says the score moved; nothing said
+       * where the ball went, so a reader who rebuilt the match from events
+       * ended up with the Payload still in the scorer's hands. The client's
+       * replay found this by disagreeing with the server's own board.
+       */
+      readonly kind: 'payloadReset';
+      readonly at: Point;
+      readonly carriedBy: UnitId | null;
+    }
   | { readonly kind: 'scored'; readonly team: TeamId; readonly points: number }
   | { readonly kind: 'matchEnded'; readonly result: MatchResult }
   | { readonly kind: 'diceRolled'; readonly unitId: UnitId; readonly roll: DiceRoll; readonly reason: string };

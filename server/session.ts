@@ -206,6 +206,10 @@ function advance(
   let current = session.state;
   let spent = 0;
 
+  // Who was on the clock before this step, so the deadline below can tell a
+  // turn that carried on from a turn that started.
+  const wasOnClock = session.state.turn?.unitId ?? null;
+
   while (current.phase !== 'finished' && current.turn) {
     const unit = unitById(current, current.turn.unitId);
     if (isHuman(unit)) break;
@@ -227,13 +231,35 @@ function advance(
   }
 
   return {
-    session: { state: current, turnDeadline: deadlineFor(current, now) },
+    session: {
+      state: current,
+      turnDeadline: deadlineFor(current, now, wasOnClock, session.turnDeadline),
+    },
     events,
   };
 }
 
-/** The clock only runs while a human is being asked for something. */
-function deadlineFor(state: MatchState, now: number): number | null {
+/**
+ * The clock only runs while a human is being asked for something, and it is
+ * **the turn's clock, not the request's**.
+ *
+ * That distinction is the whole of this function and it was got wrong. A turn
+ * is walk, swing, walk again, end: four requests, and every one of them used to
+ * be handed a fresh `now + 60s`. A player who kept clicking was never on a
+ * clock at all, while the display restarted at sixty each time, which is
+ * exactly what Jérôme saw. So the deadline is only made when the turn actually
+ * changes hands; a turn that carries on keeps the one it started with.
+ */
+function deadlineFor(
+  state: MatchState,
+  now: number,
+  wasOnClock: UnitId | null,
+  standing: number | null,
+): number | null {
   if (state.phase === 'finished' || !state.turn) return null;
-  return isHuman(unitById(state, state.turn.unitId)) ? now + TURN_TIMER_SECONDS * 1000 : null;
+  if (!isHuman(unitById(state, state.turn.unitId))) return null;
+  // Same unit still on the clock, and it already had a deadline: it is the same
+  // turn continuing, so it keeps the time it was given.
+  if (standing !== null && wasOnClock === state.turn.unitId) return standing;
+  return now + TURN_TIMER_SECONDS * 1000;
 }

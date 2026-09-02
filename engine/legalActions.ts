@@ -182,6 +182,32 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
   };
 }
 
+/**
+ * Whether ending the turn is the only thing left to do.
+ *
+ * The interface passes a turn on by itself when this is true, so that a player
+ * who has moved and acted is not made to click "End turn" at a bar where every
+ * other button is dead. It lives here rather than in a React component for the
+ * usual reason: it is a statement about what the rules still allow, and the day
+ * a new action is added to `LegalActions`, it has to be counted here or the
+ * interface will start skipping turns that still had something in them.
+ */
+export function onlyEndTurnLeft(legal: LegalActions): boolean {
+  return (
+    legal.destinations.size === 0 &&
+    legal.attack.length === 0 &&
+    legal.shove.length === 0 &&
+    legal.pass.length === 0 &&
+    legal.batCracker.length === 0 &&
+    legal.shoot === null &&
+    legal.catchSpark === null &&
+    !legal.canGrabPayload &&
+    !legal.canDash &&
+    !legal.canDodge &&
+    !legal.canDisengage
+  );
+}
+
 function shotOption(arena: Arena, state: MatchState, unit: Unit): ShotOption | null {
   const furnace = arena.targetFurnaceOf(unit.team);
   const range = throwRangeOver(rangeToFurnace(unit, furnace));

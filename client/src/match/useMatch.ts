@@ -1,5 +1,5 @@
 /**
- * The board, as the client holds it.
+ * The board, as the client holds it, and the replay that makes it watchable.
  *
  * **The snapshot is never computed here.** The client does not call `reduce`,
  * does not roll, and does not decide legality; it posts an intention and reads
@@ -12,6 +12,14 @@
  * returned events locally to save it would put a second implementation of the
  * rules in the browser, which is the one thing the architecture forbids.
  *
+ * **What was added is playback, not resolution.** One click in solo resolves
+ * thirteen AI turns and comes back as sixty events, and applying them in one
+ * frame made the whole field teleport: Jérôme's own words were that he had to
+ * scroll the log to discover his team had scored. So the batch is now walked
+ * through beat by beat by `replay.ts`, which only ever transcribes what the
+ * events already state, and the server's snapshot is re-read at the end and
+ * replaces the projection wholesale. The authority never moved.
+ *
  * Realtime is here for the day two or three humans share a match: the Edge
  * Functions broadcast every batch on `match:<id>`, and a batch whose `fromSeq`
  * is ahead of ours triggers the same re-read. **Nothing depends on it.** In
@@ -23,34 +31,130 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { AllyOrder } from '../../../ai/orders.js';
 import type { Action } from '../../../engine/actions.js';
 import type { MatchEvent } from '../../../engine/events.js';
-import type { MatchState } from '../../../engine/types.js';
-import { submitAction, supabase } from '../lib/supabase.js';
+import type { MatchState, TeamId } from '../../../engine/types.js';
+import { sendOrders, submitAction, supabase } from '../lib/supabase.js';
+import { toBeats, type Beat } from './replay.js';
+
+export type Speed = 'slow' | 'normal' | 'instant';
 
 export interface MatchView {
+  /** What to draw. The server's snapshot, or the beat being replayed. */
   state: MatchState | null;
   /** The seq of the last event the snapshot includes. */
   seq: number;
   /** Newest last, capped: the feed is a running commentary, not the archive. */
   feed: MatchEvent[];
   deadline: number | null;
+  /**
+   * How far this browser's clock is behind the server's, in milliseconds.
+   *
+   * The deadline is stamped by the server, and a machine whose clock is a few
+   * minutes fast would read every turn as already expired and hand it straight
+   * back. That is not hypothetical: Jérôme played four or five turns and the
+   * match reported ten rounds gone.
+   */
+  skew: number;
+  /** True while a request is in flight or a replay is running. */
   busy: boolean;
+  /** True only while the replay is walking beats: the board is a past moment. */
+  replaying: boolean;
+  /**
+   * The card on screen. It **outlives the replay on purpose**: the last thing
+   * that happened stays up until the player acts again, which is how they get
+   * to read their own roll instead of watching it flash past.
+   */
+  beat: Beat | null;
+  /** How far through the batch the replay is, for the progress pips. */
+  progress: { at: number; of: number } | null;
   refusal: string | null;
+  /** Set when the turn clock, not the player, ended the turn. */
+  expired: boolean;
+  speed: Speed;
+  setSpeed: (speed: Speed) => void;
+  /** Drops the rest of the replay and jumps to the server's board. */
+  skip: () => void;
   send: (action: Action) => Promise<void>;
+  /** Posts standing orders to AI team-mates. Spends no turn. */
+  order: (orders: readonly AllyOrder[]) => Promise<void>;
   dismissRefusal: () => void;
+  /** Clears the card left standing after a replay. */
+  dismissBeat: () => void;
 }
 
 const FEED_LIMIT = 120;
 
-export function useMatch(matchId: string): MatchView {
+/**
+ * How long one beat sits on screen.
+ *
+ * Jérôme picked turn-by-turn, first at roughly seven tenths of a second, then
+ * **still too fast to follow**, so every step is up: a normal beat is a second
+ * and a half and the slow setting is two and a half. A goal or a knockout is
+ * held twice as long, because those are the moments he was missing entirely,
+ * and a beat with nothing to read goes by in a blink.
+ *
+ * Costing this in turn time is what the timer going to a hundred and twenty
+ * seconds pays for, and the clock does not start against the player until the
+ * replay is over anyway. See `Match.tsx`.
+ */
+const BEAT_MS: Record<Speed, number> = { slow: 2500, normal: 1500, instant: 0 };
+
+/**
+ * A ceiling on the whole batch, so a pathological round cannot lock a player
+ * out for a minute. Past it the replay speeds up rather than dropping beats:
+ * seeing all of it fast beats seeing a third of it at the right pace.
+ */
+const REPLAY_BUDGET_MS = 30_000;
+
+const SPEED_KEY = 'boomball.replaySpeed';
+
+function storedSpeed(): Speed {
+  try {
+    const saved = localStorage.getItem(SPEED_KEY);
+    if (saved === 'slow' || saved === 'normal' || saved === 'instant') return saved;
+  } catch {
+    // A browser with site data blocked still gets to play, just not to
+    // remember. Nothing here is worth failing a match over.
+  }
+  return 'normal';
+}
+
+export function useMatch(matchId: string, own: TeamId): MatchView {
   const [state, setState] = useState<MatchState | null>(null);
   const [seq, setSeq] = useState(-1);
   const [feed, setFeed] = useState<MatchEvent[]>([]);
   const [deadline, setDeadline] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [replaying, setReplaying] = useState(false);
+  const [beat, setBeat] = useState<Beat | null>(null);
+  const [progress, setProgress] = useState<{ at: number; of: number } | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
+  const [skew, setSkew] = useState(0);
+  const [speed, setSpeedState] = useState<Speed>(storedSpeed);
   const seqRef = useRef(-1);
+  const speedRef = useRef(speed);
+  const skipRef = useRef(false);
+  const liveRef = useRef(true);
+
+  useEffect(() => {
+    liveRef.current = true;
+    return () => {
+      liveRef.current = false;
+    };
+  }, []);
+
+  const setSpeed = useCallback((next: Speed) => {
+    speedRef.current = next;
+    setSpeedState(next);
+    try {
+      localStorage.setItem(SPEED_KEY, next);
+    } catch {
+      // See `storedSpeed`.
+    }
+  }, []);
 
   const load = useCallback(async () => {
     const [{ data: snapshot }, { data: row }] = await Promise.all([
@@ -112,6 +216,50 @@ export function useMatch(matchId: string): MatchView {
     };
   }, [matchId, load]);
 
+  const skip = useCallback(() => {
+    skipRef.current = true;
+  }, []);
+
+  /**
+   * Walks the batch beat by beat, then hands the board back to the server.
+   *
+   * The projection is only ever what is on screen. Whatever happens in here,
+   * including a skip halfway through, ends at `load()`, so the board a player
+   * acts from is always the one the server holds.
+   */
+  const play = useCallback(
+    async (from: MatchState, events: readonly MatchEvent[]) => {
+      const beats = toBeats(from, events, own);
+      if (beats.length === 0) return;
+
+      // Fit the whole batch inside the budget rather than cutting it short.
+      const nominal = beats.reduce((total, one, i) => total + holdFor(one, i === 0), 0);
+      const perBeat = BEAT_MS[speedRef.current];
+      const scale =
+        perBeat > 0 && nominal * perBeat > REPLAY_BUDGET_MS
+          ? REPLAY_BUDGET_MS / (nominal * perBeat)
+          : 1;
+
+      skipRef.current = false;
+      setReplaying(true);
+      for (let i = 0; i < beats.length; i++) {
+        if (skipRef.current || !liveRef.current) break;
+        const one = beats[i]!;
+        setBeat(one);
+        setState(one.state);
+        setProgress({ at: i + 1, of: beats.length });
+        if (holdFor(one, i === 0) > 0) await wait(holdFor(one, i === 0) * scale * perBeat);
+      }
+
+      setProgress(null);
+      setReplaying(false);
+      // The card is deliberately left up. `load()` puts the server's board back
+      // underneath it, and the next action clears it.
+      await load();
+    },
+    [load, own],
+  );
+
   const send = useCallback(
     async (action: Action) => {
       const unitId = state?.turn?.unitId;
@@ -119,22 +267,63 @@ export function useMatch(matchId: string): MatchView {
 
       setBusy(true);
       setRefusal(null);
-      const reply = await submitAction(matchId, unitId, action);
+      setExpired(false);
+      setBeat(null);
+      // `busy` locks the action bar, so every path out of here has to clear it.
+      // One that did not is what left the lobby button stuck forever, and in a
+      // match the same mistake costs a player the rest of the game.
+      try {
+        const before = state;
+        const sentAt = Date.now();
+        const reply = await submitAction(matchId, unitId, action);
 
-      if (!reply.accepted) {
-        setRefusal(reply.reason);
+        // Every reply carries the server's clock. Half the round trip is a
+        // rough enough correction: what matters is catching a machine minutes
+        // out, not milliseconds.
+        if ('serverNow' in reply && typeof reply.serverNow === 'number') {
+          setSkew(reply.serverNow - (sentAt + Date.now()) / 2);
+        }
+
+        if (!reply.accepted) {
+          setRefusal(reply.reason);
+          // A refusal usually means a stale board, so read it again rather than
+          // leaving the player looking at the position that produced it.
+          await load();
+          return;
+        }
+
+        setFeed((old) => [...old, ...reply.events].slice(-FEED_LIMIT));
+        // The server answers `expired` when the clock, not the player, spent
+        // the turn. It is news, not an error, and the screen says so.
+        if ('expired' in reply && reply.expired) setExpired(true);
+        await play(before, reply.events);
+      } catch (failure) {
+        console.error('the turn could not be sent', failure);
+        setRefusal('the turn could not be sent. Check your connection and try again.');
+      } finally {
         setBusy(false);
-        // A refusal usually means a stale board, so read it again rather than
-        // leaving the player looking at the position that produced it.
-        await load();
-        return;
       }
-
-      setFeed((old) => [...old, ...reply.events].slice(-FEED_LIMIT));
-      await load();
-      setBusy(false);
     },
-    [matchId, state, busy, load],
+    [matchId, state, busy, load, play],
+  );
+
+  /**
+   * Orders go through the same door and come back with nothing to replay, so
+   * this is deliberately not `send`: no beats, no board change, no turn spent.
+   * The only thing worth surfacing is a refusal.
+   */
+  const order = useCallback(
+    async (orders: readonly AllyOrder[]) => {
+      if (orders.length === 0) return;
+      try {
+        const reply = await sendOrders(matchId, orders);
+        if (!reply.accepted) setRefusal(reply.reason);
+      } catch (failure) {
+        console.error('the order could not be sent', failure);
+        setRefusal('the order could not be sent. Check your connection and try again.');
+      }
+    },
+    [matchId],
   );
 
   return {
@@ -142,9 +331,41 @@ export function useMatch(matchId: string): MatchView {
     seq,
     feed,
     deadline,
+    skew,
     busy,
+    replaying,
+    beat,
+    progress,
     refusal,
+    expired,
+    speed,
+    setSpeed,
+    skip,
     send,
+    order,
     dismissRefusal: () => setRefusal(null),
+    dismissBeat: () => setBeat(null),
   };
+}
+
+/**
+ * How long to hold a beat, in multiples of `BEAT_MS`.
+ *
+ * The rule is: **stop for a result, never for an instruction.** A goal or a
+ * knockout is held twice as long, because those are the two things Jérôme
+ * missed entirely. Anything with dice in it is held once, because the roll is
+ * the whole reason the card exists. And the first beat of a batch, when it is
+ * the player's own turn carrying on, is not held at all: they clicked to move
+ * eight cells and watching a card say "moves 8 cells" is a toll, not feedback.
+ */
+function holdFor(beat: Beat, isFirst: boolean): number {
+  if (beat.lines.length === 0) return 0;
+  if (beat.weight === 'loud') return 2;
+  const hasDice = beat.lines.some((line) => line.roll);
+  if (isFirst && !hasDice && beat.unitId === null) return 0;
+  return 1;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

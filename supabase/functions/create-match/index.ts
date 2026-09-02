@@ -15,7 +15,7 @@
  * there.
  *
  *   POST { teamId, seats: [{ profileId, role, characterName? }], arenaId? }
- *     -> { accepted: true, matchId, fromSeq, events }
+ *     -> { accepted: true, matchId, fromSeq, events, serverNow }
  *      | { accepted: false, reason }
  *
  * **Two fields the client does not get to send.** The Tier is read off the
@@ -30,6 +30,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
+import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
 import { toArenaSpec } from '../../../server/arenaRow.ts';
 import { openLobbyMatch, type SeatRequest } from '../../../server/lobby.ts';
 
@@ -44,7 +45,7 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 function reply(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { ...CORS_HEADERS, 'content-type': 'application/json' },
   });
 }
 
@@ -58,6 +59,11 @@ function freshSeed(): number {
 }
 
 Deno.serve(async (request: Request): Promise<Response> => {
+  // Before anything, including the method check: an OPTIONS here is a browser
+  // asking permission, not a caller using the wrong verb.
+  const preflighted = preflight(request);
+  if (preflighted) return preflighted;
+
   if (request.method !== 'POST') return refuse('POST only', 405);
 
   // Identity from the JWT, never from the body. Same rule as `resolve-action`:
@@ -197,5 +203,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
     payload: { matchId, fromSeq: 0, events },
   });
 
-  return reply({ accepted: true, matchId, fromSeq: 0, events });
+  // `serverNow` rides along for the same reason it does on `resolve-action`:
+  // the turn deadline is the server's clock, and a browser has to know how far
+  // its own is out before it can count anything down against it.
+  return reply({ accepted: true, matchId, fromSeq: 0, events, serverNow: Date.now() });
 });

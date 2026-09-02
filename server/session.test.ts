@@ -52,9 +52,58 @@ describe('opening a session', () => {
   it('puts the human on the clock and nobody else', () => {
     const { session } = open(SOLO);
 
-    expect(session.turnDeadline).toBe(T0 + TURN_TIMER_SECONDS * 1000);
-    expect(isExpired(session, T0 + 59_000)).toBe(false);
-    expect(isExpired(session, T0 + 60_000)).toBe(true);
+    // Expressed in the constant, not in sixty seconds. The timer moved to a
+    // hundred and twenty and these were the only two places that noticed.
+    const timer = TURN_TIMER_SECONDS * 1000;
+    expect(session.turnDeadline).toBe(T0 + timer);
+    expect(isExpired(session, T0 + timer - 1_000)).toBe(false);
+    expect(isExpired(session, T0 + timer)).toBe(true);
+  });
+});
+
+describe('the clock belongs to the turn, not to the request', () => {
+  it('does not restart when the same player acts again inside their turn', () => {
+    const { session } = open(SOLO);
+    const opened = session.turnDeadline!;
+    const unitId = session.state.turn!.unitId;
+
+    // A turn is several requests: walk, act, walk again, end. Each one used to
+    // be handed a fresh sixty seconds, so a player who kept clicking was never
+    // on a clock while the display restarted at sixty every time.
+    const dodged = submitAction(
+      arena,
+      session,
+      { humanId: 'jerome', unitId, action: { kind: 'dodge' } },
+      T0 + 20_000,
+    );
+    expect(dodged.ok).toBe(true);
+    if (!dodged.ok) return;
+
+    expect(dodged.step.session.state.turn!.unitId).toBe(unitId);
+    expect(dodged.step.session.turnDeadline).toBe(opened);
+    // And it still runs out at the same moment it always would have.
+    expect(isExpired(dodged.step.session, T0 + TURN_TIMER_SECONDS * 1000)).toBe(true);
+  });
+
+  it('makes a fresh one when the turn actually changes hands', () => {
+    const { session } = open(SOLO);
+    const opened = session.turnDeadline!;
+
+    const ended = submitAction(
+      arena,
+      session,
+      { humanId: 'jerome', unitId: session.state.turn!.unitId, action: { kind: 'endTurn' } },
+      T0 + 20_000,
+    );
+    expect(ended.ok).toBe(true);
+    if (!ended.ok) return;
+
+    // Solo puts the whole house between two human turns, so the next deadline
+    // belongs to a different turn and has to be new.
+    if (ended.step.session.state.phase !== 'finished') {
+      expect(ended.step.session.turnDeadline).toBe(T0 + 20_000 + TURN_TIMER_SECONDS * 1000);
+      expect(ended.step.session.turnDeadline).toBeGreaterThan(opened);
+    }
   });
 });
 

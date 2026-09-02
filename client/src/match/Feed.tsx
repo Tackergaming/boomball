@@ -124,6 +124,10 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
         : null;
     case 'payloadScattered':
       return null;
+    case 'payloadReset':
+      return event.carriedBy
+        ? `A fresh Payload goes to ${name(event.carriedBy)}.`
+        : 'A fresh Payload drops in front of the Furnace.';
     case 'shotAtFurnace':
       if (event.scored) return `${name(event.unitId)} puts it in the Furnace.`;
       return event.blockedBy

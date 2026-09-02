@@ -37,7 +37,7 @@ export function Lobby({
   userId: string;
   team: Team;
   displayName: string;
-  onOpened: () => void;
+  onOpened: () => Promise<void>;
   onBack: () => void;
 }) {
   const [role, setRole] = useState<Role>('striker');
@@ -47,18 +47,36 @@ export function Lobby({
 
   const fielded = (r: Role) => TEAM_COMPOSITION.filter((x) => x === r).length;
 
+  /**
+   * Opening a match is the one place this screen leaves the browser, and every
+   * way out of it has to end with the button usable again or say why not.
+   * It did not, and a lobby button that reads "Loading the silo" forever is
+   * indistinguishable from a game that is broken.
+   */
   async function start() {
     setBusy(true);
     setError(null);
-    const reply = await createMatch(team.id, [
-      { profileId: userId, role, characterName: name.trim() },
-    ]);
-    if (!reply.accepted) {
-      setError(reply.reason);
+    try {
+      const reply = await createMatch(team.id, [
+        { profileId: userId, role, characterName: name.trim() },
+      ]);
+      if (!reply.accepted) {
+        setError(reply.reason);
+        return;
+      }
+      // The match exists now. `onOpened` re-reads the account, and App puts the
+      // match on screen the moment it sees an unfinished one, which unmounts
+      // this component. Still being here afterwards means the row was written
+      // but not read back, and the player deserves to be told rather than left
+      // watching a button.
+      await onOpened();
+      setError('the match opened but did not come back. Reload the page and you will be in it.');
+    } catch (failure) {
+      console.error('the match could not be opened', failure);
+      setError('the match could not be opened. Check your connection and try again.');
+    } finally {
       setBusy(false);
-      return;
     }
-    onOpened();
   }
 
   return (

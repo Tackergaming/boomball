@@ -178,6 +178,21 @@ a {
   }
 }
 
+@keyframes bb-struck {
+  0% {
+    transform: scale(1);
+    text-shadow: none;
+  }
+  30% {
+    transform: scale(1.28);
+    text-shadow: 0 0 22px currentColor;
+  }
+  100% {
+    transform: scale(1);
+    text-shadow: none;
+  }
+}
+
 @keyframes bb-tick {
   0%,
   100% {

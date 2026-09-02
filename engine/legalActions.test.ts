@@ -4,7 +4,7 @@ import type { Action } from './actions.js';
 import { Arena } from './arena.js';
 import { KILL_SILO } from './arenas/kill-silo.js';
 import { BULWARK_BLOCK_BONUS, FURNACE_AC } from './constants.js';
-import { legalActions } from './legalActions.js';
+import { legalActions, onlyEndTurnLeft } from './legalActions.js';
 import { openMatch, reduce } from './reduce.js';
 import { key, pathTo } from './rules/movement.js';
 import { createMatch } from './setup.js';
@@ -211,6 +211,26 @@ describe('what it offers against whom', () => {
       ),
     };
     expect(legalActions(arena, state)!.shoot).toBeNull();
+  });
+
+  it('says when ending the turn is the only thing left, and not before', () => {
+    // The interface passes the turn on by itself when this is true, so a false
+    // positive skips a turn a player still had something to do in.
+    const start = base();
+    const unitId = start.turn!.unitId;
+    expect(onlyEndTurnLeft(legalActions(arena, start)!)).toBe(false);
+
+    // Spend the Action and every foot of movement. Dash is refused once the
+    // Action is gone, so this is genuinely the end of the turn.
+    const dodged = must(start, { kind: 'dodge' }).state;
+    expect(onlyEndTurnLeft(legalActions(arena, dodged)!)).toBe(false);
+
+    const spent: MatchState = {
+      ...dodged,
+      turn: { ...dodged.turn!, movementFeetRemaining: 0 },
+    };
+    expect(spent.turn!.unitId).toBe(unitId);
+    expect(onlyEndTurnLeft(legalActions(arena, spent)!)).toBe(true);
   });
 
   it('offers the loose ball only to a player standing on it', () => {

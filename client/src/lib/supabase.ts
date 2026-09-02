@@ -13,6 +13,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+import type { AllyOrder } from '../../../ai/orders.js';
 import type { Action } from '../../../engine/actions.js';
 import type { MatchEvent } from '../../../engine/events.js';
 import type { Role } from '../../../engine/stats.js';
@@ -33,11 +34,30 @@ export const supabase = createClient(url, anonKey, {
 export type Refused = { accepted: false; reason: string };
 
 export type CreateMatchReply =
-  | { accepted: true; matchId: string; fromSeq: number; events: MatchEvent[] }
+  | {
+      accepted: true;
+      matchId: string;
+      fromSeq: number;
+      events: MatchEvent[];
+      /** The server's own clock, for working out how far this browser's is out. */
+      serverNow?: number;
+    }
   | Refused;
 
 export type ResolveActionReply =
-  | { accepted: true; fromSeq: number; events: MatchEvent[] }
+  | {
+      accepted: true;
+      fromSeq: number;
+      events: MatchEvent[];
+      /**
+       * Set when the turn clock ran out before this action arrived. The server
+       * spent the turn in Dodge and moved play on, so the action was late
+       * rather than illegal, and the events are the expiry it settled.
+       */
+      expired?: boolean;
+      /** The server's own clock, for working out how far this browser's is out. */
+      serverNow?: number;
+    }
   | Refused;
 
 export interface SeatRequest {
@@ -50,21 +70,36 @@ export interface SeatRequest {
  * `functions.invoke` swallows the body of a non-2xx reply, and a refusal *is*
  * the reply here: "it is not your turn" arrives as a 400 with the reason in it.
  * So these post directly and read the body whatever the status says.
+ *
+ * **Every failure comes back as a `Refused`, none of them throws.** The one
+ * that taught us to care was a CORS preflight the functions did not answer:
+ * `fetch` rejected with a bare `TypeError`, nothing on the screen caught it,
+ * and the lobby button sat on "Loading the silo" for good. A network that is
+ * down, a function that is not deployed and a project that has moved all fail
+ * the same way, and none of them should be able to hang a screen.
  */
 async function callFunction<T>(name: string, body: unknown): Promise<T | Refused> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) return { accepted: false, reason: 'you are signed out' };
 
-  const response = await fetch(`${url}/functions/v1/${name}`, {
-    method: 'POST',
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${url}/functions/v1/${name}`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (failure) {
+    // A rejected `fetch` says nothing useful on purpose, the browser keeps the
+    // reason to itself. The console line is where the real one is.
+    console.error(`${name} could not be reached`, failure);
+    return { accepted: false, reason: `could not reach the ${name} server. Check your connection.` };
+  }
 
   try {
     return (await response.json()) as T;
@@ -86,4 +121,19 @@ export function submitAction(
   action: Action,
 ): Promise<ResolveActionReply> {
   return callFunction<ResolveActionReply>('resolve-action', { matchId, unitId, action });
+}
+
+/**
+ * Standing orders to AI team-mates, and nothing else.
+ *
+ * **It spends no turn and plays nothing.** Calling for the ball must not cost
+ * the turn you were calling for it with, so this goes through the same door
+ * carrying orders and no action; the server writes them and answers. They stand
+ * until they are replaced.
+ */
+export function sendOrders(
+  matchId: string,
+  orders: readonly AllyOrder[],
+): Promise<ResolveActionReply> {
+  return callFunction<ResolveActionReply>('resolve-action', { matchId, orders });
 }

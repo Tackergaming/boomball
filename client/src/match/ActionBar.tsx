@@ -12,6 +12,14 @@
  * The numbers are shown before committing on purpose. A Giff who can see that
  * the Bulwark lifts the shot from 15 to 18 is a Giff who can decide to pass
  * instead, and that decision is the game.
+ *
+ * **Every action keeps its place, whether or not it is available.** Buttons
+ * used to appear and vanish with the position, so the bar changed shape between
+ * turns and a player only learned that Shove existed by happening to stand next
+ * to somebody. A dead button that says why is a rule taught; a missing button
+ * is a rule hidden. This does not weaken the one-generator rule: what is
+ * *possible* still comes from `legalActions` alone, and a greyed button cannot
+ * be pressed. Only the sentence explaining the absence is written here.
  */
 
 import { useState } from 'react';
@@ -143,50 +151,78 @@ export function ActionBar({
           {movementFeet} ft left
         </span>
 
-        {legal.canGrabPayload && (
-          <Act label="Take the Payload" tone="brass" busy={busy} onClick={() => act({ kind: 'grabPayload' })} />
-        )}
+        <Act
+          label="Take the Payload"
+          tone="brass"
+          busy={busy}
+          off={legal.canGrabPayload ? null : 'stand on the Payload to pick it up'}
+          onClick={() => act({ kind: 'grabPayload' })}
+        />
 
-        {legal.shoot && (
-          <Act
-            label={`Shoot · ${legal.shoot.against}${MODE_MARK[legal.shoot.mode]}`}
-            {...(legal.shoot.blockedBy ? { hint: 'the Bulwark is in the mouth' } : {})}
-            tone="brass"
-            busy={busy}
-            onClick={() => act({ kind: 'shoot' })}
-          />
-        )}
+        <Act
+          label={legal.shoot ? `Shoot · ${legal.shoot.against}${MODE_MARK[legal.shoot.mode]}` : 'Shoot'}
+          {...(legal.shoot?.blockedBy ? { hint: 'the Bulwark is in the mouth' } : {})}
+          tone="brass"
+          busy={busy}
+          off={legal.shoot ? null : 'carry the Payload within range of their Furnace'}
+          onClick={() => act({ kind: 'shoot' })}
+        />
 
-        {legal.catchSpark && (
-          <Act
-            label={`Catch the Spark · ${legal.catchSpark.against}`}
-            tone="spark"
-            busy={busy}
-            onClick={() => act({ kind: 'catchSpark' })}
-          />
-        )}
+        <Act
+          label={legal.catchSpark ? `Catch the Spark · ${legal.catchSpark.against}` : 'Catch the Spark'}
+          tone="spark"
+          busy={busy}
+          off={legal.catchSpark ? null : 'only from the cell the Spark is on'}
+          onClick={() => act({ kind: 'catchSpark' })}
+        />
 
-        {legal.pass.length > 0 && (
-          <Act label="Pass" busy={busy} onClick={() => setPending('pass')} />
-        )}
-        {legal.attack.length > 0 && (
-          <Act label="Swing" busy={busy} onClick={() => setPending('attack')} />
-        )}
-        {legal.shove.length > 0 && (
-          <Act label="Shove" busy={busy} onClick={() => setPending('shove')} />
-        )}
-        {legal.batCracker.length > 0 && (
-          <Act label="Bat a Cracker" tone="danger" busy={busy} onClick={() => setPending('cracker')} />
-        )}
+        <Act
+          label="Pass"
+          busy={busy}
+          off={legal.pass.length > 0 ? null : 'carry the Payload, with a team mate in range'}
+          onClick={() => setPending('pass')}
+        />
+        <Act
+          label="Swing"
+          busy={busy}
+          off={legal.attack.length > 0 ? null : 'no enemy within reach, and never while carrying'}
+          onClick={() => setPending('attack')}
+        />
+        <Act
+          label="Shove"
+          busy={busy}
+          off={legal.shove.length > 0 ? null : 'no enemy within reach'}
+          onClick={() => setPending('shove')}
+        />
+        <Act
+          label="Bat a Cracker"
+          tone="danger"
+          busy={busy}
+          off={legal.batCracker.length > 0 ? null : 'no live Cracker within reach'}
+          onClick={() => setPending('cracker')}
+        />
 
-        {legal.canDash && <Act label="Dash" busy={busy} onClick={() => act({ kind: 'dash' })} />}
-        {legal.canDodge && <Act label="Dodge" busy={busy} onClick={() => act({ kind: 'dodge' })} />}
-        {legal.canDisengage && (
-          <Act label="Disengage" busy={busy} onClick={() => act({ kind: 'disengage' })} />
-        )}
+        <Act
+          label="Dash"
+          busy={busy}
+          off={legal.canDash ? null : 'the Action is already spent'}
+          onClick={() => act({ kind: 'dash' })}
+        />
+        <Act
+          label="Dodge"
+          busy={busy}
+          off={legal.canDodge ? null : 'the Action is already spent'}
+          onClick={() => act({ kind: 'dodge' })}
+        />
+        <Act
+          label="Disengage"
+          busy={busy}
+          off={legal.canDisengage ? null : 'the Action is already spent'}
+          onClick={() => act({ kind: 'disengage' })}
+        />
 
         <div style={{ marginLeft: 'auto' }}>
-          <Act label="End turn" busy={busy} onClick={() => act({ kind: 'endTurn' })} />
+          <Act label="End turn" busy={busy} off={null} onClick={() => act({ kind: 'endTurn' })} />
         </div>
       </div>
     </div>
@@ -198,27 +234,34 @@ function Act({
   hint,
   tone,
   busy,
+  off,
   onClick,
 }: {
   label: string;
   hint?: string | undefined;
   tone?: 'brass' | 'danger' | 'spark';
   busy: boolean;
+  /** Why this action is unavailable, or null when it can be taken. */
+  off: string | null;
   onClick: () => void;
 }) {
   const colour =
     tone === 'brass' ? '#c9b489' : tone === 'danger' ? '#d8a12a' : tone === 'spark' ? '#fffce8' : undefined;
+  const note = off ?? hint;
 
   return (
     <button
       className="ghost"
-      disabled={busy}
+      disabled={busy || off !== null}
       onClick={onClick}
-      title={hint}
-      style={{ ...S.act, ...(colour ? { color: colour, borderColor: colour } : {}) }}
+      title={note}
+      style={{
+        ...S.act,
+        ...(off ? S.off : colour ? { color: colour, borderColor: colour } : {}),
+      }}
     >
       {label}
-      {hint && <span style={S.hint}>{hint}</span>}
+      {note && <span style={S.hint}>{note}</span>}
     </button>
   );
 }
@@ -253,6 +296,13 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'flex-start',
     fontSize: 13,
     padding: '9px 14px',
+    maxWidth: 210,
+  },
+  off: {
+    color: 'var(--text-faint)',
+    borderColor: 'rgba(43,52,57,.9)',
+    opacity: 0.55,
+    cursor: 'not-allowed',
   },
   hint: {
     fontFamily: 'var(--mono)',

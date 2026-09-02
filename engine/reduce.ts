@@ -866,6 +866,14 @@ function score(ctx: Ctx, state: MatchState, team: MatchState['units'][number]['t
       }
     : { ...state, payload: { carriedBy: null, x: spot.x, y: spot.y } };
 
+  // Where the fresh ball went. Logged because nothing else says it, and a log
+  // a match cannot be rebuilt from is not the truth this project claims it is.
+  ctx.log.push({
+    kind: 'payloadReset',
+    at: keeper ? { x: keeper.x, y: keeper.y } : { x: spot.x, y: spot.y },
+    carriedBy: keeper?.id ?? null,
+  });
+
   const next: MatchState = { ...withBall, score: { ...state.score, [team]: scored } };
 
   // In sudden death the first goal ends it, which is the whole point of it.
@@ -939,7 +947,7 @@ function returnSubstitutes(arena: Arena, state: MatchState, log: MatchEvent[]): 
     const taken = activeUnits(next).some((u) => u.x === entry.x && u.y === entry.y);
     if (taken) continue;
 
-    log.push({ kind: 'substituteEntered', unitId: unit.id, round: state.round });
+    log.push({ kind: 'substituteEntered', unitId: unit.id, round: state.round, at: entry });
     next = {
       ...replaceUnit(next, {
         ...unit,
