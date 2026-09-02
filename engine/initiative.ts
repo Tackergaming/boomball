@@ -20,6 +20,14 @@
  * the engine walks it with a single index and has no nested cursor to lose.
  * Units of the same block share a `blockId`, which is all the interface needs
  * to draw them as one rung.
+ *
+ * **Two teams on the same count are separated by `initiativeNonce`, not by
+ * their name.** Both AI blocks resolve on 15 and on 10, so every slot of team A
+ * ties with a slot of team B, and the tie used to fall to a stable string key
+ * that begins with the team letter. A therefore moved before B on every count,
+ * of every round, of every match. That is the same defect already fixed for
+ * Cracker proximity, where a tie broken by identifier always aimed at the same
+ * side; it is invisible in one match and it decides a sweep.
  */
 
 import { INITIATIVE_ENEMY_FAST, INITIATIVE_ENEMY_SLOW } from './constants.js';
@@ -65,6 +73,7 @@ export function buildTurnOrder(state: MatchState): TurnSlot[] {
       priority: SLOT_PRIORITY.crackers,
       actor: { kind: 'crackers' },
       blockId: null,
+      team: null,
     });
   }
 
@@ -74,12 +83,24 @@ export function buildTurnOrder(state: MatchState): TurnSlot[] {
       priority: SLOT_PRIORITY.spark,
       actor: { kind: 'spark' },
       blockId: null,
+      team: null,
     });
   }
 
   for (const team of TEAMS) slots.push(...teamSlots(state, team));
 
-  return sortSlots(slots);
+  return sortSlots(slots, firstTeamOfRound(state));
+}
+
+/**
+ * The side that wins ties this round. Alternates every round from a value
+ * rolled at kick-off, so over a sweep each team opens round 6 exactly half the
+ * time. A plain alternation from a fixed start would not do: the Spark enters
+ * on a fixed round, so one side would always reach it first, which trades one
+ * permanent bias for its mirror image.
+ */
+function firstTeamOfRound(state: MatchState): TeamId {
+  return (state.initiativeNonce + state.round) % 2 === 0 ? 'A' : 'B';
 }
 
 function teamSlots(state: MatchState, team: TeamId): TurnSlot[] {
@@ -99,6 +120,7 @@ function teamSlots(state: MatchState, team: TeamId): TurnSlot[] {
     priority: SLOT_PRIORITY.units,
     actor: { kind: 'unit' as const, unitId: unit.id },
     blockId: null,
+    team,
   }));
 
   // Immediately after the last human, so orders given this round land this
@@ -124,17 +146,29 @@ function groupSlots(
     priority: SLOT_PRIORITY.units,
     actor: { kind: 'unit' as const, unitId: unit.id },
     blockId,
+    team,
   }));
 }
 
 /**
- * Highest count first, then the fixed within-count priority, then a stable key
- * so the ladder is identical on every replay of the same state.
+ * Highest count first, then the fixed within-count priority, then the side that
+ * wins ties this round, then a stable key so the ladder is identical on every
+ * replay of the same state.
+ *
+ * The team rank sits above the stable key and not below it, because the stable
+ * key is exactly what used to decide the tie and it can only ever answer the
+ * same way.
  */
-function sortSlots(slots: TurnSlot[]): TurnSlot[] {
+function sortSlots(slots: TurnSlot[], firstTeam: TeamId): TurnSlot[] {
+  const teamRank = (slot: TurnSlot): number => {
+    if (slot.team === null) return 0;
+    return slot.team === firstTeam ? 0 : 1;
+  };
+
   return [...slots].sort((a, b) => {
     if (a.count !== b.count) return b.count - a.count;
     if (a.priority !== b.priority) return a.priority - b.priority;
+    if (teamRank(a) !== teamRank(b)) return teamRank(a) - teamRank(b);
     return actorKey(a).localeCompare(actorKey(b));
   });
 }

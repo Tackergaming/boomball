@@ -327,6 +327,48 @@ describe('the initiative ladder', () => {
     }
   });
 
+  it('alternates which side wins an initiative tie, round by round', () => {
+    const state = createMatch(base);
+    const openerOn = (round: number) =>
+      buildTurnOrder({ ...state, round }).find((s) => s.count === 15)!.team;
+
+    for (let round = 1; round < 6; round++) {
+      expect(openerOn(round), `round ${round} and ${round + 1} share an opener`).not.toBe(
+        openerOn(round + 1),
+      );
+    }
+  });
+
+  it('hands the tie to the other side when the kick-off die falls the other way', () => {
+    const state = createMatch(base);
+    const openerWith = (initiativeNonce: number) =>
+      buildTurnOrder({ ...state, initiativeNonce }).find((s) => s.count === 15)!.team;
+
+    expect(openerWith(0)).not.toBe(openerWith(1));
+  });
+
+  /**
+   * The Spark enters on a fixed round and is worth several goals, so first
+   * reach at it must not belong to the same side every match. Before the
+   * kick-off die, the tie fell to a stable key beginning with the team letter
+   * and A opened round 6 two hundred times out of two hundred.
+   */
+  it('opens the Spark round for each side about half the time', () => {
+    let openedByA = 0;
+    const runs = 200;
+
+    for (let seed = 1; seed <= runs; seed++) {
+      const state = createMatch({ ...base, seed });
+      const opener = buildTurnOrder({ ...state, round: SPARK_ENTRY_ROUND }).find(
+        (s) => s.count === 15,
+      )!.team;
+      if (opener === 'A') openedByA++;
+    }
+
+    expect(openedByA).toBeGreaterThan(runs * 0.4);
+    expect(openedByA).toBeLessThan(runs * 0.6);
+  });
+
   it('lists every unit on the field exactly once', () => {
     const state = fullMatch();
     const listed = state.turnOrder

@@ -18,6 +18,22 @@ function acting(state: MatchState): Unit {
   return state.units.find((u) => u.id === state.turn!.unitId)!;
 }
 
+/**
+ * One free cell a unit can step onto, taken vertically. Which way is open
+ * depends on the side: the layout mirrors around y=22, so a kick-off row sits
+ * above its catwalk for one team and below it for the other. Asking the arena
+ * keeps these tests about the movement budget and not about who won the
+ * initiative tie.
+ */
+function oneStepFrom(unit: Unit): { x: number; y: number } {
+  const step = [
+    { x: unit.x, y: unit.y + 1 },
+    { x: unit.x, y: unit.y - 1 },
+  ].find((cell) => arena.isOccupiable(cell));
+  if (!step) throw new Error(`${unit.id} is walled in at (${unit.x}, ${unit.y})`);
+  return step;
+}
+
 /** Applies a command and fails the test loudly if the engine refused it. */
 function must(state: MatchState, action: Parameters<typeof reduce>[2]['action']): {
   state: MatchState;
@@ -81,7 +97,7 @@ describe('the turn economy', () => {
   it('bills movement against the budget and moves the unit', () => {
     const state = opened();
     const unit = acting(state);
-    const step = { x: unit.x, y: unit.y + 1 };
+    const step = oneStepFrom(unit);
 
     const after = must(state, { kind: 'move', path: [step] }).state;
     const moved = after.units.find((u) => u.id === unit.id)!;
@@ -93,7 +109,7 @@ describe('the turn economy', () => {
   it('leaves the Action untouched when a unit only moves', () => {
     const state = opened();
     const unit = acting(state);
-    const after = must(state, { kind: 'move', path: [{ x: unit.x, y: unit.y + 1 }] }).state;
+    const after = must(state, { kind: 'move', path: [oneStepFrom(unit)] }).state;
     expect(after.turn!.actionUsed).toBe(false);
   });
 

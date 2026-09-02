@@ -132,6 +132,12 @@ export interface TurnSlot {
    * lose, while the interface groups by this field to draw the rung.
    */
   readonly blockId: string | null;
+  /**
+   * The side this slot belongs to, null for the two hazards. Read by the sort
+   * to break ties between slots that share a count, which is the whole of the
+   * initiative fairness question when both teams resolve on the same numbers.
+   */
+  readonly team: TeamId | null;
 }
 
 /**
@@ -176,6 +182,13 @@ export interface MatchState {
   readonly bench: Readonly<Record<TeamId, number>>;
 
   readonly rngSeed: number;
+  /**
+   * Which side goes first among slots sharing an initiative count, alternating
+   * every round from this starting value. Rolled once at kick-off and never
+   * again: see `sortSlots` in `initiative.ts` for why it is a die and not a
+   * fixed rule.
+   */
+  readonly initiativeNonce: number;
   readonly result: MatchResult | null;
 }
 

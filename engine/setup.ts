@@ -57,6 +57,11 @@ export function createMatch(setup: MatchSetup): MatchState {
     respawnOnRound: null,
   }));
 
+  // Which side wins initiative ties in round 1, alternating from there. One die
+  // for the whole match, taken before the human counts so the tie-break cannot
+  // depend on what the humans rolled.
+  const initiativeNonce = rng.int(2);
+
   const state: MatchState = {
     arenaId: setup.arena.id,
     round: 1,
@@ -72,6 +77,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     score: { A: 0, B: 0 },
     bench: { A: BENCH_SIZE, B: BENCH_SIZE },
     rngSeed: rng.seed,
+    initiativeNonce,
     result: null,
   };
 
