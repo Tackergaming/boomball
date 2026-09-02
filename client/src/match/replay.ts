@@ -22,6 +22,7 @@
  * sentence: who acted, what they tried, what the dice said.
  */
 
+import { ZONE_HEIGHT } from '../../../engine/constants.js';
 import type { Point } from '../../../engine/geometry.js';
 import type { DiceRoll, MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId, Unit, UnitId } from '../../../engine/types.js';
@@ -44,6 +45,15 @@ export interface BeatLine {
   /** Rendered as the roll it was, so a player reads the dice and not a verdict. */
   readonly roll?: DiceRoll | undefined;
   readonly outcome?: 'good' | 'bad' | 'neutral' | undefined;
+  /**
+   * Background movement: worth a line only when nothing louder shares the beat.
+   *
+   * A walk and a Cracker's drift are both context. Once something was thrown,
+   * swung or blown up in the same beat, they are noise in front of it. This
+   * used to be decided by sniffing the word `moves` out of the text, which
+   * quietly broke the moment a second kind of line needed the same treatment.
+   */
+  readonly minor?: boolean | undefined;
 }
 
 /**
@@ -286,7 +296,7 @@ function describe(
       case 'moved':
         // Only worth a line when nothing louder happened in the same turn; the
         // filter at the end drops it if it did.
-        lines.push({ text: `${name(event.unitId)} moves ${event.path.length} cells` });
+        lines.push({ text: `${name(event.unitId)} moves ${event.path.length} cells`, minor: true });
         break;
       case 'dashed':
         lines.push({ text: `${name(event.unitId)} dashes` });
@@ -388,6 +398,24 @@ function describe(
           outcome: forMe(event.hit, mine(event.unitId)),
         });
         break;
+      // The Crackers had no commentary at all, so a round where neither one
+      // went off showed them jumping across the shaft with nothing said, and a
+      // fresh one appearing at the centre of The Scramble looked like the same
+      // Cracker refusing to leave. Both are minor: a detonation in the same
+      // beat outranks them.
+      case 'crackerMoved':
+        lines.push({
+          text: `${label(event.crackerId)} drifts ${event.path.length} cells into ${zoneName(event.to.y)}`,
+          minor: true,
+        });
+        break;
+      case 'crackerRespawned':
+        lines.push({
+          text: `A fresh ${label(event.crackerId)} drops into ${zoneName(event.at.y)}`,
+          outcome: 'neutral',
+          minor: true,
+        });
+        break;
       case 'crackerDetonated':
         lines.push({
           text: `${event.crackerId} goes off on ${name(event.targetId)} · ${
@@ -424,13 +452,36 @@ function describe(
     }
   }
 
-  // A walk only earns a line when it is the whole story. Once anything was
-  // thrown, swung or scored, "moves 8 cells" is noise in front of it.
-  const eventful = lines.some((line) => !line.text.includes(' moves '));
-  const kept = eventful ? lines.filter((line) => !line.text.includes(' moves ')) : lines;
+  // A walk, or a Cracker drifting, only earns a line when it is the whole
+  // story. Once anything was thrown, swung or scored, "moves 8 cells" is noise
+  // in front of it. `roundStarted` is not minor and is not competing: it is the
+  // heading of the beat it opens.
+  const eventful = lines.some((line) => !line.minor);
+  const kept = eventful ? lines.filter((line) => !line.minor) : lines;
 
   return kept.slice(0, 4);
 }
+
+/** `cracker-1` is not a thing to read on a card. */
+function label(crackerId: string): string {
+  const n = /(\d+)$/.exec(crackerId)?.[1];
+  return n ? `Cracker ${n}` : 'A Cracker';
+}
+
+/**
+ * The zone a height falls in, named. Display numbering, 1 at the floor, which
+ * is the numbering every other surface of this client uses.
+ */
+function zoneName(y: number): string {
+  const zone = Math.min(3, Math.max(1, Math.floor(y / ZONE_HEIGHT) + 1));
+  return ZONE_NAMES[zone] ?? `Zone ${zone}`;
+}
+
+const ZONE_NAMES: Record<number, string> = {
+  1: 'The Trench',
+  2: 'The Scramble',
+  3: 'The Summit',
+};
 
 /** Where a unit walked during a beat, for the trail drawn on the board. */
 export function trailOf(beat: Beat): { unitId: UnitId; path: readonly Point[] } | null {

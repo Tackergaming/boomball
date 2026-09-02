@@ -17,7 +17,7 @@
  * every row here is flipped exactly once, in `rowOf`. Nowhere else.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Point } from '../../../engine/geometry.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
@@ -67,6 +67,31 @@ export function Board({
   const reachable = legal && onMove ? legal.destinations : null;
   const units = activeUnits(state);
 
+  /**
+   * How many screen pixels one cell is worth, which is what lets the labels be
+   * sized in pixels rather than in cells.
+   *
+   * A cell is one SVG unit, so `font-size: 0.21` is 0.21 of a cell, and a cell
+   * is whatever the window left over: about 47 px on a big screen and about
+   * 30 px on the 1280 x 800 this game is specified down to. The same label is
+   * legible on the first and 6 px tall on the second. So the stage is measured
+   * and the type is asked for in pixels, which is the unit legibility is
+   * actually in.
+   */
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [cellPx, setCellPx] = useState(40);
+  useEffect(() => {
+    const node = stageRef.current;
+    if (!node) return;
+    const measure = () => setCellPx(Math.max(1, node.getBoundingClientRect().width / ARENA_WIDTH));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  /** A size in screen pixels, expressed in the SVG units the viewBox counts in. */
+  const px = (size: number) => size / cellPx;
+
   return (
     <div style={S.frame}>
       <Strip
@@ -83,7 +108,7 @@ export function Board({
             in `cover` and the SVG letterboxed inside it by `meet`: the grid
             then covered less ground than the picture, which is exactly the
             mismatch Jérôme saw. One square, both layers, no discrepancy. */}
-        <div style={S.stage}>
+        <div style={S.stage} ref={stageRef}>
         <img src={ZONE_ART[zone]} alt="" style={S.art} />
         <div style={S.wash} />
 
@@ -269,6 +294,24 @@ export function Board({
             />
           )}
 
+          {/* Names first, tokens second, and the order is the whole reason a
+              plate may be wider than the cell it belongs to. Six characters at
+              a readable size do not fit in a thirty pixel box, so the plate
+              hangs under the token and takes its chances with the neighbours;
+              painting it before the tokens means the one thing it can ever be
+              hidden by is another Giff, which is the right way round. */}
+          {units.filter(inZone).map((unit) => (
+            <NamePlate
+              key={`n${unit.id}`}
+              unit={unit}
+              own={own}
+              x={unit.x}
+              row={rowOf(unit.y)}
+              isYou={yoursId === unit.id}
+              px={px}
+            />
+          ))}
+
           {units.filter(inZone).map((unit) => (
             <UnitMark
               key={unit.id}
@@ -281,6 +324,7 @@ export function Board({
               isYou={yoursId === unit.id}
               selected={selected === unit.id}
               carrying={state.payload.carriedBy === unit.id}
+              px={px}
               onClick={() => onSelectUnit(selected === unit.id ? null : unit.id)}
             />
           ))}
@@ -301,6 +345,68 @@ export function Board({
   );
 }
 
+/**
+ * The name plate, hung under the token.
+ *
+ * Its own component and its own layer because of one constraint: a Giff's given
+ * name is up to six characters, and six characters at a size a person can read
+ * is wider than a cell on the smallest window this game supports. So it cannot
+ * live inside the box, and if it were drawn with its token it would sit on top
+ * of whoever stands below. Drawn ahead of every token instead, the worst it can
+ * do is be covered by one.
+ *
+ * The given name alone. "Voss Ardent" is two cells wide and the surname is the
+ * half nobody shouts.
+ */
+function NamePlate({
+  unit,
+  own,
+  x,
+  row,
+  isYou,
+  px,
+}: {
+  unit: Unit;
+  own: 'A' | 'B';
+  x: number;
+  row: number;
+  isYou: boolean;
+  px: (size: number) => number;
+}) {
+  const colour = isYou ? '#ffc14d' : unit.team === own ? '#3ce0f0' : '#ff56dc';
+  const name = unit.name.split(' ')[0] ?? unit.name;
+
+  const size = px(10);
+  const height = px(13);
+  // Under the token, except on the bottom row of the zone where the stage
+  // would clip it, and clear of the chevron that marks the player's own Giff.
+  const below = row < ZONE_ROWS - 1;
+  const top = below ? row + 0.98 : row - height - (isYou ? 0.3 : 0.06);
+  // Monospace advance is about 0.6 em, plus a little air either side.
+  const width = Math.max(0.7, name.length * size * 0.6 + px(6));
+
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      <rect
+        x={x + 0.5 - width / 2}
+        y={top}
+        width={width}
+        height={height}
+        fill="rgba(5,7,10,.86)"
+      />
+      <text
+        x={x + 0.5}
+        y={top + height - px(3.5)}
+        textAnchor="middle"
+        fill={colour}
+        style={{ font: `600 ${size}px 'IBM Plex Mono', monospace` }}
+      >
+        {name}
+      </text>
+    </g>
+  );
+}
+
 function UnitMark({
   unit,
   own,
@@ -311,6 +417,7 @@ function UnitMark({
   isYou,
   selected,
   carrying,
+  px,
   onClick,
 }: {
   unit: Unit;
@@ -324,6 +431,8 @@ function UnitMark({
   isYou: boolean;
   selected: boolean;
   carrying: boolean;
+  /** A size in screen pixels, in the SVG units the viewBox counts in. */
+  px: (size: number) => number;
   onClick: () => void;
 }) {
   // Three colours, not two. Every shirt on your own side was one cyan, so the
@@ -350,7 +459,7 @@ function UnitMark({
         y={row + 0.08}
         width={0.84}
         height={0.84}
-        fill={isYou ? 'rgba(255,193,77,.2)' : 'rgba(5,7,10,.78)'}
+        fill={isYou ? 'rgba(255,193,77,.24)' : 'rgba(5,7,10,.86)'}
         stroke={colour}
         strokeWidth={isYou ? 0.13 : selected || onTheClock ? 0.11 : 0.06}
       />
@@ -372,27 +481,48 @@ function UnitMark({
           opacity={0.55}
         />
       )}
+
+      {/* Hit points in figures, top right of the box.
+          Two digits at most: the deepest pool in the game is a Star Breaker's
+          85. Red under a third, so a Giff about to be carried off says so
+          before it happens rather than after. Reading this used to mean
+          clicking the Giff to open its sheet, which is a click for a fact that
+          should never have been a click away. */}
+      <text
+        x={x + 0.88}
+        y={row + 0.1 + px(10)}
+        textAnchor="end"
+        fill={hurt <= 0.34 ? '#ff8fa0' : colour}
+        style={{ font: `700 ${px(11)}px 'IBM Plex Mono', monospace` }}
+      >
+        {unit.hp}
+      </text>
+
       <text
         x={x + 0.5}
-        y={row + 0.62}
+        y={row + 0.72}
         textAnchor="middle"
         fill={colour}
-        style={{ font: `600 0.44px 'IBM Plex Mono', monospace`, letterSpacing: '0.02px' }}
+        style={{ font: `600 ${px(15)}px 'IBM Plex Mono', monospace`, letterSpacing: '0.02px' }}
       >
         {unit.role[0]!.toUpperCase()}
       </text>
-      {/* The health bar along the bottom edge, so a wounded Giff reads at a
-          glance without opening its sheet. */}
-      <rect x={x + 0.08} y={row + 0.84} width={0.84 * hurt} height={0.08} fill={colour} />
+
+      {/* The health bar along the bottom edge, so a wounded Giff still reads at
+          a glance on a board too small for the figure to be comfortable. */}
+      <rect x={x + 0.08} y={row + 0.86} width={0.84 * hurt} height={0.06} fill={colour} />
+
+      {/* The ball sits bottom left. The whole top of the box is spoken for:
+          the anchoring warning on the left, the hit points on the right. */}
       {carrying && (
-        <circle cx={x + 0.84} cy={row + 0.16} r={0.13} fill="#c9b489" stroke="#05070a" strokeWidth={0.04} />
+        <circle cx={x + 0.21} cy={row + 0.66} r={0.13} fill="#c9b489" stroke="#05070a" strokeWidth={0.04} />
       )}
       {!unit.anchored && (
         <text
-          x={x + 0.14}
-          y={row + 0.3}
+          x={x + 0.12}
+          y={row + 0.1 + px(10)}
           fill="#d8a12a"
-          style={{ font: `700 0.3px 'IBM Plex Mono', monospace` }}
+          style={{ font: `700 ${px(11)}px 'IBM Plex Mono', monospace` }}
         >
           !
         </text>

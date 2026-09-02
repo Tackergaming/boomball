@@ -30,7 +30,7 @@ import { Feed } from '../match/Feed.js';
 import { Ladder } from '../match/Ladder.js';
 import { SeatPanel } from '../match/SeatPanel.js';
 import { trailOf } from '../match/replay.js';
-import { useMatch, type Speed } from '../match/useMatch.js';
+import { beatHoldMs, useMatch, type Speed } from '../match/useMatch.js';
 import { zoneOf } from '../lib/arena.js';
 
 export function Match({
@@ -128,14 +128,12 @@ export function Match({
 
     // Held for a beat first. The action that emptied the turn has its result on
     // screen, and sending the next request would wipe that card before it had
-    // been read, which is the very thing the card exists to prevent.
-    const timer = setTimeout(
-      () => {
-        autoEnded.current = turnKey;
-        void send({ kind: 'endTurn' });
-      },
-      match.speed === 'instant' ? 0 : 1000,
-    );
+    // been read, which is the very thing the card exists to prevent. The wait
+    // is the card's own hold time, so raising one raises the other.
+    const timer = setTimeout(() => {
+      autoEnded.current = turnKey;
+      void send({ kind: 'endTurn' });
+    }, beatHoldMs(match.speed));
     return () => clearTimeout(timer);
   }, [canAct, legal, match.seq, match.speed, send]);
 

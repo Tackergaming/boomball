@@ -10,6 +10,10 @@
 > trois lots de correctifs : le CORS qui bloquait le lobby, dix retours d'ergonomie de match, puis
 > deux trous fonctionnels, les victoires que rien n'enregistrait et le canal d'ordres alliés que rien
 > ne branchait. Les trois sections sont plus bas, à lire dans l'ordre.
+> Le quatrième test a produit deux correctifs d'écran, le token qui porte enfin nom et points de
+> vie, et la carte d'annonce qui ne se fait plus compresser sous la seconde, plus **une question de
+> règle en attente d'arbitrage** sur les Crackers qui ne quittent pas la Scramble. Section « Le
+> quatrième test en local » : ils décrochent du match au round 4, et le levier est leur vitesse.
 > **261 tests.** Ce qui reste est du playtest, pas de la construction.
 
 ## Le projet en trois lignes
@@ -938,6 +942,129 @@ chrono, le bouton d'appel, la bannière de reprise et le rythme du rejeu, **n'a 
 qui est vérifié l'est par les 261 tests, les deux typechecks, le build, `browser-path.py` et un match
 complet joué par `live-match.ts` contre les fonctions déployées.
 
+## Le quatrième test en local : le token muet et le rythme de la carte
+
+Trois retours. Deux sont de l'écran et sont corrigés. Le troisième n'est pas un défaut de code, et
+c'est une question de règle qui attend un arbitrage.
+
+### Le token ne disait ni qui ni combien
+
+**Le retour :** « je ne vois pas visuellement sur le token les points de vie et le nom des joueurs,
+ce qui me force à devoir cliquer sur mon adversaire pour voir sa fiche sur la droite ». Un clic pour
+deux faits qui n'auraient jamais dû être à un clic.
+
+Le token portait la lettre du rôle et une barre de vie fine, et rien d'autre. Il porte maintenant
+**les points de vie en chiffres**, en haut à droite, qui passent au rouge sous un tiers, et **le
+prénom sur une plaque sous la case**. La barre reste : c'est elle qui se lit sans qu'on la fixe.
+
+**Le vrai problème était la taille, pas le contenu, et c'est ce qui a façonné la solution.** Une case
+vaut une unité de `viewBox`, donc `font-size: 0.21` veut dire 21 % d'une case, et une case vaut ce
+que la fenêtre a bien voulu laisser : environ 47 px sur un grand écran et **environ 30 px sur le
+1280 x 800 dont le projet se réclame**. Le même libellé est confortable sur le premier et haut de
+6 px sur le second. Le composant mesure donc la scène avec un `ResizeObserver` et demande ses tailles
+**en pixels d'écran**, converties en unités de `viewBox`, ce qui est la seule unité dans laquelle la
+lisibilité se pense.
+
+Conséquence directe : un prénom de six caractères lisible est **plus large qu'une case** sur la
+petite fenêtre, donc il ne peut pas tenir dans la boîte. La plaque pend sous le token et déborde sur
+les voisins. Elle est donc dessinée **dans sa propre couche, avant tous les tokens** : la seule chose
+qui peut la masquer est un autre Giff, ce qui est le bon sens de l'empilement. Sur la ligne du bas
+d'une zone, elle passe au-dessus, sinon la scène la coupe.
+
+Le reste du token a été redistribué autour de ces deux ajouts : la balle portée descend en bas à
+gauche, parce que tout le haut de la boîte est pris, l'avertissement d'ancrage à gauche et les points
+de vie à droite. Le prénom seul, jamais le nom complet : « Voss Ardent » fait deux cases de large et
+le patronyme est la moitié que personne ne crie.
+
+### La carte d'annonce passait encore trop vite
+
+**Le retour :** « j'aimerais bien que le log d'action qui apparaît au milieu apparaisse plus
+longtemps pour que j'aie le temps de lire ». Troisième fois que ce reproche revient, après 700 ms
+puis 1,5 s, et **la montée précédente ne pouvait pas se voir**, ce qui est la seule chose
+intéressante de ce correctif.
+
+`REPLAY_BUDGET_MS` plafonnait le lot entier à 30 secondes et compressait chaque beat pour y entrer.
+Un round solo, c'est treize tours d'IA, donc un lot de quinze à vingt beats était la norme et le coût
+nominal passait le plafond systématiquement. Le facteur d'échelle ramenait alors **toutes les cartes
+sous la seconde**, c'est à dire exactement la vitesse qu'on venait de corriger. Le plafond a été monté
+à 45 secondes, et surtout il **cède maintenant avant le plancher** : `MIN_BEAT_MS` à 1,6 s est la
+limite sous laquelle la compression ne descend pas. Un lot pathologique dure simplement plus
+longtemps, et le bouton Skip, qui est sur la carte elle-même, est la sortie.
+
+Les durées montent par ailleurs : **2,5 s en normal, 4 s en lent**, un but ou une évacuation toujours
+au double. Ça ne coûte aucun tour au joueur, le chrono ne courant pas contre lui pendant le rejeu.
+
+**Et l'attente avant le passage automatique du tour est désormais la même durée.** Elle était figée à
+une seconde en face d'une carte qui en durait deux et demie, donc la requête suivante effaçait la
+carte avant qu'elle soit lue, ce qui est précisément ce que cette attente existait pour éviter.
+`beatHoldMs()` est exporté de `useMatch.ts` et lu par `Match.tsx` : un seul nombre, deux usages.
+
+### Les Crackers décrochent du match au round 4
+
+**Le retour :** « j'ai l'impression que les deux balles qui sont censées poursuivre les joueurs et
+exploser restent coincées en zone 2 et n'arrivent pas à passer en zone 3. »
+
+**Premier point, et il ferme une piste : la règle que Jérôme a formulée en arbitrage est déjà celle
+qui tourne, mot pour mot.** Un Cracker réapparaît au centre de la Zone 2, il n'explose que sur la
+première unité dont il traverse la case, et sinon il survit d'un round à l'autre et poursuit sa
+course. `runCracker` ne détruit un Cracker que si `run.struck` existe. Il n'y avait rien à corriger de
+ce côté, et le symptôme vient d'ailleurs.
+
+**Ce que la mesure a trouvé est pire que « coincés en zone 2 ».** Position moyenne round par round,
+120 matchs Veteran :
+
+| Round | Unités Z1/Z2/Z3 | Crackers vivants Z1/Z2/Z3 | Payload Z1/Z2/Z3 |
+|---|---|---|---|
+| 1 | 0 / 86 / 14 % | — | 0 / 100 / 0 % |
+| 3 | 0 / 66 / 34 % | 0 / 100 / 0 % | 0 / 65 / 35 % |
+| 5 | 0 / 33 / 67 % | 0 / 100 / 0 % | 0 / 23 / 78 % |
+| 7 | 0 / 13 / 87 % | 0 / 83 / 17 % | 0 / 3 / 97 % |
+| 10 | 1 / 6 / 93 % | 4 / 87 / 9 % | 0 / 1 / 99 % |
+
+**Le match monte, les Crackers restent.** Dès le round 6, neuf unités sur dix et le ballon sont au
+Sommet, et près de neuf Crackers vivants sur dix sont encore dans la Scramble. Ils ne sont pas
+seulement confinés : à partir du round 5, **ils explosent au-dessus d'un stade vide**, et la moitié
+du match se joue sans eux.
+
+**Le mécanisme est la conjonction de deux règles justes.** Un Cracker renaît en `(7, 22)` et vise
+l'unité **la plus proche**. Après le round 4 la plus proche n'est plus le peloton, c'est le
+retardataire resté dans la Scramble. Il le tue, il renaît au même endroit, il tue le suivant. Il fait
+la navette sur les traînards pendant que le match se joue quinze cases plus haut.
+
+**Le second effet, moins visible :** un Cracker vit 0,19 round en moyenne, donc **frapper un Cracker
+ne trouve presque jamais de cible vivante**. L'action que B8 donne au Breaker est morte.
+
+**Le levier compatible avec l'arbitrage de Jérôme est la vitesse, et un seul chiffre le porte.** Un
+joueur parcourt 40 pieds par round, soit **8 cases**. Un Cracker en parcourt **6**. Une tête
+chercheuse plus lente que sa cible ne rattrape jamais un terrain qui a bougé, et c'est exactement ce
+que la table du dessus montre. `CRACKER_MOVE_CELLS` porté à 10 met le missile plus vite que le
+peloton sans toucher un mot du reste de B8.
+
+Mesuré sur les mêmes 120 matchs :
+
+| `CRACKER_MOVE_CELLS` | Arrivées Z2 / Z3 | Crackers vivants en Z3, rounds 6-10 | Déton./match | Buts/match | Évac./match | Dégâts/match |
+|---|---|---|---|---|---|---|
+| **6, actuel** | 85,7 % / 14,0 % | 9 à 17 % | 13,87 | 4,03 | 4,05 | 100,4 |
+| **10** | 76,2 % / 23,7 % | **100 %** | 17,19 | 4,16 | 4,52 | 123,5 |
+| 14 | 76,0 % / 23,9 % | 100 % | 18,26 | 4,18 | 4,78 | 132,3 |
+
+La colonne des arrivées bouge peu parce que les quatre premiers rounds se jouent en Zone 2 de toute
+façon, et c'est la colonne suivante qui porte la vraie réponse : **à 10 cases, un Cracker vivant du
+round 6 au round 10 est au Sommet, avec le match.** Passer de 10 à 14 n'achète plus rien et ne coûte
+que des dégâts.
+
+**Le prix :** le souffle total monte de 23 %, une demi-évacuation de plus par match. **Le nombre de
+buts ne bouge pas**, 4,03 contre 4,16, donc l'équilibrage clos n'est pas rouvert.
+
+**En attente de validation.** `engine/constants.ts` est inchangé, `CRACKER_MOVE_CELLS` vaut toujours
+6. C'est un écart à verser au règlement v2 le jour où Jérôme le tranche.
+
+**Deux variantes mesurées avant ce diagnostic**, gardées ici pour ne pas refaire les sweeps. Faire
+renaître le Cracker là où il a explosé donne 37 % d'arrivées en Zone 3 mais il ne vit plus du tout,
+renaissant collé à la victime précédente, et le souffle monte de 28 %. Le faire renaître au centre des
+trois zones à tour de rôle donne 23 / 58 / 19 %, une durée de vie d'un round entier et un souffle
+divisé par deux, mais il ne réapparaît plus au centre de la Zone 2, ce que l'arbitrage exclut.
+
 ## Ce qui attend Jérôme
 
 **La zone 1 est bonne, et ce document a longtemps prétendu le contraire.** Vérifié le 2026-09-02 en
@@ -973,6 +1100,12 @@ même. Il y a maintenant **deux projets dans l'org**, `boomball` et `projet test
 plafond du plan gratuit : supprime `projet test` si tu en veux un troisième. Et un **match de
 démonstration** est conservé en base avec l'utilisateur jetable qui le porte, ids dans « L'Edge
 Function tourne », à effacer quand tu l'auras regardé. À part lui, la base est vide.
+
+**Une décision à prendre sur les Crackers.** Ils décrochent du match au round 4 : dès le round 6, neuf
+unités sur dix sont au Sommet et neuf Crackers vivants sur dix sont encore dans la Scramble. La règle
+que tu as formulée est déjà celle qui tourne, le levier est la vitesse. Recommandation :
+`CRACKER_MOVE_CELLS` de 6 à 10, un joueur en parcourant 8. Les chiffres sont dans « Le quatrième test
+en local », le nombre de buts n'en bouge pas.
 
 **Rejouer une partie, et c'est la prochaine chose.** `npm run dev` depuis `boomball/client`, puis
 `http://localhost:5173`. Les deuxième et troisième lots sont largement de l'écran, et **rien de ce

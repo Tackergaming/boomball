@@ -89,24 +89,51 @@ const FEED_LIMIT = 120;
 /**
  * How long one beat sits on screen.
  *
- * Jérôme picked turn-by-turn, first at roughly seven tenths of a second, then
- * **still too fast to follow**, so every step is up: a normal beat is a second
- * and a half and the slow setting is two and a half. A goal or a knockout is
- * held twice as long, because those are the moments he was missing entirely,
- * and a beat with nothing to read goes by in a blink.
+ * Third time up, and the third report is the same one: the card in the middle
+ * of the board goes before it has been read. Seven tenths, then a second and a
+ * half, now two and a half at normal and four at slow. A goal or a knockout is
+ * held twice as long, because those are the moments that were being missed
+ * entirely, and a beat with nothing to read goes by in a blink.
  *
  * Costing this in turn time is what the timer going to a hundred and twenty
  * seconds pays for, and the clock does not start against the player until the
  * replay is over anyway. See `Match.tsx`.
  */
-const BEAT_MS: Record<Speed, number> = { slow: 2500, normal: 1500, instant: 0 };
+const BEAT_MS: Record<Speed, number> = { slow: 4000, normal: 2500, instant: 0 };
 
 /**
- * A ceiling on the whole batch, so a pathological round cannot lock a player
+ * A target for the whole batch, so a pathological round does not lock a player
  * out for a minute. Past it the replay speeds up rather than dropping beats:
  * seeing all of it fast beats seeing a third of it at the right pace.
  */
-const REPLAY_BUDGET_MS = 30_000;
+const REPLAY_BUDGET_MS = 45_000;
+
+/**
+ * The floor the budget may not compress a beat below, and the reason the last
+ * rise did not land.
+ *
+ * A solo round is thirteen AI turns, so a batch of fifteen to twenty beats was
+ * routine and the nominal cost went straight past the old thirty second
+ * ceiling. The scale factor then quietly took every card back under a second,
+ * which is exactly the speed that was reported as unreadable **after** the
+ * per-beat number had been raised to fix it. So the ceiling now gives way
+ * before the floor does: a long batch simply runs long, and the Skip button,
+ * which is on the card itself, is the way out of one. A player who wants the
+ * whole round in a blink already has the instant setting.
+ */
+const MIN_BEAT_MS = 1600;
+
+/**
+ * How long a card wants on screen at the current speed.
+ *
+ * Exported because `Match.tsx` waits before auto-passing an empty turn, and
+ * that wait exists only to let the card that emptied it be read. Two numbers
+ * for one purpose drift the moment one of them is tuned, which is what a fixed
+ * one-second wait had already done against a two-and-a-half second card.
+ */
+export function beatHoldMs(speed: Speed): number {
+  return BEAT_MS[speed];
+}
 
 const SPEED_KEY = 'boomball.replaySpeed';
 
@@ -232,12 +259,14 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
       const beats = toBeats(from, events, own);
       if (beats.length === 0) return;
 
-      // Fit the whole batch inside the budget rather than cutting it short.
+      // Fit the whole batch inside the budget rather than cutting it short,
+      // but never below the floor: an unreadable card is not a faster replay,
+      // it is a replay that did not happen.
       const nominal = beats.reduce((total, one, i) => total + holdFor(one, i === 0), 0);
       const perBeat = BEAT_MS[speedRef.current];
       const scale =
         perBeat > 0 && nominal * perBeat > REPLAY_BUDGET_MS
-          ? REPLAY_BUDGET_MS / (nominal * perBeat)
+          ? Math.max(REPLAY_BUDGET_MS / (nominal * perBeat), MIN_BEAT_MS / perBeat)
           : 1;
 
       skipRef.current = false;
