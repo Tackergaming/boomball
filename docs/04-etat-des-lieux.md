@@ -19,7 +19,7 @@ version codable avant la moindre ligne de code.
 |---|---|
 | `docs/00-reglement-v2.md` | **Les règles. Validé par Jérôme le 2026-09-01, partie A et partie B.** Rien ne s'écarte de ce document sans un nouvel arbitrage de sa part |
 | `docs/02-architecture.md` | Le contrat entre moteur, serveur et client |
-| `docs/03-brief-claude-design.md` | Les prompts Claude Design, dont le prompt 2 non encore lancé |
+| `docs/03-brief-claude-design.md` | Les prompts Claude Design. **Les deux sont lancés et livrés** |
 | `docs/01-prompts-arene.md` | Les prompts d'images d'arène, et ce qu'on a appris dessus |
 | `design/README.md` | La vérification du design livré, et les jetons de couleur pour la phase 4 |
 | `~/.claude/plans/salut-jarvis-donc-comme-clever-elephant.md` | Le plan validé : phases, décisions produit |
@@ -465,13 +465,18 @@ régénération est prêt dans `01-prompts-arene.md` s'il change d'avis.
 niveau des hauteurs de passerelles et des colonnes, mais ce n'est pas encore un tracé case par case
 sur les dessins. À faire avant le playtest, pas avant.
 
-**Le prompt 2 de Claude Design** n'a pas été lancé : connexion, hub d'équipe, lobby, résultats.
+**Le design est complet, les deux prompts sont livrés.** Les écrans de coque du prompt 2 sont dans
+le même `design/Boomball Interface.html`, sous la section « Out-of-match screens », ancres `#2a` à
+`#2e` : Sign in, Team hub, Lobby, Results, Seat panel states. `design/README.md` a longtemps
+prétendu le contraire, il ne documentait que la vérification du prompt 1.
 
-**Le prompt 2 de Claude Design, que je ne peux pas lancer à ta place.** Il est écrit dans
-`03-brief-claude-design.md` et couvre connexion, hub d'équipe, lobby et résultats.
+**Rien, côté design.** Les deux prompts sont livrés et vérifiés.
 
-**Un projet Supabase.** La migration, le seed et l'Edge Function sont écrits et n'ont été appliqués
-nulle part. Sans projet ni identifiants, la phase 4 s'arrête au code.
+**Le projet Supabase est à créer, et de quoi le faire est disponible.** Le `.env` du workspace porte
+`SUPABASE_API_KEY_BOOMBALL`, un **Personal Access Token** (préfixe `sbp_`), donc l'API Management
+permet de créer le projet, de récupérer ses clés et d'exécuter le SQL sans intervention manuelle. Ni
+la CLI `supabase` ni `psql` ne sont installés sur la machine : passer par l'API Management, ou
+installer la CLI. Il faudra choisir une région et un mot de passe de base de données.
 
 **L'équilibrage est clos.** Si tu veux le rouvrir, la section « Le lot 4 » liste les leviers déjà
 mesurés et ce qu'ils valent, pour ne pas refaire ces sweeps.
