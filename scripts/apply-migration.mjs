@@ -20,12 +20,24 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Load the workspace .env when the variables are not already there, so this
+// runs the same way in PowerShell and in bash. Sourcing a .env by hand is a
+// bash-ism, and getting it wrong looks exactly like a missing key: the script
+// fails before touching the network and the message blames the environment.
+// Anything already exported wins, so an explicit override still works.
+if (!process.env.SUPABASE_API_KEY_BOOMBALL || !process.env.SUPABASE_BOOMBALL_REF) {
+  const envFile = resolve(import.meta.dirname, '../../.env');
+  if (existsSync(envFile)) process.loadEnvFile(envFile);
+}
 
 const PAT = process.env.SUPABASE_API_KEY_BOOMBALL;
 const REF = process.env.SUPABASE_BOOMBALL_REF;
 if (!PAT || !REF) {
-  console.error('SUPABASE_API_KEY_BOOMBALL and SUPABASE_BOOMBALL_REF must be in the environment.');
-  console.error('From the workspace root:  set -a && . ./.env && set +a');
+  console.error('SUPABASE_API_KEY_BOOMBALL and SUPABASE_BOOMBALL_REF must be in the environment,');
+  console.error('or in the workspace .env, which this script loads on its own.');
   process.exit(1);
 }
 
