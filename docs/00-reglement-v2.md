@@ -27,12 +27,12 @@ disait pas.
 
 | # | Règle de table | Règle v2 | Raison |
 |---|---|---|---|
-| 6 | Le Spark est en jeu dès le round 1 | Il entre au **round 6**, sur une case aléatoire de la Zone 2, à 4 cases ou plus de toute unité | À 150 points contre 10 il décidait seul du match, et une position d'entrée fixe se camperait. Le prix a depuis été ramené à 30, voir l'écart 20, mais l'entrée tardive reste : elle laisse cinq rounds de Payload avant que le Spark n'existe |
+| 6 | Le Spark est en jeu dès le round 1 | Il entre au **round 6**, sur une case aléatoire de la Zone 2, à 4 cases ou plus de toute unité | À 150 points contre 10 il décidait seul du match, et une position d'entrée fixe se camperait. Le prix a depuis été ramené à 20, voir l'écart 20, mais l'entrée tardive reste : elle laisse cinq rounds de Payload avant que le Spark n'existe |
 | 7 | Un joueur à 0 HP est éliminé du match | Un **humain** reprend son remplaçant après 2 rounds, même rôle, même Tier, HP pleins | À la table, un joueur éliminé reste à la table. Devant un écran, il regarde huit rounds sans rien faire |
 | 8 | Le MJ groupe les PNJ ennemis en deux blocs d'initiative | Les coéquipiers IA ont aussi leur bloc, placé **juste après le dernier humain** | Ta fiche ne prévoit pas de coéquipiers IA, ils n'existaient pas à la table. Les faire jouer après les humains garantit qu'un ordre donné pendant ton tour est exécuté dans le même round |
 | 9 | Rien sur la profondeur de banc | **3 remplaçants par équipe**, au Tier de l'équipe | Ta fiche dit « si l'équipe a gardé des remplaçants de ce calibre » sans jamais donner le nombre. Un banc fini garde une tension d'attrition |
 | 19 | Le Spark parcourt 12 cases, direction retirée au `d8` chaque round | **6 cases**, et il garde son cap d'un round sur l'autre. Nouveau cap seulement quand un mur le renvoie, par réflexion | Il allait 12 cases quand un joueur en fait 8, donc il ne se poursuivait pas, et son cap changeait chaque round, donc il ne s'anticipait pas. Sur 600 matchs il ne provoquait que 0,4 tentative par match. Ce n'était pas un objectif, c'était un billet de loterie |
-| 20 | Capture du Spark : 150 points et fin immédiate | **50 points, et le match continue.** Le Spark est retiré du terrain pour de bon | Devenu réellement attrapable, un objet à 150 points et fin immédiate serait la seule chose à jouer. Le prix se ramasse une fois et il reste des rounds pour jouer le Payload |
+| 20 | Capture du Spark : 150 points et fin immédiate | **20 points, et le match continue.** Le Spark est retiré du terrain pour de bon | Devenu réellement attrapable, un objet à 150 points et fin immédiate serait la seule chose à jouer. Le prix se ramasse une fois et il reste des rounds pour jouer le Payload. *(Passé de 150 à 50 le 2026-09-01, puis de 50 à 20 le 2026-09-02. Le Spark n'a pas changé, l'échelle autour de lui a changé : à 4 buts par match, 50 points valaient un peu plus que le match ; à 1,9 but sur le terrain de bout en bout, ils en valaient deux et demi. À 20 points, il décide 33 % des matchs en Veteran et 36 % au Star, contre 39 % et 44 % à 50 points.)* |
 | 21 | Blocage du Bulwark : +4 / +6 / +8 sur l'AC de la Furnace | **+2 / +3 / +4** | 96 à 98 % des tirs d'un match étaient bloqués. Le contre prévu, un second tireur dans le même round, ne se produisait jamais faute de volume de tir, donc la Réaction se comportait comme un bonus permanent et tenait le taux de réussite à 30 % |
 | 22 | Furnace AC 18 | **AC 15** | Écrite contre un blocage qu'on croyait occasionnel. Avec le blocage ramené à sa vraie fréquence, 15 place le tir propre d'un Striker Rookie à une chance sur deux |
 | 23 | Portée propre du lancer : 30 pieds | **45 pieds**, la portée longue reste à 60 | Les deux Furnaces étaient alors à 14 cases l'une de l'autre sur la même passerelle. À 30 pieds, le porteur mesurait en moyenne 10 cases de la Furnace visée et ne tirait proprement que sur un cinquième de ses tours. *(La géométrie qui motivait ce chiffre a changé à l'écart 24 ; la portée, elle, est conservée telle quelle.)* |
@@ -263,9 +263,15 @@ Deux Crackers, hasard neutre pour les deux équipes.
   le sol et le plafond, poursuit son mouvement sur le nouveau cap, et **conserve ce cap pour les
   rounds suivants**. Il ignore le terrain. Aucun autre dé n'est jeté : entre deux murs, le Spark est
   une bille sur un tapis, et le couper est une décision qui se lit sur le plateau.
-- **Attraper** : Action, sur la même case, `DC 20` Dextérité, Escamotage ou Acrobaties. **50 points.
+- **Attraper** : Action, sur la même case, `DC 20` Dextérité, Escamotage ou Acrobaties. **20 points.
   Le match ne s'arrête pas.** Réussi, le Spark quitte le terrain définitivement et ne réapparaît
   pas. Manqué, l'Action est dépensée et le Spark reste en jeu.
+
+  *(Le prix se fixe contre le nombre de buts et se rejuge chaque fois que celui-ci bouge. Il vaut
+  deux buts, soit environ ce que pèse un match entier. Ce n'est pas une constante que l'IA lit :
+  les mêmes graines jouent le même match à n'importe quel prix, seul le tableau change, et la
+  mesure porte donc sur la part de rencontres que le Spark décide et sur le nombre de matchs nuls,
+  qu'un Spark cher écrase.)*
 
 ## B10. Élimination
 
@@ -281,7 +287,7 @@ Deux Crackers, hasard neutre pour les deux équipes.
 ## B11. Fin de match
 
 - Fin au terme du round 10, le plus haut score gagne. La capture du Spark ne met pas fin au match,
-  elle met 50 points au tableau.
+  elle met 20 points au tableau.
 - Égalité : deux rounds de mort subite, le premier score gagne. En mort subite, la capture du Spark
   met fin au match comme n'importe quel score, par la règle de la mort subite et non par celle du
   Spark. Toujours à égalité, match nul.

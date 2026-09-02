@@ -44,16 +44,22 @@ export interface RoleWeights {
 
   // -- The Spark ------------------------------------------------------------
   /**
-   * Five goals in one Action, and no whistle any more. The same number in all
-   * four tables because the Spark does not care what role picks it up: it is
-   * `SPARK_POINTS / GOAL_POINTS` goals priced at what a goal is worth to the
-   * middle of the four roles. It stays the largest single appetite in the file
-   * because it is still four goals, but it no longer buries the Payload game
-   * the way a hundred and fifty and an instant win did.
+   * Take it, you are standing on it. The same number in all four tables
+   * because the Spark does not care what role picks it up.
    *
-   * Above a threshold the exact figure barely matters: this appetite is only
-   * ever read by a unit already standing on the Spark, where almost nothing
-   * competes. What governs how often that happens is `chaseSpark`.
+   * **It deliberately does not track `SPARK_POINTS`.** The price came down to
+   * two goals on 2026-09-02 and this stayed at 240, because the two numbers
+   * answer different questions. The price says what a capture is worth on the
+   * scoreboard; this says whether a unit already standing on the Spark should
+   * spend its Action on it, and the answer is yes at any price the game would
+   * plausibly set. Scaling it down with the price would only risk dropping it
+   * near `pickUpPayload` at 90, which is the one case where the choice is real.
+   *
+   * Above a threshold the exact figure barely matters, and this was measured:
+   * a full sweep at 400 and a full sweep at 240 return the same figures to
+   * within one match. This appetite is only ever read by a unit already on the
+   * Spark's cell, where almost nothing competes. What governs how often that
+   * happens is `chaseSpark`.
    */
   readonly catchSpark: number;
   /**

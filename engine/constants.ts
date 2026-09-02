@@ -143,19 +143,35 @@ export const SPARK_SPAWN_ZONE = 1;
 export const SPARK_MOVE_CELLS = 6;
 export const SPARK_CATCH_DC = 20;
 /**
- * Five goals. It was a hundred and fifty and it ended the match on the spot,
- * which made it the only thing on the field worth playing for.
+ * Two goals, which is about what a whole match is worth. It was a hundred and
+ * fifty and it ended the match on the spot, then fifty, and it comes down here
+ * because the scale around it moved and it did not.
  *
- * The sweep says this number matters far less than it looks. Scored over the
- * same 600 matches at every value from 10 to 150, the count of matches whose
- * winner the Spark changes barely moves: 28 of 33 at ten points, 29 of 33 at a
- * hundred and fifty. A prize of any size settles a match that would otherwise
- * have finished nil-nil, and at 0.8 goals a match most of them do. The Spark
- * will stop deciding matches when the Payload starts deciding them, not when
- * this constant comes down. So it is set at the bottom of the validated range,
- * which costs nothing measurable now and ages best as the goal rate rises.
+ * **This constant is scenery to the AI.** Nothing outside `reduce` reads it, so
+ * changing it moves no decision: the same seeds play the same match and only
+ * the scoreboard differs. What it does change is the share of matches the Spark
+ * settles, and how many end level. Measured on real sweeps at each price, 200
+ * matches per Tier on the end-to-end pitch:
+ *
+ *     price   Veteran decided   Star decided   draws (Vet / Star)
+ *        10      46 (23%)         52 (26%)         14 / 11
+ *        20      66 (33%)         71 (36%)         13 / 14
+ *        30      72 (36%)         81 (41%)          8 /  5
+ *        50      78 (39%)         88 (44%)          5 /  2
+ *
+ * Twenty was arbitrated on 2026-09-02 because it reproduces the regime Jérôme
+ * had already accepted, 27% and 38% of matches decided, at a time when the
+ * pitch produced four goals a match rather than two. Fifty was priced for that
+ * pitch: five goals bought more than the whole rest of the match once the goal
+ * rate halved.
+ *
+ * The lesson from the 0.8-goal era still holds and is worth keeping: a prize of
+ * any size settles a match that would otherwise have finished nil-nil. The
+ * Spark stops deciding matches when the Payload starts deciding them, not when
+ * this number comes down. That is why the price is set against the goal rate
+ * and gets revisited whenever the goal rate moves.
  */
-export const SPARK_POINTS = 50;
+export const SPARK_POINTS = 20;
 
 // -- Initiative -------------------------------------------------------------
 
