@@ -1,0 +1,189 @@
+/*
+ * The tokens Claude Design settled on, lifted from `design/README.md` and from
+ * the delivered artboards. Nothing here is invented: a colour that is not in
+ * that table does not belong in the interface.
+ *
+ * Desktop only, 1280px minimum. There is no mobile breakpoint anywhere in this
+ * stylesheet and that is a product decision, not an omission.
+ */
+
+:root {
+  --team-own: #3ce0f0;
+  --team-foe: #ff56dc;
+  --brass: #c9b489;
+  --brass-dim: #8a6a2f;
+
+  --text: #e9f0f2;
+  --text-dim: #8ea1a9;
+  --text-faint: #6b7c84;
+
+  --line: #2b3439;
+  --panel: #10161a;
+  --panel-deep: #0d1114;
+  --shell: #0b0f12;
+  --void: #05070a;
+  --page: #07080a;
+
+  --danger: #d8a12a;
+  --spark: #fffce8;
+
+  --display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: #c5d2d8;
+  font-family: var(--sans);
+  /* The arena art is the picture; the page must not add its own scrollbars
+     around a screen that is sized to the viewport. */
+  overflow: hidden;
+}
+
+/* -- Shared vocabulary ----------------------------------------------------- */
+
+.display {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* The hazard stripe that runs along the top of every out-of-match screen. */
+.hazard {
+  height: 10px;
+  background: repeating-linear-gradient(135deg, var(--danger) 0 12px, #0a0c0e 12px 24px);
+  opacity: 0.85;
+}
+
+.panel {
+  background: linear-gradient(#161b1f, #0e1214);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+}
+
+/* The hex plate that carries a team badge or a player's initial. */
+.plate {
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: var(--page);
+  clip-path: polygon(50% 0, 100% 26%, 100% 74%, 50% 100%, 0 74%, 0 26%);
+}
+
+button {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--page);
+  background: var(--team-own);
+  border: none;
+  padding: 12px 26px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #9df3fb;
+}
+
+button:disabled {
+  background: #223037;
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+button.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+}
+
+button.ghost:hover:not(:disabled) {
+  background: #161b1f;
+  border-color: var(--team-own);
+  color: var(--text);
+}
+
+input,
+select {
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--text);
+  background: #0a0e11;
+  border: 1px solid var(--line);
+  padding: 11px 13px;
+  width: 100%;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--team-own);
+}
+
+a {
+  color: var(--team-own);
+  text-decoration: none;
+  border-bottom: 1px solid rgb(60 224 240 / 40%);
+}
+
+.error {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #ff8fa0;
+  border-left: 2px solid #ff8fa0;
+  padding-left: 10px;
+}
+
+/* -- The Spark, which pulses because it is the only thing on the board that
+      is running out of time ------------------------------------------------ */
+
+@keyframes bb-spark {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgb(8 10 12 / 90%),
+      0 0 12px 3px rgb(255 252 232 / 85%),
+      0 0 34px 10px rgb(255 238 160 / 32%);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgb(8 10 12 / 90%),
+      0 0 20px 6px rgb(255 252 232 / 100%),
+      0 0 52px 18px rgb(255 238 160 / 45%);
+  }
+}
+
+@keyframes bb-tick {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}

@@ -1,0 +1,276 @@
+/**
+ * Artboard 1c. Every button on it comes from `legalActions` and none of it is
+ * decided here.
+ *
+ * This is the component the one-generator rule exists to protect. The moment a
+ * React file works out for itself that a shot is possible, the interface and
+ * the AI hold two copies of the rules and they drift the first time one of them
+ * is edited. So: no `if` about the sport below. A button appears because the
+ * engine listed it, it carries the number the roll has to beat because the
+ * engine worked that out, and pressing it posts an intention.
+ *
+ * The numbers are shown before committing on purpose. A Giff who can see that
+ * the Bulwark lifts the shot from 15 to 18 is a Giff who can decide to pass
+ * instead, and that decision is the game.
+ */
+
+import { useState } from 'react';
+
+import type { Action } from '../../../engine/actions.js';
+import type { LegalActions, TargetOption } from '../../../engine/legalActions.js';
+import { DIRECTIONS } from '../../../engine/geometry.js';
+
+type Pending = 'attack' | 'shove' | 'pass' | 'cracker' | null;
+
+const MODE_MARK: Record<TargetOption['mode'], string> = {
+  normal: '',
+  advantage: ' ▲',
+  disadvantage: ' ▼',
+};
+
+export function ActionBar({
+  legal,
+  yours,
+  busy,
+  movementFeet,
+  onAct,
+}: {
+  legal: LegalActions | null;
+  /** False while the house is playing, which is most of a solo round. */
+  yours: boolean;
+  busy: boolean;
+  movementFeet: number;
+  onAct: (action: Action) => void;
+}) {
+  const [pending, setPending] = useState<Pending>(null);
+  const [cracker, setCracker] = useState<string | null>(null);
+
+  if (!legal || !yours) {
+    return (
+      <div style={S.bar}>
+        <span className="label" style={{ animation: busy ? 'bb-tick 1.2s infinite' : undefined }}>
+          {busy ? 'The house is playing' : 'Waiting on the house'}
+        </span>
+      </div>
+    );
+  }
+
+  const act = (action: Action) => {
+    setPending(null);
+    setCracker(null);
+    onAct(action);
+  };
+
+  const targets =
+    pending === 'attack'
+      ? legal.attack
+      : pending === 'shove'
+        ? legal.shove
+        : pending === 'pass'
+          ? legal.pass
+          : [];
+
+  return (
+    <div style={S.wrap}>
+      {pending && pending !== 'cracker' && (
+        <div style={S.tray}>
+          <span className="label">Pick a target</span>
+          {targets.map((target) => (
+            <button
+              key={target.unitId}
+              className="ghost"
+              style={S.trayButton}
+              onClick={() =>
+                act(
+                  pending === 'attack'
+                    ? { kind: 'attack', targetId: target.unitId }
+                    : pending === 'shove'
+                      ? { kind: 'shove', targetId: target.unitId }
+                      : { kind: 'pass', targetId: target.unitId },
+                )
+              }
+            >
+              {target.name} · {target.against}
+              {MODE_MARK[target.mode]}
+            </button>
+          ))}
+          <button className="ghost" style={S.trayButton} onClick={() => setPending(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {pending === 'cracker' && (
+        <div style={S.tray}>
+          <span className="label">{cracker ? 'Send it down a line' : 'Which Cracker'}</span>
+          {!cracker &&
+            legal.batCracker.map((option) => (
+              <button
+                key={option.crackerId}
+                className="ghost"
+                style={S.trayButton}
+                onClick={() => setCracker(option.crackerId)}
+              >
+                {option.crackerId} · {option.against}
+              </button>
+            ))}
+          {cracker &&
+            (legal.batCracker.find((o) => o.crackerId === cracker)?.directions ?? []).map((d) => (
+              <button
+                key={d}
+                className="ghost"
+                style={S.trayButton}
+                onClick={() => act({ kind: 'batCracker', crackerId: cracker, direction: d })}
+              >
+                {arrowFor(d)}
+              </button>
+            ))}
+          <button
+            className="ghost"
+            style={S.trayButton}
+            onClick={() => {
+              setPending(null);
+              setCracker(null);
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      <div style={S.bar}>
+        <span className="label" style={{ marginRight: 6 }}>
+          {movementFeet} ft left
+        </span>
+
+        {legal.canGrabPayload && (
+          <Act label="Take the Payload" tone="brass" busy={busy} onClick={() => act({ kind: 'grabPayload' })} />
+        )}
+
+        {legal.shoot && (
+          <Act
+            label={`Shoot · ${legal.shoot.against}${MODE_MARK[legal.shoot.mode]}`}
+            {...(legal.shoot.blockedBy ? { hint: 'the Bulwark is in the mouth' } : {})}
+            tone="brass"
+            busy={busy}
+            onClick={() => act({ kind: 'shoot' })}
+          />
+        )}
+
+        {legal.catchSpark && (
+          <Act
+            label={`Catch the Spark · ${legal.catchSpark.against}`}
+            tone="spark"
+            busy={busy}
+            onClick={() => act({ kind: 'catchSpark' })}
+          />
+        )}
+
+        {legal.pass.length > 0 && (
+          <Act label="Pass" busy={busy} onClick={() => setPending('pass')} />
+        )}
+        {legal.attack.length > 0 && (
+          <Act label="Swing" busy={busy} onClick={() => setPending('attack')} />
+        )}
+        {legal.shove.length > 0 && (
+          <Act label="Shove" busy={busy} onClick={() => setPending('shove')} />
+        )}
+        {legal.batCracker.length > 0 && (
+          <Act label="Bat a Cracker" tone="danger" busy={busy} onClick={() => setPending('cracker')} />
+        )}
+
+        {legal.canDash && <Act label="Dash" busy={busy} onClick={() => act({ kind: 'dash' })} />}
+        {legal.canDodge && <Act label="Dodge" busy={busy} onClick={() => act({ kind: 'dodge' })} />}
+        {legal.canDisengage && (
+          <Act label="Disengage" busy={busy} onClick={() => act({ kind: 'disengage' })} />
+        )}
+
+        <div style={{ marginLeft: 'auto' }}>
+          <Act label="End turn" busy={busy} onClick={() => act({ kind: 'endTurn' })} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Act({
+  label,
+  hint,
+  tone,
+  busy,
+  onClick,
+}: {
+  label: string;
+  hint?: string | undefined;
+  tone?: 'brass' | 'danger' | 'spark';
+  busy: boolean;
+  onClick: () => void;
+}) {
+  const colour =
+    tone === 'brass' ? '#c9b489' : tone === 'danger' ? '#d8a12a' : tone === 'spark' ? '#fffce8' : undefined;
+
+  return (
+    <button
+      className="ghost"
+      disabled={busy}
+      onClick={onClick}
+      title={hint}
+      style={{ ...S.act, ...(colour ? { color: colour, borderColor: colour } : {}) }}
+    >
+      {label}
+      {hint && <span style={S.hint}>{hint}</span>}
+    </button>
+  );
+}
+
+/** The eight compass lines, in the engine's own d8 order. */
+function arrowFor(direction: number): string {
+  const step = DIRECTIONS[direction - 1];
+  if (!step) return String(direction);
+  const glyphs: Record<string, string> = {
+    '0,1': '↑', '1,1': '↗', '1,0': '→', '1,-1': '↘',
+    '0,-1': '↓', '-1,-1': '↙', '-1,0': '←', '-1,1': '↖',
+  };
+  return glyphs[`${step.x},${step.y}`] ?? String(direction);
+}
+
+const S: Record<string, React.CSSProperties> = {
+  wrap: { flex: 'none' },
+  bar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 58,
+    padding: '0 12px',
+    background: 'linear-gradient(#161b1f,#0e1214)',
+    border: '1px solid var(--line)',
+    boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 6%)',
+    flexWrap: 'wrap',
+  },
+  act: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    fontSize: 13,
+    padding: '9px 14px',
+  },
+  hint: {
+    fontFamily: 'var(--mono)',
+    fontSize: 9,
+    letterSpacing: '.08em',
+    textTransform: 'none',
+    color: 'var(--text-faint)',
+    marginTop: 2,
+  },
+  tray: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '10px 12px',
+    marginBottom: 4,
+    background: 'var(--panel-deep)',
+    border: '1px solid var(--brass-dim)',
+    flexWrap: 'wrap',
+  },
+  trayButton: { fontSize: 13, padding: '8px 13px' },
+};

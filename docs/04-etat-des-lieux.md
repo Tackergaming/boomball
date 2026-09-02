@@ -3,9 +3,10 @@
 > Point de reprise du projet Boomball. À lire en premier dans une nouvelle session.
 > Dernière mise à jour : 2026-09-02, après le câblage Supabase. L'équilibrage est clos, le nombre de
 > buts est à l'objectif (3,6 à 4,5 par match, 0 à 2 matchs sans but sur 200, voir « Le lot 4 »).
-> **Le dos de l'application est en ligne et complet** : projet Supabase créé, schéma et seed
-> appliqués, RLS vérifiée sur de vrais utilisateurs, **les deux Edge Functions déployées**, et un
-> match entier ouvert et joué à travers elles. Il ne reste de la phase 4 que le client React.
+> **La phase 4 est écrite de bout en bout.** Projet Supabase en ligne, schéma et seed appliqués,
+> RLS vérifiée sur de vrais utilisateurs, les deux Edge Functions déployées, un match entier joué à
+> travers elles, et **le client React construit et servi en local**. Ce qui reste est du playtest,
+> pas de la construction.
 
 ## Le projet en trois lignes
 
@@ -67,6 +68,7 @@ celui de la racine et celui de `scripts/`, pour la raison expliquée plus bas.
 | `scripts/build-edge-function.mjs` | Le bundle esbuild qui lève l'obstacle Deno. `npm run build:function` |
 | `scripts/deploy-edge-function.mjs` | Le déploiement par l'API Management. `npm run deploy:function` |
 | `scripts/live-match.ts` | Un match entier joué contre la fonction déployée, en HTTP, de bout en bout |
+| `client/` | React, Vite, TypeScript. Les cinq écrans du design, la grille SVG, la barre d'actions, la piste d'initiative, le journal |
 
 ## Décisions d'ingénierie prises en cours de route
 
@@ -591,20 +593,60 @@ importe le moteur, parce que Node 24 enlève les types mais ne résout pas plus 
 `process.env` ne compilerait pas, et cette garantie vaut mieux qu'un tsconfig économisé.
 `npm run typecheck` lance les deux.
 
-### Ce qui reste de la phase 4
+### Le client
 
-**Le client React et Vite en entier.** La grille SVG posée sur l'art de la zone active, la piste
-d'initiative, la barre d'actions pilotée par `legalActions`, le panneau d'ordres alliés, et
-l'abonnement Realtime avec reprise depuis le dernier `seq` connu.
+`client/`, React et Vite, son propre `package.json` et son propre tsconfig. `npm run dev` depuis
+`boomball/client`, sur `http://localhost:5173`.
+
+**Il importe le moteur, il ne le recopie pas.** `legalActions` est le générateur unique qui nourrit
+l'IA et l'interface, donc la barre d'actions le lit directement depuis `../engine`. C'est ce qui
+interdit à un composant React de décider tout seul qu'un tir est possible, et c'est le jour où il le
+ferait que les deux réponses divergeraient. Vite le permet par `server.fs.allow`, et son esbuild
+applique la même règle `./types.js` vers `.ts` que le bundle des Edge Functions.
+
+**Le client ne résout rien.** Il n'appelle jamais `reduce`, ne tire aucun dé, ne juge d'aucune
+légalité. Après chaque action acceptée il **relit `match_state`** au lieu de rejouer les événements
+localement. Ça coûte un aller-retour d'environ un dixième de seconde sur un tour qu'un humain a mis
+plusieurs secondes à décider ; rejouer localement pour l'économiser mettrait une seconde
+implémentation des règles dans le navigateur.
+
+**Realtime est branché mais rien n'en dépend.** Les deux fonctions diffusent sur `match:<id>`, et un
+lot dont le `fromSeq` dépasse le nôtre déclenche la même relecture. En solo, le seul mode construit,
+tout arrive déjà dans la réponse à sa propre requête, donc une diffusion perdue ne coûte rien. La
+reprise après coupure que demande le plan emprunte le même chemin : au réveil, comparer `seq` et
+relire s'il a bougé.
+
+**La terre est le layout ASCII, jamais l'image.** La grille SVG dessine les cases solides depuis
+`KILL_SILO.rows`. Une colonne qui paraît pleine sur le JPEG et vaut `.` dans le layout est
+franchissable. C'est aussi ce qui permettra de refaire le relevé de l'arène sans toucher une ligne
+du client.
+
+**Une zone à la fois, quinze cases de côté**, avec les zones voisines en bandeaux au-dessus et
+en dessous qui montrent qui s'y trouve. Le silo fait quinze de large sur quarante-cinq de haut : une
+vue du puits entier rendrait chaque Giff illisible.
+
+**Ce que le design donnait et qui n'est pas construit**, faute de données et non faute d'écran. Les
+chiffres de carrière du hub (GOALS 9, SAVES 14) : rien ne les compte entre deux matchs, et une
+colonne qui affiche toujours zéro vaut moins que pas de colonne. Les sièges 2 et 3 du lobby :
+`create-match` en accepte trois et `server/lobby.ts` refuse le quatrième, mais **rejoindre l'équipe
+de quelqu'un d'autre n'existe pas encore**, et c'est ça qui manque, pas la porte. Les temps forts de
+l'écran de résultats, tous dérivables de `match_events` le jour où il y aura un match à revoir.
 
 **L'authentification se fait par email et mot de passe.** Arbitré par Jérôme le 2026-09-02. Pas
-d'OAuth, pas de magic link : c'est le mode que Supabase Auth donne sans configurer quoi que ce soit
-en dehors du projet, et le groupe est un cercle d'amis, pas un public.
+d'OAuth, pas de magic link : c'est le mode que Supabase Auth donne sans rien configurer hors du
+projet, et le groupe est un cercle d'amis, pas un public.
 
-**Le client se teste en local avant tout hébergement.** Décidé par Jérôme le 2026-09-02. `vite dev`
-contre le projet Supabase en ligne, qui est déjà le vrai backend : rien n'oblige à monter un
-Supabase local, et un backend de développement séparé ferait deux bases à garder d'accord. La mise
-en ligne du client ne vient qu'après une partie jouée sur la machine.
+**La confirmation d'email est désactivée**, arbitré par Jérôme le 2026-09-02. Le SMTP intégré de
+Supabase plafonne à deux messages par heure, ce qui rendait la création d'un compte de test
+pénible et l'arrivée d'un ami pire. Le jeu n'envoie aucun message, ne réinitialise aucun mot de
+passe et ne stocke rien de sensible, donc vérifier l'adresse n'achetait presque rien.
+`mailer_autoconfirm` est à `true` et `site_url` pointe sur le port de Vite. **À rouvrir en même
+temps qu'un vrai SMTP** si le jeu sort du cercle.
+
+**Le parcours exact du navigateur est vérifié**, avec la seule clé anon et zéro appel d'administration :
+inscription, écriture du profil, création d'équipe en `insert().select()`, lecture de `role_stats`,
+ouverture d'un match par `create-match`, lecture du plateau à travers la RLS, un tour envoyé à
+`resolve-action`, et le refus d'un but écrit à la main. 16 assertions, toutes vertes.
 
 ## Ce qui attend Jérôme
 
@@ -642,10 +684,20 @@ plafond du plan gratuit : supprime `projet test` si tu en veux un troisième. Et
 démonstration** est conservé en base avec l'utilisateur jetable qui le porte, ids dans « L'Edge
 Function tourne », à effacer quand tu l'auras regardé. À part lui, la base est vide.
 
-**Une revue de sécurité, à lancer par toi.** `/security-review` sur le dépôt, une fois le client
-écrit et avant la mise en ligne. C'est ta commande, je ne peux pas la déclencher. Le moment utile
-est celui où il existe du code qui manipule des jetons dans un navigateur : aujourd'hui la surface
-se limite à la RLS et à une Edge Function, toutes deux déjà éprouvées contre le projet vivant.
+**Jouer une partie en local, et c'est la prochaine chose.** `npm run dev` depuis `boomball/client`,
+puis `http://localhost:5173`. C'est le premier moment où quelqu'un voit le jeu, et le seul moyen de
+savoir si la barre d'actions se pilote au clic. La mise en ligne ne vient qu'après.
+
+**Une revue de sécurité, à lancer par toi.** `/security-review` sur le dépôt, avant la mise en
+ligne. C'est ta commande, je ne peux pas la déclencher. Le client existe maintenant, donc la surface
+qu'elle a à regarder existe aussi : un jeton dans un navigateur, une clé anon dans un bundle, et
+deux fonctions qui écrivent avec la clé service.
+
+**L'hébergement Vercel, quand tu auras joué.** Le jeton est en place et vérifié, compte
+`montigny-8072`. **Rien n'est connecté à GitHub et il ne faut pas le faire** : l'intégration
+donnerait à Vercel un accès en lecture sur tout le dépôt, dont `campagne-vault/`, `context/` et le
+`CLAUDE.md` racine. Le projet se créera et se déploiera par l'API, en envoyant les fichiers
+construits, sans que Vercel voie jamais le dépôt.
 
 **L'équilibrage est clos.** Si tu veux le rouvrir, la section « Le lot 4 » liste les leviers déjà
 mesurés et ce qu'ils valent, pour ne pas refaire ces sweeps.

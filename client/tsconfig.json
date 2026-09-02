@@ -1,0 +1,23 @@
+{
+  // The client's own config. It extends nothing: the root one deliberately
+  // denies `engine`, `ai` and `server` any DOM or Node types, and a browser
+  // needs both DOM and Vite's own ambient types.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src", "vite.config.ts", "../engine"]
+}
