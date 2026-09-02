@@ -35,7 +35,9 @@ disait pas.
 | 20 | Capture du Spark : 150 points et fin immédiate | **50 points, et le match continue.** Le Spark est retiré du terrain pour de bon | Devenu réellement attrapable, un objet à 150 points et fin immédiate serait la seule chose à jouer. Le prix se ramasse une fois et il reste des rounds pour jouer le Payload |
 | 21 | Blocage du Bulwark : +4 / +6 / +8 sur l'AC de la Furnace | **+2 / +3 / +4** | 96 à 98 % des tirs d'un match étaient bloqués. Le contre prévu, un second tireur dans le même round, ne se produisait jamais faute de volume de tir, donc la Réaction se comportait comme un bonus permanent et tenait le taux de réussite à 30 % |
 | 22 | Furnace AC 18 | **AC 15** | Écrite contre un blocage qu'on croyait occasionnel. Avec le blocage ramené à sa vraie fréquence, 15 place le tir propre d'un Striker Rookie à une chance sur deux |
-| 23 | Portée propre du lancer : 30 pieds | **45 pieds**, la portée longue reste à 60 | Les deux Furnaces sont à 14 cases l'une de l'autre sur la même passerelle. À 30 pieds, le porteur mesurait en moyenne 10 cases de la Furnace visée et ne tirait proprement que sur un cinquième de ses tours |
+| 23 | Portée propre du lancer : 30 pieds | **45 pieds**, la portée longue reste à 60 | Les deux Furnaces étaient alors à 14 cases l'une de l'autre sur la même passerelle. À 30 pieds, le porteur mesurait en moyenne 10 cases de la Furnace visée et ne tirait proprement que sur un cinquième de ses tours. *(La géométrie qui motivait ce chiffre a changé à l'écart 24 ; la portée, elle, est conservée telle quelle.)* |
+| 24 | Les deux Furnaces en Zone 3, l'une à gauche l'autre à droite | **Une Furnace à chaque bout du silo, au centre.** `(6,0)-(8,0)` dans le sol de la Trench pour l'équipe A, `(6,44)-(8,44)` dans le plafond du Summit pour B, soit 44 cases de séparation. Trois cases de large au lieu de deux. *(Arbitrage du 2026-09-02.)* | Les deux camps attaquaient le même endroit, et le Payload repart dans les mains du gardien qui encaisse, gardien posté devant sa Furnace. Dès le round 6, 93 % des unités et 99 % du ballon étaient en Zone 3 : deux tiers de l'arène étaient du décor. L'axe d'équité passe de gauche/droite à haut/bas, et le layout devient un miroir exact autour de `y = 22`, tenu par une assertion |
+| 25 | Rien : les deux blocs adverses partagent les comptes 15 et 10, et la fiche ne dit pas qui passe devant | **Un dé au coup d'envoi désigne le camp qui gagne les égalités d'initiative, et ce camp alterne à chaque round.** *(Arbitrage du 2026-09-02.)* | À égalité de compte, l'ordre se réglait sur une clé stable commençant par la lettre d'équipe, donc A jouait avant B à chaque compte, de chaque round, de chaque match. Sur 200 matchs par Tier, A ouvrait le round 6 deux cents fois sur deux cents et attrapait le Spark près de trois fois plus souvent, ce qui lui donnait 129 victoires à 66 en Veteran alors que B marquait plus de buts. Une alternance à départ fixe ne suffisait pas : le Spark entrant à un round fixe, elle aurait donné le premier accès à l'autre camp aussi systématiquement |
 
 ## A3. Trous comblés, la fiche ne disait rien
 
@@ -46,10 +48,10 @@ disait pas.
 | 12 | Coût du déplacement diagonal | 5 pieds par case, règle 5e 2024. Distance de Chebyshev partout |
 | 13 | Égalité au round 10 | Deux rounds de mort subite, premier score gagne, sinon match nul |
 | 14 | Payload remis en jeu si le Bulwark est évacué | Il apparaît sur la case devant la Furnace, libre pour tout le monde |
-| 15 | Point d'entrée d'un remplaçant | La plateforme devant la Furnace de son équipe, en Zone 3 |
+| 15 | Point d'entrée d'un remplaçant | À côté de la bouche de la Furnace de son équipe, `(5, 1)` pour A et `(5, 43)` pour B. *(Suit l'écart 24 : chaque camp a désormais son but à un bout du silo, l'équipe A en Zone 1 et l'équipe B en Zone 3.)* |
 | 16 | Ligne de vue et couvert | Aucun blocage au MVP. Le silo est à ciel ouvert, les poutrelles sont fines |
 | 17 | Liste des actions disponibles | Voir B5. La fiche cite des actions au fil du texte sans jamais les lister |
-| 18 | Égalités dans les ciblages automatiques | Compte d'initiative le plus bas, puis identifiant d'unité. Nécessaire pour que le match soit rejouable à l'identique |
+| 18 | Égalités dans les ciblages automatiques | Compte d'initiative le plus bas, puis identifiant d'unité, **sauf pour la cible d'un Cracker, qui se départage au dé**. Un identifiant porte la lettre d'équipe, donc un départage par identifiant vise toujours le même camp : invisible sur un match, cela fausse une passe d'équilibrage, c'est à dire exactement ce que ces passes servent à détecter. Le même raisonnement a produit l'écart 25 |
 
 ---
 
@@ -70,9 +72,17 @@ occupables, elles arrêtent une chute, et elles rendent ancrables les cases ouve
 touchent. Une unité est donc toujours en l'air, accrochée à une structure voisine, ce qui est
 exactement la fiction du grappin.
 
-**Furnaces.** Furnace 1 contre le mur gauche de la Zone 3, Furnace 2 contre le mur droit. L'équipe
-A défend la 1 et marque dans la 2. Emplacement exact à figer quand la grille sera tracée sur les
-images, en visant la hauteur où elles sont dessinées.
+**Furnaces.** Une bouche à chaque bout du silo, au centre de la paroi. L'équipe A défend
+`(6,0)-(8,0)`, creusée dans le sol de la Trench, et marque dans celle de B ; l'équipe B défend
+`(6,44)-(8,44)`, ouverte dans le plafond du Summit, et marque dans celle de A. Quarante-quatre cases
+les séparent. Trois cases de large, parce qu'une bouche doit rester trouvable depuis l'autre bout du
+silo. *(Écart 24, arbitrage du 2026-09-02. Les deux Furnaces étaient auparavant côte à côte en
+Zone 3, ce qui laissait deux tiers de l'arène inutilisés à partir du round 4.)*
+
+**Le terrain est symétrique autour de `y = 22`**, ligne pour ligne. Ce n'est pas une intention de
+dessin, c'est une assertion tenue par `setup.test.ts` : ce qui doit être identique pour les deux
+camps, c'est l'approche vers le but adverse, et l'axe d'équité est donc vertical et non horizontal.
+La chaîne centrale plonge dans chaque bouche, donc elle court de `y1` à `y43`.
 
 **Franchissement de zone.** Passer de `y=14` à `y=15`, ou de `y=29` à `y=30`, coûte **10 pieds en
 plus** du coût de la case. *(Arbitrage du 2026-09-01, ramené de 15 à 10 : à 15, un pas de
@@ -81,10 +91,20 @@ C'est ce qui empêche la Zone 3 d'être à trois cases de tout le monde.
 
 ## B2. Placement de départ
 
+Le coup d'envoi est une mise en jeu : chaque équipe dans sa moitié, le ballon à égale distance des
+deux buts.
+
 - Payload et les deux Crackers au centre de la Zone 2, case `(7, 22)`.
 - Le Spark n'est pas sur le terrain.
-- Les deux Bulwarks en Zone 3, adjacents à leur Furnace.
-- Le reste de l'équipe A en Zone 2 côté gauche, `x` de 1 à 3. L'équipe B côté droit, `x` de 11 à 13.
+- **Chaque Bulwark dans sa propre bouche**, à une case de la Furnace qu'il défend et donc dans sa
+  portée de blocage : `(7, 1)` pour A, `(7, 43)` pour B.
+- **Les six joueurs de champ au-dessus de leur propre passerelle**, sur `y19` pour A et `y25`
+  pour B, aux `x` 2, 4, 6, 8, 10 et 12. Au-dessus et non dessus : `y18` et `y26` sont de la
+  structure. Chacune de ces cases touche la passerelle ou la chaîne centrale, donc les six
+  commencent ancrés.
+
+*(Écart 24. Les passerelles de la Zone 2 sont passées à `y18` et `y26` : les anciennes n'étaient
+symétriques ni entre elles ni avec le reste du silo.)*
 
 ## B3. Unités
 
@@ -132,8 +152,16 @@ Un round descend du compte 20 au compte 1.
 
 Égalité d'initiative entre humains : bonus d'Acrobaties le plus haut, puis identifiant d'unité.
 
-**Chrono de 60 secondes par tour humain.** À expiration, l'unité passe automatiquement en Dodge
-plutôt que de perdre son tour, ce qui évite de punir une coupure réseau.
+**Égalité entre les deux camps : un dé au coup d'envoi, puis alternance.** Les blocs des deux
+équipes partagent les comptes 15 et 10, donc chaque slot d'un camp est à égalité avec un slot de
+l'autre. Un `d2` tiré à l'ouverture du match désigne le camp qui passe devant au round 1, et ce camp
+alterne à chaque round. *(Écart 25, arbitrage du 2026-09-02. L'ordre se réglait auparavant sur une
+clé stable commençant par la lettre d'équipe, ce qui donnait toujours la main au même camp et lui
+offrait le premier accès au Spark dans tous les matchs.)*
+
+**Chrono de 120 secondes par tour humain.** À expiration, l'unité passe automatiquement en Dodge
+plutôt que de perdre son tour, ce qui évite de punir une coupure réseau. *(Porté de 60 à 120 le
+2026-09-02 : le chrono ne borne rien dans les règles et aucune passe d'équilibrage ne le lit.)*
 
 Le match dure **10 rounds**. Rien ne l'interrompt : la capture du Spark ne siffle plus la fin.
 
@@ -190,8 +218,14 @@ rencontré en chemin. L'unité est ancrée à l'arrivée.
 
   **Le principe qui fixe ces nombres** : ce qui est fixe dans le décor devient plus facile avec le
   palier, ce qui est incarné par un adversaire de ton palier reste à parité. La Furnace ne monte pas,
-  le gardien monte. Résultat : tir libre à 55 / 70 / 80 %, tir bloqué à 45 / 55 / 60 %, et le match
-  produit 3,6 à 4,5 buts pour moins de 1 % de matchs sans but.
+  le gardien monte. Résultat : tir libre à 55 / 70 / 80 %, tir bloqué à 45 / 55 / 60 %.
+
+  *(Deux chiffres de ce bloc datent d'avant l'écart 24 et ne décrivent plus le terrain. Les deux
+  Furnaces ne sont plus distantes de 14 cases sur une passerelle commune mais de 44 cases, aux deux
+  bouts du silo ; la portée de 45 pieds est conservée telle quelle, mesurée et non recalculée. Et le
+  match produit désormais 1,6 à 2,3 buts pour 7 à 16 % de matchs sans but, ce qui reste dans la cible
+  d'au moins un à deux buts par match, et non les 3,6 à 4,5 buts d'un terrain où les deux camps
+  attaquaient le même endroit.)*
 - **Marquer** : 10 points. Le Payload est incinéré, un neuf apparaît immédiatement dans les mains
   du Bulwark qui défend, ou sur la case devant la Furnace si ce Bulwark est hors jeu.
 - **Voler** : par Bousculade, ou en Réaction par un jet d'Acrobaties opposé si une passe traverse
@@ -238,7 +272,9 @@ Deux Crackers, hasard neutre pour les deux équipes.
 À 0 HP, l'unité tombe au sol de la Zone 1 et est évacuée.
 
 - **Humain** : reprend la main sur son remplaçant après 2 rounds, même rôle, même Tier, HP pleins,
-  entrée sur la plateforme devant la Furnace de son équipe en Zone 3.
+  entrée à côté de la bouche de la Furnace de son équipe, `(5, 1)` pour A et `(5, 43)` pour B. *(Suit
+  l'écart 24 : chaque camp défend désormais un bout du silo, l'équipe A en Zone 1 et l'équipe B en
+  Zone 3.)*
 - **IA** : même délai, même point d'entrée, tant que le banc n'est pas vide.
 - **Banc** : 3 remplaçants par équipe. Épuisé, l'équipe joue en sous nombre.
 
