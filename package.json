@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts",
     "sweep": "vitest run --config vitest.sweep.config.ts",
     "build:function": "node scripts/build-edge-function.mjs",
-    "deploy:function": "node scripts/build-edge-function.mjs && node scripts/deploy-edge-function.mjs"
+    "deploy:function": "node scripts/deploy-edge-function.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

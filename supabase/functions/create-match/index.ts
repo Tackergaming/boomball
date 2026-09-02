@@ -1,0 +1,201 @@
+/**
+ * `create-match`, the door that opens a match.
+ *
+ * The second Edge Function, and the architecture said there would be one. The
+ * reason there are two is the same reason there are no write policies on the
+ * match tables: opening a match writes to `matches`, `match_participants`,
+ * `match_events` and `match_state`, and a browser can write to none of them and
+ * should not be able to. `scripts/live-match.ts` gets away with the service
+ * role key because it is a script on a trusted machine; a lobby in a browser
+ * never sees that key, so it needs a door.
+ *
+ * Like `resolve-action`, it decides nothing. `server/lobby.ts` refuses the
+ * malformed parties and plays the kick-off; this file loads, writes, and
+ * answers. If you are about to add an `if` about the sport here, it belongs
+ * there.
+ *
+ *   POST { teamId, seats: [{ profileId, role, characterName? }], arenaId? }
+ *     -> { accepted: true, matchId, fromSeq, events }
+ *      | { accepted: false, reason }
+ *
+ * **Two fields the client does not get to send.** The Tier is read off the
+ * team's generated column, and the seed is made here. Both are stated at length
+ * in `server/lobby.ts`; the short version is that a client choosing either one
+ * is a client cheating.
+ *
+ * Deno, not Node, and deployed as the esbuild bundle rather than as this file:
+ * see `scripts/build-edge-function.mjs` for why. Editing this file changes
+ * nothing until `npm run deploy:function` runs.
+ */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+
+import { toArenaSpec } from '../../../server/arenaRow.ts';
+import { openLobbyMatch, type SeatRequest } from '../../../server/lobby.ts';
+
+declare const Deno: {
+  env: { get(key: string): string | undefined };
+  serve(handler: (request: Request) => Promise<Response>): void;
+};
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+function reply(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+function refuse(reason: string, status = 400): Response {
+  return reply({ accepted: false, reason }, status);
+}
+
+/** A uint32, which is exactly what `Rng` narrows anything to anyway. */
+function freshSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0]!;
+}
+
+Deno.serve(async (request: Request): Promise<Response> => {
+  if (request.method !== 'POST') return refuse('POST only', 405);
+
+  // Identity from the JWT, never from the body. Same rule as `resolve-action`:
+  // a client that could name itself could open matches for other people.
+  const authorization = request.headers.get('Authorization') ?? '';
+  const asUser = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    global: { headers: { Authorization: authorization } },
+  });
+
+  const { data: auth } = await asUser.auth.getUser();
+  const callerId = auth?.user?.id;
+  if (!callerId) return refuse('not signed in', 401);
+
+  let body: { teamId?: string; seats?: unknown; arenaId?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return refuse('the body is not JSON');
+  }
+
+  const { teamId, arenaId = 'kill-silo' } = body;
+  if (!teamId) return refuse('teamId is required');
+  if (!Array.isArray(body.seats)) return refuse('seats must be an array');
+  const seats = body.seats as SeatRequest[];
+
+  const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // The Tier comes from here and nowhere else.
+  const { data: team } = await db
+    .from('teams')
+    .select('id, owner, tier')
+    .eq('id', teamId)
+    .single();
+  if (!team) return refuse('no such team', 404);
+
+  // Everyone taking a seat must belong to the team, the caller included. Read
+  // the roster once and answer both questions from it.
+  const { data: roster } = await db
+    .from('team_members')
+    .select('profile_id')
+    .eq('team_id', teamId);
+  const members = new Set<string>((roster ?? []).map((row) => row.profile_id as string));
+  members.add(team.owner as string);
+
+  if (!members.has(callerId)) return refuse('you are not on this team', 403);
+  for (const seat of seats) {
+    if (!seat || !members.has(seat.profileId)) {
+      return refuse(`${seat?.profileId ?? 'that player'} is not on this team`, 403);
+    }
+  }
+
+  // One live match per team. Without this a double-clicked lobby button opens
+  // two matches, and the second silently becomes the one the client watches
+  // while the first sits unfinished forever.
+  const { data: running } = await db
+    .from('matches')
+    .select('id')
+    .eq('team_id', teamId)
+    .neq('phase', 'finished')
+    .limit(1);
+  if (running && running.length > 0) {
+    return refuse('this team already has a match running', 409);
+  }
+
+  const { data: arenaRow } = await db.from('arenas').select('*').eq('id', arenaId).single();
+  if (!arenaRow) return refuse(`there is no arena called ${arenaId}`, 404);
+
+  const seed = freshSeed();
+  const opened = openLobbyMatch(toArenaSpec(arenaRow), {
+    callerId,
+    tier: team.tier as 'rookie' | 'veteran' | 'star',
+    seats,
+    seed,
+    now: Date.now(),
+  });
+  if (!opened.ok) return refuse(opened.reason);
+
+  const { session, events, seats: assigned } = opened.opening;
+  const state = session.state;
+
+  const { data: created, error: createError } = await db
+    .from('matches')
+    .insert({
+      team_id: teamId,
+      arena_id: arenaId,
+      tier: team.tier,
+      phase: state.phase,
+      round: state.round,
+      rng_seed: seed,
+      turn_deadline: session.turnDeadline ? new Date(session.turnDeadline).toISOString() : null,
+    })
+    .select('id')
+    .single();
+  if (createError || !created) return refuse('could not open the match', 500);
+
+  const matchId = created.id as string;
+
+  // Everything after this point has a half-written match behind it, so a
+  // failure tears the match down rather than leaving one the client can find
+  // but `resolve-action` cannot load. The delete cascades to all three tables.
+  const written = await Promise.all([
+    db.from('match_participants').insert(
+      assigned.map((seat) => ({
+        match_id: matchId,
+        unit_id: seat.unitId,
+        profile_id: seat.profileId,
+        role: seat.role,
+        character_name: seat.characterName,
+      })),
+    ),
+    db.from('match_events').insert(
+      events.map((event, i) => ({
+        match_id: matchId,
+        seq: i,
+        kind: event.kind,
+        payload: event,
+      })),
+    ),
+    db.from('match_state').insert({
+      match_id: matchId,
+      seq: events.length - 1,
+      snapshot: state,
+    }),
+  ]);
+
+  const failed = written.find((result) => result.error);
+  if (failed) {
+    await db.from('matches').delete().eq('id', matchId);
+    return refuse(`could not open the match: ${failed.error!.message}`, 500);
+  }
+
+  // The same batch the caller gets back, so a team-mate already watching the
+  // lobby sees the kick-off without polling.
+  await db.channel(`match:${matchId}`).send({
+    type: 'broadcast',
+    event: 'events',
+    payload: { matchId, fromSeq: 0, events },
+  });
+
+  return reply({ accepted: true, matchId, fromSeq: 0, events });
+});

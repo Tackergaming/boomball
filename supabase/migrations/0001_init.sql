@@ -239,8 +239,8 @@ create policy match_state_read on match_state
   ));
 
 -- No write policy on matches, match_participants, match_events or match_state.
--- That is the design, not an omission: **every write to a live match goes
--- through the `resolve-action` Edge Function**, which holds the service role
--- key and bypasses RLS. A client that could append an event directly could
--- write a goal, and the one door that exists in the engine would have been
--- given a second one in the database.
+-- That is the design, not an omission: **every write to a match goes through an
+-- Edge Function**, `create-match` to open one and `resolve-action` to play it,
+-- both holding the service role key and bypassing RLS. A client that could
+-- append an event directly could write a goal, and the one door that exists in
+-- the engine would have been given a second one in the database.

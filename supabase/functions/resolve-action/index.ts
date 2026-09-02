@@ -1,17 +1,14 @@
 /**
  * `resolve-action`, the one write door of a live match.
  *
- * Deno, not Node: this file runs on Supabase Edge and is typechecked by the
- * Supabase CLI, not by the project's `tsc`. That is why it is the only place in
- * the repo with URL imports.
+ * Deno, not Node: this file runs on Supabase Edge, which is why it is one of
+ * the two places in the repo with URL imports.
  *
- * **NOT YET RUN ANYWHERE.** It is written, it is not deployed, and one known
- * obstacle stands between the two. The engine imports its own modules as
- * `./types.js` while the files on disk are `.ts`, which is the TypeScript
- * convention the rest of the repo is built on and which **Deno does not
- * resolve**. Before this deploys, `engine`, `ai` and `server` have to be
- * bundled into one ESM file by esbuild and imported here as that bundle. That
- * is a build step to add, not a rewrite: nothing about the code below changes.
+ * **It is not this file that gets deployed.** The engine imports its own
+ * modules as `./types.js` while the files on disk are `.ts`, and Deno does not
+ * resolve that; esbuild does. So `npm run deploy:function` bundles this into
+ * `dist/index.js` and deploys the bundle. Editing here changes nothing until
+ * that runs. See `scripts/build-edge-function.mjs` for the whole of it.
  *
  * It holds no logic of its own. Everything that decides anything lives in
  * `server/session.ts`, which is pure and tested; this file loads, calls, writes
@@ -27,9 +24,10 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
-import { Arena, type ArenaSpec } from '../../../engine/arena.ts';
+import { Arena } from '../../../engine/arena.ts';
 import type { Action } from '../../../engine/actions.ts';
 import type { MatchState } from '../../../engine/types.ts';
+import { toArenaSpec } from '../../../server/arenaRow.ts';
 import {
   expireIfDue,
   submitAction,
@@ -201,18 +199,4 @@ async function persist(
       finished_at: state.phase === 'finished' ? new Date().toISOString() : null,
     })
     .eq('id', matchId);
-}
-
-/** The arena row back into the engine's own shape. */
-function toArenaSpec(row: Record<string, unknown>): ArenaSpec {
-  return {
-    id: row.id as string,
-    name: row.name as string,
-    rows: row.layout as string[],
-    furnaces: row.furnaces as ArenaSpec['furnaces'],
-    ordnanceStart: row.ordnance_start as ArenaSpec['ordnanceStart'],
-    starts: row.starts as ArenaSpec['starts'],
-    substituteEntry: row.substitute_entry as ArenaSpec['substituteEntry'],
-    art: row.art as ArenaSpec['art'],
-  };
 }

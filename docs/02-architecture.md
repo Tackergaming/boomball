@@ -139,13 +139,26 @@ divergeront sur le premier jet de dé.
 écrit et diffuse ; elle ne décide rien. C'est ce qui permet de tester au complet la partie
 intéressante, la résolution d'un bloc de treize tours IA derrière un seul clic, sans base ni réseau.
 
-Une seule Edge Function, `resolve-action`.
+Deux Edge Functions, et la seconde a été ajoutée le 2026-09-02. Ce document n'en prévoyait qu'une,
+`resolve-action`, et l'oubli est instructif : **aucune écriture de match n'est ouverte à un client,
+et ouvrir un match est une écriture de match**. Une fonction qui joue un tour ne suffit donc pas, il
+en faut une pour poser la première pierre.
 
 ```
+POST /create-match
+  { teamId, seats: [{ profileId, role, characterName? }], arenaId? }
+  -> { accepted: true, matchId, fromSeq, events } | { accepted: false, reason }
+
 POST /resolve-action
   { matchId, unitId, action }
   -> { accepted: true, fromSeq, events } | { accepted: false, reason }
 ```
+
+`create-match` lit le Tier sur la colonne générée de l'équipe et tire la graine lui-même. **Ni l'un
+ni l'autre n'est un champ de la requête**, et c'est la différence entre un lobby et une triche : un
+Tier choisi aligne des Star au premier match, une graine choisie permet de rouvrir la partie jusqu'à
+ce que le coup d'envoi plaise. Sa logique vit dans `server/lobby.ts`, comme celle de l'autre vit
+dans `server/session.ts`.
 
 Ce qu'elle fait, dans l'ordre : elle charge l'instantané, vérifie que l'appelant contrôle bien
 l'unité et que c'est son tour, vérifie que l'action figure dans `legalActions`, appelle `reduce`,
@@ -182,8 +195,10 @@ auxquels il participe. Le rattraper après coup coûte toujours plus cher.
 
 **Aucune policy d'écriture sur les tables de match.** `matches`, `match_participants`,
 `match_events` et `match_state` sont en lecture seule pour tout client. Toute écriture passe par
-`resolve-action`, qui détient la clé service. C'est le pendant en base du principe de la porte
-unique : un client capable d'insérer dans `match_events` serait un client capable de s'écrire un but.
+`create-match` ou `resolve-action`, qui détiennent la clé service. C'est le pendant en base du
+principe de la porte unique : un client capable d'insérer dans `match_events` serait un client
+capable de s'écrire un but. C'est aussi ce qui a imposé la seconde fonction, puisque **ouvrir un
+match est une écriture de match** comme une autre.
 
 **`role_stats` et `arenas.layout` sont des miroirs du moteur, et un miroir dérive.** Ils sont donc
 générés par `server/seed.ts` et tenus contre le moteur par `server/seed.test.ts`, jamais écrits à la

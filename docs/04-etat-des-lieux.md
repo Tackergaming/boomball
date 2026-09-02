@@ -3,9 +3,9 @@
 > Point de reprise du projet Boomball. À lire en premier dans une nouvelle session.
 > Dernière mise à jour : 2026-09-02, après le câblage Supabase. L'équilibrage est clos, le nombre de
 > buts est à l'objectif (3,6 à 4,5 par match, 0 à 2 matchs sans but sur 200, voir « Le lot 4 »).
-> **Le dos de l'application est en ligne** : projet Supabase créé, schéma et seed appliqués, RLS
-> vérifiée sur de vrais utilisateurs, Edge Function déployée, et **un match entier joué à travers
-> elle**. Il ne reste de la phase 4 que le client React.
+> **Le dos de l'application est en ligne et complet** : projet Supabase créé, schéma et seed
+> appliqués, RLS vérifiée sur de vrais utilisateurs, **les deux Edge Functions déployées**, et un
+> match entier ouvert et joué à travers elles. Il ne reste de la phase 4 que le client React.
 
 ## Le projet en trois lignes
 
@@ -35,7 +35,7 @@ seule arène au MVP. **Ordinateur uniquement, 1280 px minimum, pas de mobile.** 
 
 ## Ce qui est construit et testé
 
-**235 tests au vert, environ 8600 lignes.** Plus `npm run sweep` pour le rapport d'équilibrage.
+**254 tests au vert, environ 9000 lignes.** Plus `npm run sweep` pour le rapport d'équilibrage.
 `npm test` et `npm run typecheck` depuis `boomball/`. Le typecheck lance désormais **deux** tsconfig,
 celui de la racine et celui de `scripts/`, pour la raison expliquée plus bas.
 
@@ -58,9 +58,12 @@ celui de la racine et celui de `scripts/`, pour la raison expliquée plus bas.
 | `ai/selfPlay` | Le match sans écran, et le harnais d'équilibrage |
 | `server/session` | La logique du serveur, sans serveur. Propriété d'une unité, chrono de tour, et la résolution de tous les tours IA jusqu'au prochain humain |
 | `server/seed` | Le seed SQL généré depuis le moteur, pour que `role_stats` et l'arène ne dérivent pas |
+| `server/lobby` | Qui a le droit d'ouvrir un match, et le coup d'envoi. Sans base, comme `session` |
+| `server/arenaRow` | La ligne `arenas` remise dans la forme du moteur. Partagée par les deux fonctions, testée en aller-retour contre `KILL_SILO` |
 | `supabase/migrations/*.sql` | Le schéma, les enums et la RLS. **Appliqués au projet**, `0002` corrige la lecture d'une équipe par son propriétaire |
 | `supabase/checks/rls-check.py` | 24 assertions de RLS contre le projet vivant, deux utilisateurs et de vrais JWT. Hors `npm test`, il lui faut le réseau |
-| `supabase/functions/resolve-action` | L'Edge Function. **Déployée et éprouvée sur un match complet** |
+| `supabase/functions/resolve-action` | L'Edge Function du match. **Déployée et éprouvée sur un match complet** |
+| `supabase/functions/create-match` | La porte du lobby. **Déployée et éprouvée**, refus compris |
 | `scripts/build-edge-function.mjs` | Le bundle esbuild qui lève l'obstacle Deno. `npm run build:function` |
 | `scripts/deploy-edge-function.mjs` | Le déploiement par l'API Management. `npm run deploy:function` |
 | `scripts/live-match.ts` | Un match entier joué contre la fonction déployée, en HTTP, de bout en bout |
@@ -500,23 +503,86 @@ déplacements, des passes, des tirs et des coups de batte au lieu d'une file d'`
 ne garde jamais le plateau entre deux tours : il relit `match_state` **à travers la RLS en tant que
 joueur**, qui est le chemin de lecture du client React.
 
-Ce que ça donne, deux fois de suite avec des identifiants différents et le même seed :
+L'ordre de grandeur d'un match solo complet, mesuré sur plusieurs exécutions :
 
 | Mesure | Valeur |
 |---|---|
-| Requêtes à la fonction | 26 |
-| Événements rendus | 657, plus 27 à l'ouverture |
+| Requêtes à la fonction | 26 à 27 |
+| Événements rendus | 640 à 680, plus 8 à 27 à l'ouverture |
 | Refus | 0 |
 | Durée | 20 secondes |
-| Fin | round 10, `finished`, A 80 - B 0 |
-| Séquence des événements | 684 lignes, aucun trou |
-| Instantané | `seq` 683, sur le dernier événement |
+| Fin | round 10, `finished`, toujours un vainqueur |
+| Séquence des événements | 665 à 690 lignes, aucun trou |
+| Instantané | toujours sur le dernier événement |
 
-Le 80 se lit 3 buts à 10 plus le Spark à 50. Les deux runs sont identiques événement pour événement
-avec des ids différents, donc **le déterminisme à graine égale tient aussi à travers le réseau**.
+Les fourchettes viennent de la graine, désormais tirée par `create-match`, et le nombre d'événements
+à l'ouverture varie avec le rang de l'humain dans l'échelle d'initiative : il compte tous les tours
+IA joués avant la première décision humaine.
 
-Un match est conservé en base pour être regardé, `f9f48c4b-e7e1-4b62-87c1-94e2afbff000`. Il part
-avec son joueur, `DELETE /auth/v1/admin/users/7da65fbe-3bbe-4581-8bc7-6274188e1608`, tout cascade.
+**Le déterminisme à travers le réseau a été vérifié avant ce changement.** Deux exécutions à graine
+fixe rendaient exactement le même match, événement pour événement, avec des identifiants de joueur et
+de match différents. Ce n'est plus rejouable depuis ce script, et c'est normal : le contrôle vit dans
+`ai.test.ts` et `session.test.ts`, à graine fixe, là où il a sa place.
+
+Un match est conservé en base pour être regardé, `b8fa8b66-7003-4587-95d5-4f1dba5eccea`, ouvert par
+`create-match` et joué en entier. Il part avec son joueur,
+`DELETE /auth/v1/admin/users/908c92d2-bfd9-42ce-b90f-0db66ac68fb5`, tout cascade.
+
+### La seconde porte, `create-match`
+
+**L'architecture disait « une seule Edge Function », il y en a deux, et c'est la même raison qui
+l'impose.** Ouvrir un match écrit dans `matches`, `match_participants`, `match_events` et
+`match_state`, quatre tables sur lesquelles aucun client n'a de policy d'écriture. Un navigateur ne
+peut donc pas ouvrir un match, et c'est voulu : celui qui le pourrait pourrait aussi s'écrire un
+but. Il lui faut une porte, comme pour jouer.
+
+**La logique est dans `server/lobby.ts`, pas dans la fonction**, exactement comme `session.ts` pour
+l'autre. 13 tests, sans base et sans réseau. Ce que cette couche possède, c'est la question du
+lobby : est-ce une équipe qui a le droit de commencer un match.
+
+**Deux champs que le client n'a pas le droit d'envoyer**, et les deux séparent un lobby d'une
+triche :
+
+- **Le Tier** est lu sur la colonne générée de l'équipe. Un client qui nommerait son Tier alignerait
+  des Star à son premier match
+- **La graine** est tirée par la fonction. Un client qui l'enverrait pourrait rouvrir le même match
+  jusqu'à ce que le coup d'envoi lui plaise, dans un jeu dont toute la promesse de déterminisme
+  repose sur cette graine
+
+**Les refus sont des refus, pas des exceptions.** `createMatch` lève déjà sur une équipe de quatre,
+sur un joueur en double et sur trois Bulwark quand l'équipe n'en aligne qu'un. C'est la bonne
+assertion pour un moteur, qui a le droit de tenir ça pour impossible, et la mauvaise réponse pour un
+lobby, où c'est un formulaire mal rempli. `server/lobby.ts` les vérifie donc d'abord et rend une
+raison affichable, et les jets du moteur redeviennent le garde-fou qu'ils devaient être.
+
+**Deux garde-fous que la couche pure ne peut pas connaître**, parce qu'ils vivent en base. Tout le
+monde à table doit appartenir à l'équipe, l'appelant compris. Et **une équipe n'a qu'un match à la
+fois** : sans ça un bouton de lobby cliqué deux fois ouvre deux matchs, dont le second devient
+silencieusement celui que le client regarde pendant que le premier reste inachevé pour toujours.
+
+**Si une écriture échoue après la création de la ligne de match, le match est détruit.** Un match
+dont l'instantané manque est un match que le client trouve et que `resolve-action` ne sait pas
+charger. La suppression cascade sur les trois autres tables.
+
+**Éprouvée sur le vrai projet**, et pas seulement en test unitaire. `scripts/live-match.ts` ouvre
+désormais son match par cette porte et vérifie au passage les trois refus contre la fonction
+déployée : un second match pendant qu'un tourne rend 409, un siège pour quelqu'un d'une autre équipe
+rend 403, une requête sans jeton de joueur rend 401.
+
+**Le script ne prend plus aucun raccourci qu'un navigateur n'aurait pas.** Il détient la clé service
+et ne s'en sert plus que pour deux choses, créer l'utilisateur jetable et le supprimer, qui sont des
+actes d'administration par nature. Tout le reste passe par la RLS ou par une fonction.
+
+Conséquence à connaître : **la graine étant tirée côté serveur, deux exécutions sont deux matchs
+différents.** C'est le bon comportement, et ça coûte au script son contrôle de déterminisme, qui
+reste couvert là où il doit l'être, dans `ai.test.ts` et `session.test.ts`, à graine fixe.
+
+**Un piège de lecture des événements, rencontré en écrivant le résumé du script.** `sparkCaught` est
+émis à **chaque tentative**, réussie ou non, et une capture réussie émet en plus un `scored` à 50
+points. Compter les `sparkCaught` comme des captures lit donc deux échecs comme deux Sparks pris.
+`scored` est le seul événement qui bouge le tableau, et il porte ses propres points, 10 pour un but
+et 50 pour le Spark. Le script réconcilie désormais la somme des `scored` avec les colonnes
+`score_a` et `score_b`, ce qui est l'assertion que le mauvais comptage cachait.
 
 **Ce que ça a coûté en outillage.** `scripts/run-ts.mjs` bundle et exécute un script TypeScript qui
 importe le moteur, parce que Node 24 enlève les types mais ne résout pas plus `./types.js` que Deno.
@@ -527,21 +593,36 @@ importe le moteur, parce que Node 24 enlève les types mais ne résout pas plus 
 
 ### Ce qui reste de la phase 4
 
-**Une seconde Edge Function, `create-match`.** Ouvrir un match écrit dans quatre tables sur
-lesquelles la RLS n'accorde aucune écriture, donc un navigateur ne peut pas le faire et ne le doit
-pas. `scripts/live-match.ts` s'en sort avec la clé service parce que c'est un script ; le lobby aura
-besoin d'une porte. Elle appelle `createMatch` puis `openSession` et pose les mêmes lignes que le
-script, qui sert de spécification.
-
 **Le client React et Vite en entier.** La grille SVG posée sur l'art de la zone active, la piste
 d'initiative, la barre d'actions pilotée par `legalActions`, le panneau d'ordres alliés, et
 l'abonnement Realtime avec reprise depuis le dernier `seq` connu.
 
+**L'authentification se fait par email et mot de passe.** Arbitré par Jérôme le 2026-09-02. Pas
+d'OAuth, pas de magic link : c'est le mode que Supabase Auth donne sans configurer quoi que ce soit
+en dehors du projet, et le groupe est un cercle d'amis, pas un public.
+
+**Le client se teste en local avant tout hébergement.** Décidé par Jérôme le 2026-09-02. `vite dev`
+contre le projet Supabase en ligne, qui est déjà le vrai backend : rien n'oblige à monter un
+Supabase local, et un backend de développement séparé ferait deux bases à garder d'accord. La mise
+en ligne du client ne vient qu'après une partie jouée sur la machine.
+
 ## Ce qui attend Jérôme
 
-**La zone 1 n'a pas été régénérée.** Elle est en 1024 quand les deux autres sont en 2048, elle est
-légèrement asymétrique, et sa palette tire plus rouge. Il a validé en l'état, mais le prompt de
-régénération est prêt dans `01-prompts-arene.md` s'il change d'avis.
+**La zone 1 est bonne, et ce document a longtemps prétendu le contraire.** Vérifié le 2026-09-02 en
+lisant les en-têtes des fichiers : `zone-1-trench.jpeg` fait **2048 x 2048**, exactement comme les
+deux autres. Le seul fichier en 1024 de tout le dossier est
+`assets/arena/_rejected/zone-2-duplicate-of-zone-1.jpeg`, une image écartée, et c'est cette
+confusion qui a produit le reproche.
+
+Les deux autres reproches ne tiennent pas mieux. Sa palette tire plus chaud que celles des zones 2
+et 3, mais **c'est la fosse de la Furnace qui brûle en bas de l'image**, donc la fiction de la zone
+et pas une dérive d'étalonnage : la Trench est le niveau du sol, elle est censée être la seule
+éclairée par le feu. Et la structure est bien symétrique, passerelle pour passerelle aux trois
+niveaux ; il ne reste d'asymétrie que dans le placement des échelles, ce qui ne touche à rien
+puisque **le terrain jouable est le layout ASCII de `arenas/kill-silo.ts` et jamais le dessin**.
+
+Rien à régénérer, donc. Le prompt reste dans `01-prompts-arene.md` si tu veux quand même une autre
+version.
 
 **Le relevé de l'arène.** Le terrain de `arenas/kill-silo.ts` respecte ce que montrent les images au
 niveau des hauteurs de passerelles et des colonnes, mais ce n'est pas encore un tracé case par case
@@ -559,13 +640,12 @@ prétendu le contraire, il ne documentait que la vérification du prompt 1.
 même. Il y a maintenant **deux projets dans l'org**, `boomball` et `projet test`, ce qui est le
 plafond du plan gratuit : supprime `projet test` si tu en veux un troisième. Et un **match de
 démonstration** est conservé en base avec l'utilisateur jetable qui le porte, ids dans « L'Edge
-Function tourne », à effacer quand tu l'auras regardé.
+Function tourne », à effacer quand tu l'auras regardé. À part lui, la base est vide.
 
-**La création de match n'a pas encore de porte.** `scripts/live-match.ts` la fait en écrivant les
-lignes avec la clé service, ce qui va pour un script mais pas pour un client : le navigateur n'aura
-jamais cette clé. Il faudra une seconde Edge Function, `create-match`, qui appelle `createMatch` et
-`openSession` et pose les mêmes lignes. C'est le premier travail côté serveur qui reste, et il est
-petit.
+**Une revue de sécurité, à lancer par toi.** `/security-review` sur le dépôt, une fois le client
+écrit et avant la mise en ligne. C'est ta commande, je ne peux pas la déclencher. Le moment utile
+est celui où il existe du code qui manipule des jetons dans un navigateur : aujourd'hui la surface
+se limite à la RLS et à une Edge Function, toutes deux déjà éprouvées contre le projet vivant.
 
 **L'équilibrage est clos.** Si tu veux le rouvrir, la section « Le lot 4 » liste les leviers déjà
 mesurés et ce qu'ils valent, pour ne pas refaire ces sweeps.
