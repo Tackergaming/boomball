@@ -12,8 +12,9 @@
  */
 
 import { Arena, type ArenaSpec } from '../engine/arena.js';
-import { GOAL_POINTS } from '../engine/constants.js';
+import { ZONE_COUNT } from '../engine/constants.js';
 import type { MatchEvent } from '../engine/events.js';
+import { zoneOf, type Point } from '../engine/geometry.js';
 import { openMatch, reduce } from '../engine/reduce.js';
 import { createMatch, type MatchSetup } from '../engine/setup.js';
 import type { Tier } from '../engine/stats.js';
@@ -29,6 +30,34 @@ export interface PlayResult {
   readonly events: readonly MatchEvent[];
   /** Every action sent, which is what a stuck AI shows up in. */
   readonly actions: number;
+  /** Where the ball was at the top of each turn. See `SweepReport`. */
+  readonly ballTrack: BallTrack;
+}
+
+/** Turns counted by where the Payload was, sampled once per turn. */
+export interface BallTrack {
+  /** One entry per zone, floor first. */
+  readonly byZone: readonly number[];
+  /** Of those turns, the ones where a goalkeeper was holding it. */
+  readonly heldByKeeper: number;
+  readonly turns: number;
+}
+
+/**
+ * Where the Payload is, as a cell.
+ *
+ * Carried, it rides on its carrier: the engine stamps `payload.x/y` when the
+ * ball changes hands and lets them age while somebody holds it, so those
+ * coordinates are only the truth for a loose ball.
+ */
+function ballAt(state: MatchState): { cell: Point; keeper: boolean } {
+  const carrier = state.payload.carriedBy
+    ? state.units.find((u) => u.id === state.payload.carriedBy)
+    : undefined;
+
+  return carrier
+    ? { cell: { x: carrier.x, y: carrier.y }, keeper: carrier.role === 'bulwark' }
+    : { cell: { x: state.payload.x, y: state.payload.y }, keeper: false };
 }
 
 /**
@@ -47,8 +76,24 @@ export function playMatch(
   let actions = 0;
   const limit = ACTIONS_PER_TURN_LIMIT * 14 * 14;
 
+  const byZone = new Array<number>(ZONE_COUNT).fill(0);
+  let heldByKeeper = 0;
+  let turns = 0;
+  let sampled: string | null = null;
+
   while (state.phase !== 'finished' && state.turn && actions < limit) {
     const unitId = state.turn.unitId;
+
+    // Once per turn, not once per action: a turn is a walk, a swing and another
+    // walk, and counting actions would weight a busy turn three times over.
+    if (sampled !== unitId) {
+      sampled = unitId;
+      const ball = ballAt(state);
+      byZone[zoneOf(ball.cell)]!++;
+      if (ball.keeper) heldByKeeper++;
+      turns++;
+    }
+
     const result = reduce(arena, state, {
       unitId,
       action: chooseAction(arena, state, unitId, orders),
@@ -64,7 +109,7 @@ export function playMatch(
   }
 
   if (state.phase !== 'finished') throw new Error(`the match did not end in ${limit} actions`);
-  return { state, events, actions };
+  return { state, events, actions, ballTrack: { byZone, heldByKeeper, turns } };
 }
 
 export function playSeed(spec: ArenaSpec, tier: Tier, seed: number): PlayResult {
@@ -99,6 +144,25 @@ export interface SweepReport {
   /** Mean players still off the field when the whistle goes. */
   readonly meanEvacuated: number;
   readonly meanActions: number;
+  /**
+   * Where the ball spends the match, as a share of turns in each zone, floor
+   * first.
+   *
+   * This is the column that diagnosed the pitch. With both Furnaces in Zone 3
+   * it read 0 / 10 / 90 from round 6 on: the ball went up and never came back,
+   * and two thirds of the arena were scenery. On a pitch that runs end to end
+   * it should be spread, and a reading that collapses onto one zone again means
+   * the sport has found a new place to camp.
+   */
+  readonly ballZoneShare: readonly number[];
+  /**
+   * Share of turns the ball sits in a goalkeeper's hands.
+   *
+   * The failure mode a long pitch invites: a keeper takes the restart, nobody
+   * comes back within throwing distance, and the ball never leaves the goal.
+   * `passReach` in `ai/evaluate.ts` exists for this number.
+   */
+  readonly keeperHeldShare: number;
 }
 
 /**
@@ -132,6 +196,9 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
   let sparkDecided = 0;
   let evacuated = 0;
   let actions = 0;
+  const ballZone = new Array<number>(ZONE_COUNT).fill(0);
+  let keeperHeld = 0;
+  let ballTurns = 0;
 
   for (let i = 0; i < matches; i++) {
     const played = playSeed(spec, tier, firstSeed + i);
@@ -141,8 +208,11 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     if (winner === 'draw' || winner === undefined) draws++;
     else wins[winner]++;
 
+    // Read off `source`, never off the price. The two used to be told apart by
+    // comparing points against GOAL_POINTS, which stops working the moment the
+    // Spark is priced at a goal.
     const goalEvents = played.events.filter(
-      (e) => e.kind === 'scored' && e.points === GOAL_POINTS,
+      (e) => e.kind === 'scored' && e.source === 'payload',
     );
     goals += goalEvents.length;
     if (goalEvents.length === 0) goalless++;
@@ -155,6 +225,10 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
 
     evacuated += state.units.filter((u) => u.status === 'evacuated').length;
     actions += played.actions;
+
+    for (let z = 0; z < ZONE_COUNT; z++) ballZone[z]! += played.ballTrack.byZone[z]!;
+    keeperHeld += played.ballTrack.heldByKeeper;
+    ballTurns += played.ballTrack.turns;
   }
 
   return {
@@ -169,6 +243,8 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     sparkDecided,
     meanEvacuated: evacuated / matches,
     meanActions: actions / matches,
+    ballZoneShare: ballZone.map((n) => (ballTurns === 0 ? 0 : n / ballTurns)),
+    keeperHeldShare: ballTurns === 0 ? 0 : keeperHeld / ballTurns,
   };
 }
 

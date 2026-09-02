@@ -1065,6 +1065,130 @@ renaissant collé à la victime précédente, et le souffle monte de 28 %. Le fa
 trois zones à tour de rôle donne 23 / 58 / 19 %, une durée de vie d'un round entier et un souffle
 divisé par deux, mais il ne réapparaît plus au centre de la Zone 2, ce que l'arbitrage exclut.
 
+## Le terrain devient vertical
+
+Cinquieme test de Jerome, et le constat qui a declenche la restructuration : « tout le match se
+passe en zone 3 et n'en sort jamais ». Mesure sur 120 matchs Veteran, il avait raison au-dela de ce
+qu'il voyait.
+
+| Round | Unites Z1/Z2/Z3 | Payload Z1/Z2/Z3 |
+|---|---|---|
+| 1 | 0 / 86 / 14 % | 0 / 100 / 0 % |
+| 5 | 0 / 33 / 67 % | 0 / 23 / 78 % |
+| 10 | 1 / 6 / **93 %** | 0 / 1 / **99 %** |
+
+**Deux causes superposees.** Les deux Furnaces etaient dans la meme zone, a 14 cases l'une de
+l'autre sur la meme passerelle, donc les deux equipes attaquaient le meme endroit ; et le Payload
+repart dans les mains du gardien qui encaisse, gardien poste devant sa Furnace, donc en Zone 3. Deux
+tiers de l'arene etaient du decor a partir du round 4.
+
+### Ce qui a ete fait
+
+**Une Furnace a chaque bout, au centre.** `(6,0)-(8,0)` dans le sol de la Trench pour l'equipe A,
+`(6,44)-(8,44)` dans le plafond du Summit pour B. Quarante-quatre cases de separation. Trois cases de
+large au lieu de deux, parce qu'une bouche doit rester trouvable depuis l'autre bout.
+
+**L'axe d'equite passe de gauche/droite a haut/bas.** L'arene avait ete dessinee pour un terrain
+horizontal ; ce qui doit etre identique desormais, c'est l'approche de chaque camp vers le but
+adverse. Le layout est un miroir exact autour de `y = 22`, et `setup.test.ts` le tient :
+`rows[i] === rows[44 - i]`. Quatre autres assertions verifient que les bouches sont solides et aux
+deux extremites, que chaque case de depart est occupable **et** ancrable, que chaque gardien commence
+dans sa zone de blocage, et que le point de largage est a egale distance des deux buts.
+
+**La chaine centrale plonge desormais dans chaque bouche**, donc elle court de `y1` a `y43` au lieu
+de `y0` a `y44`. C'est ce que l'image de la Zone 1 dessinait deja.
+
+**Le coup d'envoi est une mise en jeu.** Chaque equipe dans sa moitie, six joueurs de champ
+au-dessus de leur passerelle, `y19` pour A et `y25` pour B, et le gardien dans sa bouche. Les
+passerelles de la Zone 2 sont passees a `y18` et `y26`, les crochets sur l'axe en `y22`, parce que
+les anciennes n'etaient symetriques ni entre elles ni avec quoi que ce soit.
+
+**Le reglement n'est pas viole.** B1 disait « emplacement exact a figer quand la grille sera tracee
+sur les images ».
+
+### Le defaut d'IA que ce terrain a revele, et c'est la vraie piece
+
+`positionValue` notait une case de soutien sur sa seule distance au but adverse, **sans aucune
+condition de portee de passe**. Sur 14 cases de terrain c'etait invisible, tout le monde etant a
+portee de tout le monde par accident. Sur 44 cases ca donne : l'equipe encaisse, son gardien recoit
+le ballon dans sa bouche, ses attaquants courent vers l'autre bout, et deux rounds plus tard il n'y a
+plus personne a moins de 12 cases du gardien. `legal.pass` est vide, `guardFurnace: 95` le cloue chez
+lui, et le ballon ne repart jamais.
+
+Meme defaut que le lot 4, sous une autre forme : une ponderation de position qui ignore l'action
+qu'une case debloque. Une case de soutien ne vaut pas sa distance au but, elle vaut **le fait que le
+porteur puisse y lancer**.
+
+`passReach` dans `ai/evaluate.ts` multiplie `supportAttack` : un dans la portee propre de 9 cases,
+decroissant jusqu'a zero a 18. **C'est un no-op dans le regime ou l'equilibrage clos a ete mesure**,
+puisque tout y etait a portee, donc il ne peut pas le deplacer. Trois tests dans `ai.test.ts`, dont
+celui du gardien qui doit trouver un receveur. Mesure : le ballon ne passe que **8 a 12 % des tours**
+dans les mains d'un gardien, donc le blocage n'a pas lieu.
+
+### Ce que le sweep dit du nouveau terrain
+
+200 matchs par Tier. Deux colonnes ajoutees au rapport, la zone du ballon et la part de tours ou un
+gardien le tient, parce que c'est la mesure qui avait diagnostique le probleme.
+
+| Tier | A | B | Nuls | Buts/match | Sans but | Ballon Z1/Z2/Z3 | Gardien |
+|---|---|---|---|---|---|---|---|
+| Rookie | 88 | 95 | 17 | **1,54** | 38 / 200 | 30/50/21 % | 8 % |
+| Veteran | **129** | **66** | 5 | **1,75** | 30 / 200 | 26/47/26 % | 11 % |
+| Star | **126** | **68** | 6 | **2,15** | 29 / 200 | 28/47/25 % | 12 % |
+
+**Deux resultats et un probleme.**
+
+Le nombre de buts est **dans la cible de Jerome**, au moins 1 a 2 par match. Et **le ballon circule
+enfin dans les trois zones**, 26 a 30 % en Zone 1 contre 0 % avant : le terrain fait ce qu'on lui
+demandait.
+
+**Mais A gagne 129 a 66 en Veteran et 126 a 68 en Star.** Les deux camps partagent le Tier et le
+cerveau, donc c'est un biais et pas du bruit. Decompose par camp :
+
+| Tier | Buts A / B | Spark A / B | 1er ballon A / B |
+|---|---|---|---|
+| Rookie | 117 / **191** | 55 / 44 | **200 / 0** |
+| Veteran | 158 / **193** | **103 / 38** | **200 / 0** |
+| Star | 172 / **258** | **116 / 43** | **200 / 0** |
+
+**B marque plus de buts que A partout.** L'ecart de victoires vient entierement du **Spark**, que A
+attrape pres de trois fois plus souvent. La cause est l'initiative : sans humain, A joue en bloc 15
+et B en bloc 10, donc **A a le premier acces au Spark a chaque round**, ce que confirme la colonne du
+premier ballon, 200 sur 200. Cette asymetrie a toujours existe et elle etait neutre tant qu'on
+marquait 4 buts par match ; a 1,75 but, un Spark a 50 points vaut cinq buts et emporte la rencontre a
+lui seul.
+
+**C'est exactement ce que le lot 4 avait ecrit** : « Le Spark cessera de decider les matchs quand le
+Payload commencera a les decider, pas quand cette constante baissera. » On a baisse le nombre de
+buts, donc le Spark a repris la main. Il decide desormais 36 a 54 % des matchs.
+
+**Levier mesure, non applique.** Le meme lot de matchs recompte avec `SPARK_POINTS` a 10 au lieu de
+50 donne **79/92, 99/72 et 98/91**. Les matchs sont identiques au bit pres, l'IA ne lisant jamais
+cette constante : seul le tableau change. L'ecart se referme presque entierement.
+
+**En attente d'arbitrage de Jerome.** `SPARK_POINTS` vaut toujours 50.
+
+### Un defaut de mesure corrige au passage
+
+Ce run a 10 points a rendu des colonnes fausses, et le defaut meritait d'etre repare tout de suite :
+`meanGoals`, `goallessMatches` et `sparkDecided` separaient le but du Spark **en comparant les points
+a `GOAL_POINTS`**. Mettre le Spark au prix d'un but rend les deux indistinguables, donc le rapport
+comptait chaque Spark comme un but au moment precis ou on essayait de mesurer l'effet du prix.
+
+L'evenement `scored` porte desormais `source: 'payload' | 'spark'`, et le sweep lit ce champ. Ce
+n'est ni une regle ni un de, c'est le meme genre d'ajout que `payloadReset` au second test : un
+journal dont on ne peut pas rejouer le match n'est pas la verite que ce projet pretend tenir.
+
+### Ce qui reste de ce chantier
+
+- **Les images.** La Zone 1 n'a rien a faire : son prompt dessine deja « a single round furnace pit
+  dead centre in that floor » avec la chaine qui y plonge. La **Zone 3** demande un nouveau prompt,
+  une seule bouche au centre du plafond au lieu des deux trappes laterales, en miroir vertical de la
+  Zone 1. La **Zone 2** aussi, ses passerelles ayant bouge en `y18` et `y26`
+- **Le reglement v2**, B1, B2 et B10, a mettre a jour avec l'ecart date
+- **Le seed est regenere mais pas applique** au projet en ligne
+- **Le durcissement du client** contre `ZONE_COUNT`, prevu au plan et pas encore fait
+
 ## Ce qui attend Jérôme
 
 **La zone 1 est bonne, et ce document a longtemps prétendu le contraire.** Vérifié le 2026-09-02 en

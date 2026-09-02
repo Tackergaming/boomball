@@ -140,6 +140,32 @@ export function scoringNearness(from: Point, furnace: Furnace): number {
 }
 
 /**
+ * Whether a support player is somewhere the carrier could actually throw to.
+ *
+ * Getting open is two things and the evaluator only ever priced one of them.
+ * Advancing on the goal is the half that was there; **being reachable** is the
+ * half that was not, and on a fourteen-cell pitch its absence was invisible
+ * because everyone was within a throw of everyone by accident.
+ *
+ * On a pitch that runs the height of the silo it is not invisible at all. A
+ * team concedes, its goalkeeper is handed a fresh Payload in its own mouth, and
+ * its Strikers price every cell by distance to the far goal, so they run away
+ * from the one team-mate holding the ball. Two rounds later nothing is within
+ * throwing distance of the keeper, `legal.pass` is empty, `guardFurnace` keeps
+ * the keeper home, and the ball never comes out again.
+ *
+ * One at or inside clean throwing range, falling to zero at twice it. **That
+ * makes it a no-op wherever the balance sweeps were actually run**: in the
+ * regime the closed balance was measured in, every support cell scored a reach
+ * of one and this multiplies by one. It only bites out past the range where the
+ * old formula had never been measured and was simply wrong.
+ */
+export function passReach(cell: Point, carrier: Point): number {
+  const beyond = Math.max(0, distance(cell, carrier) - PAYLOAD_RANGE_CELLS);
+  return Math.max(0, 1 - beyond / PAYLOAD_RANGE_CELLS);
+}
+
+/**
  * The odds this player would put the ball in the Furnace from this cell, or
  * zero if it cannot shoot from there at all.
  *
@@ -183,7 +209,11 @@ export function positionValue(board: Board, cell: Point): number {
     if (cell.x === state.payload.x && cell.y === state.payload.y) value += w.grabPayload;
   } else if (board.carrier && board.carrier.team === unit.team) {
     value += w.screenCarrier * nearness(cell, board.carrier);
-    value += w.supportAttack * scoringNearness(cell, board.targetFurnace);
+    // Advancing on goal only counts from somewhere the ball can reach. See
+    // `passReach`: this is the outlet half of getting open, and without it a
+    // support player walks to the far end of the silo and strands its own
+    // carrier with nobody to throw to.
+    value += w.supportAttack * scoringNearness(cell, board.targetFurnace) * passReach(cell, board.carrier);
   } else if (board.carrier) {
     value += w.pressCarrier * nearness(cell, board.carrier);
   }

@@ -192,6 +192,21 @@ export type MatchEvent =
       readonly at: Point;
       readonly carriedBy: UnitId | null;
     }
-  | { readonly kind: 'scored'; readonly team: TeamId; readonly points: number }
+  /**
+   * The only event that moves the scoreboard.
+   *
+   * `source` says which of the two things that score did it, and it is not a
+   * convenience: the balance sweep separates the Payload game from the Spark,
+   * and it used to do that by comparing `points` against `GOAL_POINTS`. Set the
+   * Spark to the same price as a goal, which is a live question, and that test
+   * silently reads every Spark as a goal. A reading that breaks when a constant
+   * is tuned is a reading you cannot tune against.
+   */
+  | {
+      readonly kind: 'scored';
+      readonly team: TeamId;
+      readonly points: number;
+      readonly source: 'payload' | 'spark';
+    }
   | { readonly kind: 'matchEnded'; readonly result: MatchResult }
   | { readonly kind: 'diceRolled'; readonly unitId: UnitId; readonly roll: DiceRoll; readonly reason: string };

@@ -21,8 +21,14 @@ const arena = new Arena(KILL_SILO);
 /** The far top corner, where every player not under test is parked. */
 const CORNER: Point = { x: 0, y: 44 };
 
-/** A cell of The Scramble with nothing to grapple on any of its eight sides. */
-const DEAD_AIR: Point = { x: 2, y: 21 };
+/**
+ * A cell of The Scramble with nothing to grapple on any of its eight sides.
+ *
+ * It used to be (2, 21). The halfway hooks moved onto y = 22 when the pitch
+ * turned vertical, and one of them anchors that cell from a corner, which is
+ * the sort of thing only `isAnchorable` notices.
+ */
+const DEAD_AIR: Point = { x: 2, y: 20 };
 
 /** An open cell that the central chain anchors from one cell away. */
 const ON_THE_CHAIN: Point = { x: 8, y: 22 };
@@ -132,10 +138,10 @@ describe('the grip guard on an opportunity attack', () => {
     const state = board();
     const mover = actorOf(state);
     const watcher = enemyOf(state, mover, 'breaker');
-    const staged = put(put(state, mover.id, { x: 6, y: 21 }), watcher.id, { x: 4, y: 21 });
+    const staged = put(put(state, mover.id, { x: 6, y: 20 }), watcher.id, { x: 4, y: 20 });
 
     const attacker = staged.units.find((u) => u.id === watcher.id)!;
-    expect(keepsGripAfterRecoil(arena, staged, attacker, { x: 6, y: 21 })).toBe(false);
+    expect(keepsGripAfterRecoil(arena, staged, attacker, { x: 6, y: 20 })).toBe(false);
   });
 
   it('takes the swing when the recoil lands on something to hold', () => {
@@ -189,9 +195,10 @@ describe('who may snatch a pass', () => {
     const state = board();
     const thrower = actorOf(state);
     const keeper = enemyOf(state, thrower, 'bulwark');
-    const staged = put(state, keeper.id, { x: 13, y: 38 });
+    // On its line: one cell under the hatch in the middle of the roof.
+    const staged = put(state, keeper.id, { x: 7, y: 43 });
 
-    const flight = straight({ x: 12, y: 40 }, { x: 12, y: 36 });
+    const flight = straight({ x: 5, y: 42 }, { x: 9, y: 42 });
     expect(passInterceptors(arena, staged, thrower, flight)).toHaveLength(0);
   });
 
@@ -199,9 +206,9 @@ describe('who may snatch a pass', () => {
     const state = board();
     const thrower = actorOf(state);
     const keeper = enemyOf(state, thrower, 'bulwark');
-    const staged = put(state, keeper.id, { x: 12, y: 26 });
+    const staged = put(state, keeper.id, { x: 12, y: 30 });
 
-    const flight = straight({ x: 10, y: 26 }, { x: 14, y: 26 });
+    const flight = straight({ x: 10, y: 30 }, { x: 14, y: 30 });
     expect(passInterceptors(arena, staged, thrower, flight).map((u) => u.id)).toEqual([keeper.id]);
   });
 
@@ -267,15 +274,15 @@ describe('an opportunity attack in a match', () => {
   });
 
   it('holds the Reaction rather than trade a grip for a d8', () => {
-    const { state, watcherId } = staged(5, { x: 5, y: 21 }, { x: 4, y: 21 });
-    const { state: after, events } = must(state, { kind: 'move', path: [{ x: 6, y: 21 }] });
+    const { state, watcherId } = staged(5, { x: 5, y: 20 }, { x: 4, y: 20 });
+    const { state: after, events } = must(state, { kind: 'move', path: [{ x: 6, y: 20 }] });
 
     expect(events).toContainEqual({ kind: 'reactionHeld', unitId: watcherId, reason: 'anchor' });
     expect(events.some((e) => e.kind === 'opportunityAttacked')).toBe(false);
 
     const held = after.units.find((u) => u.id === watcherId)!;
     expect(held.reactionAvailable).toBe(true);
-    expect({ x: held.x, y: held.y }).toEqual({ x: 4, y: 21 });
+    expect({ x: held.x, y: held.y }).toEqual({ x: 4, y: 20 });
   });
 
   it('cuts the move into segments, so the swing lands where it happened', () => {
@@ -422,10 +429,10 @@ describe('snatching a pass in a match', () => {
     const mate = mateOf(state, thrower);
     const keeper = enemyOf(state, thrower, 'bulwark');
 
-    let placed = put(state, thrower.id, { x: 12, y: 40 }, { holdingPayload: true });
-    placed = put(placed, mate.id, { x: 12, y: 36 });
-    placed = put(placed, keeper.id, { x: 13, y: 38 });
-    const staged: MatchState = { ...placed, payload: { carriedBy: thrower.id, x: 12, y: 40 } };
+    let placed = put(state, thrower.id, { x: 5, y: 42 }, { holdingPayload: true });
+    placed = put(placed, mate.id, { x: 9, y: 42 });
+    placed = put(placed, keeper.id, { x: 7, y: 43 });
+    const staged: MatchState = { ...placed, payload: { carriedBy: thrower.id, x: 5, y: 42 } };
 
     const { state: after, events } = must(staged, { kind: 'pass', targetId: mate.id });
 

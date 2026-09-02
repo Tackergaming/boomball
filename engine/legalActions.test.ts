@@ -180,7 +180,7 @@ describe('what it offers against whom', () => {
       ...start,
       units: start.units.map((u) => {
         if (u.id === actor.id) return { ...u, team: 'A' as const, x: 9, y: 38, holdingPayload: true };
-        if (u.id === keeper.id) return { ...u, x: 13, y: 38 };
+        if (u.id === keeper.id) return { ...u, x: 7, y: 43 };
         return u;
       }),
     };

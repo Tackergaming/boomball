@@ -611,7 +611,7 @@ function applyCatchSpark(ctx: TurnCtx): ReduceResult {
   const next: MatchState = { ...state, turn: { ...turn, actionUsed: true } };
   if (!outcome.hit) return done(ctx, next);
 
-  ctx.log.push({ kind: 'scored', team: unit.team, points: SPARK_POINTS });
+  ctx.log.push({ kind: 'scored', team: unit.team, points: SPARK_POINTS, source: 'spark' });
   const caught: MatchState = {
     ...next,
     spark: { ...next.spark, state: 'caught', heading: null },
@@ -853,7 +853,7 @@ function applyShoot(ctx: TurnCtx): ReduceResult {
  */
 function score(ctx: Ctx, state: MatchState, team: MatchState['units'][number]['team']): MatchState {
   const scored = state.score[team] + GOAL_POINTS;
-  ctx.log.push({ kind: 'scored', team, points: GOAL_POINTS });
+  ctx.log.push({ kind: 'scored', team, points: GOAL_POINTS, source: 'payload' });
 
   const defender = opposingTeam(team);
   const keeper = activeUnits(state).find((u) => u.team === defender && u.role === 'bulwark');

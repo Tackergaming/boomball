@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { Arena } from './arena.js';
 import { KILL_SILO } from './arenas/kill-silo.js';
-import { BENCH_SIZE, SPARK_ENTRY_ROUND } from './constants.js';
+import {
+  ARENA_HEIGHT,
+  BENCH_SIZE,
+  BULWARK_BLOCK_RANGE_CELLS,
+  SPARK_ENTRY_ROUND,
+} from './constants.js';
+import { rangeToFurnace } from './rules/payload.js';
 import { buildTurnOrder, ladderRungs } from './initiative.js';
 import { createMatch, MAX_HUMANS, type MatchSetup } from './setup.js';
 import { TEAM_COMPOSITION } from './stats.js';
@@ -27,6 +33,74 @@ const fullMatch = () =>
       { humanId: 'ami-2', role: 'trajector' },
     ],
   });
+
+/**
+ * The arena itself, before anybody stands on it.
+ *
+ * These assertions exist because the pitch now runs top to bottom. One Furnace
+ * is in the floor and one is in the ceiling, so the thing that has to be fair
+ * is the climb, and a hand-authored ASCII layout is exactly the kind of data
+ * that drifts one character at a time without anybody noticing.
+ */
+describe('the Kill-Silo as a pitch', () => {
+  const arena = new Arena(KILL_SILO);
+
+  it('is an exact mirror about the halfway line, so neither side has the better half', () => {
+    // `rows` is authored top first, so index i and index 44 - i are the two
+    // heights an equal distance either side of y = 22. This is the whole of
+    // what makes the two approaches to goal identical, and it replaces the
+    // left/right symmetry that mattered when both Furnaces were in Zone 3.
+    for (let i = 0; i < ARENA_HEIGHT; i++) {
+      expect(KILL_SILO.rows[i]).toBe(KILL_SILO.rows[ARENA_HEIGHT - 1 - i]);
+    }
+  });
+
+  it('puts the two Furnaces at opposite ends of the shaft', () => {
+    const a = arena.furnaceOf('A');
+    const b = arena.furnaceOf('B');
+
+    expect(Math.min(...a.cells.map((c) => c.y))).toBe(0);
+    expect(Math.max(...b.cells.map((c) => c.y))).toBe(ARENA_HEIGHT - 1);
+    // Every cell of a mouth is solid: it is a hatch, not a place to stand.
+    for (const cell of [...a.cells, ...b.cells]) expect(arena.isSolid(cell)).toBe(true);
+  });
+
+  it('starts every unit somewhere it can stand and hold on to', () => {
+    // A start cell that is solid drops a player into a girder, and one that is
+    // not anchorable drops them down the shaft on their own first turn. Both
+    // are silent: `createMatch` places units without asking the terrain.
+    for (const team of ['A', 'B'] as const) {
+      for (const cell of KILL_SILO.starts[team]) {
+        expect(arena.isOccupiable(cell)).toBe(true);
+        expect(arena.isAnchorable(cell)).toBe(true);
+      }
+      const entry = KILL_SILO.substituteEntry[team];
+      expect(arena.isOccupiable(entry)).toBe(true);
+      expect(arena.isAnchorable(entry)).toBe(true);
+    }
+  });
+
+  it('starts each goalkeeper close enough to its own hatch to block a shot', () => {
+    // The Bulwark is the first start cell by convention. If it began outside
+    // `BULWARK_BLOCK_RANGE_CELLS` it would not be a goalkeeper at kick-off, and
+    // `rules/reactions.ts` would also stop treating it as one for the pass
+    // exception in front of goal.
+    for (const team of ['A', 'B'] as const) {
+      const keeper = KILL_SILO.starts[team][0]!;
+      expect(rangeToFurnace(keeper, arena.furnaceOf(team))).toBeLessThanOrEqual(
+        BULWARK_BLOCK_RANGE_CELLS,
+      );
+    }
+  });
+
+  it('drops the ordnance on the halfway line, equidistant from both goals', () => {
+    const { ordnanceStart } = KILL_SILO;
+    expect(arena.isOccupiable(ordnanceStart)).toBe(true);
+    expect(rangeToFurnace(ordnanceStart, arena.furnaceOf('A'))).toBe(
+      rangeToFurnace(ordnanceStart, arena.furnaceOf('B')),
+    );
+  });
+});
 
 describe('kick-off', () => {
   it('fields seven per team in the composition the sport requires', () => {

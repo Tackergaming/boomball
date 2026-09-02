@@ -221,15 +221,91 @@ describe('the priority tables', () => {
   });
 
   it('keeps the goalkeeper at home: its own hatch is worth more than any cell out there', () => {
+    // Read off the arena rather than typed in. The Furnaces moved to opposite
+    // ends of the shaft and this test asserted the old coordinates, which is
+    // exactly the kind of test that passes for the wrong reason afterwards.
     const keeper = 'A-bulwark-1';
-    const state = giveTurnTo(put(board(), keeper, { x: 1, y: 38 }), keeper);
+    const mine = arena.furnaceOf('A').cells[1]!;
+    const theirs = arena.furnaceOf('B').cells[1]!;
+    const goalMouth = { x: mine.x, y: mine.y + 1 };
+
+    const state = giveTurnTo(put(board(), keeper, goalMouth), keeper);
     const legal = legalActions(arena, state)!;
     const home = buildBoard(arena, state, unit(state, keeper), legal, weightsFor('bulwark'), []);
 
-    expect(positionValue(home, { x: 1, y: 38 })).toBeGreaterThan(
-      positionValue(home, { x: 13, y: 38 }),
+    expect(positionValue(home, goalMouth)).toBeGreaterThan(
+      positionValue(home, { x: theirs.x, y: theirs.y - 1 }),
     );
-    expect(positionValue(home, { x: 1, y: 38 })).toBeGreaterThan(positionValue(home, { x: 7, y: 20 }));
+    // Deliberately not the halfway cell itself: a loose Payload sits there and
+    // its cell carries the pickup, which is a different rule and would make
+    // this a test of `grabPayload` rather than of `guardFurnace`.
+    expect(positionValue(home, goalMouth)).toBeGreaterThan(positionValue(home, { x: 7, y: 20 }));
+  });
+
+  it('gets open where the carrier can throw, not just up the pitch', () => {
+    // Two cells for a Striker supporting its own carrier. One is nearer the
+    // goal it attacks and out of any throw; the other is behind it but within
+    // a clean pass. Priced on distance to goal alone the first one wins, which
+    // is how a support player walks away from the ball.
+    const carrier = 'A-breaker-5';
+    const mate = 'A-striker-2';
+    const target = arena.targetFurnaceOf('A').cells[1]!;
+
+    let staged = put(board(), carrier, { x: 7, y: 12 });
+    staged = carrying(staged, carrier);
+    staged = giveTurnTo(put(staged, mate, { x: 7, y: 14 }), mate);
+
+    const legal = legalActions(arena, staged)!;
+    const view = buildBoard(arena, staged, unit(staged, mate), legal, weightsFor('striker'), []);
+
+    const reachable = { x: 7, y: 20 }; // 8 cells off the carrier: a clean pass
+    const stranded = { x: 7, y: 30 }; // 18 cells off it: nothing can reach here
+
+    expect(distance(stranded, target)).toBeLessThan(distance(reachable, target));
+    expect(positionValue(view, reachable)).toBeGreaterThan(positionValue(view, stranded));
+  });
+
+  it('still prefers the cell further up the pitch when both are within a throw', () => {
+    // The guard on the guard. `passReach` must not turn support play into
+    // hugging the carrier: inside clean range it is one either way, so the
+    // original gradient decides and the more advanced cell has to win.
+    const carrier = 'A-breaker-5';
+    const mate = 'A-striker-2';
+
+    let staged = put(board(), carrier, { x: 7, y: 22 });
+    staged = carrying(staged, carrier);
+    staged = giveTurnTo(put(staged, mate, { x: 7, y: 22 }), mate);
+
+    const legal = legalActions(arena, staged)!;
+    const view = buildBoard(arena, staged, unit(staged, mate), legal, weightsFor('striker'), []);
+
+    expect(positionValue(view, { x: 7, y: 30 })).toBeGreaterThan(
+      positionValue(view, { x: 7, y: 26 }),
+    );
+  });
+
+  it('brings somebody back into range of a goalkeeper holding the ball', () => {
+    // The scene the whole fix exists for. A team concedes, its keeper is handed
+    // a fresh Payload in its own mouth at the bottom of the shaft, and its
+    // Strikers are away up the silo. Somebody has to come back for the throw or
+    // the ball never leaves the goal again.
+    const keeper = 'A-bulwark-1';
+    const mate = 'A-striker-2';
+    const mouth = arena.furnaceOf('A').cells[1]!;
+    const keeperCell = { x: mouth.x, y: mouth.y + 1 };
+
+    let staged = put(board(), keeper, keeperCell);
+    staged = carrying(staged, keeper);
+    staged = giveTurnTo(put(staged, mate, { x: 7, y: 30 }), mate);
+
+    const legal = legalActions(arena, staged)!;
+    const view = buildBoard(arena, staged, unit(staged, mate), legal, weightsFor('striker'), []);
+
+    // The Striker is eight cells into the move it can make this turn. Coming
+    // down towards the keeper has to beat pressing on up the shaft.
+    expect(positionValue(view, { x: 7, y: 22 })).toBeGreaterThan(
+      positionValue(view, { x: 7, y: 38 }),
+    );
   });
 
   it('never sends a Cracker into one of its own', () => {

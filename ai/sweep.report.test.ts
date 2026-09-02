@@ -45,7 +45,13 @@ describe('balance', () => {
           `spark ${report.sparkCaught}`.padEnd(12),
           `tries/match ${report.meanSparkAttempts.toFixed(2)}`.padEnd(20),
           `decided ${report.sparkDecided}`.padEnd(14),
-          `evacuated ${report.meanEvacuated.toFixed(2)}`,
+          `evacuated ${report.meanEvacuated.toFixed(2)}`.padEnd(17),
+          // Where the ball lives, floor zone first, and how much of that is a
+          // goalkeeper standing on it. These two read the pitch rather than the
+          // scoreline: a share that collapses onto one zone means the sport has
+          // found somewhere to camp again.
+          `ball ${report.ballZoneShare.map((n) => `${Math.round(n * 100)}%`).join('/')}`.padEnd(20),
+          `keeper ${Math.round(report.keeperHeldShare * 100)}%`,
         ].join(' '),
       );
     }

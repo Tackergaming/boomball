@@ -71,13 +71,14 @@ describe('path validation', () => {
   });
 
   it('refuses to walk into a girder', () => {
-    // Row 19 carries the catwalk that runs x = 0..4.
-    const onTheEdge = unitAt(5, 19);
+    // Row 18 carries the catwalk that runs x = 0..4, on team A's side of the
+    // halfway line.
+    const onTheEdge = unitAt(5, 18);
     const verdict = validatePath(
       arena,
       emptyFieldWith(onTheEdge),
       onTheEdge,
-      [{ x: 4, y: 19 }],
+      [{ x: 4, y: 18 }],
       FLY_SPEED_FEET,
     );
     expect(verdict.ok).toBe(false);
@@ -180,24 +181,34 @@ describe('falling', () => {
   });
 
   it('stops a free fall on the first girder it meets, and that hurts', () => {
-    // Row 23 is a catwalk at x = 0..4; a fall down x = 2 from row 27 lands on it.
-    const outcome = resolveFall(arena, { x: 2, y: 27 });
+    // Row 26 is a catwalk at x = 0..4; a fall down x = 2 from row 30 lands on it.
+    const outcome = resolveFall(arena, { x: 2, y: 30 });
     expect(outcome.impact).toBe(true);
-    expect(outcome.landing).toEqual({ x: 2, y: 24 });
+    expect(outcome.landing).toEqual({ x: 2, y: 27 });
     expect(outcome.cellsFallen).toBe(3);
     expect(outcome.damageDice).toBe(1);
   });
 
   it('charges a d6 for every ten feet of the drop, not for every cell', () => {
-    const outcome = resolveFall(arena, { x: 2, y: 27 });
+    const outcome = resolveFall(arena, { x: 2, y: 30 });
     expect(outcome.damageDice).toBe(Math.floor(outcome.cellsFallen / 2));
     expect(outcome.damageDie).toBe(6);
   });
 
   it('stops a free fall on the deck of The Trench', () => {
-    const outcome = resolveFall(arena, { x: 6, y: 3 });
+    // Down x = 5, which is clear of the Furnace mouth: the three centre columns
+    // of the deck are the hatch itself and a fall stops one cell short of them.
+    const outcome = resolveFall(arena, { x: 5, y: 3 });
     expect(outcome.landing.y).toBe(0);
     expect(outcome.impact).toBe(true);
+  });
+
+  it('stops a free fall on the lip of the Furnace rather than inside it', () => {
+    // The mouth is solid, so the deck's three centre columns catch a faller a
+    // cell higher than the rest of the floor does. Nobody lands in the fire.
+    const outcome = resolveFall(arena, { x: 7, y: 3 });
+    expect(outcome.impact).toBe(true);
+    expect(outcome.landing).toEqual({ x: 7, y: 1 });
   });
 
   it('drops a shoved player three cells and no further', () => {
@@ -208,9 +219,9 @@ describe('falling', () => {
   });
 
   it('hurts a shoved player who meets a girder inside those three cells', () => {
-    const outcome = resolveFall(arena, { x: 2, y: 25 }, 'shove');
+    const outcome = resolveFall(arena, { x: 2, y: 20 }, 'shove');
     expect(outcome.impact).toBe(true);
-    expect(outcome.landing).toEqual({ x: 2, y: 24 });
+    expect(outcome.landing).toEqual({ x: 2, y: 19 });
     expect(outcome.damageDice).toBe(0);
   });
 

@@ -147,13 +147,14 @@ describe('a Cracker on count 20', () => {
   });
 
   it('ignores terrain, and flies through a catwalk to reach someone', () => {
-    expect(arena.isSolid({ x: 3, y: 23 })).toBe(true);
+    // Row 18 is the catwalk on team A's side of the halfway line.
+    expect(arena.isSolid({ x: 3, y: 18 })).toBe(true);
 
-    const { state } = loneTarget({ x: 3, y: 25 });
-    const outcome = crackerRun(state, { x: 1, y: 21 }, new Rng(1));
+    const { state } = loneTarget({ x: 3, y: 16 });
+    const outcome = crackerRun(state, { x: 1, y: 20 }, new Rng(1));
 
     expect(outcome.struck).not.toBeNull();
-    expect(outcome.path).toContainEqual({ x: 3, y: 23 });
+    expect(outcome.path).toContainEqual({ x: 3, y: 18 });
   });
 });
 

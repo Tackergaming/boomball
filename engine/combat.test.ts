@@ -158,11 +158,11 @@ describe('swinging the bat', () => {
   });
 
   it('stops the recoil against terrain rather than pushing through it', () => {
-    // Row 23 is a catwalk at x = 0..4, so a swing eastward from (5, 23) would
+    // Row 18 is a catwalk at x = 0..4, so a swing eastward from (5, 18) would
     // recoil into it. The attacker simply does not move.
     const { state, actorId, victimId } = staged({
-      actor: { x: 5, y: 23 },
-      victim: { x: 6, y: 23 },
+      actor: { x: 5, y: 18 },
+      victim: { x: 6, y: 18 },
     });
     const { state: after } = must(state, { kind: 'attack', targetId: victimId });
     expect(after.units.find((u) => u.id === actorId)!.x).toBe(5);
@@ -189,7 +189,12 @@ describe('shoving', () => {
     expect(state.payload.carriedBy).toBeNull();
     expect(state.payload).toMatchObject({ x: 8, y: 26 });
 
-    const stripped = state.units.find((u) => u.id !== state.turn?.unitId && u.x === 8)!;
+    // Matched on both coordinates. On x alone this picked up whichever shirt
+    // the kick-off happened to seat in column 8, which is a different unit
+    // every time the starting positions are redrawn.
+    const stripped = state.units.find(
+      (u) => u.id !== state.turn?.unitId && u.x === 8 && u.y === 26,
+    )!;
     expect({ x: stripped.x, y: stripped.y }).toEqual({ x: 8, y: 26 });
   });
 
@@ -322,7 +327,7 @@ describe('shooting at the Furnace', () => {
       ...start,
       units: start.units.map((u) => {
         if (u.id === actor.id) return { ...u, team: 'A' as const, x: 9, y: 38, holdingPayload: true };
-        if (u.team === 'B' && u.role === 'bulwark') return { ...u, x: 13, y: 38, ...keeper };
+        if (u.team === 'B' && u.role === 'bulwark') return { ...u, x: 7, y: 43, ...keeper };
         return u;
       }),
     };

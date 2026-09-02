@@ -1,6 +1,21 @@
 /**
  * The Kill-Silo, the only arena of the MVP.
  *
+ * **The pitch runs top to bottom.** One Furnace in the floor of The Trench, one
+ * in the ceiling of The Summit, forty-four cells apart, and a team has to cross
+ * the whole shaft to score. Both used to sit in Zone 3, fourteen cells apart on
+ * the same catwalk, and the consequence was measured over 120 matches: from
+ * round 6 onward ninety per cent of the units and ninety per cent of the ball
+ * were in Zone 3 and stayed there. Two goals at the same end make one end the
+ * whole sport. Every other sport, Quidditch included, puts them at opposite
+ * ends for exactly this reason.
+ *
+ * **So the axis of fairness is up/down, not left/right.** The layout is an
+ * exact mirror about y = 22: `rows[i] === rows[44 - i]`, held by an assertion in
+ * `setup.test.ts`. That is the only thing guaranteeing neither side has the
+ * better half, and it replaces the left/right symmetry the phase 0 checklist
+ * asked for back when the pitch ran across the shaft.
+ *
  * PROVISIONAL LAYOUT. This is a hand-built terrain that respects what the three
  * generated images actually show, at the level of "wall trusses run the full
  * height, catwalks project at these heights, one chain hangs dead centre". It
@@ -19,39 +34,41 @@ export const KILL_SILO: ArenaSpec = {
   name: 'The Kill-Silo',
 
   rows: [
-    // ---- Zone 3, The Summit. Both Furnaces, lanterns, suspended platforms.
-    '.......|.......', // 44  ceiling
-    '.......|.......', // 43
+    // ---- Zone 3, The Summit. Team B's Furnace, in the ceiling.
+    '......###......', // 44  Furnace B: the hatch, dead centre in the roof
+    '.......|.......', // 43  the chain, and B's goalkeeper in front of the mouth
     '.......|.......', // 42
     '.......|.......', // 41
-    '.......|.......', // 40
-    '#....##|##....#', // 39  Furnace hatches, upper suspended platform
-    '#......|......#', // 38  Furnace hatches
-    '#####..|..#####', // 37  the broad catwalk under each Furnace
+    '####...|...####', // 40
+    '.......|.......', // 39
+    '.......|.......', // 38
+    '#####..|..#####', // 37
     '.......|.......', // 36
     '.......|.......', // 35
     '.......|.......', // 34
-    '.....##|##.....', // 33  lower suspended platform
+    '####...|...####', // 33
     '.......|.......', // 32
     '.......|.......', // 31
     '.......|.......', // 30
-    // ---- Zone 2, The Scramble. Main battleground, no floor and no ceiling.
+    // ---- Zone 2, The Scramble. Midfield: one catwalk per half, hooks on the
+    //      halfway line. No floor and no ceiling.
     '.......|.......', // 29
     '.......|.......', // 28
-    '####...|...####', // 27
-    '.......|.......', // 26
-    '...|.|.|.|.|...', // 25  the four hanging hooks, plus the central chain
+    '.......|.......', // 27
+    '#####..|..#####', // 26  B's half: the six field players line up above it
+    '.......|.......', // 25  B's kick-off line
     '.......|.......', // 24
-    '#####..|..#####', // 23
-    '.......|.......', // 22  kick-off: Payload and both Crackers drop here
+    '.......|.......', // 23
+    '...|.|.|.|.|...', // 22  halfway: the four hanging hooks. Payload and both
+    //                          Crackers drop on the chain at (7, 22)
     '.......|.......', // 21
     '.......|.......', // 20
-    '#####..|..#####', // 19
-    '.......|.......', // 18
+    '.......|.......', // 19  A's kick-off line
+    '#####..|..#####', // 18  A's half
     '.......|.......', // 17
     '.......|.......', // 16
     '.......|.......', // 15
-    // ---- Zone 1, The Trench. The floor and the furnace pit.
+    // ---- Zone 1, The Trench. Team A's Furnace, the pit in the floor.
     '.......|.......', // 14
     '.......|.......', // 13
     '.......|.......', // 12
@@ -65,23 +82,29 @@ export const KILL_SILO: ArenaSpec = {
     '####...|...####', // 4
     '.......|.......', // 3
     '.......|.......', // 2
-    '.......|.......', // 1
-    '.......|.......', // 0   the deck, and the pit at its centre
+    '.......|.......', // 1   the chain, and A's goalkeeper in front of the mouth
+    '......###......', // 0   Furnace A: the pit, dead centre in the deck
   ],
 
+  // Three cells wide instead of two, because the pitch is now forty-four cells
+  // long instead of fourteen and a mouth has to be findable from the far end.
+  // `rangeToFurnace` takes the minimum over the cells, so a wider mouth is a
+  // marginally easier target, which is the intent.
   furnaces: [
     {
       defendedBy: 'A',
       cells: [
-        { x: 0, y: 39 },
-        { x: 0, y: 38 },
+        { x: 6, y: 0 },
+        { x: 7, y: 0 },
+        { x: 8, y: 0 },
       ],
     },
     {
       defendedBy: 'B',
       cells: [
-        { x: 14, y: 39 },
-        { x: 14, y: 38 },
+        { x: 6, y: 44 },
+        { x: 7, y: 44 },
+        { x: 8, y: 44 },
       ],
     },
   ],
@@ -89,31 +112,38 @@ export const KILL_SILO: ArenaSpec = {
   ordnanceStart: { x: 7, y: 22 },
 
   starts: {
-    // The Bulwark first, then the six other starters. Team A holds the left
-    // wall of The Scramble, team B the right, both perched on the catwalks.
+    // The Bulwark first, because `setup.ts` assigns it the first cell and
+    // `score()` reads that same cell as where a fresh Payload lands when the
+    // goalkeeper is off the field. It stands in its own goal mouth: one cell
+    // from the hatch, inside `BULWARK_BLOCK_RANGE_CELLS`.
+    //
+    // Then the six field players, in their own half, above their own catwalk.
+    // Not *on* it: y18 and y26 are structure. Each of those cells touches the
+    // catwalk or the central chain, so all six start anchored.
     A: [
-      { x: 1, y: 38 },
-      { x: 1, y: 20 },
-      { x: 2, y: 20 },
-      { x: 3, y: 20 },
-      { x: 1, y: 24 },
-      { x: 2, y: 24 },
-      { x: 3, y: 24 },
+      { x: 7, y: 1 },
+      { x: 2, y: 19 },
+      { x: 4, y: 19 },
+      { x: 6, y: 19 },
+      { x: 8, y: 19 },
+      { x: 10, y: 19 },
+      { x: 12, y: 19 },
     ],
     B: [
-      { x: 13, y: 38 },
-      { x: 13, y: 20 },
-      { x: 12, y: 20 },
-      { x: 11, y: 20 },
-      { x: 13, y: 24 },
-      { x: 12, y: 24 },
-      { x: 11, y: 24 },
+      { x: 7, y: 43 },
+      { x: 2, y: 25 },
+      { x: 4, y: 25 },
+      { x: 6, y: 25 },
+      { x: 8, y: 25 },
+      { x: 10, y: 25 },
+      { x: 12, y: 25 },
     ],
   },
 
+  // Beside its own goal mouth, off the goalkeeper's cell.
   substituteEntry: {
-    A: { x: 1, y: 36 },
-    B: { x: 13, y: 36 },
+    A: { x: 5, y: 1 },
+    B: { x: 5, y: 43 },
   },
 
   art: {

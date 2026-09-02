@@ -115,14 +115,23 @@ describe('the Kill-Silo', () => {
     expect(arena.isSolid({ x: 7, y: 37 })).toBe(false);
   });
 
-  it('runs the central chain unbroken from the deck to the ceiling', () => {
+  it('runs the central chain unbroken between the two Furnace mouths', () => {
     // The images show one chain falling the whole height of the silo without a
     // break. Nothing may sever it, suspended platforms included: they hang to
     // either side of it. A player who can see the chain must be able to climb it.
-    for (let y = 0; y < ARENA_HEIGHT; y++) {
+    //
+    // It stops one cell short at each end because that is where it goes: the
+    // mouths are dead centre in the deck and in the roof, and the Zone 1 art
+    // draws the chain descending into the collar of the pit. So the run is
+    // y = 1 to y = 43, and the two cells that close it are the goals.
+    for (let y = 1; y < ARENA_HEIGHT - 1; y++) {
       expect(arena.cellAt({ x: 7, y }), `the chain is cut at y=${y}`).toBe('rig');
       expect(arena.isOccupiable({ x: 7, y })).toBe(true);
       expect(arena.isAnchorable({ x: 7, y })).toBe(true);
+    }
+
+    for (const y of [0, ARENA_HEIGHT - 1]) {
+      expect(arena.cellAt({ x: 7, y }), `the mouth at y=${y} is not solid`).toBe('structure');
     }
   });
 
@@ -170,7 +179,9 @@ describe('the Kill-Silo', () => {
       const entry = KILL_SILO.substituteEntry[team];
       expect(arena.isOccupiable(entry)).toBe(true);
       expect(arena.isAnchorable(entry)).toBe(true);
-      expect(zoneOf(entry)).toBe(2);
+      // Beside its own goal, wherever that is. It used to assert Zone 3 for
+      // both teams, which was true only while both Furnaces were up there.
+      expect(zoneOf(entry)).toBe(zoneOf(arena.furnaceOf(team).cells[0]!));
     }
   });
 
