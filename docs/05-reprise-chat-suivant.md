@@ -5,11 +5,12 @@
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
-Lis boomball/docs/04-etat-des-lieux.md EN ENTIER avant de toucher à quoi que
-ce soit. Il est à jour au 2026-09-02 et il contient tout le contexte. Les
-sections à lire en priorité sont les comptes rendus de test en local, dans
-l'ordre, puis « Le terrain devient vertical », puis la dernière, « L'initiative
-se départage au dé, et le Spark vaut deux buts ».
+Charge le skill boomball, qui porte les commandes, les pièges d'environnement et
+les interdits durs, puis lis boomball/docs/04-etat-des-lieux.md EN ENTIER avant
+de toucher à quoi que ce soit. Il est à jour au 2026-09-02 et il contient tout
+le contexte. Les sections à lire en priorité sont les comptes rendus de test en
+local, dans l'ordre, puis « Le terrain devient vertical », puis la dernière,
+« L'initiative se départage au dé, et le Spark vaut deux buts ».
 
 Sept choses à savoir tout de suite.
 
@@ -39,7 +40,10 @@ Sept choses à savoir tout de suite.
    le mien, avec mes trois parties de test. Le match de démonstration et son
    utilisateur jetable sont supprimés. Attention : le contrôle automatique du
    harnais refuse les écritures destructives en ligne, donc c'est moi qui les
-   lance. La lecture passe, tu peux vérifier l'état après coup.
+   lance. La lecture passe, tu peux vérifier l'état après coup. Le skill
+   supabase-migrate porte la procédure : il classe le SQL en additif ou en
+   destructif avant qu'on y touche, et dans les deux cas c'est moi qui lance la
+   commande.
 
 5. Les trois images d'arène sont finales, en 2048x2048, les anciennes dans
    assets/arena/_rejected/. Ce qui reste :
