@@ -215,8 +215,13 @@ l'état complet.
 React, TypeScript, Vite. **Ordinateur uniquement, 1280 px de large au minimum, aucune adaptation
 mobile.**
 
-Grille SVG posée sur l'image de fond de la zone active. L'image est de l'art fini, l'interface est
-une couche par dessus, et le terrain jouable est `arena.layout`, jamais l'image.
+**Deux plateaux, derrière un interrupteur.** *(Décision de Jérôme du 2026-10-09, voir
+`07-audit-et-plan-3d.md` §3.)* Le plateau SVG, une grille posée sur l'image de fond de la zone
+active, reste dans le code et sert de repli quand WebGL échoue. Le plateau 2.5D, une scène Three.js
+via react-three-fiber dans `client/src/board3d/`, construit sa géométrie **depuis `arena.layout`** :
+chaque cellule solide du layout produit un solide, et un test le tient. Dans les deux cas le terrain
+jouable est le layout, jamais une image. Le plateau 2.5D lit le moteur exactement comme le plateau
+SVG, ne résout rien, et anime le flux d'événements que le rejeu découpe déjà en beats.
 
 Trois choses que le client ne fait jamais : résoudre une règle, tirer un dé, décider qu'une action
 est légale. Il affiche l'état, il envoie des intentions, il rejoue les événements reçus.
@@ -229,5 +234,10 @@ dernier `seq` connu.
 ## Ce qu'on ne construit pas
 
 Pas de serveur de jeu dédié ni de WebSocket maison : Realtime suffit pour trois clients en tour par
-tour. Pas de moteur de rendu 3D. Pas de file d'attente de matchmaking, l'équipe est fixe et
-l'adversaire est la maison. Pas d'API publique.
+tour. Pas de file d'attente de matchmaking, l'équipe est fixe et l'adversaire est la maison. Pas
+d'API publique.
+
+**Le rendu 3D, qui figurait ici, a été décidé le 2026-10-09** sous la forme d'une scène 2.5D à
+caméra fixe, dans le client, sans rien changer au moteur, aux règles, à la grille ni à l'IA. Ce qui
+reste exclu : un troisième axe dans les règles, et un moteur externe (Godot, Unity) qui ne lirait
+plus le moteur TypeScript.
