@@ -78,8 +78,6 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
       return `${name(event.unitId)} goes low.`;
     case 'disengaged':
       return `${name(event.unitId)} breaks contact.`;
-    case 'fell':
-      return `${name(event.unitId)} ${event.cause === 'shoved' ? 'is put off the edge' : 'loses grip'} and drops ${event.cellsFallen}.`;
     case 'damaged':
       return `${name(event.unitId)} takes ${event.amount}.`;
     case 'evacuated':
@@ -88,13 +86,11 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
       return `${name(event.attackerId)} swings at ${name(event.targetId)}${event.hit ? '' : ' and misses'}.`;
     case 'opportunityAttacked':
       return `${name(event.attackerId)} catches ${name(event.targetId)} leaving${event.hit ? '' : ', and misses'}.`;
-    case 'reactionHeld':
-      return `${name(event.unitId)} holds, no grip to swing from.`;
     case 'recoiled':
       return null;
     case 'shoved':
       return event.success
-        ? `${name(event.shoverId)} shoves ${name(event.targetId)} off the line.`
+        ? `${name(event.shoverId)} shoves ${name(event.targetId)}${event.pushedTo ? ' back a cell' : ' off the line'}.`
         : `${name(event.shoverId)} shoves at ${name(event.targetId)} and it holds.`;
     case 'crackerBatted':
       return `${name(event.unitId)} bats ${event.crackerId} away.`;

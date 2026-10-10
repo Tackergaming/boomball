@@ -16,7 +16,7 @@
  */
 
 import type { Action } from '../../../engine/actions.js';
-import { ARENA_WIDTH, ZONE_HEIGHT } from '../../../engine/constants.js';
+import { ARENA_WIDTH, THIRD_LENGTH } from '../../../engine/constants.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
 import type { MatchState } from '../../../engine/types.js';
 
@@ -101,11 +101,11 @@ export function summarise(legal: LegalActions | null): LegalSummary | null {
 export function cellToScreen(zone: number, x: number, y: number): { x: number; y: number } | null {
   const stage = document.querySelector<HTMLElement>('[data-board-stage]');
   if (!stage) return null;
-  const bottomY = (zone - 1) * ZONE_HEIGHT;
-  if (y < bottomY || y >= bottomY + ZONE_HEIGHT) return null;
+  const bottomY = (zone - 1) * THIRD_LENGTH;
+  if (y < bottomY || y >= bottomY + THIRD_LENGTH) return null;
   const rect = stage.getBoundingClientRect();
   const cell = rect.width / ARENA_WIDTH;
-  const row = ZONE_HEIGHT - 1 - (y - bottomY);
+  const row = THIRD_LENGTH - 1 - (y - bottomY);
   return { x: rect.left + (x + 0.5) * cell, y: rect.top + (row + 0.5) * cell };
 }
 

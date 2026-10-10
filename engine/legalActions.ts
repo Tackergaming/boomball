@@ -21,10 +21,16 @@
 import type { Action } from './actions.js';
 import type { Arena } from './arena.js';
 import { CRACKER_AC, PAYLOAD_PASS_AC, SPARK_CATCH_DC } from './constants.js';
-import { DIRECTIONS, distance } from './geometry.js';
-import { blockingBulwark, rangeToFurnace, shotTarget, throwRangeOver } from './rules/payload.js';
+import { DIRECTIONS, distance, type Point } from './geometry.js';
 import { reachableCells, type Reachable } from './rules/movement.js';
-import { throwRange } from './rules/payload.js';
+import {
+  blockingBulwark,
+  shotTarget,
+  throwRange,
+  throwRangeOver,
+  visibleRangeToFurnace,
+} from './rules/payload.js';
+import { hasLineOfSight } from './rules/sight.js';
 import { statsFor } from './stats.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from './types.js';
 
@@ -50,10 +56,11 @@ export interface CrackerOption {
   readonly crackerId: string;
   readonly against: number;
   /**
-   * The lines it may be sent down, 1..8 in d8 order. Always all eight: a
-   * Cracker ignores terrain, so no direction is ever barred. They are listed
-   * rather than assumed so the AI enumerates candidates from here like every
-   * other action, instead of growing its own copy of that rule.
+   * The lines it may be sent down, 1..8 in d8 order. A line whose first cell
+   * is an obstacle or off the pitch is not offered: a Cracker is not batted
+   * straight into a crate (past its first cell it bounces, écart 35). They are
+   * listed rather than assumed so the AI enumerates candidates from here like
+   * every other action, instead of growing its own copy of that rule.
    */
   readonly directions: readonly number[];
 }
@@ -120,13 +127,15 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
       })
     : [];
 
+  // A pass needs range and a line of sight (écart 34). The sight is filtered
+  // here so the interface and the AI both see only the throws the door takes.
   const pass: TargetOption[] =
     hasAction && holding
       ? activeUnits(state)
           .filter((u) => u.team === unit.team && u.id !== unit.id)
           .flatMap((mate) => {
             const range = throwRange(unit, mate);
-            if (!range.ok) return [];
+            if (!range.ok || !hasLineOfSight(arena, unit, mate)) return [];
             return [
               {
                 unitId: mate.id,
@@ -146,7 +155,7 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
     hasAction && !holding
       ? state.crackers
           .filter((c) => c.state === 'live' && distance(unit, c) === 1)
-          .map((c) => ({ crackerId: c.id, against: CRACKER_AC, directions: D8_DIRECTIONS }))
+          .map((c) => ({ crackerId: c.id, against: CRACKER_AC, directions: openLines(arena, c) }))
       : [];
 
   const catchSpark: CatchOption | null =
@@ -208,9 +217,20 @@ export function onlyEndTurnLeft(legal: LegalActions): boolean {
   );
 }
 
+/** The d8 faces whose first cell from `at` is open, which is what a bat can send a Cracker down. */
+function openLines(arena: Arena, at: Point): number[] {
+  return D8_DIRECTIONS.filter((face) => {
+    const d = DIRECTIONS[face - 1]!;
+    return !arena.isSolid({ x: at.x + d.x, y: at.y + d.y });
+  });
+}
+
+/** A shot needs a hatch cell in sight and in range (écart 34). */
 function shotOption(arena: Arena, state: MatchState, unit: Unit): ShotOption | null {
   const furnace = arena.targetFurnaceOf(unit.team);
-  const range = throwRangeOver(rangeToFurnace(unit, furnace));
+  const visible = visibleRangeToFurnace(arena, unit, furnace);
+  if (visible === null) return null;
+  const range = throwRangeOver(visible);
   if (!range.ok) return null;
 
   const keeper = blockingBulwark(state, furnace, furnace.defendedBy);

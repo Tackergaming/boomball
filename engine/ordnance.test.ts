@@ -7,20 +7,27 @@ import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
   CRACKER_DAMAGE_DICE,
+  CRACKER_BAT_RANGE_CELLS,
   CRACKER_DAMAGE_DIE,
   CRACKER_MOVE_CELLS,
   SPARK_ENTRY_ROUND,
   SPARK_MOVE_CELLS,
   SPARK_POINTS,
   SPARK_SPAWN_MIN_DISTANCE,
-  SPARK_SPAWN_ZONE,
+  SPARK_SPAWN_THIRD,
 } from './constants.js';
 import type { MatchEvent } from './events.js';
-import { distance, zoneOf, type Point } from './geometry.js';
+import { distance, thirdOf, type Point } from './geometry.js';
 import { legalActions } from './legalActions.js';
 import { openMatch, reduce, type ReduceResult } from './reduce.js';
 import { Rng } from './rng.js';
-import { battedCrackerRun, crackerRun, sparkEntryCell, sparkRun } from './rules/ordnance.js';
+import {
+  battedCrackerRun,
+  crackerRun,
+  shortestPath,
+  sparkEntryCell,
+  sparkRun,
+} from './rules/ordnance.js';
 import { createMatch } from './setup.js';
 import type { MatchState, TeamId, Unit, UnitId } from './types.js';
 
@@ -37,6 +44,14 @@ const WEST = 7;
 
 function fresh(seed = 5): MatchState {
   return createMatch({ arena: KILL_SILO, tier: 'rookie', humans: [], seed });
+}
+
+/**
+ * A cell as a bare point. A run that ends on a player hands back the player's
+ * own record as its last cell, so equality is read on the coordinates only.
+ */
+function xy(p: Point): Point {
+  return { x: p.x, y: p.y };
 }
 
 /** Everyone in one corner, so a test places only the players it cares about. */
@@ -109,10 +124,10 @@ function loneTarget(at: Point, team: TeamId = 'B'): { state: MatchState; target:
 describe('a Cracker on count 20', () => {
   it('walks to the nearest player and goes off on them', () => {
     const { state, target } = loneTarget({ x: 7, y: 25 });
-    const outcome = crackerRun(state, { x: 7, y: 22 }, new Rng(1));
+    const outcome = crackerRun(arena, state, { x: 7, y: 22 }, new Rng(1));
 
     expect(outcome.struck?.id).toBe(target.id);
-    expect(outcome.landing).toEqual({ x: 7, y: 25 });
+    expect(xy(outcome.landing)).toEqual({ x: 7, y: 25 });
     expect(outcome.path).toHaveLength(3);
   });
 
@@ -122,56 +137,123 @@ describe('a Cracker on count 20', () => {
     const bystander = someone(board, 'A');
     const state = place(place(board, aimedAt.id, { x: 7, y: 27 }), bystander.id, { x: 7, y: 24 });
 
-    const outcome = crackerRun(state, { x: 7, y: 22 }, new Rng(1));
+    const outcome = crackerRun(arena, state, { x: 7, y: 22 }, new Rng(1));
 
     expect(outcome.struck?.id).toBe(bystander.id);
-    expect(outcome.landing).toEqual({ x: 7, y: 24 });
+    expect(xy(outcome.landing)).toEqual({ x: 7, y: 24 });
   });
 
   it('covers six cells and no more, and hurts nobody when it falls short', () => {
-    const { state } = loneTarget({ x: 7, y: 40 });
-    const outcome = crackerRun(state, { x: 7, y: 22 }, new Rng(1));
+    // Column 11 is open from y = 22 to y = 37, so the route is a straight line.
+    const { state } = loneTarget({ x: 11, y: 40 });
+    const outcome = crackerRun(arena, state, { x: 11, y: 22 }, new Rng(1));
 
     expect(outcome.struck).toBeNull();
     expect(outcome.path).toHaveLength(CRACKER_MOVE_CELLS);
-    expect(outcome.landing).toEqual({ x: 7, y: 28 });
+    expect(outcome.landing).toEqual({ x: 11, y: 28 });
   });
 
   it('goes off where it lies when a player is standing on it', () => {
     const { state, target } = loneTarget({ x: 7, y: 22 });
-    const outcome = crackerRun(state, { x: 7, y: 22 }, new Rng(1));
+    const outcome = crackerRun(arena, state, { x: 7, y: 22 }, new Rng(1));
 
     expect(outcome.struck?.id).toBe(target.id);
     expect(outcome.path).toHaveLength(0);
     expect(outcome.landing).toEqual({ x: 7, y: 22 });
   });
 
-  it('ignores terrain, and flies through a catwalk to reach someone', () => {
-    // Row 18 is the catwalk on team A's side of the halfway line.
-    expect(arena.isSolid({ x: 3, y: 18 })).toBe(true);
+  it('goes round an obstacle to reach someone behind it', () => {
+    // The pillar at (7, 16) is dead between the Cracker and its target.
+    expect(arena.isSolid({ x: 7, y: 16 })).toBe(true);
 
-    const { state } = loneTarget({ x: 3, y: 16 });
-    const outcome = crackerRun(state, { x: 1, y: 20 }, new Rng(1));
+    const { state, target } = loneTarget({ x: 7, y: 18 });
+    const from: Point = { x: 7, y: 14 };
+    const outcome = crackerRun(arena, state, from, new Rng(1));
 
-    expect(outcome.struck).not.toBeNull();
-    expect(outcome.path).toContainEqual({ x: 3, y: 18 });
+    for (const cell of outcome.path) expect(arena.isSolid(cell)).toBe(false);
+    expect(outcome.path.length).toBeLessThanOrEqual(CRACKER_MOVE_CELLS);
+
+    // Four rows to climb and one diagonal to step round the pillar: four steps,
+    // worked out by hand and then held equal to what the search returns.
+    const route = shortestPath(arena, from, { x: 7, y: 18 }, CRACKER_MOVE_CELLS);
+    expect(route).toHaveLength(4);
+    expect(outcome.path.map(xy)).toEqual(route.map(xy));
+
+    expect(outcome.struck?.id).toBe(target.id);
+    expect(xy(outcome.landing)).toEqual({ x: 7, y: 18 });
+  });
+
+  it('stops six cells short of a target the route to which is longer than six', () => {
+    // From (7, 12) to (7, 20) is eight rows: the pillar costs nothing, but the
+    // Cracker still only has six cells of move.
+    const { state } = loneTarget({ x: 7, y: 20 });
+    const outcome = crackerRun(arena, state, { x: 7, y: 12 }, new Rng(1));
+
+    expect(outcome.struck).toBeNull();
+    expect(outcome.path).toHaveLength(CRACKER_MOVE_CELLS);
+    for (const cell of outcome.path) expect(arena.isSolid(cell)).toBe(false);
+  });
+
+  it('never stops because of an obstacle, from any open cell near the target', () => {
+    // Targets on either side of the pillar and of the crate at y = 9.
+    for (const at of [
+      { x: 7, y: 17 },
+      { x: 7, y: 15 },
+      { x: 7, y: 10 },
+      { x: 7, y: 8 },
+    ]) {
+      const { state } = loneTarget(at);
+      for (const cell of arena.occupiableCells()) {
+        const away = distance(cell, at);
+        if (away === 0 || away > 12) continue;
+
+        const outcome = crackerRun(arena, state, cell, new Rng(1));
+        expect(outcome.path.length, `from ${cell.x},${cell.y} to ${at.x},${at.y}`).toBeGreaterThan(0);
+        for (const step of outcome.path) expect(arena.isSolid(step)).toBe(false);
+      }
+    }
   });
 });
 
 describe('a batted Cracker', () => {
   it('goes off on the first player down the chosen line', () => {
     const { state, target } = loneTarget({ x: 9, y: 22 });
-    const outcome = battedCrackerRun(state, { x: 6, y: 22 }, EAST);
+    const outcome = battedCrackerRun(arena, state, { x: 6, y: 22 }, EAST);
 
     expect(outcome.struck?.id).toBe(target.id);
-    expect(outcome.landing).toEqual({ x: 9, y: 22 });
+    expect(xy(outcome.landing)).toEqual({ x: 9, y: 22 });
   });
 
-  it('stops at the wall rather than bouncing when it meets nobody', () => {
-    const outcome = battedCrackerRun(cleared(fresh()), { x: 6, y: 22 }, EAST);
+  it('bounces off the edge of the pitch and keeps all twelve of its cells', () => {
+    // Row 20 is open end to end. East from (10, 20): four cells to the wall at
+    // x = 14, then eight back west.
+    const outcome = battedCrackerRun(arena, cleared(fresh()), { x: 10, y: 20 }, EAST);
 
     expect(outcome.struck).toBeNull();
-    expect(outcome.landing).toEqual({ x: 14, y: 22 });
+    expect(outcome.path).toHaveLength(CRACKER_BAT_RANGE_CELLS);
+    expect(outcome.path[3]).toEqual({ x: 14, y: 20 });
+    expect(outcome.landing).toEqual({ x: 6, y: 20 });
+  });
+
+  it('bounces off an obstacle too, and never enters it', () => {
+    // North from (7, 13): the pillar at (7, 16) turns it round after two cells.
+    const outcome = battedCrackerRun(arena, cleared(fresh()), { x: 7, y: 13 }, 1);
+
+    expect(outcome.path).toHaveLength(CRACKER_BAT_RANGE_CELLS);
+    expect(outcome.path[1]).toEqual({ x: 7, y: 15 });
+    expect(outcome.path[2]).toEqual({ x: 7, y: 14 });
+    for (const cell of outcome.path) expect(arena.isSolid(cell)).toBe(false);
+  });
+
+  it('goes off on the first player it meets along the bounced path', () => {
+    // East to the wall and back: the player at (8, 20) is the tenth cell, on the
+    // way home, and the Cracker does not go on to its twelfth.
+    const { state, target } = loneTarget({ x: 8, y: 20 });
+    const outcome = battedCrackerRun(arena, state, { x: 10, y: 20 }, EAST);
+
+    expect(outcome.struck?.id).toBe(target.id);
+    expect(xy(outcome.landing)).toEqual({ x: 8, y: 20 });
+    expect(outcome.path).toHaveLength(10);
   });
 });
 
@@ -332,6 +414,33 @@ describe('swinging at a Cracker', () => {
     expect({ x: swinger.x, y: swinger.y }).toEqual({ x: 3, y: 22 });
   });
 
+  it('offers only the lines whose first cell is open, and refuses the rest', () => {
+    // The actor beside a Cracker that has the pillar (7, 16) directly north of it.
+    const board = staged();
+    const actorId = board.turn!.unitId;
+    const state = crackersAt(place(board, actorId, { x: 6, y: 14 }), { x: 7, y: 15 }, { x: 0, y: 0 });
+
+    const legal = legalActions(arena, state)!;
+    expect(legal.batCracker[0]!.directions).not.toContain(1);
+
+    const result = run(state, { kind: 'batCracker', crackerId: 'cracker-1', direction: 1 });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/obstacle/);
+
+    // South, into the open, is accepted.
+    expect(run(state, { kind: 'batCracker', crackerId: 'cracker-1', direction: 5 }).ok).toBe(true);
+  });
+
+  it('refuses a line whose first cell is off the pitch', () => {
+    const board = staged();
+    const actorId = board.turn!.unitId;
+    const state = crackersAt(place(board, actorId, { x: 1, y: 10 }), { x: 0, y: 10 }, { x: 0, y: 0 });
+
+    const result = run(state, { kind: 'batCracker', crackerId: 'cracker-1', direction: WEST });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/obstacle/);
+  });
+
   it('refuses a swing at a Cracker out of reach', () => {
     const state = crackersAt(staged(), { x: 12, y: 22 }, { x: 0, y: 0 });
     const result = run(state, { kind: 'batCracker', crackerId: 'cracker-1', direction: EAST });
@@ -389,19 +498,28 @@ describe('swinging at a Cracker', () => {
 // -- The Spark --------------------------------------------------------------
 
 describe('where the Spark drops in', () => {
-  it('picks a cell of The Scramble, clear of everyone', () => {
+  it('picks an open cell of the middle third, clear of everyone', () => {
     const state = opened().state;
     const cell = sparkEntryCell(arena, state, new Rng(7));
 
-    expect(zoneOf(cell)).toBe(SPARK_SPAWN_ZONE);
+    expect(thirdOf(cell)).toBe(SPARK_SPAWN_THIRD);
     expect(arena.isOccupiable(cell)).toBe(true);
     for (const unit of state.units.filter((u) => u.status === 'active')) {
       expect(distance(cell, unit)).toBeGreaterThanOrEqual(SPARK_SPAWN_MIN_DISTANCE);
     }
   });
 
+  it('never drops into an obstacle, whatever the dice say', () => {
+    const state = opened().state;
+    for (let seed = 1; seed < 200; seed++) {
+      const cell = sparkEntryCell(arena, state, new Rng(seed));
+      expect(arena.isOccupiable(cell), `seed ${seed}: ${cell.x},${cell.y}`).toBe(true);
+      expect(thirdOf(cell)).toBe(SPARK_SPAWN_THIRD);
+    }
+  });
+
   it('gives ground rather than stalling when no cell is clear enough', () => {
-    // Nine players on a grid put every cell of The Scramble within three of
+    // Nine players on a grid put every cell of the middle third within three of
     // somebody, which is the only case the fallback exists for.
     const grid: Point[] = [];
     for (const x of [3, 7, 11]) for (const y of [18, 22, 26]) grid.push({ x, y });
@@ -415,40 +533,85 @@ describe('where the Spark drops in', () => {
     const cell = sparkEntryCell(arena, state, new Rng(3));
     const clearance = Math.min(...state.units.map((u) => distance(cell, u)));
 
-    expect(zoneOf(cell)).toBe(SPARK_SPAWN_ZONE);
+    expect(thirdOf(cell)).toBe(SPARK_SPAWN_THIRD);
+    expect(arena.isOccupiable(cell)).toBe(true);
     expect(clearance).toBe(SPARK_SPAWN_MIN_DISTANCE - 1);
   });
 
-  it('keeps a dart inside the silo from a corner, on every heading', () => {
+  it('keeps a dart on the pitch and off the obstacles from a corner, on every heading', () => {
     for (let heading = 1; heading <= 8; heading++) {
-      const run = sparkRun({ x: 1, y: 43 }, heading);
+      const run = sparkRun(arena, { x: 1, y: 43 }, heading);
       expect(run.path).toHaveLength(SPARK_MOVE_CELLS);
       for (const cell of run.path) {
         expect(cell.x).toBeGreaterThanOrEqual(0);
         expect(cell.x).toBeLessThan(ARENA_WIDTH);
         expect(cell.y).toBeGreaterThanOrEqual(0);
         expect(cell.y).toBeLessThan(ARENA_HEIGHT);
+        expect(arena.isSolid(cell)).toBe(false);
+      }
+    }
+  });
+
+  it('never enters an obstacle from any open cell on any heading, and never loses a step', () => {
+    for (const from of arena.occupiableCells()) {
+      for (let heading = 1; heading <= 8; heading++) {
+        const run = sparkRun(arena, from, heading);
+        expect(run.path, `from ${from.x},${from.y} heading ${heading}`).toHaveLength(
+          SPARK_MOVE_CELLS,
+        );
+        for (const cell of run.path) expect(arena.isSolid(cell)).toBe(false);
       }
     }
   });
 
   it('travels on the heading it was given and hands back the one it leaves on', () => {
-    // Due south from mid-field: nothing in the way, so the heading is unchanged
-    // and the landing is exactly six cells on. That is what makes it readable.
-    const clear = sparkRun({ x: 7, y: 22 }, 5);
+    // Due south down column 3, which is open from y = 22 to y = 16: nothing in
+    // the way, so the heading is unchanged and the landing is exactly six cells
+    // on. That is what makes it readable.
+    const clear = sparkRun(arena, { x: 3, y: 22 }, 5);
     expect(clear.direction).toBe(5);
     expect(clear.heading).toBe(5);
-    expect(clear.landing).toEqual({ x: 7, y: 22 - SPARK_MOVE_CELLS });
+    expect(clear.landing).toEqual({ x: 3, y: 22 - SPARK_MOVE_CELLS });
 
     // Due east into the east wall: it comes back, and it comes back west.
-    const bounced = sparkRun({ x: ARENA_WIDTH - 2, y: 22 }, 3);
+    const bounced = sparkRun(arena, { x: ARENA_WIDTH - 2, y: 20 }, 3);
     expect(bounced.direction).toBe(3);
     expect(bounced.heading).toBe(7);
+    expect(bounced.path[0]).toEqual({ x: ARENA_WIDTH - 1, y: 20 });
+    expect(bounced.landing).toEqual({ x: ARENA_WIDTH - 1 - (SPARK_MOVE_CELLS - 1), y: 20 });
+  });
+
+  it('bounces off an obstacle and comes back down the line it went up', () => {
+    // North from (7, 13): (7, 14), (7, 15), then the pillar at (7, 16) turns it
+    // round for the other four cells.
+    const run = sparkRun(arena, { x: 7, y: 13 }, 1);
+
+    expect(run.direction).toBe(1);
+    expect(run.path).toEqual([
+      { x: 7, y: 14 },
+      { x: 7, y: 15 },
+      { x: 7, y: 14 },
+      { x: 7, y: 13 },
+      { x: 7, y: 12 },
+      { x: 7, y: 11 },
+    ]);
+    expect(run.landing).toEqual({ x: 7, y: 11 });
+    expect(run.heading).toBe(5);
+  });
+
+  it('bounces off the edge of the pitch at the end wall', () => {
+    // North up column 1 to y = 44, then back down it.
+    const run = sparkRun(arena, { x: 1, y: 43 }, 1);
+
+    expect(run.path[0]).toEqual({ x: 1, y: 44 });
+    expect(run.path[1]).toEqual({ x: 1, y: 43 });
+    expect(run.landing).toEqual({ x: 1, y: 39 });
+    expect(run.heading).toBe(5);
   });
 
   it('throws no dice, so the same heading gives the same run every time', () => {
-    const once = sparkRun({ x: 3, y: 12 }, 2);
-    const twice = sparkRun({ x: 3, y: 12 }, 2);
+    const once = sparkRun(arena, { x: 3, y: 12 }, 2);
+    const twice = sparkRun(arena, { x: 3, y: 12 }, 2);
     expect(twice).toEqual(once);
   });
 });
@@ -467,7 +630,8 @@ describe('the Spark in a match', () => {
     expect(arrived.spark.state).toBe('live');
     expect(arrived.spark.heading).toBeGreaterThanOrEqual(1);
     expect(arrived.spark.heading).toBeLessThanOrEqual(8);
-    expect(zoneOf(arrived.spark)).toBe(SPARK_SPAWN_ZONE);
+    expect(thirdOf(arrived.spark)).toBe(SPARK_SPAWN_THIRD);
+    expect(arena.isOccupiable(arrived.spark)).toBe(true);
     expect(arrived.turnOrder.find((slot) => slot.actor.kind === 'spark')?.count).toBe(10);
   });
 

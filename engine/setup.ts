@@ -157,7 +157,6 @@ function buildTeam(
       y: cell.y,
       hp: stats.hp,
       maxHp: stats.hp,
-      anchored: true,
       holdingPayload: false,
       reactionAvailable: true,
       dodging: false,

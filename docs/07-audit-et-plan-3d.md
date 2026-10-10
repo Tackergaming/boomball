@@ -773,3 +773,65 @@ l'horizontal, et le plan qui en découle est `08-plan-terrain-horizontal.md`. Go
 les sept arbitrages tranchés, la partie C de `00` écrite, le layout accepté. Le développement
 démarre dans un chat neuf par 2H.1.
 
+
+### Sous-phase 2H.1, « règles et moteur », construite le 2026-10-10
+
+Par le fil principal (Fable 5.1), avec six sous-agents Sonnet nommés ci-dessous. Le fil principal a
+gardé `types.ts`, `constants.ts`, `geometry.ts`, `arena.ts`, `arenas/kill-silo.ts`, `events.ts`,
+`reduce.ts`, `legalActions.ts`, les règles `movement`, `combat`, `reactions`, `payload` et
+`ordnance`, le passage minimal de l'IA, `selfPlay.ts`, la régénération de la fixture et
+l'intégration. **La sous-phase est close** : `npm test` vert, 17 fichiers et 328 tests contre 14
+et 273 avant, `npm run typecheck` vert à la racine, dans `scripts/`, dans `e2e/` et dans `client/`,
+`check_drift.py` sans dérive.
+
+| Tâche de `08` §4.1 | État |
+|---|---|
+| Partie C appliquée au moteur | Fait. Plus de chute, d'ancrage, de vol ni de coût de zone ; obstacles infranchissables qui coupent la ligne de vue ; poussée d'une case sur la bousculade, qui ne bouge pas un porteur ; attaque d'opportunité toujours prise ; évacuation sur place ; Crackers qui contournent en dérive et rebondissent frappés ; Spark qui rebondit ; tir et passe refusés sans ligne de vue, et déjà filtrés par `legalActions`, donc l'IA et la barre d'actions ne les voient plus |
+| `rules/sight.ts`, `rules/bounce.ts` et leurs tests | Fait, **sous-agent (a), Sonnet effort moyen**. Ligne de vue par segment de centre à centre, bloquée quand le segment traverse l'intérieur ouvert d'une case `#`, un coin effleuré ne bloque pas. 13 et 15 tests |
+| Suppression de `falling.ts`, tests `foundations`, `rules`, `reduce`, `setup` | Fait, **sous-agent (b1), Sonnet moyen**, 102 tests. Nouveaux : évacuation sur place, chemins qui contournent le pilier et la caisse, les faits du layout (58 cases pleines hors bouches, aucun cul-de-sac, aucune colonne ouverte vers une bouche) |
+| Tests `combat`, `reactions`, `ordnance`, `legalActions` | Fait, **sous-agent (b2), Sonnet moyen**, 128 tests. Nouveaux : la poussée et ses quatre blocages, l'attaque d'opportunité toujours prise, l'interception qui ignore une case pleine du vol, le contournement d'un Cracker, les rebonds, les lignes de frappe refusées, le tir et la passe masqués |
+| `arenas/kill-silo.ts` | Fait par le fil principal, recopié tel quel depuis `08` §3 avant de lancer les agents, pour qu'ils aient tous le même terrain. Le sous-agent (c) prévu dessus n'a eu que la migration |
+| Migration `0005_horizontal.sql` | Écrite, **sous-agent (c), Sonnet moyen**, avec `server/migration0005.test.ts` qui tient son bloc `arenas` égal à `buildSeedSql()`. **Pas appliquée** : c'est Jérôme en 2H.4, via `/supabase-migrate`, avec A11 |
+| `02-architecture.md` et `live-match.ts` | Fait, **sous-agent (d), Sonnet faible**. Au passage `live-match.ts` comptait les Sparks par `points === 50` : il lit désormais `source === 'spark'` |
+| Client compilant sur le moteur 2 | Fait, **sous-agent (e), Sonnet moyen**, hors plan mais nécessaire : sans lui le harnais et `npm test` cassaient. Branches `fell` et `reactionHeld` retirées, « No grip » retiré, le rejeu applique `shoved.pushedTo`. **Aucun changement visuel** : le plateau dessine encore trois bandes de quinze lignes jusqu'à 2H.4 |
+| Fixture de seed | Régénérée, `supabase/seed.sql` porte le nouveau layout |
+
+**Ce qui a été fait en avance sur le plan, et pourquoi.** `keepGrip` est retiré des poids de l'IA et
+de `evaluate.ts` dès 2H.1 et non en 2H.2 : la pénalité lisait `isAnchorable`, qui n'existe plus,
+et un poids mort dans quatre fiches de rôle aurait menti. Rien d'autre de l'IA n'a bougé :
+`shotQuality` et `scoringNearness` ignorent encore la ligne de vue, c'est le travail de 2H.2.
+
+**Un point de règle à confirmer par Jérôme.** L'écart 36b, appliqué à la lettre, **coince** un
+Cracker ou le Spark sur 24 couples case et cap du layout accepté : une case de bord contre une
+couverture latérale avec un cap orthogonal, où l'inversion ne fait que permuter le bord et la
+couverture, et une case entre un pilier central et une couverture qui se touchent par les coins,
+avec un cap diagonal. Le sous-agent (a) l'a mesuré en balayant toutes les cases ouvertes dans les
+huit directions. Comme la précision J6 dit que leur mouvement ne tombe jamais à zéro, `bounce.ts`
+ajoute un repli : quand la règle écrite n'a trouvé aucune case libre en quatre tentatives, le
+mobile tourne d'une face de d8 dans le sens horaire à partir de son cap d'arrivée et prend la
+première case libre, puis continue sur ce cap. Le repli est commenté comme un ajout d'ingénierie
+et testé ; il ne se déclenche que sur ces 24 couples. **À écrire dans la partie C sous 36b si
+Jérôme le confirme, ou à remplacer par la règle qu'il préfère.** L'interception, écart 34, est
+lue de la façon suivante : deux cases adjacentes se voient toujours, donc la ligne de vue porte sur
+la passe elle-même, et une case pleine que le pas de Chebyshev du vol effleure ne compte pas.
+
+**Premier sweep du moteur 2**, 200 matchs par Tier, 135 s, sans aucun réglage, comme demandé.
+
+| Tier | A | B | nuls | buts/match | sans but | Spark pris | essais/match | décidés par le Spark | évacués | ballon par tiers A/milieu/B | gardien |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| rookie | 89 | 76 | 35 | 0,42 | 147 | 142 | 2,35 | 122 | 1,77 | 24 / 41 / 35 % | 3 % |
+| veteran | 98 | 93 | 9 | 0,47 | 146 | 175 | 2,29 | 155 | 1,30 | 24 / 44 / 32 % | 3 % |
+| star | 92 | 95 | 13 | 0,50 | 143 | 186 | 1,65 | 159 | 1,15 | 25 / 44 / 31 % | 3 % |
+
+Lecture, sans rien toucher : la cible de 1 à 2 buts par match est loin, trois matchs sur quatre
+finissent sans but et le Spark décide trois rencontres sur quatre. Deux causes probables, à
+départager en 2H.2 avant tout réglage en 2H.3 : l'IA place encore ses tireurs et ses relais à la
+distance, sans savoir qu'une caisse est entre eux et la bouche, donc elle « prépare » des tirs qui
+ne lui sont jamais proposés ; et la partie A/B est équilibrée, donc le terrain lui-même n'avantage
+personne. La comparaison avec le tableau du 2026-09-02 ne vaut rien graine par graine, seules les
+moyennes se lisent, et elles disent que le jeu a changé de régime.
+
+**Ce qui attend 2H.4 et n'a pas bougé** : la ligne `arenas` en base est encore le silo vertical,
+les deux fonctions déployées jouent encore le moteur 1, les images de zone sont encore référencées
+par le client, A8 et A30 n'ont plus d'objet mais restent écrits en §2.A jusqu'à ce que le plateau
+soit redessiné.

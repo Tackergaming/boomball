@@ -6,12 +6,7 @@ import { KILL_SILO } from './arenas/kill-silo.js';
 import type { MatchEvent } from './events.js';
 import { lineTo, type Point } from './geometry.js';
 import { openMatch, reduce, type ReduceResult } from './reduce.js';
-import {
-  keepsGripAfterRecoil,
-  opportunityAttackers,
-  passInterceptors,
-  provokedAlong,
-} from './rules/reactions.js';
+import { opportunityAttackers, passInterceptors, provokedAlong } from './rules/reactions.js';
 import { createMatch } from './setup.js';
 import type { Role } from './stats.js';
 import type { MatchState, Unit, UnitId } from './types.js';
@@ -20,18 +15,6 @@ const arena = new Arena(KILL_SILO);
 
 /** The far top corner, where every player not under test is parked. */
 const CORNER: Point = { x: 0, y: 44 };
-
-/**
- * A cell of The Scramble with nothing to grapple on any of its eight sides.
- *
- * It used to be (2, 21). The halfway hooks moved onto y = 22 when the pitch
- * turned vertical, and one of them anchors that cell from a corner, which is
- * the sort of thing only `isAnchorable` notices.
- */
-const DEAD_AIR: Point = { x: 2, y: 20 };
-
-/** An open cell that the central chain anchors from one cell away. */
-const ON_THE_CHAIN: Point = { x: 8, y: 22 };
 
 function board(seed = 5): MatchState {
   const created = createMatch({ arena: KILL_SILO, tier: 'rookie', humans: [], seed });
@@ -128,45 +111,6 @@ describe('who an opportunity attack is drawn from', () => {
   });
 });
 
-describe('the grip guard on an opportunity attack', () => {
-  it('agrees with the arena about which landings hang in open air', () => {
-    expect(arena.isAnchorable(DEAD_AIR)).toBe(false);
-    expect(arena.isAnchorable(ON_THE_CHAIN)).toBe(true);
-  });
-
-  it('holds the swing when the recoil would end in open air', () => {
-    const state = board();
-    const mover = actorOf(state);
-    const watcher = enemyOf(state, mover, 'breaker');
-    const staged = put(put(state, mover.id, { x: 6, y: 20 }), watcher.id, { x: 4, y: 20 });
-
-    const attacker = staged.units.find((u) => u.id === watcher.id)!;
-    expect(keepsGripAfterRecoil(arena, staged, attacker, { x: 6, y: 20 })).toBe(false);
-  });
-
-  it('takes the swing when the recoil lands on something to hold', () => {
-    const state = board();
-    const mover = actorOf(state);
-    const watcher = enemyOf(state, mover, 'breaker');
-    const staged = put(put(state, mover.id, { x: 4, y: 22 }), watcher.id, { x: 6, y: 22 });
-
-    const attacker = staged.units.find((u) => u.id === watcher.id)!;
-    expect(keepsGripAfterRecoil(arena, staged, attacker, { x: 4, y: 22 })).toBe(true);
-  });
-
-  it('takes the swing when the recoil cannot move at all', () => {
-    const state = board();
-    const mover = actorOf(state);
-    const watcher = enemyOf(state, mover, 'breaker');
-    // Backed against the left wall: there is nowhere to be thrown, so there is
-    // nothing to weigh against the swing.
-    const staged = put(put(state, mover.id, { x: 1, y: 21 }), watcher.id, { x: 0, y: 21 });
-
-    const attacker = staged.units.find((u) => u.id === watcher.id)!;
-    expect(keepsGripAfterRecoil(arena, staged, attacker, { x: 1, y: 21 })).toBe(true);
-  });
-});
-
 describe('who may snatch a pass', () => {
   it('names an opponent beside the lane, in the order the ball reaches them', () => {
     const state = board();
@@ -221,6 +165,40 @@ describe('who may snatch a pass', () => {
     const flight = straight({ x: 5, y: 22 }, { x: 11, y: 22 });
     expect(passInterceptors(arena, staged, thrower, flight)).toHaveLength(0);
   });
+
+  describe('when the flight clips an obstacle', () => {
+    // (5, 14) to (9, 16) walks (6, 15), (7, 16), (8, 16), (9, 16), and (7, 16)
+    // is the central pillar: the ball does not pass through a crate, so a
+    // defender who is beside nothing but that cell has nothing to snatch.
+    const flight = straight({ x: 5, y: 14 }, { x: 9, y: 16 });
+
+    it('walks through the pillar on this line, which is what the test relies on', () => {
+      expect(flight).toContainEqual({ x: 7, y: 16 });
+      expect(arena.isSolid({ x: 7, y: 16 })).toBe(true);
+    });
+
+    it('does not count an enemy who is beside the obstacle cell only', () => {
+      const state = board();
+      const thrower = actorOf(state);
+      const lurker = enemyOf(state, thrower, 'striker');
+      // One from (7, 16) and two from every open cell of the flight.
+      const staged = put(state, lurker.id, { x: 6, y: 17 });
+
+      expect(passInterceptors(arena, staged, thrower, flight)).toHaveLength(0);
+    });
+
+    it('does count the same enemy once it is beside an open cell of the flight', () => {
+      const state = board();
+      const thrower = actorOf(state);
+      const lurker = enemyOf(state, thrower, 'striker');
+      // One from (6, 15), which is open floor.
+      const staged = put(state, lurker.id, { x: 6, y: 16 });
+
+      expect(passInterceptors(arena, staged, thrower, flight).map((u) => u.id)).toEqual([
+        lurker.id,
+      ]);
+    });
+  });
 });
 
 // -- Through the engine ------------------------------------------------------
@@ -269,20 +247,50 @@ describe('an opportunity attack in a match', () => {
 
     const swinger = after.units.find((u) => u.id === watcherId)!;
     expect(events.some((e) => e.kind === 'recoiled' && e.unitId === watcherId)).toBe(true);
-    expect({ x: swinger.x, y: swinger.y }).toEqual(ON_THE_CHAIN);
-    expect(swinger.anchored).toBe(true);
+    // Two cells east, away from the cell the mover was struck on.
+    expect({ x: swinger.x, y: swinger.y }).toEqual({ x: 8, y: 22 });
   });
 
-  it('holds the Reaction rather than trade a grip for a d8', () => {
-    const { state, watcherId } = staged(5, { x: 5, y: 20 }, { x: 4, y: 20 });
-    const { state: after, events } = must(state, { kind: 'move', path: [{ x: 6, y: 20 }] });
+  it('is always taken, wherever the recoil would send the swinger', () => {
+    // Nothing is weighed any more: a watcher with a Reaction swings. Three
+    // landings, from open floor to a recoil that cannot move at all.
+    const cases: { name: string; mover: Point; step: Point; watcher: Point; lands: Point }[] = [
+      {
+        name: 'in the open',
+        mover: { x: 5, y: 22 },
+        step: { x: 4, y: 22 },
+        watcher: { x: 6, y: 22 },
+        lands: { x: 8, y: 22 },
+      },
+      {
+        // (9, 17) has the cover (9, 18) directly above it.
+        name: 'beside an obstacle',
+        mover: { x: 6, y: 17 },
+        step: { x: 5, y: 17 },
+        watcher: { x: 7, y: 17 },
+        lands: { x: 9, y: 17 },
+      },
+      {
+        // The cover (5, 18) is the very first cell the recoil would enter.
+        name: 'with an obstacle at its back',
+        mover: { x: 7, y: 18 },
+        step: { x: 8, y: 18 },
+        watcher: { x: 6, y: 18 },
+        lands: { x: 6, y: 18 },
+      },
+    ];
 
-    expect(events).toContainEqual({ kind: 'reactionHeld', unitId: watcherId, reason: 'anchor' });
-    expect(events.some((e) => e.kind === 'opportunityAttacked')).toBe(false);
+    for (const c of cases) {
+      const { state, watcherId } = staged(5, c.mover, c.watcher);
+      const { state: after, events } = must(state, { kind: 'move', path: [c.step] });
 
-    const held = after.units.find((u) => u.id === watcherId)!;
-    expect(held.reactionAvailable).toBe(true);
-    expect({ x: held.x, y: held.y }).toEqual({ x: 4, y: 20 });
+      expect(events.some((e) => e.kind === 'opportunityAttacked'), c.name).toBe(true);
+      expect(events.some((e) => (e.kind as string) === 'reactionHeld'), c.name).toBe(false);
+
+      const swinger = after.units.find((u) => u.id === watcherId)!;
+      expect(swinger.reactionAvailable, c.name).toBe(false);
+      expect({ x: swinger.x, y: swinger.y }, c.name).toEqual(c.lands);
+    }
   });
 
   it('cuts the move into segments, so the swing lands where it happened', () => {
@@ -315,7 +323,7 @@ describe('an opportunity attack in a match', () => {
     expect(after.turn!.movementFeetRemaining).toBe(30);
   });
 
-  it('ends the turn where the mover fell, and walks the ladder on', () => {
+  it('ends the turn where the mover is carried off, and walks the ladder on', () => {
     for (let seed = 1; seed < 300; seed++) {
       const { state, actorId } = staged(seed);
       const wounded = put(state, actorId, { x: 5, y: 22 }, { hp: 1 });
@@ -346,11 +354,12 @@ describe('an opportunity attack in a match', () => {
       const staged = put(put(state, shover.id, { x: 5, y: 22 }), target.id, { x: 6, y: 22 });
 
       const { events } = must(staged, { kind: 'shove', targetId: target.id });
-      if (!events.some((e) => e.kind === 'fell')) continue;
+      const shoved = events.find((e) => e.kind === 'shoved');
+      if (!shoved || shoved.kind !== 'shoved' || shoved.pushedTo === null) continue;
 
-      // The Shove drags the target down out of the shover's own reach, which
-      // would have been swung at had the target walked there. The fiche is
-      // explicit that forced movement is free.
+      // The push carries the target out of the shover's own reach, which would
+      // have been swung at had the target walked there. The fiche is explicit
+      // that forced movement is free.
       expect(events.some((e) => e.kind === 'opportunityAttacked')).toBe(false);
       return;
     }
@@ -447,10 +456,11 @@ describe('snatching a pass in a match', () => {
 
     const furnace = arena.targetFurnaceOf(shooter.team);
     const near = furnace.cells[0]!;
-    const from: Point = { x: near.x === 0 ? 2 : 12, y: near.y };
+    // On the end wall, four cells from the mouth and in plain sight of it.
+    const from: Point = { x: near.x + 6, y: near.y };
 
     let placed = put(state, shooter.id, from, { holdingPayload: true });
-    placed = put(placed, thief.id, { x: from.x, y: from.y - 1 });
+    placed = put(placed, thief.id, { x: from.x, y: from.y === 0 ? 1 : from.y - 1 });
     const staged: MatchState = { ...placed, payload: { carriedBy: shooter.id, ...from } };
 
     const { events } = must(staged, { kind: 'shoot' });

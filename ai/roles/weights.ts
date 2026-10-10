@@ -93,8 +93,6 @@ export interface RoleWeights {
   readonly pressCarrier: number;
 
   // -- Caution --------------------------------------------------------------
-  /** Penalty for ending up somewhere with nothing to grapple. */
-  readonly keepGrip: number;
   /** Penalty per opponent a route would walk out of the reach of. */
   readonly avoidOpportunity: number;
   /** Penalty for standing next to a live Cracker on count 20. */

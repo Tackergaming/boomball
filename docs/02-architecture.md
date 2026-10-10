@@ -4,6 +4,8 @@
 > document que je relis quand j'hésite sur où mettre un bout de logique.
 >
 > Il ne réécrit aucune règle. Le règlement fait autorité et vit dans `00-reglement-v2.md`.
+>
+> Mis à jour le 2026-10-10 pour la décision D11 (terrain horizontal), voir `08-plan-terrain-horizontal.md`.
 
 ---
 
@@ -16,7 +18,7 @@ d'autre.
 Ce n'est pas un choix esthétique, il paie trois fois :
 
 1. **Un match complet se joue en test automatisé**, sans navigateur ni serveur, en quelques
-   millisecondes. C'est la seule façon de vérifier une règle de chute sans cliquer.
+   millisecondes. C'est la seule façon de vérifier une règle de ligne de vue sans cliquer.
 2. **L'IA s'équilibre par auto-affrontement.** Mille matchs IA contre IA par Tier, relançables à
    l'identique quand une règle change. Impossible si le moteur a besoin d'un écran.
 3. **La même logique tourne des deux côtés du réseau.** Le client peut prédire le résultat d'une
@@ -32,15 +34,17 @@ de désactivation de bouton codée dans un composant React est un bug en attente
 ```
 engine/          TypeScript pur. Les règles. Aucune dépendance.
   ├── constants  tous les nombres réglables du sport
-  ├── geometry   coordonnées, distances, trajectoires, rebonds
-  ├── arena      terrain ASCII, ancrage dérivé
+  ├── geometry   coordonnées, distances, tiers du terrain
+  ├── arena      terrain ASCII, obstacles, ligne de vue
   ├── stats      table rôle x Tier
   ├── rng        dés à graine
   ├── types      MatchState, Unit, TurnSlot
   ├── initiative construction de l'échelle d'un round
   ├── setup      coup d'envoi
   ├── names      pool de noms Giff
-  ├── rules/     un fichier par système
+  ├── rules/     un fichier par système, dont sight.ts (la ligne de vue, écart 34)
+  │              et bounce.ts (la règle de rebond, écart 36b), une règle pure chacun
+  │              avec son propre test
   ├── reduce     le point d'entrée unique
   └── legalActions
 
@@ -170,7 +174,7 @@ résolus côté serveur en une passe et diffusés ensemble, pas un aller-retour 
 
 ### Le chrono
 
-Le chrono de 60 secondes n'est pas gardé par le client. La date limite du tour courant vit dans
+Le chrono de 120 secondes n'est pas gardé par le client. La date limite du tour courant vit dans
 l'instantané, et un tour expiré se résout en Dodge à la première requête qui le constate. Un
 navigateur en veille ne peut donc pas geler la partie.
 
@@ -217,11 +221,11 @@ mobile.**
 
 **Deux plateaux, derrière un interrupteur.** *(Décision de Jérôme du 2026-10-09, voir
 `07-audit-et-plan-3d.md` §3.)* Le plateau SVG, une grille posée sur l'image de fond de la zone
-active, reste dans le code et sert de repli quand WebGL échoue. Le plateau 2.5D, une scène Three.js
+active, reste dans le code et sert de repli quand WebGL échoue. Depuis D11 (2026-10-10) le terrain se voit de dessus, et le plateau SVG bascule sur une vue du terrain entier en plongée dans la sous-phase 2H.4 de `08-plan-terrain-horizontal.md`. Le plateau 2.5D, une scène Three.js
 via react-three-fiber dans `client/src/board3d/`, construit sa géométrie **depuis `arena.layout`** :
 chaque cellule solide du layout produit un solide, et un test le tient. Dans les deux cas le terrain
 jouable est le layout, jamais une image. Le plateau 2.5D lit le moteur exactement comme le plateau
-SVG, ne résout rien, et anime le flux d'événements que le rejeu découpe déjà en beats.
+SVG, ne résout rien, et anime le flux d'événements que le rejeu découpe déjà en beats. Depuis D11, cette scène est un tube couché sur le flanc, vu d'une caméra trois quarts fixe à deux niveaux de zoom, construit depuis le layout.
 
 Trois choses que le client ne fait jamais : résoudre une règle, tirer un dé, décider qu'une action
 est légale. Il affiche l'état, il envoie des intentions, il rejoue les événements reçus.

@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { Arena } from './arena.js';
 import { KILL_SILO } from './arenas/kill-silo.js';
-import { FLY_SPEED_FEET, MATCH_ROUNDS, SUDDEN_DEATH_ROUNDS } from './constants.js';
+import { MOVE_SPEED_FEET, MATCH_ROUNDS, SUDDEN_DEATH_ROUNDS } from './constants.js';
 import type { MatchEvent } from './events.js';
 import { openMatch, reduce } from './reduce.js';
+import { pathTo, reachableCells } from './rules/movement.js';
 import { createMatch } from './setup.js';
-import type { MatchState, Unit } from './types.js';
+import { unitAt, type MatchState, type Unit } from './types.js';
 
 const arena = new Arena(KILL_SILO);
 
@@ -57,7 +58,7 @@ describe('opening a match', () => {
   it('starts the first turn and hands out a full move', () => {
     const state = opened();
     expect(state.turn).not.toBeNull();
-    expect(state.turn!.movementFeetRemaining).toBe(FLY_SPEED_FEET);
+    expect(state.turn!.movementFeetRemaining).toBe(MOVE_SPEED_FEET);
     expect(state.turn!.actionUsed).toBe(false);
     expect(state.round).toBe(1);
   });
@@ -103,7 +104,7 @@ describe('the turn economy', () => {
     const moved = after.units.find((u) => u.id === unit.id)!;
 
     expect({ x: moved.x, y: moved.y }).toEqual(step);
-    expect(after.turn!.movementFeetRemaining).toBe(FLY_SPEED_FEET - 5);
+    expect(after.turn!.movementFeetRemaining).toBe(MOVE_SPEED_FEET - 5);
   });
 
   it('leaves the Action untouched when a unit only moves', () => {
@@ -115,7 +116,7 @@ describe('the turn economy', () => {
 
   it('buys a second helping of movement with Dash, and spends the Action', () => {
     const after = must(opened(), { kind: 'dash' }).state;
-    expect(after.turn!.movementFeetRemaining).toBe(FLY_SPEED_FEET * 2);
+    expect(after.turn!.movementFeetRemaining).toBe(MOVE_SPEED_FEET * 2);
     expect(after.turn!.actionUsed).toBe(true);
   });
 
@@ -162,59 +163,80 @@ describe('Dodge and Disengage do not last the same time', () => {
   });
 });
 
-describe('anchoring and the fall it causes', () => {
-  /** An open cell with nothing to grapple, and open air under it. */
-  function deadAir(): { x: number; y: number } {
-    for (const cell of arena.occupiableCells()) {
-      if (arena.isAnchorable(cell)) continue;
-      if (cell.y < 20 || cell.y > 28) continue;
-      return cell;
-    }
-    throw new Error('the arena has no unanchorable cell to test with');
-  }
-
-  it('records a lost grip when a turn ends in open air', () => {
+describe('ending a turn', () => {
+  it('records the end of a turn with the unit and nothing about a grip', () => {
+    // There is no anchoring any more: standing where you stand is always safe,
+    // so the event carries the kind and the unit and no flag.
     const state = opened();
     const unit = acting(state);
-    const target = deadAir();
-    const placed: MatchState = {
-      ...state,
-      units: state.units.map((u) => (u.id === unit.id ? { ...u, x: target.x, y: target.y } : u)),
-    };
-
-    const { events } = must(placed, { kind: 'endTurn' });
+    const { events } = must(state, { kind: 'endTurn' });
     const ended = events.find((e) => e.kind === 'turnEnded');
-    expect(ended).toMatchObject({ unitId: unit.id, anchored: false });
+
+    expect(ended).toEqual({ kind: 'turnEnded', unitId: unit.id });
+    expect(ended).not.toHaveProperty('anchored');
   });
 
-  it('drops the unit at the start of its next turn, not immediately', () => {
+  it('leaves a unit exactly where it stopped, wherever that is', () => {
     const state = opened();
     const unit = acting(state);
-    const target = deadAir();
+    const after = must(state, { kind: 'endTurn' }).state;
+    const same = after.units.find((u) => u.id === unit.id)!;
+    expect({ x: same.x, y: same.y }).toEqual({ x: unit.x, y: unit.y });
+  });
+});
 
-    let current: MatchState = {
-      ...state,
-      units: state.units.map((u) => (u.id === unit.id ? { ...u, x: target.x, y: target.y } : u)),
-    };
+describe('evacuation on the spot', () => {
+  /** The acting unit, an enemy at 1 hp beside it, and a seed where the bat lands. */
+  function felled(): { before: MatchState; after: MatchState; events: readonly MatchEvent[]; victim: Unit } {
+    for (let seed = 1; seed < 400; seed++) {
+      const start = opened(seed);
+      const actor = acting(start);
+      const enemy = start.units.find((u) => u.team !== actor.team && u.role !== 'bulwark')!;
+      const spot = { x: actor.x + 1, y: actor.y };
+      if (!arena.isOccupiable(spot) || unitAt(start, spot.x, spot.y)) continue;
 
-    // Still up there the moment the turn ends.
-    current = must(current, { kind: 'endTurn' }).state;
-    const afterEnd = current.units.find((u) => u.id === unit.id)!;
-    expect(afterEnd.y).toBe(target.y);
-    expect(afterEnd.anchored).toBe(false);
-
-    // And falls when its turn comes round again.
-    let fell: MatchEvent | undefined;
-    for (let i = 0; i < 400 && !fell; i++) {
-      const step = must(current, { kind: 'endTurn' });
-      current = step.state;
-      fell = step.events.find((e) => e.kind === 'fell' && e.unitId === unit.id);
+      const before: MatchState = {
+        ...start,
+        units: start.units.map((u) => (u.id === enemy.id ? { ...u, ...spot, hp: 1 } : u)),
+      };
+      const result = reduce(arena, before, {
+        unitId: actor.id,
+        action: { kind: 'attack', targetId: enemy.id },
+      });
+      if (!result.ok) continue;
+      if (result.events.some((e) => e.kind === 'evacuated' && e.unitId === enemy.id)) {
+        return { before, after: result.state, events: result.events, victim: before.units.find((u) => u.id === enemy.id)! };
+      }
     }
+    throw new Error('no seed in range landed the killing blow');
+  }
 
-    expect(fell).toBeDefined();
-    const landed = current.units.find((u) => u.id === unit.id)!;
-    expect(landed.y).toBeLessThan(target.y);
-    expect(landed.anchored).toBe(true);
+  it('keeps the evacuated unit where it fell, with its status changed', () => {
+    const { after, victim } = felled();
+    const down = after.units.find((u) => u.id === victim.id)!;
+
+    expect(down.status).toBe('evacuated');
+    expect(down.hp).toBe(0);
+    expect({ x: down.x, y: down.y }).toEqual({ x: victim.x, y: victim.y });
+  });
+
+  it('frees the cell for everybody else the moment the unit is down', () => {
+    const { before, after, victim } = felled();
+    expect(unitAt(before, victim.x, victim.y)?.id).toBe(victim.id);
+    expect(unitAt(after, victim.x, victim.y)).toBeUndefined();
+  });
+
+  it('lets another unit walk onto that cell', () => {
+    // The bat's recoil has pushed the attacker two cells back, so the route to
+    // the vacated cell is found rather than assumed adjacent.
+    const { after, victim } = felled();
+    const actor = acting(after);
+    const reachable = reachableCells(arena, after, actor, after.turn!.movementFeetRemaining);
+    const path = pathTo(reachable, { x: victim.x, y: victim.y });
+
+    expect(path).not.toBeNull();
+    const stepOn = reduce(arena, after, { unitId: actor.id, action: { kind: 'move', path: path! } });
+    expect(stepOn.ok).toBe(true);
   });
 });
 

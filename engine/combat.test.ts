@@ -10,6 +10,7 @@ import {
   SUBSTITUTE_DELAY_ROUNDS,
 } from './constants.js';
 import type { MatchEvent } from './events.js';
+import type { Point } from './geometry.js';
 import { openMatch, reduce, type ReduceResult } from './reduce.js';
 import { createMatch } from './setup.js';
 import type { MatchState, Unit, UnitId } from './types.js';
@@ -157,77 +158,187 @@ describe('swinging the bat', () => {
     expect(after.units.find((u) => u.id === actorId)!.x).toBe(5);
   });
 
-  it('stops the recoil against terrain rather than pushing through it', () => {
-    // Row 18 is a catwalk at x = 0..4, so a swing eastward from (5, 18) would
-    // recoil into it. The attacker simply does not move.
+  it('stops the recoil against an obstacle rather than pushing through it', () => {
+    // Row 18 has a cover at x = 4,5, so a swing eastward from (6, 18) would
+    // recoil straight into it. The attacker simply does not move.
+    expect(arena.isSolid({ x: 5, y: 18 })).toBe(true);
     const { state, actorId, victimId } = staged({
-      actor: { x: 5, y: 18 },
-      victim: { x: 6, y: 18 },
+      actor: { x: 6, y: 18 },
+      victim: { x: 7, y: 18 },
+    });
+    const { state: after, events } = must(state, { kind: 'attack', targetId: victimId });
+    const swinger = after.units.find((u) => u.id === actorId)!;
+    expect({ x: swinger.x, y: swinger.y }).toEqual({ x: 6, y: 18 });
+    expect(events.some((e) => e.kind === 'recoiled')).toBe(false);
+  });
+
+  it('cuts the recoil short when the obstacle is the second cell', () => {
+    // From (7, 18) the first cell west, (6, 18), is open and the second, (5, 18),
+    // is the cover: one cell of the two is all it gets.
+    const { state, actorId, victimId } = staged({
+      actor: { x: 7, y: 18 },
+      victim: { x: 8, y: 18 },
     });
     const { state: after } = must(state, { kind: 'attack', targetId: victimId });
-    expect(after.units.find((u) => u.id === actorId)!.x).toBe(5);
+    const swinger = after.units.find((u) => u.id === actorId)!;
+    expect({ x: swinger.x, y: swinger.y }).toEqual({ x: 6, y: 18 });
+  });
+
+  it('stops the recoil against the edge of the pitch', () => {
+    const { state, actorId, victimId } = staged({
+      actor: { x: 1, y: 20 },
+      victim: { x: 2, y: 20 },
+    });
+    const { state: after } = must(state, { kind: 'attack', targetId: victimId });
+    const swinger = after.units.find((u) => u.id === actorId)!;
+    expect({ x: swinger.x, y: swinger.y }).toEqual({ x: 0, y: 20 });
   });
 });
 
 describe('shoving', () => {
+  /** A Shove hunted over the seeds until the contest goes the shover's way. */
+  function shoveWon(options: {
+    shover: Point;
+    victim: Point;
+    victimExtra?: Partial<Unit>;
+    /** A third player put somewhere on purpose, behind the victim for instance. */
+    bystander?: Point;
+  }): { state: MatchState; events: readonly MatchEvent[]; victimId: UnitId } {
+    let victimId: UnitId = '';
+    const { state, events } = seedWhere(
+      (seed) => {
+        const built = staged({
+          seed,
+          actor: { ...options.shover, role: 'breaker' },
+          victim: { ...options.victim, ...options.victimExtra },
+        });
+        victimId = built.victimId;
+        if (!options.bystander) return built.state;
+        const other = built.state.units.find(
+          (u) => u.id !== built.actorId && u.id !== built.victimId,
+        )!;
+        return {
+          ...built.state,
+          units: built.state.units.map((u) =>
+            u.id === other.id ? { ...u, ...options.bystander } : u,
+          ),
+        };
+      },
+      (s) => ({
+        kind: 'shove',
+        targetId: s.units.find((u) => u.x === options.victim.x && u.y === options.victim.y)!.id,
+      }),
+      (e) => e.some((x) => x.kind === 'shoved' && x.success),
+    );
+    return { state, events, victimId };
+  }
+
+  function shoveEvent(events: readonly MatchEvent[]) {
+    return events.find((e): e is Extract<MatchEvent, { kind: 'shoved' }> => e.kind === 'shoved')!;
+  }
+
   it('takes the ball off a carrier and leaves it standing there', () => {
-    const { state, events } = seedWhere(
-      (seed) =>
-        staged({
-          seed,
-          actor: { x: 7, y: 26, role: 'breaker' },
-          victim: { x: 8, y: 26, holdingPayload: true },
-        }).state,
-      (s) => ({ kind: 'shove', targetId: s.units.find((u) => u.x === 8 && u.y === 26)!.id }),
-      (e) => e.some((x) => x.kind === 'shoved' && x.success),
-    );
+    const { state, events, victimId } = shoveWon({
+      shover: { x: 7, y: 22 },
+      victim: { x: 8, y: 22 },
+      victimExtra: { holdingPayload: true },
+    });
 
-    // Stripping and dropping three cells at once undid the whole climb towards
-    // Zone 3 and made the trip to a Furnace impossible. Only the strip is left.
+    // Stripping the carrier and moving it in the same action undid the whole
+    // trip towards a Furnace and made scoring impossible. Only the strip is left.
     expect(events.some((e) => e.kind === 'payloadDropped')).toBe(true);
-    expect(events.some((e) => e.kind === 'fell')).toBe(false);
+    expect(shoveEvent(events).pushedTo).toBeNull();
     expect(state.payload.carriedBy).toBeNull();
-    expect(state.payload).toMatchObject({ x: 8, y: 26 });
+    expect(state.payload).toMatchObject({ x: 8, y: 22 });
 
-    // Matched on both coordinates. On x alone this picked up whichever shirt
-    // the kick-off happened to seat in column 8, which is a different unit
-    // every time the starting positions are redrawn.
-    const stripped = state.units.find(
-      (u) => u.id !== state.turn?.unitId && u.x === 8 && u.y === 26,
-    )!;
-    expect({ x: stripped.x, y: stripped.y }).toEqual({ x: 8, y: 26 });
+    const stripped = state.units.find((u) => u.id === victimId)!;
+    expect({ x: stripped.x, y: stripped.y }).toEqual({ x: 8, y: 22 });
+    expect(stripped.holdingPayload).toBe(false);
   });
 
-  it('still drops anyone who is not carrying three cells down the shaft', () => {
-    const { state, events } = seedWhere(
-      (seed) =>
-        staged({
-          seed,
-          actor: { x: 7, y: 26, role: 'breaker' },
-          victim: { x: 8, y: 26 },
-        }).state,
-      (s) => ({ kind: 'shove', targetId: s.units.find((u) => u.x === 8 && u.y === 26)!.id }),
-      (e) => e.some((x) => x.kind === 'shoved' && x.success),
-    );
+  it('pushes anyone who is not carrying one cell straight away', () => {
+    const { state, events, victimId } = shoveWon({
+      shover: { x: 7, y: 22 },
+      victim: { x: 8, y: 22 },
+    });
 
-    const fall = events.find((e) => e.kind === 'fell');
-    expect(fall).toBeDefined();
-    expect(fall!.kind === 'fell' && fall!.cause).toBe('shoved');
-    expect(state.units.some((u) => u.x === 8 && u.y < 26)).toBe(true);
+    expect(shoveEvent(events).pushedTo).toEqual({ x: 9, y: 22 });
+    const pushed = state.units.find((u) => u.id === victimId)!;
+    expect({ x: pushed.x, y: pushed.y }).toEqual({ x: 9, y: 22 });
   });
 
-  it('leaves the target where it stands when the contest is lost', () => {
+  it('pushes along the diagonal when the shover stands on one', () => {
+    const { state, events, victimId } = shoveWon({
+      shover: { x: 7, y: 21 },
+      victim: { x: 8, y: 22 },
+    });
+
+    expect(shoveEvent(events).pushedTo).toEqual({ x: 9, y: 23 });
+    const pushed = state.units.find((u) => u.id === victimId)!;
+    expect({ x: pushed.x, y: pushed.y }).toEqual({ x: 9, y: 23 });
+  });
+
+  it('does not move a target with its back to an obstacle', () => {
+    // The pillar at (7, 16) is behind a victim at (7, 15) shoved from (7, 14).
+    expect(arena.isSolid({ x: 7, y: 16 })).toBe(true);
+    const { state, events, victimId } = shoveWon({
+      shover: { x: 7, y: 14 },
+      victim: { x: 7, y: 15 },
+    });
+
+    expect(shoveEvent(events).success).toBe(true);
+    expect(shoveEvent(events).pushedTo).toBeNull();
+    const held = state.units.find((u) => u.id === victimId)!;
+    expect({ x: held.x, y: held.y }).toEqual({ x: 7, y: 15 });
+  });
+
+  it('does not move a target with another player behind it', () => {
+    const { state, events, victimId } = shoveWon({
+      shover: { x: 7, y: 22 },
+      victim: { x: 8, y: 22 },
+      bystander: { x: 9, y: 22 },
+    });
+
+    expect(shoveEvent(events).pushedTo).toBeNull();
+    const held = state.units.find((u) => u.id === victimId)!;
+    expect({ x: held.x, y: held.y }).toEqual({ x: 8, y: 22 });
+    expect(state.units.filter((u) => u.x === 9 && u.y === 22)).toHaveLength(1);
+  });
+
+  it('does not move a target with the edge of the pitch behind it', () => {
+    const { state, events, victimId } = shoveWon({
+      shover: { x: 1, y: 20 },
+      victim: { x: 0, y: 20 },
+    });
+
+    expect(shoveEvent(events).pushedTo).toBeNull();
+    const held = state.units.find((u) => u.id === victimId)!;
+    expect({ x: held.x, y: held.y }).toEqual({ x: 0, y: 20 });
+  });
+
+  it('leaves both players where they stand when the contest is lost', () => {
+    let victimId: UnitId = '';
+    let actorId: UnitId = '';
     const { state, events } = seedWhere(
-      (seed) => staged({ seed, actor: { x: 7, y: 26 }, victim: { x: 8, y: 26 } }).state,
-      (s) => ({ kind: 'shove', targetId: s.units.find((u) => u.x === 8 && u.y === 26)!.id }),
+      (seed) => {
+        const built = staged({ seed, actor: { x: 7, y: 22 }, victim: { x: 8, y: 22 } });
+        victimId = built.victimId;
+        actorId = built.actorId;
+        return built.state;
+      },
+      (s) => ({ kind: 'shove', targetId: s.units.find((u) => u.x === 8 && u.y === 22)!.id }),
       (e) => e.some((x) => x.kind === 'shoved' && !x.success),
     );
-    expect(events.some((e) => e.kind === 'fell')).toBe(false);
-    expect(state.units.find((u) => u.id === state.units.find((v) => v.x === 8)?.id)).toBeDefined();
+
+    expect(shoveEvent(events).pushedTo).toBeNull();
+    const victim = state.units.find((u) => u.id === victimId)!;
+    const shover = state.units.find((u) => u.id === actorId)!;
+    expect({ x: victim.x, y: victim.y }).toEqual({ x: 8, y: 22 });
+    expect({ x: shover.x, y: shover.y }).toEqual({ x: 7, y: 22 });
   });
 
   it('reports both sides of the contested roll', () => {
-    const { state, victimId } = staged({ actor: { x: 7, y: 26 }, victim: { x: 8, y: 26 } });
+    const { state, victimId } = staged({ actor: { x: 7, y: 22 }, victim: { x: 8, y: 22 } });
     const { events } = must(state, { kind: 'shove', targetId: victimId });
     const shove = events.find((e) => e.kind === 'shoved')!;
     expect(shove.kind === 'shoved' && shove.shoverRoll.against).toBe(shove.targetRoll.total);
@@ -409,7 +520,8 @@ describe('going down and coming back', () => {
 
     const downed = after.units.find((u) => u.id === victimId)!;
     expect(downed.status).toBe('evacuated');
-    expect(downed.y).toBe(0);
+    // The medics drag it off where it lies: x and y stay in place.
+    expect({ x: downed.x, y: downed.y }).toEqual({ x: 8, y: 22 });
     expect(after.payload.carriedBy).toBeNull();
     expect(state.units.find((u) => u.id === victimId)!.status).toBe('active');
   });

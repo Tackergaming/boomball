@@ -23,25 +23,25 @@ import { KILL_SILO } from '../../../engine/arenas/kill-silo.js';
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
-  ZONE_COUNT,
-  ZONE_HEIGHT,
+  THIRD_COUNT,
+  THIRD_LENGTH,
 } from '../../../engine/constants.js';
 
 export const arena = new Arena(KILL_SILO);
 export const spec = KILL_SILO;
 
-export { ARENA_HEIGHT, ARENA_WIDTH, ZONE_COUNT };
+export { ARENA_HEIGHT, ARENA_WIDTH, THIRD_COUNT as ZONE_COUNT };
 
 /** Zone 1 is the floor, zone 3 the roof, and `y` counts up from the floor. */
 export const ZONE_ART: Record<number, string> = { 1: zone1, 2: zone2, 3: zone3 };
 
-/** Which zone a height falls in. 1 at the bottom, `ZONE_COUNT` at the top. */
+/** Which zone a height falls in. 1 at the bottom, `THIRD_COUNT` at the top. */
 export function zoneOf(y: number): number {
-  return Math.min(ZONE_COUNT, Math.max(1, Math.floor(y / ZONE_HEIGHT) + 1));
+  return Math.min(THIRD_COUNT, Math.max(1, Math.floor(y / THIRD_LENGTH) + 1));
 }
 
 /** The band of rows a zone covers, top row first, the way the grid is drawn. */
 export function rowsOfZone(zone: number): { topY: number; bottomY: number } {
-  const bottomY = (zone - 1) * ZONE_HEIGHT;
-  return { topY: bottomY + ZONE_HEIGHT - 1, bottomY };
+  const bottomY = (zone - 1) * THIRD_LENGTH;
+  return { topY: bottomY + THIRD_LENGTH - 1, bottomY };
 }

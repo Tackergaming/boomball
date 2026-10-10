@@ -2,13 +2,18 @@
  * The two neutral hazards: the Crackers and the Spark.
  *
  * Neither belongs to a team, and that is the whole of their design. A Cracker
- * homes in on whoever is nearest, friend or foe, and the Spark is worth three
+ * homes in on whoever is nearest, friend or foe, and the Spark is worth two
  * goals to whichever side gets a hand on it. They are the reason the sport is
  * not a positional stalemate.
  *
  * This file works out **where they go**. It never changes a match: it returns a
  * run, and `reduce` decides what the run costs. That split is what lets the
  * homing rule be tested on a hand-placed board without building a whole turn.
+ *
+ * Since D11 both hazards know the terrain (écarts 35 and 36, arbitrage J6):
+ * a Cracker in drift takes the shortest path round the obstacles, a struck
+ * Cracker and the drifting Spark bounce off them. **Their movement never falls
+ * to zero because of an obstacle.**
  */
 
 import type { Arena } from '../arena.js';
@@ -17,20 +22,20 @@ import {
   CRACKER_MOVE_CELLS,
   SPARK_MOVE_CELLS,
   SPARK_SPAWN_MIN_DISTANCE,
-  SPARK_SPAWN_ZONE,
+  SPARK_SPAWN_THIRD,
 } from '../constants.js';
 import {
+  DIRECTIONS,
   d8FromDirection,
   directionFromD8,
   distance,
-  lineTo,
-  reflectedRun,
-  straightPath,
-  zoneOf,
+  inBounds,
+  thirdOf,
   type Point,
 } from '../geometry.js';
 import type { Rng } from '../rng.js';
 import { activeUnits, type MatchState, type Unit } from '../types.js';
+import { bouncingRun } from './bounce.js';
 
 /** A hazard's travel: the cells it crossed, where it stopped, and who it met. */
 export interface HazardRun {
@@ -41,13 +46,18 @@ export interface HazardRun {
 }
 
 /**
- * Whoever is nearest, on either team and in any zone.
+ * Whoever is nearest, on either team and in any third.
  *
  * Ties are broken by the dice rather than by unit id. An id-ordered tie-break
  * would always resolve the same way, and since ids carry the team letter it
  * would aim the Crackers systematically at one side. That is invisible in a
  * single match and it poisons a thousand-run balance sweep, which is exactly
  * what the sweeps exist to detect.
+ *
+ * Nearest as the crow flies, not as the Cracker rolls: a unit two cells away
+ * behind a crate is still the nearest, and the Cracker goes round the crate to
+ * get to it. Measuring by path length instead would make a Cracker switch
+ * targets as the field moves, which is harder to read and no fairer.
  */
 export function nearestUnit(state: MatchState, from: Point, rng: Rng): Unit | null {
   const units = activeUnits(state);
@@ -58,11 +68,11 @@ export function nearestUnit(state: MatchState, from: Point, rng: Rng): Unit | nu
 }
 
 /**
- * Count 20. Six cells straight at the nearest player, terrain ignored: the
- * thing floats through girders, which is what makes it impossible to hide from
- * behind a catwalk.
+ * Count 20. Six cells towards the nearest player along the **shortest path
+ * that goes round the obstacles** (écart 35), and it goes off on the first
+ * player it rolls into, which need not be the one it was aiming at.
  */
-export function crackerRun(state: MatchState, from: Point, rng: Rng): HazardRun {
+export function crackerRun(arena: Arena, state: MatchState, from: Point, rng: Rng): HazardRun {
   const target = nearestUnit(state, from, rng);
   if (!target) return { path: [], landing: from, struck: null };
 
@@ -71,16 +81,74 @@ export function crackerRun(state: MatchState, from: Point, rng: Rng): HazardRun 
   // would defuse it for the rest of the match.
   if (distance(from, target) === 0) return { path: [], landing: from, struck: target };
 
-  return stopAtFirstUnit(state, from, lineTo(from, target, CRACKER_MOVE_CELLS));
+  const route = shortestPath(arena, from, target, CRACKER_MOVE_CELLS);
+  return stopAtFirstUnit(state, from, route);
 }
 
 /**
- * A Cracker sent down a chosen line by a bat. Twelve cells, no bounce: it stops
- * against the shell of the silo if it meets nobody, and stays live there.
+ * The first `maxSteps` cells of a shortest route from `from` to `to` that
+ * never enters an obstacle, eight directions, one cell per step. Units are not
+ * in the way: a Cracker detonates on the first one it meets rather than
+ * routing round it. Empty when `to` cannot be reached at all, which the layout
+ * never produces but a hand-built arena might.
+ *
+ * Breadth-first, because every step costs one. Ties between equally short
+ * routes fall to the order of `DIRECTIONS`, which is fixed, so the run is the
+ * same for the same board and the match replays.
  */
-export function battedCrackerRun(state: MatchState, from: Point, direction: number): HazardRun {
-  const path = straightPath(from, directionFromD8(direction), CRACKER_BAT_RANGE_CELLS);
-  return stopAtFirstUnit(state, from, path);
+export function shortestPath(arena: Arena, from: Point, to: Point, maxSteps: number): Point[] {
+  const key = (p: Point): string => `${p.x},${p.y}`;
+  // Callers hand over a Unit as the destination. The route is logged into the
+  // event stream, so it has to carry a bare cell there, not a player record.
+  const goal: Point = { x: to.x, y: to.y };
+  if (key(from) === key(goal)) return [];
+
+  const cameFrom = new Map<string, Point | null>();
+  cameFrom.set(key(from), null);
+  const queue: Point[] = [from];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (key(current) === key(goal)) break;
+
+    for (const d of DIRECTIONS) {
+      const next = { x: current.x + d.x, y: current.y + d.y };
+      if (!inBounds(next) || arena.isSolid(next) || cameFrom.has(key(next))) continue;
+      cameFrom.set(key(next), current);
+      queue.push(next);
+    }
+  }
+
+  if (!cameFrom.has(key(goal))) return [];
+
+  const route: Point[] = [];
+  let step: Point | null = goal;
+  while (step && key(step) !== key(from)) {
+    route.unshift(step);
+    step = cameFrom.get(key(step)) ?? null;
+  }
+  return route.slice(0, maxSteps);
+}
+
+/**
+ * A Cracker sent down a chosen line by a bat. Twelve cells on the d8 heading,
+ * **bouncing** off obstacles and the edge of the pitch (écarts 35 and 36b) and
+ * carrying on with whatever cells it has left. It goes off on the first player
+ * it meets, and comes to rest, still live, where its run ends.
+ */
+export function battedCrackerRun(
+  arena: Arena,
+  state: MatchState,
+  from: Point,
+  direction: number,
+): HazardRun {
+  const run = bouncingRun(
+    (p) => arena.isSolid(p),
+    from,
+    directionFromD8(direction),
+    CRACKER_BAT_RANGE_CELLS,
+  );
+  return stopAtFirstUnit(state, from, run.path);
 }
 
 /** Walks a path in travel order and stops on the first player standing in it. */
@@ -100,20 +168,19 @@ function stopAtFirstUnit(state: MatchState, from: Point, path: readonly Point[])
 /**
  * Where the Spark drops in at the start of round 6.
  *
- * A random cell of The Scramble, four cells clear of everyone, so that nobody
- * simply happens to be standing on the prize. The fallback
- * matters more than it looks: written as a hard constraint the rule could find
- * no cell in a crowded Scramble and stall the round, so it gives ground and
- * takes the emptiest cell there is.
+ * A random open cell of the middle third, four cells clear of everyone, so
+ * that nobody simply happens to be standing on the prize (écart 36). The
+ * fallback matters more than it looks: written as a hard constraint the rule
+ * could find no cell in a crowded middle and stall the round, so it gives
+ * ground and takes the emptiest cell there is.
  *
- * Only occupiable cells are candidates. The Spark ignores terrain once it is
- * moving, but it is caught by standing in its cell, and a Spark born inside a
- * girder would be uncatchable until it drifted out.
+ * Only occupiable cells are candidates: it is caught by standing in its cell,
+ * and a Spark born inside a crate would be uncatchable until it drifted out.
  */
 export function sparkEntryCell(arena: Arena, state: MatchState, rng: Rng): Point {
   const units = activeUnits(state);
-  const cells = [...arena.occupiableCells()].filter((c) => zoneOf(c) === SPARK_SPAWN_ZONE);
-  if (cells.length === 0) throw new Error('the arena has no open cell in the Spark\'s zone');
+  const cells = [...arena.occupiableCells()].filter((c) => thirdOf(c) === SPARK_SPAWN_THIRD);
+  if (cells.length === 0) throw new Error('the arena has no open cell in the middle third');
 
   const clearance = (c: Point): number =>
     units.length === 0 ? Infinity : Math.min(...units.map((u) => distance(c, u)));
@@ -126,19 +193,23 @@ export function sparkEntryCell(arena: Arena, state: MatchState, rng: Rng): Point
 }
 
 /**
- * Count 10. Six cells along the heading it already had, reflecting off the
- * walls, the floor and the ceiling, and spending the rest of the move on the
- * new heading.
+ * Count 10. Six cells along the heading it already had, in the plane of the
+ * pitch, **bouncing** off obstacles and the edge and spending the rest of the
+ * move on the new heading (écart 36).
  *
  * No dice. The d8 is rolled once, when it drops in; after that the Spark is a
- * ball on a table and the only thing that turns it is a wall. That is what a
- * player is meant to read off the board and cut across, and it is why this
- * function no longer takes an rng.
+ * ball on a table and the only thing that turns it is something solid. That is
+ * what a player is meant to read off the board and cut across, and it is why
+ * this function takes no rng.
  *
  * Nothing it crosses matters. The Spark is not a projectile and hits nobody:
  * the only thing that ever happens to it is being caught.
  */
-export function sparkRun(from: Point, heading: number): {
+export function sparkRun(
+  arena: Arena,
+  from: Point,
+  heading: number,
+): {
   /** The face it travelled on this round. */
   readonly direction: number;
   readonly path: readonly Point[];
@@ -146,7 +217,7 @@ export function sparkRun(from: Point, heading: number): {
   /** The face it will travel on next round, turned by any bounce. */
   readonly heading: number;
 } {
-  const run = reflectedRun(from, directionFromD8(heading), SPARK_MOVE_CELLS);
+  const run = bouncingRun((p) => arena.isSolid(p), from, directionFromD8(heading), SPARK_MOVE_CELLS);
   return {
     direction: heading,
     path: run.path,

@@ -13,10 +13,9 @@
  *
  *   - A pass crossing a defended lane is **always** contested. Taking the ball
  *     off an opponent is worth more than any use the Reaction has later.
- *   - An opportunity attack is taken **unless the bat's recoil would leave the
- *     swinger without a grip**. That is the one cost that is not worth a d8:
- *     the swinger would drop at the start of its next turn and lose its
- *     position as well as hit points.
+ *   - An opportunity attack is **always** taken (écart 33). The vertical silo
+ *     held it back when the bat's recoil would have cost the swinger its grip;
+ *     there is no grip to lose on a floor, so there is nothing to weigh.
  *   - The goalkeeper never chases a pass. Its Reaction is worth ten points at
  *     its own Furnace, and without that exception a pass across the goalmouth
  *     would be the cheapest way to strip the block before shooting.
@@ -28,7 +27,6 @@
 import type { Arena } from '../arena.js';
 import { BULWARK_BLOCK_RANGE_CELLS } from '../constants.js';
 import { distance, type Point } from '../geometry.js';
-import { recoilDestination } from './combat.js';
 import { rangeToFurnace } from './payload.js';
 import { activeUnits, type MatchState, type Unit } from '../types.js';
 
@@ -76,31 +74,21 @@ export function provokedAlong(state: MatchState, mover: Unit, path: readonly Poi
 }
 
 /**
- * Whether the recoil of an opportunity attack would leave the swinger hanging
- * in open air. This is the whole of the guard on the automatic policy.
- *
- * A recoil that cannot move at all, because terrain or another player is in the
- * way, changes nothing and is therefore never a reason to hold back.
- */
-export function keepsGripAfterRecoil(
-  arena: Arena,
-  state: MatchState,
-  attacker: Unit,
-  target: Point,
-): boolean {
-  const landing = recoilDestination(arena, state, attacker, target);
-  if (landing.x === attacker.x && landing.y === attacker.y) return true;
-  return arena.isAnchorable(landing);
-}
-
-/**
  * The opponents in position to snatch a pass, in the order the ball reaches
  * them. The fiche says a pass crossing an adjacent cell can be stolen; a player
  * the ball flies straight through is read as covered by the same rule, since
  * being on the line is not less of an opportunity than being beside it.
  *
+ * Écart 34 puts a line of sight on the interception too. Between two adjacent
+ * cells nothing can stand, so for a defender beside the flight it is always
+ * clear and the rule bites on the flight itself: the pass needs a line of sight
+ * to be thrown at all (`reduce` and `legalActions` check it), and a cell of the
+ * flight that is an obstacle is not a cell the ball passes through. `lineTo`
+ * walks Chebyshev steps and may clip the corner of a crate the real line
+ * misses, so those cells are skipped rather than counted.
+ *
  * Each of them gets one attempt, and the first to win it takes the ball, which
- * is what makes a long throw across a crowded Scramble a real gamble.
+ * is what makes a long throw across the middle third a real gamble.
  */
 export function passInterceptors(
   arena: Arena,
@@ -116,6 +104,7 @@ export function passInterceptors(
   const seen = new Set<string>();
 
   for (const cell of flight) {
+    if (arena.isSolid(cell)) continue;
     for (const enemy of enemies) {
       if (seen.has(enemy.id)) continue;
       if (distance(enemy, cell) > 1) continue;

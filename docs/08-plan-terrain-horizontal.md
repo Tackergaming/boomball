@@ -6,8 +6,9 @@
 > l'audit, le harnais de la phase 1.
 >
 > **Statut : GO DONNÉ PAR JÉRÔME LE 2026-10-10**, avec les sept arbitrages de §7 tranchés et deux
-> précisions reprises en §0. La partie C du règlement est écrite. Le développement démarre dans un
-> chat neuf par la sous-phase 2H.1, avec le prompt de `05-reprise-chat-suivant.md`.
+> précisions reprises en §0. La partie C du règlement est écrite. **2H.1 est faite le 2026-10-10**,
+> journal en `07` §10 ; la suite démarre dans un chat neuf par 2H.2, avec le prompt de
+> `05-reprise-chat-suivant.md`.
 >
 > **Unité d'effort : la séance**, environ deux heures de Claude Code bornées à un commit.
 

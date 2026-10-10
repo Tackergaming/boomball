@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { Arena } from './arena.js';
 import { KILL_SILO } from './arenas/kill-silo.js';
-import { ARENA_HEIGHT, ARENA_WIDTH, CELL_FEET, ZONE_CROSSING_FEET } from './constants.js';
+import { ARENA_HEIGHT, ARENA_WIDTH, CELL_FEET } from './constants.js';
 import {
   directionFromD8,
   distance,
   d8FromDirection,
+  inBounds,
   lineTo,
-  reflectedRun,
+  neighbours,
   stepCostFeet,
-  straightPath,
-  zoneOf,
+  thirdOf,
 } from './geometry.js';
 import { Rng } from './rng.js';
 import { ROLE_STATS, TEAM_COMPOSITION, statsFor } from './stats.js';
@@ -23,22 +23,24 @@ describe('geometry', () => {
     expect(distance({ x: 7, y: 22 }, { x: 7, y: 22 })).toBe(0);
   });
 
-  it('splits the plane into three zones of equal height', () => {
-    expect(zoneOf({ x: 7, y: 0 })).toBe(0);
-    expect(zoneOf({ x: 7, y: 14 })).toBe(0);
-    expect(zoneOf({ x: 7, y: 15 })).toBe(1);
-    expect(zoneOf({ x: 7, y: 29 })).toBe(1);
-    expect(zoneOf({ x: 7, y: 30 })).toBe(2);
-    expect(zoneOf({ x: 7, y: 44 })).toBe(2);
+  it('splits the pitch into three thirds of fifteen cells along its length', () => {
+    expect(thirdOf({ x: 7, y: 0 })).toBe(0);
+    expect(thirdOf({ x: 7, y: 14 })).toBe(0);
+    expect(thirdOf({ x: 7, y: 15 })).toBe(1);
+    expect(thirdOf({ x: 7, y: 29 })).toBe(1);
+    expect(thirdOf({ x: 7, y: 30 })).toBe(2);
+    expect(thirdOf({ x: 7, y: 44 })).toBe(2);
   });
 
-  it('tolls a step that crosses a zone boundary and nothing else', () => {
+  it('charges every step the same, across a third boundary too', () => {
+    // A third is a name for the feed and for the Spark's entry. Crossing from
+    // one to the next is a step like any other.
     expect(stepCostFeet({ x: 7, y: 10 }, { x: 7, y: 11 })).toBe(CELL_FEET);
-    expect(stepCostFeet({ x: 7, y: 14 }, { x: 7, y: 15 })).toBe(CELL_FEET + ZONE_CROSSING_FEET);
-    expect(stepCostFeet({ x: 7, y: 29 }, { x: 8, y: 30 })).toBe(CELL_FEET + ZONE_CROSSING_FEET);
+    expect(stepCostFeet({ x: 7, y: 14 }, { x: 7, y: 15 })).toBe(CELL_FEET);
+    expect(stepCostFeet({ x: 7, y: 29 }, { x: 8, y: 30 })).toBe(CELL_FEET);
   });
 
-  it('reads a d8 as the eight compass directions with north up the silo', () => {
+  it('reads a d8 as the eight compass directions with north towards Furnace B', () => {
     expect(directionFromD8(1)).toEqual({ x: 0, y: 1 });
     expect(directionFromD8(5)).toEqual({ x: 0, y: -1 });
     expect(directionFromD8(3)).toEqual({ x: 1, y: 0 });
@@ -51,36 +53,11 @@ describe('geometry', () => {
     expect(() => d8FromDirection({ x: 0, y: 0 })).toThrow();
   });
 
-  it('bounces the Spark off a wall instead of letting it leave the arena', () => {
-    const run = reflectedRun({ x: 13, y: 22 }, { x: 1, y: 0 }, 4);
-    expect(run.path).toEqual([
-      { x: 14, y: 22 },
-      { x: 13, y: 22 },
-      { x: 12, y: 22 },
-      { x: 11, y: 22 },
-    ]);
-    expect(run.path.every((p) => p.x >= 0 && p.x < ARENA_WIDTH)).toBe(true);
-  });
-
-  it('hands back the heading the bounce left it on, so the Spark can keep it', () => {
-    // Due east into the east wall comes back due west, and stays west.
-    expect(reflectedRun({ x: 13, y: 22 }, { x: 1, y: 0 }, 4).heading).toEqual({ x: -1, y: 0 });
-    // Nothing in the way, nothing turned.
-    expect(reflectedRun({ x: 7, y: 22 }, { x: 0, y: 1 }, 4).heading).toEqual({ x: 0, y: 1 });
-    // A corner turns both axes at once.
-    expect(reflectedRun({ x: 1, y: 1 }, { x: -1, y: -1 }, 3).heading).toEqual({ x: 1, y: 1 });
-  });
-
-  it('keeps a bounced Spark inside the arena over a long move', () => {
-    const run = reflectedRun({ x: 2, y: 2 }, { x: -1, y: -1 }, 12);
-    expect(run.path).toHaveLength(12);
-    for (const p of run.path) {
-      expect(p.x).toBeGreaterThanOrEqual(0);
-      expect(p.x).toBeLessThan(ARENA_WIDTH);
-      expect(p.y).toBeGreaterThanOrEqual(0);
-      expect(p.y).toBeLessThan(ARENA_HEIGHT);
-    }
-    expect(() => d8FromDirection(run.heading)).not.toThrow();
+  it('keeps the neighbours of an edge cell inside the pitch', () => {
+    const corner = neighbours({ x: 0, y: 0 });
+    expect(corner).toHaveLength(3);
+    expect(corner.every(inBounds)).toBe(true);
+    expect(neighbours({ x: 7, y: 22 })).toHaveLength(8);
   });
 
   it('walks a Cracker toward its target one cell at a time, destination included', () => {
@@ -90,79 +67,118 @@ describe('geometry', () => {
       { x: 3, y: 1 },
     ]);
   });
-
-  it('stops a batted Cracker at the wall rather than bouncing it', () => {
-    const path = straightPath({ x: 12, y: 22 }, { x: 1, y: 0 }, 12);
-    expect(path).toEqual([
-      { x: 13, y: 22 },
-      { x: 14, y: 22 },
-    ]);
-  });
 });
 
 describe('the Kill-Silo', () => {
   const arena = new Arena(KILL_SILO);
 
+  const isMouth = (p: { x: number; y: number }) =>
+    arena.spec.furnaces.some((f) => f.cells.some((c) => c.x === p.x && c.y === p.y));
+
   it('parses to the declared dimensions', () => {
     expect(KILL_SILO.rows).toHaveLength(ARENA_HEIGHT);
     for (const row of KILL_SILO.rows) expect(row).toHaveLength(ARENA_WIDTH);
+    expect(ARENA_WIDTH).toBe(15);
+    expect(ARENA_HEIGHT).toBe(45);
   });
 
-  it('stores the floor at y = 0 and the ceiling at the top', () => {
-    // Row 37 is the broad catwalk under each Furnace, five cells from each wall.
-    expect(arena.isSolid({ x: 0, y: 37 })).toBe(true);
-    expect(arena.isSolid({ x: 4, y: 37 })).toBe(true);
-    expect(arena.isSolid({ x: 7, y: 37 })).toBe(false);
-  });
-
-  it('runs the central chain unbroken between the two Furnace mouths', () => {
-    // The images show one chain falling the whole height of the silo without a
-    // break. Nothing may sever it, suspended platforms included: they hang to
-    // either side of it. A player who can see the chain must be able to climb it.
-    //
-    // It stops one cell short at each end because that is where it goes: the
-    // mouths are dead centre in the deck and in the roof, and the Zone 1 art
-    // draws the chain descending into the collar of the pit. So the run is
-    // y = 1 to y = 43, and the two cells that close it are the goals.
-    for (let y = 1; y < ARENA_HEIGHT - 1; y++) {
-      expect(arena.cellAt({ x: 7, y }), `the chain is cut at y=${y}`).toBe('rig');
-      expect(arena.isOccupiable({ x: 7, y })).toBe(true);
-      expect(arena.isAnchorable({ x: 7, y })).toBe(true);
+  it('reads the pitch off the page as an obstacle or as open floor, nothing else', () => {
+    for (let y = 0; y < ARENA_HEIGHT; y++) {
+      for (let x = 0; x < ARENA_WIDTH; x++) {
+        expect(['open', 'obstacle']).toContain(arena.cellAt({ x, y }));
+      }
     }
+    // Outside the pitch is the edge, and the edge is solid.
+    expect(arena.cellAt({ x: -1, y: 10 })).toBe('obstacle');
+    expect(arena.cellAt({ x: 7, y: ARENA_HEIGHT })).toBe('obstacle');
+  });
 
+  it('refuses the old rig character, which no longer means anything', () => {
+    const rows = [...KILL_SILO.rows];
+    rows[10] = '.......|.......';
+    expect(() => new Arena({ ...KILL_SILO, rows })).toThrow(/unknown arena character/);
+  });
+
+  it('closes each Furnace mouth with solid hatch cells at both ends', () => {
     for (const y of [0, ARENA_HEIGHT - 1]) {
-      expect(arena.cellAt({ x: 7, y }), `the mouth at y=${y} is not solid`).toBe('structure');
+      for (const x of [6, 7, 8]) {
+        expect(arena.isSolid({ x, y }), `the mouth at (${x}, ${y}) is not solid`).toBe(true);
+      }
+    }
+    // The wall either side of the mouth is floor.
+    expect(arena.isSolid({ x: 5, y: 0 })).toBe(false);
+    expect(arena.isSolid({ x: 9, y: ARENA_HEIGHT - 1 })).toBe(false);
+  });
+
+  it('puts crates and pillars on the floor, and leaves the cells beside them open', () => {
+    const solid = [
+      { x: 7, y: 16 }, // central pillar, A's half
+      { x: 7, y: 28 }, // central pillar, B's half
+      { x: 6, y: 9 }, // the crate in front of A's shooting line
+      { x: 7, y: 9 },
+      { x: 8, y: 9 },
+      { x: 3, y: 5 }, // the posts
+      { x: 4, y: 6 },
+    ];
+    for (const p of solid) expect(arena.isSolid(p), `(${p.x}, ${p.y}) should be solid`).toBe(true);
+
+    const open = [
+      { x: 6, y: 16 },
+      { x: 8, y: 16 },
+      { x: 7, y: 15 },
+      { x: 7, y: 17 },
+      { x: 5, y: 9 },
+      { x: 9, y: 9 },
+      { x: 7, y: 8 },
+      { x: 2, y: 5 },
+      { x: 5, y: 6 },
+    ];
+    for (const p of open) expect(arena.isSolid(p), `(${p.x}, ${p.y}) should be open`).toBe(false);
+  });
+
+  it('lists fifty-eight obstacle cells outside the mouths, sixty-four in all', () => {
+    const all = arena.obstacles();
+    expect(all).toHaveLength(64);
+    expect(all.filter((p) => !isMouth(p))).toHaveLength(58);
+    for (const p of all) expect(arena.isSolid(p)).toBe(true);
+  });
+
+  it('leaves no dead end: every open cell has at least three open neighbours', () => {
+    for (const cell of arena.occupiableCells()) {
+      const free = neighbours(cell).filter((n) => arena.isOccupiable(n));
+      expect(free.length, `(${cell.x}, ${cell.y}) is a dead end`).toBeGreaterThanOrEqual(3);
     }
   });
 
-  it('anchors against the silo wall, so the outer columns are always holdable', () => {
-    expect(arena.isAnchorable({ x: 0, y: 21 })).toBe(true);
-    expect(arena.isAnchorable({ x: 14, y: 21 })).toBe(true);
+  it('has no straight open column from the halfway line to a mouth', () => {
+    // A shot has to be set up, not taken from distance down an empty lane. For
+    // each column of a mouth there is an obstacle somewhere on each half.
+    for (const x of [6, 7, 8]) {
+      const onA = Array.from({ length: 21 }, (_, i) => i + 1).some((y) => arena.isSolid({ x, y }));
+      const onB = Array.from({ length: 21 }, (_, i) => i + 23).some((y) => arena.isSolid({ x, y }));
+      expect(onA, `column ${x} is open from y=22 down to Furnace A`).toBe(true);
+      expect(onB, `column ${x} is open from y=22 up to Furnace B`).toBe(true);
+    }
   });
 
-  it('leaves real dead air where a unit cannot end its turn', () => {
-    const dead = [...arena.occupiableCells()].filter((p) => !arena.isAnchorable(p));
-    expect(dead.length).toBeGreaterThan(0);
-  });
-
-  it('drops the ordnance on a cell a unit can reach and hold', () => {
+  it('drops the ordnance on a cell a unit can stand on', () => {
     expect(arena.isOccupiable(KILL_SILO.ordnanceStart)).toBe(true);
-    expect(arena.isAnchorable(KILL_SILO.ordnanceStart)).toBe(true);
   });
 
-  it('gives every starter a cell that is free, anchored and unique', () => {
+  it('gives every starter a cell that is open and unique', () => {
+    const seen = new Set<string>();
     for (const team of ['A', 'B'] as const) {
       const starts = KILL_SILO.starts[team];
       expect(starts).toHaveLength(TEAM_COMPOSITION.length);
 
-      const seen = new Set<string>();
       for (const p of starts) {
         expect(arena.isOccupiable(p), `${team} start ${p.x},${p.y} is solid`).toBe(true);
-        expect(arena.isAnchorable(p), `${team} start ${p.x},${p.y} has no grip`).toBe(true);
-        seen.add(`${p.x},${p.y}`);
+        const k = `${p.x},${p.y}`;
+        expect(seen.has(k), `two starts share ${k}`).toBe(false);
+        seen.add(k);
       }
-      expect(seen.size).toBe(starts.length);
     }
+    expect(seen.size).toBe(TEAM_COMPOSITION.length * 2);
   });
 
   it('starts each Bulwark within blocking range of the Furnace it defends', () => {
@@ -174,14 +190,11 @@ describe('the Kill-Silo', () => {
     }
   });
 
-  it('lets a substitute enter on solid footing beside its own Furnace', () => {
+  it('lets a substitute enter on open floor in the third of its own Furnace', () => {
     for (const team of ['A', 'B'] as const) {
       const entry = KILL_SILO.substituteEntry[team];
       expect(arena.isOccupiable(entry)).toBe(true);
-      expect(arena.isAnchorable(entry)).toBe(true);
-      // Beside its own goal, wherever that is. It used to assert Zone 3 for
-      // both teams, which was true only while both Furnaces were up there.
-      expect(zoneOf(entry)).toBe(zoneOf(arena.furnaceOf(team).cells[0]!));
+      expect(thirdOf(entry)).toBe(thirdOf(arena.furnaceOf(team).cells[0]!));
     }
   });
 
@@ -190,11 +203,16 @@ describe('the Kill-Silo', () => {
     expect(arena.targetFurnaceOf('B').defendedBy).toBe('A');
   });
 
-  it('is mirror-symmetrical, so neither team gets the better terrain', () => {
+  it('cuts the line of sight on an obstacle and on nothing else', () => {
+    for (const p of arena.obstacles()) expect(arena.blocksSight(p)).toBe(true);
+    for (const p of arena.occupiableCells()) expect(arena.blocksSight(p)).toBe(false);
+  });
+
+  it('is mirror-symmetrical about y = 22, so neither team gets the better terrain', () => {
     for (let y = 0; y < ARENA_HEIGHT; y++) {
       for (let x = 0; x < ARENA_WIDTH; x++) {
-        const mirrored = { x: ARENA_WIDTH - 1 - x, y };
-        expect(arena.cellAt({ x, y }), `row ${y} is not mirrored at x=${x}`).toBe(
+        const mirrored = { x, y: ARENA_HEIGHT - 1 - y };
+        expect(arena.cellAt({ x, y }), `cell (${x}, ${y}) is not mirrored`).toBe(
           arena.cellAt(mirrored),
         );
       }

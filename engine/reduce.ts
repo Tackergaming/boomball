@@ -20,9 +20,9 @@ import {
   CRACKER_DAMAGE_DIE,
   CRACKER_RESPAWN_DELAY,
   CRACKER_SAVE_DC,
-  FLY_SPEED_FEET,
   GOAL_POINTS,
   MATCH_ROUNDS,
+  MOVE_SPEED_FEET,
   PAYLOAD_PASS_AC,
   SPARK_CATCH_DC,
   SPARK_ENTRY_ROUND,
@@ -31,23 +31,19 @@ import {
   SUDDEN_DEATH_ROUNDS,
 } from './constants.js';
 import type { MatchEvent } from './events.js';
-import { distance, lineTo, stepCostFeet, type Point } from './geometry.js';
+import { directionFromD8, distance, lineTo, stepCostFeet, type Point } from './geometry.js';
 import { buildTurnOrder } from './initiative.js';
 import { Rng } from './rng.js';
 import {
   attackMode,
   opposedRoll,
+  pushDestination,
   recoilDestination,
   resolveShove,
   rollAgainst,
 } from './rules/combat.js';
-import { resolveFall } from './rules/falling.js';
 import { validatePath } from './rules/movement.js';
-import {
-  keepsGripAfterRecoil,
-  opportunityAttackers,
-  passInterceptors,
-} from './rules/reactions.js';
+import { opportunityAttackers, passInterceptors } from './rules/reactions.js';
 import {
   battedCrackerRun,
   crackerRun,
@@ -57,12 +53,13 @@ import {
 } from './rules/ordnance.js';
 import {
   blockingBulwark,
-  rangeToFurnace,
   scatter,
   shotTarget,
   throwRange,
   throwRangeOver,
+  visibleRangeToFurnace,
 } from './rules/payload.js';
+import { hasLineOfSight } from './rules/sight.js';
 import { statsFor } from './stats.js';
 import {
   activeUnits,
@@ -231,8 +228,9 @@ function applyMove(ctx: TurnCtx, path: readonly Point[]): ReduceResult {
 
 /**
  * The swings drawn by one step. Automatic, under the policy in `reactions.ts`:
- * every opponent takes it unless the recoil would cost it its grip, in which
- * case it holds the Reaction rather than trade a d8 for a fall.
+ * every opponent with a Reaction left takes it (écart 33). The vertical silo
+ * let a swinger hold back when the recoil would have cost it its grip; on a
+ * floor there is nothing to hold back for.
  */
 function resolveOpportunityAttacks(
   ctx: Ctx,
@@ -250,11 +248,6 @@ function resolveOpportunityAttacks(
     if (attacker.status !== 'active' || !attacker.reactionAvailable) continue;
 
     const landingSpot = { x: target.x, y: target.y };
-    if (!keepsGripAfterRecoil(ctx.arena, next, attacker, landingSpot)) {
-      ctx.log.push({ kind: 'reactionHeld', unitId: attacker.id, reason: 'anchor' });
-      continue;
-    }
-
     next = replaceUnit(next, { ...attacker, reactionAvailable: false });
 
     const might = statsFor(attacker.role, attacker.tier).might;
@@ -287,13 +280,13 @@ function applyDash(ctx: TurnCtx): ReduceResult {
   const turn = state.turn!;
   if (turn.actionUsed) return { ok: false, reason: `${unit.name} has already acted` };
 
-  ctx.log.push({ kind: 'dashed', unitId: unit.id, extraFeet: FLY_SPEED_FEET });
+  ctx.log.push({ kind: 'dashed', unitId: unit.id, extraFeet: MOVE_SPEED_FEET });
   return done(ctx, {
     ...state,
     turn: {
       ...turn,
       actionUsed: true,
-      movementFeetRemaining: turn.movementFeetRemaining + FLY_SPEED_FEET,
+      movementFeetRemaining: turn.movementFeetRemaining + MOVE_SPEED_FEET,
     },
   });
 }
@@ -351,8 +344,8 @@ function applyAttack(ctx: TurnCtx, targetId: UnitId): ReduceResult {
 /**
  * The blast-bat's charge going off, which fires whether or not the swing
  * landed. That is what makes any swing a positional decision and not a free
- * one. It is forced movement, so it provokes nothing, and it can tear the
- * swinger off its own anchor.
+ * one. It is forced movement, so it provokes nothing, and it stops against an
+ * obstacle, a player or the edge (écart 33).
  *
  * The status guard is not theoretical: a player may bat a Cracker back into its
  * own cell and be carried off before the recoil would have moved it.
@@ -371,15 +364,7 @@ function recoilFrom(ctx: Ctx, state: MatchState, unitId: UnitId, target: Point):
     to: landing,
   });
 
-  // The grip is settled here rather than at the end of the turn, because a
-  // recoil from an opportunity attack happens on somebody else's turn and the
-  // swinger would otherwise carry a stale flag until its own turn ends.
-  return replaceUnit(state, {
-    ...attacker,
-    x: landing.x,
-    y: landing.y,
-    anchored: ctx.arena.isAnchorable(landing),
-  });
+  return replaceUnit(state, { ...attacker, x: landing.x, y: landing.y });
 }
 
 function applyShove(ctx: TurnCtx, targetId: UnitId): ReduceResult {
@@ -391,55 +376,45 @@ function applyShove(ctx: TurnCtx, targetId: UnitId): ReduceResult {
   if ('reason' in target) return { ok: false, reason: target.reason };
 
   const contest = resolveShove(ctx.rng, unit, target.unit);
-  ctx.log.push({
+  const shoved = (pushedTo: Point | null): MatchEvent => ({
     kind: 'shoved',
     shoverId: unit.id,
     targetId,
     success: contest.success,
     shoverRoll: contest.shoverRoll,
     targetRoll: contest.targetRoll,
+    pushedTo,
   });
 
-  let next: MatchState = { ...state, turn: { ...turn, actionUsed: true } };
-  if (!contest.success) return done(ctx, next);
-
-  // A Shove that takes the ball takes the ball and stops there.
-  //
-  // Stripping the carrier and dropping it three cells in the same action did
-  // two jobs at once: it won the ball back, which is good defence, and it undid
-  // the climb towards Zone 3, which made the trip to a Furnace impossible. The
-  // sweep measured a ball changing hands every round and a half and 1.2 shots a
-  // match. Only the second job is removed. In fiction you are grabbing for the
-  // Payload, not throwing somebody off the rig.
-  const stripped = target.unit.holdingPayload;
-  next = dropPayload(ctx, next, target.unit.id);
-  if (stripped) return done(ctx, next);
-
-  const shoved = next.units.find((u) => u.id === target.unit.id)!;
-  const fall = resolveFall(arena, { x: shoved.x, y: shoved.y }, 'shove');
-  ctx.log.push({
-    kind: 'fell',
-    unitId: shoved.id,
-    from: fall.from,
-    to: fall.landing,
-    cellsFallen: fall.cellsFallen,
-    impact: fall.impact,
-    cause: 'shoved',
-  });
-
-  next = replaceUnit(next, {
-    ...shoved,
-    x: fall.landing.x,
-    y: fall.landing.y,
-    anchored: true,
-  });
-
-  if (fall.damageDice > 0) {
-    const amount = ctx.rng.roll(fall.damageDice, fall.damageDie);
-    next = applyDamage(ctx, next, shoved.id, amount, 'fall');
+  const next: MatchState = { ...state, turn: { ...turn, actionUsed: true } };
+  if (!contest.success) {
+    ctx.log.push(shoved(null));
+    return done(ctx, next);
   }
 
-  return done(ctx, next);
+  // A Shove that takes the ball takes the ball and stops there (arbitrage of
+  // 2026-09-01, kept by écart 32).
+  //
+  // Stripping the carrier and moving it in the same action did two jobs at
+  // once: it won the ball back, which is good defence, and it undid the trip
+  // towards the Furnace, which made scoring impossible. The sweep measured a
+  // ball changing hands every round and a half and 1.2 shots a match. Only the
+  // second job is removed. In fiction you are grabbing for the Payload, not
+  // throwing somebody across the pitch.
+  if (target.unit.holdingPayload) {
+    ctx.log.push(shoved(null));
+    return done(ctx, dropPayload(ctx, next, target.unit.id));
+  }
+
+  // Anyone else is pushed one cell straight away from the shover (écart 32),
+  // or not at all when an obstacle, a player or the edge is at its back. The
+  // push is in the event itself: there is no second event to replay.
+  const landing = pushDestination(arena, next, target.unit, unit);
+  const moved = landing.x !== target.unit.x || landing.y !== target.unit.y;
+  ctx.log.push(shoved(moved ? landing : null));
+  if (!moved) return done(ctx, next);
+
+  return done(ctx, replaceUnit(next, { ...target.unit, x: landing.x, y: landing.y }));
 }
 
 // -- The Crackers -----------------------------------------------------------
@@ -452,6 +427,10 @@ function applyShove(ctx: TurnCtx, targetId: UnitId): ReduceResult {
  * throws the swinger two cells clear whether or not the swing connected. That
  * last part is a gift rather than a cost here, since it puts distance between
  * the swinger and a live charge.
+ *
+ * The line has to start on an open cell: a Cracker is not batted straight into
+ * a crate or off the pitch, and `legalActions` offers the same lines for the
+ * same reason. Past its first cell it bounces (écart 35).
  *
  * A miss simply leaves the thing where it lies, still live, still homing on
  * count 20.
@@ -470,6 +449,11 @@ function applyBatCracker(ctx: TurnCtx, crackerId: string, direction: number): Re
   if (cracker.state !== 'live') return { ok: false, reason: 'that Cracker is spent' };
   if (distance(unit, cracker) > 1) return { ok: false, reason: 'the Cracker is out of reach' };
 
+  const step = directionFromD8(direction);
+  if (ctx.arena.isSolid({ x: cracker.x + step.x, y: cracker.y + step.y })) {
+    return { ok: false, reason: 'that line runs straight into an obstacle' };
+  }
+
   const might = statsFor(unit.role, unit.tier).might;
   const outcome = rollAgainst(ctx.rng, might, CRACKER_AC);
   ctx.log.push({
@@ -483,15 +467,16 @@ function applyBatCracker(ctx: TurnCtx, crackerId: string, direction: number): Re
 
   let next: MatchState = { ...state, turn: { ...turn, actionUsed: true } };
   if (outcome.hit) {
-    next = runCracker(ctx, next, cracker.id, battedCrackerRun(next, cracker, direction));
+    next = runCracker(ctx, next, cracker.id, battedCrackerRun(ctx.arena, next, cracker, direction));
   }
 
   return done(ctx, recoilFrom(ctx, next, unit.id, { x: cracker.x, y: cracker.y }));
 }
 
 /**
- * Count 20. Each live Cracker homes six cells on whoever is nearest, friend or
- * foe alike, and goes off on the first player it crosses.
+ * Count 20. Each live Cracker rolls six cells towards whoever is nearest,
+ * friend or foe alike, round whatever is in the way, and goes off on the first
+ * player it crosses.
  *
  * They resolve one after the other rather than at once, so the second one sees
  * a field the first one has already changed. A Cracker that just carried
@@ -505,7 +490,7 @@ function resolveCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): Ma
   for (const { id } of state.crackers) {
     const cracker = current.crackers.find((c) => c.id === id)!;
     if (cracker.state !== 'live') continue;
-    current = runCracker(ctx, current, id, crackerRun(current, cracker, rng));
+    current = runCracker(ctx, current, id, crackerRun(arena, current, cracker, rng));
   }
 
   return { ...current, rngSeed: rng.seed };
@@ -529,7 +514,7 @@ function runCracker(ctx: Ctx, state: MatchState, crackerId: string, run: HazardR
 
 /**
  * The blast. One save, one victim, and the Cracker is scrap until a fresh one
- * drops at the centre of The Scramble next round.
+ * drops at the centre of the pitch next round.
  *
  * The damage is rolled whether or not the save landed, so the sequence of dice
  * is the same either way and a replay cannot drift on a lucky Dexterity roll.
@@ -559,7 +544,7 @@ function detonate(ctx: Ctx, state: MatchState, cracker: Cracker, targetId: UnitI
   return applyDamage(ctx, spent, targetId, damage, 'cracker');
 }
 
-/** A spent Cracker is replaced at the centre of The Scramble, and starts hunting again. */
+/** A spent Cracker is replaced at the centre of the pitch, and starts hunting again. */
 function respawnCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
   const at = arena.spec.ordnanceStart;
   let changed = false;
@@ -624,7 +609,8 @@ function applyCatchSpark(ctx: TurnCtx): ReduceResult {
 
 /**
  * Count 10. Six cells along the heading it is already on, bouncing off the
- * shell of the silo and keeping whatever heading the bounce leaves it with.
+ * obstacles and the edge of the pitch and keeping whatever heading the bounce
+ * leaves it with (écart 36).
  *
  * No dice are thrown here, which is deliberate: a Spark whose heading is
  * rerolled every round cannot be cut off, only stumbled into. Read off the
@@ -633,11 +619,11 @@ function applyCatchSpark(ctx: TurnCtx): ReduceResult {
  * It hits nobody and nothing on the way: the only thing that happens to the
  * Spark is being caught, which is why it is worth chasing rather than avoiding.
  */
-function resolveSpark(state: MatchState, log: MatchEvent[]): MatchState {
+function resolveSpark(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
   if (!sparkIsLive(state.spark) || state.spark.heading === null) return state;
 
   const from = { x: state.spark.x, y: state.spark.y };
-  const run = sparkRun(from, state.spark.heading);
+  const run = sparkRun(arena, from, state.spark.heading);
 
   log.push({
     kind: 'sparkMoved',
@@ -709,6 +695,9 @@ function applyPass(ctx: TurnCtx, targetId: UnitId): ReduceResult {
 
   const range = throwRange(unit, mate);
   if (!range.ok) return { ok: false, reason: range.reason };
+  if (!hasLineOfSight(arena, unit, mate)) {
+    return { ok: false, reason: `${mate.name} is out of sight behind an obstacle` };
+  }
 
   const thrower: Unit = { ...unit, holdingPayload: false };
   let next: MatchState = { ...replaceUnit(state, thrower), turn: { ...turn, actionUsed: true } };
@@ -760,7 +749,7 @@ function applyPass(ctx: TurnCtx, targetId: UnitId): ReduceResult {
  *
  * The Reaction is spent on the attempt, not on the success, so a defended lane
  * strips the reactions of everyone lining it. That is the price of throwing
- * across the Scramble, and it is what makes clearing a lane worth a turn.
+ * the middle third, and it is what makes clearing a lane worth a turn.
  *
  * A shot at a Furnace is not a pass and cannot be picked off: it is answered by
  * the goalkeeper's own Reaction instead.
@@ -806,7 +795,9 @@ function applyShoot(ctx: TurnCtx): ReduceResult {
   if (!unit.holdingPayload) return { ok: false, reason: `${unit.name} is not holding the Payload` };
 
   const furnace = arena.targetFurnaceOf(unit.team);
-  const range = throwRangeOver(rangeToFurnace(unit, furnace));
+  const visible = visibleRangeToFurnace(arena, unit, furnace);
+  if (visible === null) return { ok: false, reason: 'the Furnace is out of sight behind an obstacle' };
+  const range = throwRangeOver(visible);
   if (!range.ok) return { ok: false, reason: range.reason };
 
   // Arbitrage 2: the goalkeeper's Reaction, not a permanently higher target.
@@ -888,7 +879,7 @@ function applyDamage(
   state: MatchState,
   unitId: UnitId,
   amount: number,
-  source: 'fall' | 'bat' | 'cracker',
+  source: 'bat' | 'cracker',
 ): MatchState {
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit || unit.status !== 'active') return state;
@@ -899,18 +890,16 @@ function applyDamage(
   const hurt: Unit = { ...unit, hp };
   if (hp > 0) return replaceUnit(state, hurt);
 
-  // Down. The grapple fails, the player drops to the deck of The Trench and the
-  // medics drag them off. Their Payload, if any, stays on the field.
+  // Down. The medics drag the player off where it lies (écart 37); its cell
+  // frees up and its Payload, if any, stays on the field.
   const dropped = dropPayload(ctx, replaceUnit(state, hurt), unitId);
-  const fallen = dropped.units.find((u) => u.id === unitId)!;
+  const downed = dropped.units.find((u) => u.id === unitId)!;
 
   ctx.log.push({ kind: 'evacuated', unitId, round: state.round });
   return replaceUnit(dropped, {
-    ...fallen,
-    y: 0,
+    ...downed,
     status: 'evacuated',
     evacuatedOnRound: state.round,
-    anchored: true,
     dodging: false,
   });
 }
@@ -956,7 +945,6 @@ function returnSubstitutes(arena: Arena, state: MatchState, log: MatchEvent[]): 
         hp: unit.maxHp,
         status: 'active',
         evacuatedOnRound: null,
-        anchored: true,
         reactionAvailable: true,
       }),
       bench: { ...next.bench, [unit.team]: next.bench[unit.team] - 1 },
@@ -969,15 +957,8 @@ function returnSubstitutes(arena: Arena, state: MatchState, log: MatchEvent[]): 
 // -- End of turn and the ladder ---------------------------------------------
 
 function applyEndTurn(arena: Arena, state: MatchState, unit: Unit): ReduceResult {
-  // The whole of the anchoring rule is here: a unit that finishes in open air
-  // keeps no grip, and pays for it at the start of its next turn rather than
-  // now. That delay is what makes an unanchored end of turn a gamble instead of
-  // an immediate punishment.
-  const anchored = arena.isAnchorable(unit);
-  const events: MatchEvent[] = [{ kind: 'turnEnded', unitId: unit.id, anchored }];
-  const after: MatchState = { ...replaceUnit(state, { ...unit, anchored }), turn: null };
-
-  return advance(arena, after, events);
+  const events: MatchEvent[] = [{ kind: 'turnEnded', unitId: unit.id }];
+  return advance(arena, { ...state, turn: null }, events);
 }
 
 /**
@@ -1007,7 +988,7 @@ function advance(arena: Arena, state: MatchState, events: MatchEvent[]): ReduceR
     }
 
     if (slot.actor.kind === 'spark') {
-      current = { ...resolveSpark(current, log), turnIndex: current.turnIndex + 1 };
+      current = { ...resolveSpark(arena, current, log), turnIndex: current.turnIndex + 1 };
       continue;
     }
 
@@ -1017,72 +998,26 @@ function advance(arena: Arena, state: MatchState, events: MatchEvent[]): ReduceR
       continue;
     }
 
-    const started = beginTurn(arena, current, unit, log);
-
-    // A player can be carried off before it acts: the fall it owed from ending
-    // last turn in open air is resolved at the top of this one. The ladder has
-    // to walk on, otherwise the match sits on a slot nobody can play.
-    if (!started.turn) {
-      current = { ...started, turnIndex: current.turnIndex + 1 };
-      continue;
-    }
-
-    return { ok: true, state: started, events: log };
+    return { ok: true, state: beginTurn(current, unit, log), events: log };
   }
 
   return { ok: false, reason: 'the initiative ladder did not settle' };
 }
 
 /**
- * Start of turn. A unit that ended its last turn without a grip falls now, and
- * the fall is resolved before it gets its movement, so a bad landing costs it
- * position as well as hit points.
+ * Start of turn. The Dodge stance lapses, the Reaction comes back, and the
+ * unit gets its movement. Nothing else happens here since D11: the fall a unit
+ * owed for ending its last turn without a grip went with the grip.
  */
-function beginTurn(arena: Arena, state: MatchState, unit: Unit, log: MatchEvent[]): MatchState {
+function beginTurn(state: MatchState, unit: Unit, log: MatchEvent[]): MatchState {
   log.push({ kind: 'turnStarted', unitId: unit.id, round: state.round });
 
-  let current = state;
-  let acting: Unit = { ...unit, dodging: false, reactionAvailable: true };
-
-  if (!acting.anchored) {
-    const fall = resolveFall(arena, { x: acting.x, y: acting.y });
-    log.push({
-      kind: 'fell',
-      unitId: acting.id,
-      from: fall.from,
-      to: fall.landing,
-      cellsFallen: fall.cellsFallen,
-      impact: fall.impact,
-      cause: 'lostGrip',
-    });
-
-    current = replaceUnit(current, {
-      ...acting,
-      x: fall.landing.x,
-      y: fall.landing.y,
-      anchored: true,
-    });
-
-    if (fall.damageDice > 0) {
-      const rng = new Rng(current.rngSeed);
-      const amount = rng.roll(fall.damageDice, fall.damageDie);
-      const ctx: Ctx = { arena, log, rng };
-      current = { ...applyDamage(ctx, current, acting.id, amount, 'fall'), rngSeed: rng.seed };
-    }
-
-    const landed = current.units.find((u) => u.id === acting.id)!;
-    // A fall that took the last hit point ends the turn before it began.
-    if (landed.status !== 'active') return { ...current, turn: null };
-    acting = landed;
-  } else {
-    current = replaceUnit(current, acting);
-  }
-
+  const acting: Unit = { ...unit, dodging: false, reactionAvailable: true };
   return {
-    ...current,
+    ...replaceUnit(state, acting),
     turn: {
       unitId: acting.id,
-      movementFeetRemaining: FLY_SPEED_FEET,
+      movementFeetRemaining: MOVE_SPEED_FEET,
       actionUsed: false,
       objectInteractionUsed: false,
       disengaged: false,

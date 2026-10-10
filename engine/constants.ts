@@ -1,8 +1,10 @@
 /**
  * Every tunable number of the v2 ruleset, in one place.
  *
- * Source of truth: docs/00-reglement-v2.md, validated 2026-09-01.
- * Nothing in the engine hard-codes a number that belongs here.
+ * Source of truth: docs/00-reglement-v2.md, validated 2026-09-01, and its
+ * part C of 2026-10-10 (decision D11, the horizontal pitch), which overrides
+ * parts A and B wherever they disagree. Nothing in the engine hard-codes a
+ * number that belongs here.
  */
 
 import type { Tier } from './stats.js';
@@ -12,39 +14,45 @@ export const CELL_FEET = 5;
 
 // -- Arena ------------------------------------------------------------------
 
+/**
+ * The pitch is 15 cells wide and 45 long, seen from above. `x` is the width,
+ * `y` the long axis: 0 at Furnace A's mouth, 44 at Furnace B's. The names
+ * WIDTH and HEIGHT predate D11 and are kept because every coordinate in the
+ * engine, the events and the database is unchanged: only their reading changed,
+ * from a wall seen in profile to a floor seen from above.
+ */
 export const ARENA_WIDTH = 15;
-export const ZONE_HEIGHT = 15;
-export const ZONE_COUNT = 3;
-export const ARENA_HEIGHT = ZONE_HEIGHT * ZONE_COUNT;
+export const THIRD_LENGTH = 15;
+export const THIRD_COUNT = 3;
+export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
 
 /**
- * Crossing a zone boundary costs this on top of the cell's own 5 feet.
- *
- * Fifteen at first, lowered to ten on 2026-09-01. At fifteen a crossing step
- * ate twenty of a forty foot budget, so a carrier crossed and stopped, and the
- * Furnaces in Zone 3 were three turns from the centre when the ball only
- * survived one and a half. A crossing still costs triple a normal step, so The
- * Summit stays a territory to take rather than a rung like any other.
+ * Which engine wrote a match. Bumped when a `MatchState` or an event changes
+ * shape or meaning, so a match opened under one engine is never replayed by
+ * another (audit line A11). Version 1 was the vertical silo with anchoring and
+ * falls; version 2 is the horizontal pitch of D11, 2026-10-10. Nothing in the
+ * engine reads it yet: the server stamps it on `matches` and refuses a mismatch.
  */
-export const ZONE_CROSSING_FEET = 10;
+export const ENGINE_VERSION = 2;
 
-// -- Movement, anchoring, falling -------------------------------------------
+// -- Movement ---------------------------------------------------------------
 
-/** Grapple-rig fly speed. Walking speed never adds to it. */
-export const FLY_SPEED_FEET = 40;
+/**
+ * Forty feet, eight cells, in any of the eight directions. It was the fly speed
+ * of the grapple rig; since D11 nobody flies, everybody runs, and the number is
+ * the same (écart 29).
+ */
+export const MOVE_SPEED_FEET = 40;
 
 /** Bat recoil pushes the attacker this far in the opposite direction. */
 export const BAT_RECOIL_CELLS = 2;
 
-/** A free fall is caught by the auto-spooling grapple after this distance. */
-export const GRAPPLE_CATCH_CELLS = 10;
-
-/** A shove is a short controlled drop, not a free fall. */
-export const SHOVE_FALL_CELLS = 3;
-
-/** Collision damage is 1d6 per this many cells fallen (10 feet). */
-export const FALL_DAMAGE_PER_CELLS = 2;
-export const FALL_DAMAGE_DIE = 6;
+/**
+ * A successful Shove against a non-carrier pushes it this far straight away
+ * from the shover, stopped by an obstacle, a unit or the edge (écart 32). It
+ * replaced the three-cell drop of the vertical silo.
+ */
+export const SHOVE_PUSH_CELLS = 1;
 
 // -- The Payload ------------------------------------------------------------
 
@@ -132,8 +140,8 @@ export const SPARK_ENTRY_ROUND = 6;
 /** It enters no closer than this to any unit on the field. */
 export const SPARK_SPAWN_MIN_DISTANCE = 4;
 
-/** Zone index it enters in: 1 is The Scramble, the middle band. */
-export const SPARK_SPAWN_ZONE = 1;
+/** Third of the pitch it enters in: 1 is the middle third (écart 36). */
+export const SPARK_SPAWN_THIRD = 1;
 
 /**
  * Six, against a player's eight. Twelve made it structurally uncatchable: it

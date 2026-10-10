@@ -2,26 +2,23 @@
  * The terrain, and the only terrain data the engine ever reads.
  *
  * An arena is authored as ASCII art, one line per row, written **top row
- * first** because that is how you read the picture it is traced from. Three
+ * first** because that is how you read the picture it is traced from. Two
  * characters, and no more:
  *
- *   `.`  open air
- *   `#`  structure: a girder, a catwalk deck, a furnace hatch. Solid. A unit
- *        cannot occupy it, a fall stops against it, and it anchors every cell
- *        it touches.
- *   `|`  rig: a chain or a hanging hook. A unit *can* occupy it and it anchors
- *        both itself and its neighbours. This is what lets the central chain
- *        run the height of the silo without cutting the arena in two.
+ *   `.`  open floor
+ *   `#`  obstacle: a crate, a pillar, a Furnace hatch. Solid. A unit cannot
+ *        occupy it, a path has to go round it, a struck Cracker or a drifting
+ *        Spark bounces off it, and it **cuts the line of sight** (écart 28).
  *
- * Anchoring is derived, never authored. A cell anchors if it is a rig, if it
- * touches structure or rig on any of its eight sides, or if it lies against the
- * outer boundary, which is the silo's own wall, floor and ceiling.
+ * That is all there is since D11. The vertical silo had a third character for
+ * the chain and the hooks, and a derived notion of which cells "anchored" a
+ * unit; both went with the falls. A cell is either floor or it is not.
  */
 
 import { ARENA_HEIGHT, ARENA_WIDTH } from './constants.js';
-import { DIRECTIONS, inBounds, type Point } from './geometry.js';
+import { inBounds, type Point } from './geometry.js';
 
-export type Cell = 'open' | 'structure' | 'rig';
+export type Cell = 'open' | 'obstacle';
 
 export type TeamId = 'A' | 'B';
 
@@ -42,29 +39,43 @@ export interface ArenaSpec {
   readonly ordnanceStart: Point;
   /** Starting cells, in the order the seven starters are assigned. */
   readonly starts: Readonly<Record<TeamId, readonly Point[]>>;
-  /** Where a substitute enters, in Zone 3 beside its team's Furnace. */
+  /** Where a substitute enters, beside its team's own Furnace mouth. */
   readonly substituteEntry: Readonly<Record<TeamId, Point>>;
+  /**
+   * Pictures the 2D client lays under the grid, keyed by third. Scenery only:
+   * never read as terrain. Slated for removal with the 2.5D board (J5).
+   */
   readonly art: Readonly<Record<number, string>>;
 }
 
 export class Arena {
   readonly spec: ArenaSpec;
-  /** Indexed `[y][x]`, with y = 0 at the floor. */
+  /** Indexed `[y][x]`, with y = 0 at Furnace A's end. */
   private readonly cells: Cell[][];
+  private readonly solid: readonly Point[];
 
   constructor(spec: ArenaSpec) {
     this.spec = spec;
     this.cells = parseRows(spec.rows);
+
+    const solid: Point[] = [];
+    this.cells.forEach((row, y) =>
+      row.forEach((cell, x) => {
+        if (cell === 'obstacle') solid.push({ x, y });
+      }),
+    );
+    this.solid = solid;
   }
 
+  /** Outside the pitch reads as obstacle, which is what the edge is. */
   cellAt(p: Point): Cell {
-    if (!inBounds(p)) return 'structure';
+    if (!inBounds(p)) return 'obstacle';
     return this.cells[p.y]![p.x]!;
   }
 
-  /** Solid terrain. Nothing occupies it and a fall stops against it. */
+  /** Solid terrain, or the edge of the pitch. Nothing occupies it and nothing passes it. */
   isSolid(p: Point): boolean {
-    return this.cellAt(p) === 'structure';
+    return this.cellAt(p) === 'obstacle';
   }
 
   /** A unit may stand here, terrain-wise. Occupancy by other units is separate. */
@@ -73,23 +84,18 @@ export class Arena {
   }
 
   /**
-   * Whether a unit ending its turn here keeps its grip. Failing this is what
-   * makes a unit fall at the start of its next turn.
+   * Whether this cell cuts a line of sight drawn across it (écart 34). Today
+   * that is every obstacle and nothing else; units never block sight. It is a
+   * separate question from `isSolid` so that a terrain that blocks movement
+   * without blocking sight, or the reverse, has one method to change.
    */
-  isAnchorable(p: Point): boolean {
-    if (!this.isOccupiable(p)) return false;
-    if (this.cellAt(p) === 'rig') return true;
+  blocksSight(p: Point): boolean {
+    return this.isSolid(p);
+  }
 
-    // The silo's own wall, floor and ceiling.
-    if (p.x === 0 || p.x === ARENA_WIDTH - 1) return true;
-    if (p.y === 0 || p.y === ARENA_HEIGHT - 1) return true;
-
-    return DIRECTIONS.some((d) => {
-      const n = { x: p.x + d.x, y: p.y + d.y };
-      if (!inBounds(n)) return false;
-      const cell = this.cellAt(n);
-      return cell === 'structure' || cell === 'rig';
-    });
+  /** Every obstacle cell inside the pitch, for the sight and pathing rules. */
+  obstacles(): readonly Point[] {
+    return this.solid;
   }
 
   furnaceOf(team: TeamId): Furnace {
@@ -119,7 +125,7 @@ function parseRows(rows: readonly string[]): Cell[][] {
     throw new Error(`arena needs ${ARENA_HEIGHT} rows, got ${rows.length}`);
   }
 
-  // Authored top row first, stored with y = 0 at the floor.
+  // Authored top row first, stored with y = 0 at Furnace A's end.
   const grid: Cell[][] = [];
   for (let i = rows.length - 1; i >= 0; i--) {
     const row = rows[i]!;
@@ -138,10 +144,8 @@ function parseCell(char: string): Cell {
     case '.':
       return 'open';
     case '#':
-      return 'structure';
-    case '|':
-      return 'rig';
+      return 'obstacle';
     default:
-      throw new Error(`unknown arena character "${char}", expected one of . # |`);
+      throw new Error(`unknown arena character "${char}", expected one of . #`);
   }
 }

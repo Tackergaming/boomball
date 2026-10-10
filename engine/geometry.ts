@@ -1,19 +1,16 @@
 /**
- * The Kill-Silo is a single vertical plane seen in side elevation.
+ * The Kill-Silo is a single horizontal plane seen from above.
  *
- * x runs 0..14 left to right. y runs 0..44 with **0 at the floor**, so y grows
- * upward exactly as it does on screen. Zones are horizontal bands of that one
- * plane, not separate spaces: zone 0 is The Trench, 1 is The Scramble, 2 is
- * The Summit. They are numbered 1..3 for display only.
+ * x runs 0..14 across the pitch. y runs 0..44 along it, with **0 at Furnace
+ * A's mouth** and 44 at Furnace B's. The three "thirds" are bands of that one
+ * plane, named for the feed and for the Spark's entry and carrying no rule:
+ * third 0 is Furnace A's end, 1 the middle, 2 Furnace B's end.
+ *
+ * The coordinates predate D11 and are unchanged: a y that used to be a height
+ * is now a length along the pitch, and that is the whole of the difference.
  */
 
-import {
-  ARENA_HEIGHT,
-  ARENA_WIDTH,
-  CELL_FEET,
-  ZONE_CROSSING_FEET,
-  ZONE_HEIGHT,
-} from './constants.js';
+import { ARENA_HEIGHT, ARENA_WIDTH, CELL_FEET, THIRD_LENGTH } from './constants.js';
 
 export interface Point {
   readonly x: number;
@@ -24,9 +21,13 @@ export function inBounds(p: Point): boolean {
   return p.x >= 0 && p.x < ARENA_WIDTH && p.y >= 0 && p.y < ARENA_HEIGHT;
 }
 
-/** 0, 1 or 2. Add one to display it as Zone 1, 2 or 3. */
-export function zoneOf(p: Point): number {
-  return Math.floor(p.y / ZONE_HEIGHT);
+/**
+ * 0, 1 or 2, from Furnace A's end to Furnace B's. A reading for the feed and
+ * for where the Spark drops in, never a rule: nothing costs more or less for
+ * being in one third rather than another.
+ */
+export function thirdOf(p: Point): number {
+  return Math.floor(p.y / THIRD_LENGTH);
 }
 
 export function samePoint(a: Point, b: Point): boolean {
@@ -48,19 +49,19 @@ export function isAdjacent(a: Point, b: Point): boolean {
 
 /**
  * Movement cost of one step, in feet. A step is always to one of the eight
- * neighbouring cells. Crossing a zone boundary adds the ventilation grating's
- * toll on top of the cell's own cost.
+ * neighbouring cells and always costs the same: the zone toll of the vertical
+ * silo went with D11 (écart 30). The two arguments are kept so a future terrain
+ * cost has somewhere to live without every caller changing shape.
  */
-export function stepCostFeet(from: Point, to: Point): number {
-  const crossing = zoneOf(from) !== zoneOf(to) ? ZONE_CROSSING_FEET : 0;
-  return CELL_FEET + crossing;
+export function stepCostFeet(_from: Point, _to: Point): number {
+  return CELL_FEET;
 }
 
 // -- Directions -------------------------------------------------------------
 
 /**
  * The eight compass directions in d8 order, so a roll of 1..8 indexes straight
- * into this array. North is up the screen, which is up the silo.
+ * into this array. North is towards Furnace B, which is up the drawing.
  */
 export const DIRECTIONS: readonly Point[] = [
   { x: 0, y: 1 }, // 1 N
@@ -98,46 +99,13 @@ export function neighbours(p: Point): Point[] {
 // -- Straight lines ---------------------------------------------------------
 
 /**
- * The cells a projectile crosses travelling `steps` cells in a fixed direction,
- * bouncing off the walls, the floor and the ceiling. A bounce inverts the axis
- * that would have left the arena and the travel continues on the new heading
- * for whatever movement is left, which is how the Spark behaves on count 10.
- *
- * The heading it leaves on is returned alongside the path, because the Spark
- * keeps it into the next round: that is the whole of what makes the thing
- * anticipatable. One of the two components is always non-zero after a bounce,
- * since an axis can only invert when a step along it would leave the arena and
- * a zero component never can.
- *
- * The starting cell is not included. The path is returned in travel order so a
- * caller can stop at the first unit it meets.
- */
-export function reflectedRun(
-  from: Point,
-  direction: Point,
-  steps: number,
-): { readonly path: Point[]; readonly heading: Point } {
-  const path: Point[] = [];
-  let { x, y } = from;
-  let dx = direction.x;
-  let dy = direction.y;
-
-  for (let i = 0; i < steps; i++) {
-    if (x + dx < 0 || x + dx >= ARENA_WIDTH) dx = -dx;
-    if (y + dy < 0 || y + dy >= ARENA_HEIGHT) dy = -dy;
-
-    x += dx;
-    y += dy;
-    path.push({ x, y });
-  }
-
-  return { path, heading: { x: dx, y: dy } };
-}
-
-/**
  * The cells between two points, walked one cell at a time under Chebyshev
- * movement, excluding the origin and including the destination. Used by the
- * Crackers, which home in on the nearest unit, and by a batted Cracker.
+ * movement, excluding the origin and including the destination. This is the
+ * flight of a thrown Payload, which is what the interception rule reads.
+ *
+ * The Crackers and the Spark no longer use it: a Cracker in drift takes the
+ * shortest path around the obstacles (`rules/ordnance.ts`) and anything struck
+ * or drifting on a fixed heading bounces (`rules/bounce.ts`).
  */
 export function lineTo(from: Point, to: Point, maxSteps = Infinity): Point[] {
   const path: Point[] = [];
@@ -146,26 +114,6 @@ export function lineTo(from: Point, to: Point, maxSteps = Infinity): Point[] {
   while ((x !== to.x || y !== to.y) && path.length < maxSteps) {
     x += Math.sign(to.x - x);
     y += Math.sign(to.y - y);
-    path.push({ x, y });
-  }
-
-  return path;
-}
-
-/**
- * The cells crossed travelling in a fixed direction until the arena wall stops
- * the projectile. Unlike the Spark, a batted Cracker does not bounce: it stops
- * at the wall.
- */
-export function straightPath(from: Point, direction: Point, maxSteps: number): Point[] {
-  const path: Point[] = [];
-  let { x, y } = from;
-
-  for (let i = 0; i < maxSteps; i++) {
-    const next = { x: x + direction.x, y: y + direction.y };
-    if (!inBounds(next)) break;
-    x = next.x;
-    y = next.y;
     path.push({ x, y });
   }
 

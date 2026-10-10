@@ -24,13 +24,19 @@ import {
 } from '../constants.js';
 import { directionFromD8, distance, inBounds, type Point } from '../geometry.js';
 import type { Rng } from '../rng.js';
+import { lineOfSight } from './sight.js';
 import { activeUnitsOf, type MatchState, type TeamId, type Unit } from '../types.js';
 
 export type ThrowRange =
   | { readonly ok: true; readonly mode: 'normal' | 'disadvantage'; readonly cells: number }
   | { readonly ok: false; readonly reason: string };
 
-/** Thirty feet clean, sixty at a penalty, and never further. */
+/**
+ * Forty-five feet clean, sixty at a penalty, and never further. Distance only:
+ * the line of sight a throw also needs (écart 34) is `hasLineOfSight` in
+ * `sight.ts`, checked by the caller, because a range reads two points and a
+ * sight reads the terrain between them.
+ */
 export function throwRange(from: Point, to: Point): ThrowRange {
   return throwRangeOver(distance(from, to));
 }
@@ -46,9 +52,31 @@ export function throwRangeOver(cells: number): ThrowRange {
   };
 }
 
-/** The distance from a cell to the nearest hatch of a Furnace. */
+/** The distance from a cell to the nearest hatch of a Furnace, sight ignored. */
 export function rangeToFurnace(from: Point, furnace: Furnace): number {
   return Math.min(...furnace.cells.map((cell) => distance(from, cell)));
+}
+
+/**
+ * The distance to the nearest hatch cell of a Furnace **that can be seen** from
+ * `from`, or null when the whole mouth is hidden behind an obstacle. This is
+ * the number a shot is measured on (écart 34).
+ *
+ * The hatch cells are obstacles in the layout, so the Furnace's own cells are
+ * left out of the blocking test: a mouth three cells wide must not hide its
+ * centre behind its own edges when a shot comes in from the side.
+ */
+export function visibleRangeToFurnace(arena: Arena, from: Point, furnace: Furnace): number | null {
+  const hatch = new Set(furnace.cells.map((c) => `${c.x},${c.y}`));
+  const blocks = (p: Point): boolean => arena.blocksSight(p) && !hatch.has(`${p.x},${p.y}`);
+
+  let best: number | null = null;
+  for (const cell of furnace.cells) {
+    if (!lineOfSight(blocks, from, cell)) continue;
+    const range = distance(from, cell);
+    if (best === null || range < best) best = range;
+  }
+  return best;
 }
 
 /**

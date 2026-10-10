@@ -22,7 +22,7 @@
  * sentence: who acted, what they tried, what the dice said.
  */
 
-import { ZONE_COUNT, ZONE_HEIGHT } from '../../../engine/constants.js';
+import { THIRD_COUNT, THIRD_LENGTH } from '../../../engine/constants.js';
 import type { Point } from '../../../engine/geometry.js';
 import type { DiceRoll, MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId, Unit, UnitId } from '../../../engine/types.js';
@@ -144,9 +144,11 @@ function project(base: MatchState, events: readonly MatchEvent[]): MatchState {
       // half-built one here would be a rule this file has no business holding.
       // The board is told who is acting through the beat's own `unitId`.
       case 'moved':
-      case 'fell':
       case 'recoiled':
         moveUnit(event.unitId, event.to);
+        break;
+      case 'shoved':
+        if (event.pushedTo) moveUnit(event.targetId, event.pushedTo);
         break;
       case 'damaged': {
         const unit = units.get(event.unitId);
@@ -319,9 +321,9 @@ function describe(
         break;
       case 'shoved':
         lines.push({
-          text: `${name(event.shoverId)} shoves ${name(event.targetId)} · ${
-            event.success ? 'SHOVED' : 'HELD'
-          }`,
+          text: `${name(event.shoverId)} shoves ${name(event.targetId)}${
+            event.pushedTo ? ' back a cell' : ''
+          } · ${event.success ? 'SHOVED' : 'HELD'}`,
           roll: event.shoverRoll,
           outcome: forMe(event.success, mine(event.shoverId)),
         });
@@ -329,12 +331,6 @@ function describe(
       case 'damaged':
         lines.push({
           text: `${name(event.unitId)} takes ${event.amount} · ${event.hpAfter} hp left`,
-          outcome: mine(event.unitId) ? 'bad' : 'good',
-        });
-        break;
-      case 'fell':
-        lines.push({
-          text: `${name(event.unitId)} falls ${event.cellsFallen} cells`,
           outcome: mine(event.unitId) ? 'bad' : 'good',
         });
         break;
@@ -441,9 +437,6 @@ function describe(
           outcome: event.team === own ? 'good' : 'bad',
         });
         break;
-      case 'reactionHeld':
-        lines.push({ text: `${name(event.unitId)} holds its Reaction: no grip to swing from` });
-        break;
       case 'matchEnded':
         lines.push({ text: 'Full time', outcome: 'neutral' });
         break;
@@ -473,7 +466,7 @@ function label(crackerId: string): string {
  * is the numbering every other surface of this client uses.
  */
 function zoneName(y: number): string {
-  const zone = Math.min(ZONE_COUNT, Math.max(1, Math.floor(y / ZONE_HEIGHT) + 1));
+  const zone = Math.min(THIRD_COUNT, Math.max(1, Math.floor(y / THIRD_LENGTH) + 1));
   return ZONE_NAMES[zone] ?? `Zone ${zone}`;
 }
 

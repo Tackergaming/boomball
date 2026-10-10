@@ -1,10 +1,10 @@
 /**
- * Movement on the grapple-rig.
+ * Movement on the pitch.
  *
- * Every unit flies at forty feet, and walking speed never adds to it: a player
- * hangs in mid-air on its own line. A step costs five feet, plus fifteen more
- * when it crosses a zone boundary, which is the ventilation grating between
- * the decks and the reason The Summit is not three cells from everybody.
+ * Every unit runs at forty feet, eight cells, in any of the eight directions
+ * (écart 29). A step costs five feet wherever it is taken: the zone toll of the
+ * vertical silo went with D11. An obstacle cell cannot be entered and a cell
+ * with a unit on it cannot either, so a route goes round both.
  *
  * The client sends the **whole path**, not a destination. Two reasons: a player
  * routing around an enemy's reach to dodge an opportunity attack is making a
@@ -59,13 +59,13 @@ export function validatePath(
 
   for (const step of path) {
     if (!inBounds(step)) {
-      return { ok: false, reason: `${cellName(step)} is outside the silo` };
+      return { ok: false, reason: `${cellName(step)} is off the pitch` };
     }
     if (distance(current, step) !== 1) {
       return { ok: false, reason: `${cellName(current)} and ${cellName(step)} are not adjacent` };
     }
     if (arena.isSolid(step)) {
-      return { ok: false, reason: `${cellName(step)} is solid` };
+      return { ok: false, reason: `${cellName(step)} is an obstacle` };
     }
     if (blocked.has(key(step))) {
       return { ok: false, reason: `${cellName(step)} is already occupied` };
@@ -83,8 +83,9 @@ export function validatePath(
 
 /**
  * Every cell a unit can reach on the budget it has left, with what each costs.
- * Dijkstra rather than a flood fill, because a zone crossing costs four times a
- * normal step and a breadth-first sweep would price it wrong.
+ * Dijkstra, kept from the days when a step could cost more than another; with
+ * every step at five feet it degenerates into a breadth-first sweep, and it
+ * stays Dijkstra so a terrain cost can come back without rewriting it.
  *
  * Feeds the interface's move highlight and the AI's repositioning candidates
  * from the same code, which is the point.

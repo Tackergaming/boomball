@@ -22,7 +22,7 @@ import { legalActions } from '../engine/legalActions.js';
 import { battedCrackerRun } from '../engine/rules/ordnance.js';
 import { pathTo } from '../engine/rules/movement.js';
 import { rangeToFurnace } from '../engine/rules/payload.js';
-import { keepsGripAfterRecoil, passInterceptors, provokedAlong } from '../engine/rules/reactions.js';
+import { passInterceptors, provokedAlong } from '../engine/rules/reactions.js';
 import { statsFor } from '../engine/stats.js';
 import type { MatchState, Unit, UnitId } from '../engine/types.js';
 import {
@@ -183,11 +183,10 @@ function violenceCandidates(board: Board): Candidate[] {
     if (marked?.targetId === target.id) value += ORDER_PULL;
     if (target.hp <= 4.5 + stats.might) value *= 1.4;
 
-    const grip = keepsGripAfterRecoil(arena, state, unit, target);
     out.push({
       action: { kind: 'attack', targetId: target.id },
-      score: value * odds - (grip ? 0 : w.keepGrip),
-      why: `swing at ${target.name}${grip ? '' : ', which costs the grip'}`,
+      score: value * odds,
+      why: `swing at ${target.name}`,
     });
   }
 
@@ -222,7 +221,7 @@ function violenceCandidates(board: Board): Candidate[] {
  * little when it clears the thing away from the swinger.
  */
 function crackerCandidates(board: Board): Candidate[] {
-  const { state, unit, legal, weights: w } = board;
+  const { arena, state, unit, legal, weights: w } = board;
   const out: Candidate[] = [];
   const odds = chance(statsFor(unit.role, unit.tier).might, CRACKER_AC);
 
@@ -231,7 +230,7 @@ function crackerCandidates(board: Board): Candidate[] {
     if (!cracker) continue;
 
     for (const direction of option.directions) {
-      const run = battedCrackerRun(state, cracker, direction);
+      const run = battedCrackerRun(arena, state, cracker, direction);
       const struck = run.struck;
 
       if (struck?.team === unit.team) continue;

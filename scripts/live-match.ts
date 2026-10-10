@@ -226,9 +226,10 @@ let requests = 0;
 let eventsFromFunction = 0;
 let refusals = 0;
 // `scored` is the only event that moves the scoreboard, and it carries its own
-// points: 10 for a goal, 50 for the Spark. `sparkCaught` fires on every attempt,
+// points. To tell a Spark score from a goal, read its `source` field
+// ('payload' | 'spark'), never the price. `sparkCaught` fires on every attempt,
 // hit or miss, so counting it as a score reads two misses as two captures.
-const scored: { team: string; points: number }[] = [];
+const scored: { team: string; points: number; source?: string | undefined }[] = [];
 let sparkAttempts = 0;
 const started = Date.now();
 
@@ -279,8 +280,8 @@ for (let turn = 0; turn < 400; turn += 1) {
   }
 
   eventsFromFunction += reply.events.length;
-  for (const event of reply.events as { kind: string; team?: string; points?: number }[]) {
-    if (event.kind === 'scored') scored.push({ team: event.team!, points: event.points! });
+  for (const event of reply.events as { kind: string; team?: string; points?: number; source?: string }[]) {
+    if (event.kind === 'scored') scored.push({ team: event.team!, points: event.points!, source: event.source });
     if (event.kind === 'sparkCaught') sparkAttempts += 1;
   }
 }
@@ -320,7 +321,7 @@ console.log(`events in the table        ${seqs.length}`);
 console.log(`snapshot seq               ${finalState.body?.[0]?.seq}`);
 console.log(`gaps in the sequence       ${gaps.length === 0 ? 'none' : gaps.join(', ')}`);
 const goalsOf = (team: string) => scored.filter((s) => s.team === team && s.points === 10).length;
-const sparksOf = (team: string) => scored.filter((s) => s.team === team && s.points === 50).length;
+const sparksOf = (team: string) => scored.filter((s) => s.team === team && s.source === 'spark').length;
 console.log(
   `goals                      A ${goalsOf('A')}, B ${goalsOf('B')}`,
 );

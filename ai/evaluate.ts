@@ -193,7 +193,7 @@ export function shotQuality(board: Board, unit: Unit, from: Point): number {
  * staying off a Cracker are all true at once.
  */
 export function positionValue(board: Board, cell: Point): number {
-  const { arena, state, unit, weights: w } = board;
+  const { state, unit, weights: w } = board;
   let value = 0;
 
   if (unit.holdingPayload) {
@@ -233,7 +233,6 @@ export function positionValue(board: Board, cell: Point): number {
 
   value += w.guardFurnace * furnaceNearness(cell, board.ownFurnace);
 
-  if (!arena.isAnchorable(cell)) value -= w.keepGrip;
   value -= w.avoidCrackers * crackerPressure(state, cell);
 
   const hold = findOrder(board.orders, 'holdZone');

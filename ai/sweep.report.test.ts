@@ -15,7 +15,7 @@
  *     once the Spark's points come back out. That last one is what the Spark's
  *     value has to be set against: if it settles most of the matches it turns
  *     up in, the Payload is decoration.
- *   - **wins.** A and B share everything but their side of the silo, so a split
+ *   - **wins.** A and B share everything but their end of the pitch, so a split
  *     far off even is the arena being asymmetric.
  */
 
@@ -46,11 +46,11 @@ describe('balance', () => {
           `tries/match ${report.meanSparkAttempts.toFixed(2)}`.padEnd(20),
           `decided ${report.sparkDecided}`.padEnd(14),
           `evacuated ${report.meanEvacuated.toFixed(2)}`.padEnd(17),
-          // Where the ball lives, floor zone first, and how much of that is a
-          // goalkeeper standing on it. These two read the pitch rather than the
-          // scoreline: a share that collapses onto one zone means the sport has
-          // found somewhere to camp again.
-          `ball ${report.ballZoneShare.map((n) => `${Math.round(n * 100)}%`).join('/')}`.padEnd(20),
+          // Where the ball lives, Furnace A's third first, and how much of that
+          // is a goalkeeper standing on it. These two read the pitch rather than
+          // the scoreline: a share that collapses onto one third means the sport
+          // has found somewhere to camp again.
+          `ball ${report.ballThirdShare.map((n) => `${Math.round(n * 100)}%`).join('/')}`.padEnd(20),
           `keeper ${Math.round(report.keeperHeldShare * 100)}%`,
         ].join(' '),
       );

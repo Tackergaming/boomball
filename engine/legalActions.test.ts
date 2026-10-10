@@ -4,9 +4,11 @@ import type { Action } from './actions.js';
 import { Arena } from './arena.js';
 import { KILL_SILO } from './arenas/kill-silo.js';
 import { BULWARK_BLOCK_BONUS, FURNACE_AC } from './constants.js';
+import type { Point } from './geometry.js';
 import { legalActions, onlyEndTurnLeft } from './legalActions.js';
 import { openMatch, reduce } from './reduce.js';
 import { key, pathTo } from './rules/movement.js';
+import { visibleRangeToFurnace } from './rules/payload.js';
 import { createMatch } from './setup.js';
 import type { MatchState, Unit } from './types.js';
 
@@ -148,7 +150,7 @@ describe('what it offers against whom', () => {
     expect(legal.shove.map((t) => t.unitId)).toEqual([enemy.id]);
   });
 
-  it('offers a pass only to team-mates inside sixty feet', () => {
+  it('offers a pass only to team-mates inside sixty feet and in sight', () => {
     const start = base();
     const actor = start.units.find((u) => u.id === start.turn!.unitId)!;
     const near = start.units.find((u) => u.team === actor.team && u.id !== actor.id)!;
@@ -161,7 +163,7 @@ describe('what it offers against whom', () => {
       units: start.units.map((u) => {
         if (u.id === actor.id) return { ...u, x: 7, y: 22, holdingPayload: true };
         if (u.id === near.id) return { ...u, x: 9, y: 22 };
-        if (u.id === far.id) return { ...u, x: 7, y: 44 };
+        if (u.id === far.id) return { ...u, x: 7, y: 43 };
         return u;
       }),
     };
@@ -211,6 +213,125 @@ describe('what it offers against whom', () => {
       ),
     };
     expect(legalActions(arena, state)!.shoot).toBeNull();
+  });
+
+  describe('a pass behind an obstacle', () => {
+    /** The acting player holding the ball at (7, 14), a team-mate somewhere on purpose. */
+    function throwing(mateAt: Point): { state: MatchState; mateId: string } {
+      const start = base();
+      const actor = start.units.find((u) => u.id === start.turn!.unitId)!;
+      const mate = start.units.find((u) => u.team === actor.team && u.id !== actor.id)!;
+      return {
+        mateId: mate.id,
+        state: {
+          ...start,
+          payload: { carriedBy: actor.id, x: 7, y: 14 },
+          units: start.units.map((u) => {
+            if (u.id === actor.id) return { ...u, x: 7, y: 14, holdingPayload: true };
+            if (u.id === mate.id) return { ...u, ...mateAt };
+            return u;
+          }),
+        },
+      };
+    }
+
+    it('leaves out a team-mate in range but behind the pillar', () => {
+      // Four cells away, straight through the pillar at (7, 16).
+      expect(arena.isSolid({ x: 7, y: 16 })).toBe(true);
+      const { state, mateId } = throwing({ x: 7, y: 18 });
+      expect(legalActions(arena, state)!.pass.map((t) => t.unitId)).not.toContain(mateId);
+    });
+
+    it('lists the same team-mate once it is in sight', () => {
+      const { state, mateId } = throwing({ x: 3, y: 18 });
+      expect(legalActions(arena, state)!.pass.map((t) => t.unitId)).toContain(mateId);
+    });
+
+    it('is refused by the engine for the same reason', () => {
+      const { state, mateId } = throwing({ x: 7, y: 18 });
+      const result = reduce(arena, state, {
+        unitId: state.turn!.unitId,
+        action: { kind: 'pass', targetId: mateId },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.reason).toMatch(/out of sight/);
+    });
+  });
+
+  describe('a shot at a hidden Furnace', () => {
+    /** A team A carrier on a cell, shooting at Furnace B, which team B defends. */
+    function carrierAt(at: Point): MatchState {
+      const start = base();
+      const actor = start.units.find((u) => u.id === start.turn!.unitId)!;
+      return {
+        ...start,
+        payload: { carriedBy: actor.id, ...at },
+        units: start.units.map((u) =>
+          u.id === actor.id ? { ...u, team: 'A' as const, ...at, holdingPayload: true } : u,
+        ),
+      };
+    }
+
+    it('is withdrawn within nine cells when every hatch cell is behind an obstacle', () => {
+      // Eight cells from the mouth, with the post at (3..4, 38..39) in the way.
+      const hidden: Point = { x: 3, y: 36 };
+      expect(visibleRangeToFurnace(arena, hidden, arena.furnaceOf('B'))).toBeNull();
+
+      expect(legalActions(arena, carrierAt(hidden))!.shoot).toBeNull();
+    });
+
+    it('is refused by the engine for the same reason', () => {
+      const state = carrierAt({ x: 3, y: 36 });
+      const result = reduce(arena, state, { unitId: state.turn!.unitId, action: { kind: 'shoot' } });
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.reason).toMatch(/out of sight/);
+    });
+
+    it('is offered from a cell with a clear line, as close to the mouth', () => {
+      const clear: Point = { x: 5, y: 36 };
+      expect(visibleRangeToFurnace(arena, clear, arena.furnaceOf('B'))).toBe(8);
+
+      const shot = legalActions(arena, carrierAt(clear))!.shoot;
+      expect(shot).not.toBeNull();
+      expect(shot!.mode).toBe('normal');
+    });
+  });
+
+  describe('the lines a Cracker may be batted down', () => {
+    /** The acting player at `actorAt`, a live Cracker at `crackerAt`. */
+    function beside(actorAt: Point, crackerAt: Point): MatchState {
+      const start = base();
+      const actorId = start.turn!.unitId;
+      return {
+        ...start,
+        units: start.units.map((u) => (u.id === actorId ? { ...u, ...actorAt } : u)),
+        crackers: start.crackers.map((c, i) =>
+          i === 0 ? { ...c, ...crackerAt, state: 'live' as const, respawnOnRound: null } : c,
+        ),
+      };
+    }
+
+    it('leaves out a line that runs straight into the pillar, and keeps the one away from it', () => {
+      // The Cracker at (7, 15) has the pillar (7, 16) directly north of it.
+      const legal = legalActions(arena, beside({ x: 6, y: 14 }, { x: 7, y: 15 }))!;
+      const directions = legal.batCracker[0]!.directions;
+
+      expect(directions).not.toContain(1);
+      expect(directions).toContain(5);
+      expect(directions).toHaveLength(7);
+    });
+
+    it('leaves out the three faces that point off the pitch at the west edge', () => {
+      const legal = legalActions(arena, beside({ x: 1, y: 10 }, { x: 0, y: 10 }))!;
+
+      expect(legal.batCracker[0]!.directions).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('offers all eight in the open', () => {
+      const legal = legalActions(arena, beside({ x: 6, y: 22 }, { x: 7, y: 22 }))!;
+
+      expect(legal.batCracker[0]!.directions).toHaveLength(8);
+    });
   });
 
   it('says when ending the turn is the only thing left, and not before', () => {

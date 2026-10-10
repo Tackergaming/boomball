@@ -32,7 +32,6 @@ export const BREAKER: RoleWeights = {
   supportAttack: 20,
   pressCarrier: 55,
 
-  keepGrip: 20,
   avoidOpportunity: 2,
   avoidCrackers: 4,
   dodgeWhenHurt: 10,

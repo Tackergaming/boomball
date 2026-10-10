@@ -43,13 +43,6 @@ export interface Unit {
   readonly hp: number;
   readonly maxHp: number;
 
-  /**
-   * Whether the unit has a grip. Set when a turn ends on an anchorable cell,
-   * and also by the auto-spooling grapple after a fifty foot free fall. A unit
-   * that ends its turn without it falls at the start of its next turn.
-   */
-  readonly anchored: boolean;
-
   readonly holdingPayload: boolean;
   readonly reactionAvailable: boolean;
   /** Set by the Dodge action. Holds until this unit's next turn begins. */

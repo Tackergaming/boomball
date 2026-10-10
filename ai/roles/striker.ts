@@ -29,7 +29,6 @@ export const STRIKER: RoleWeights = {
   supportAttack: 45,
   pressCarrier: 20,
 
-  keepGrip: 26,
   avoidOpportunity: 4,
   avoidCrackers: 10,
   dodgeWhenHurt: 10,

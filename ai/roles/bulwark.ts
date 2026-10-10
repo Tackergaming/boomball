@@ -32,7 +32,6 @@ export const BULWARK: RoleWeights = {
   supportAttack: 0,
   pressCarrier: 40,
 
-  keepGrip: 30,
   avoidOpportunity: 4,
   avoidCrackers: 8,
   dodgeWhenHurt: 14,

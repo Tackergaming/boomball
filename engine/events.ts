@@ -26,15 +26,6 @@ export type MatchEvent =
   | { readonly kind: 'roundStarted'; readonly round: number }
   | { readonly kind: 'turnStarted'; readonly unitId: UnitId; readonly round: number }
   | {
-      readonly kind: 'fell';
-      readonly unitId: UnitId;
-      readonly from: Point;
-      readonly to: Point;
-      readonly cellsFallen: number;
-      readonly impact: boolean;
-      readonly cause: 'lostGrip' | 'shoved';
-    }
-  | {
       readonly kind: 'moved';
       readonly unitId: UnitId;
       readonly from: Point;
@@ -50,15 +41,10 @@ export type MatchEvent =
       readonly unitId: UnitId;
       readonly amount: number;
       readonly hpAfter: number;
-      readonly source: 'fall' | 'bat' | 'cracker';
+      readonly source: 'bat' | 'cracker';
     }
   | { readonly kind: 'evacuated'; readonly unitId: UnitId; readonly round: number }
-  | {
-      readonly kind: 'turnEnded';
-      readonly unitId: UnitId;
-      /** False means the unit ends in open air and will drop next turn. */
-      readonly anchored: boolean;
-    }
+  | { readonly kind: 'turnEnded'; readonly unitId: UnitId }
   | {
       readonly kind: 'attacked';
       readonly attackerId: UnitId;
@@ -83,21 +69,19 @@ export type MatchEvent =
       readonly success: boolean;
     }
   | {
-      /**
-       * A Reaction the engine chose not to spend. Reactions are automatic, so
-       * this is the only thing that tells a player why nobody swung at them.
-       */
-      readonly kind: 'reactionHeld';
-      readonly unitId: UnitId;
-      readonly reason: 'anchor';
-    }
-  | {
       readonly kind: 'shoved';
       readonly shoverId: UnitId;
       readonly targetId: UnitId;
       readonly success: boolean;
       readonly shoverRoll: DiceRoll;
       readonly targetRoll: DiceRoll;
+      /**
+       * Where the target was pushed, one cell straight away from the shover
+       * (écart 32). Null when the contest was lost, when the target was
+       * carrying the Payload and lost the ball instead, or when the cell behind
+       * it was an obstacle, a unit or the edge and it did not move.
+       */
+      readonly pushedTo: Point | null;
     }
   | {
       readonly kind: 'crackerMoved';

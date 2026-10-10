@@ -7,7 +7,7 @@
  */
 
 import type { Arena } from '../arena.js';
-import { BAT_RECOIL_CELLS } from '../constants.js';
+import { BAT_RECOIL_CELLS, SHOVE_PUSH_CELLS } from '../constants.js';
 import type { DiceRoll } from '../events.js';
 import { inBounds, type Point } from '../geometry.js';
 import type { Rng } from '../rng.js';
@@ -115,10 +115,9 @@ export function resolveShove(rng: Rng, shover: Unit, target: Unit): {
 /**
  * Where the blast-bat's recoil throws the attacker.
  *
- * Ten feet directly away from what it hit. This is forced movement, so it
- * provokes nothing, but it can tear the attacker off its own anchor, which is
- * the price of swinging. It stops short rather than pushing into terrain or
- * into another player.
+ * Ten feet directly away from what it hit (écart 33). This is forced movement,
+ * so it provokes nothing. It stops short rather than pushing into an obstacle,
+ * off the pitch or into another player.
  */
 export function recoilDestination(
   arena: Arena,
@@ -126,20 +125,51 @@ export function recoilDestination(
   attacker: Unit,
   target: Point,
 ): Point {
+  return forcedDestination(arena, state, attacker, target, BAT_RECOIL_CELLS);
+}
+
+/**
+ * Where a successful Shove sends a target that was not carrying the ball.
+ *
+ * One cell straight away from the shover (écart 32), the 5e 2024 shove. If the
+ * cell behind it is an obstacle, a unit or the edge, the target does not move
+ * at all, which is the whole value of having one's back to a crate.
+ */
+export function pushDestination(
+  arena: Arena,
+  state: MatchState,
+  target: Unit,
+  shover: Point,
+): Point {
+  return forcedDestination(arena, state, target, shover, SHOVE_PUSH_CELLS);
+}
+
+/**
+ * Forced movement, shared by the recoil and the push: `mover` travels up to
+ * `cells` directly away from `awayFrom`, one cell at a time, and stops in front
+ * of the first obstacle, edge or player it meets. It never lands on anything.
+ */
+function forcedDestination(
+  arena: Arena,
+  state: MatchState,
+  mover: Unit,
+  awayFrom: Point,
+  cells: number,
+): Point {
   const step = {
-    x: Math.sign(attacker.x - target.x),
-    y: Math.sign(attacker.y - target.y),
+    x: Math.sign(mover.x - awayFrom.x),
+    y: Math.sign(mover.y - awayFrom.y),
   };
-  if (step.x === 0 && step.y === 0) return { x: attacker.x, y: attacker.y };
+  if (step.x === 0 && step.y === 0) return { x: mover.x, y: mover.y };
 
   const occupied = new Set(
     activeUnits(state)
-      .filter((u) => u.id !== attacker.id)
+      .filter((u) => u.id !== mover.id)
       .map((u) => `${u.x},${u.y}`),
   );
 
-  let landing: Point = { x: attacker.x, y: attacker.y };
-  for (let i = 0; i < BAT_RECOIL_CELLS; i++) {
+  let landing: Point = { x: mover.x, y: mover.y };
+  for (let i = 0; i < cells; i++) {
     const next = { x: landing.x + step.x, y: landing.y + step.y };
     if (!inBounds(next) || arena.isSolid(next) || occupied.has(`${next.x},${next.y}`)) break;
     landing = next;

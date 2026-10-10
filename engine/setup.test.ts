@@ -37,25 +37,24 @@ const fullMatch = () =>
 /**
  * The arena itself, before anybody stands on it.
  *
- * These assertions exist because the pitch now runs top to bottom. One Furnace
- * is in the floor and one is in the ceiling, so the thing that has to be fair
- * is the climb, and a hand-authored ASCII layout is exactly the kind of data
- * that drifts one character at a time without anybody noticing.
+ * These assertions exist because the pitch is a hand-authored ASCII layout,
+ * with a Furnace at each end and obstacles between them, and that is exactly
+ * the kind of data that drifts one character at a time without anybody
+ * noticing. What has to be fair is the route to goal.
  */
 describe('the Kill-Silo as a pitch', () => {
   const arena = new Arena(KILL_SILO);
 
   it('is an exact mirror about the halfway line, so neither side has the better half', () => {
     // `rows` is authored top first, so index i and index 44 - i are the two
-    // heights an equal distance either side of y = 22. This is the whole of
-    // what makes the two approaches to goal identical, and it replaces the
-    // left/right symmetry that mattered when both Furnaces were in Zone 3.
+    // rows an equal distance either side of y = 22. This is the whole of what
+    // makes the two approaches to goal identical.
     for (let i = 0; i < ARENA_HEIGHT; i++) {
       expect(KILL_SILO.rows[i]).toBe(KILL_SILO.rows[ARENA_HEIGHT - 1 - i]);
     }
   });
 
-  it('puts the two Furnaces at opposite ends of the shaft', () => {
+  it('puts the two Furnaces at opposite ends of the pitch', () => {
     const a = arena.furnaceOf('A');
     const b = arena.furnaceOf('B');
 
@@ -65,19 +64,26 @@ describe('the Kill-Silo as a pitch', () => {
     for (const cell of [...a.cells, ...b.cells]) expect(arena.isSolid(cell)).toBe(true);
   });
 
-  it('starts every unit somewhere it can stand and hold on to', () => {
-    // A start cell that is solid drops a player into a girder, and one that is
-    // not anchorable drops them down the shaft on their own first turn. Both
-    // are silent: `createMatch` places units without asking the terrain.
+  it('starts every unit somewhere it can stand', () => {
+    // A start cell that is an obstacle buries a player in a crate. It is silent:
+    // `createMatch` places units without asking the terrain.
     for (const team of ['A', 'B'] as const) {
       for (const cell of KILL_SILO.starts[team]) {
         expect(arena.isOccupiable(cell)).toBe(true);
-        expect(arena.isAnchorable(cell)).toBe(true);
       }
-      const entry = KILL_SILO.substituteEntry[team];
-      expect(arena.isOccupiable(entry)).toBe(true);
-      expect(arena.isAnchorable(entry)).toBe(true);
+      expect(arena.isOccupiable(KILL_SILO.substituteEntry[team])).toBe(true);
     }
+  });
+
+  it('lines the teams up on the new start cells, keeper in front of its own mouth', () => {
+    const state = createMatch(base);
+    const at = (team: 'A' | 'B', role: string) =>
+      activeUnitsOf(state, team).find((u) => u.role === role)!;
+
+    expect({ x: at('A', 'bulwark').x, y: at('A', 'bulwark').y }).toEqual({ x: 7, y: 1 });
+    expect({ x: at('B', 'bulwark').x, y: at('B', 'bulwark').y }).toEqual({ x: 7, y: 43 });
+    expect(activeUnitsOf(state, 'A').filter((u) => u.y === 4)).toHaveLength(6);
+    expect(activeUnitsOf(state, 'B').filter((u) => u.y === 40)).toHaveLength(6);
   });
 
   it('starts each goalkeeper close enough to its own hatch to block a shot', () => {
@@ -130,15 +136,15 @@ describe('kick-off', () => {
     expect(fullMatch().units.filter((u) => !isHuman(u))).toHaveLength(11);
   });
 
-  it('places every unit on free, anchored, unoccupied terrain', () => {
+  it('places every unit on an open, unoccupied, unique cell', () => {
     const arena = new Arena(KILL_SILO);
     const state = fullMatch();
     const seen = new Set<string>();
 
     for (const unit of state.units) {
       expect(arena.isOccupiable(unit)).toBe(true);
-      expect(unit.anchored).toBe(true);
-      expect(arena.isAnchorable(unit)).toBe(true);
+      expect(arena.isSolid(unit)).toBe(false);
+      expect('anchored' in unit).toBe(false);
       const key = `${unit.x},${unit.y}`;
       expect(seen.has(key), `two units share ${key}`).toBe(false);
       seen.add(key);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import { FLY_SPEED_FEET, SPARK_CATCH_DC } from '../engine/constants.js';
+import { MOVE_SPEED_FEET, SPARK_CATCH_DC } from '../engine/constants.js';
 import { distance, type Point } from '../engine/geometry.js';
 import type { Action } from '../engine/actions.js';
 import type { MatchEvent } from '../engine/events.js';
@@ -38,7 +38,7 @@ function giveTurnTo(state: MatchState, unitId: UnitId): MatchState {
     ...state,
     turn: {
       unitId,
-      movementFeetRemaining: FLY_SPEED_FEET,
+      movementFeetRemaining: MOVE_SPEED_FEET,
       actionUsed: false,
       objectInteractionUsed: false,
       disengaged: false,
@@ -323,7 +323,7 @@ describe('the priority tables', () => {
     const cracker = { x: 6, y: 22 };
     for (const candidate of rankActions(arena, staged, breaker)) {
       if (candidate.action.kind !== 'batCracker') continue;
-      const struck = battedCrackerRun(staged, cracker, candidate.action.direction).struck;
+      const struck = battedCrackerRun(arena, staged, cracker, candidate.action.direction).struck;
       expect(struck?.team).not.toBe('A');
     }
   });

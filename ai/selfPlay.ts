@@ -12,9 +12,9 @@
  */
 
 import { Arena, type ArenaSpec } from '../engine/arena.js';
-import { ZONE_COUNT } from '../engine/constants.js';
+import { THIRD_COUNT } from '../engine/constants.js';
 import type { MatchEvent } from '../engine/events.js';
-import { zoneOf, type Point } from '../engine/geometry.js';
+import { thirdOf, type Point } from '../engine/geometry.js';
 import { openMatch, reduce } from '../engine/reduce.js';
 import { createMatch, type MatchSetup } from '../engine/setup.js';
 import type { Tier } from '../engine/stats.js';
@@ -36,8 +36,8 @@ export interface PlayResult {
 
 /** Turns counted by where the Payload was, sampled once per turn. */
 export interface BallTrack {
-  /** One entry per zone, floor first. */
-  readonly byZone: readonly number[];
+  /** One entry per third of the pitch, Furnace A's end first. */
+  readonly byThird: readonly number[];
   /** Of those turns, the ones where a goalkeeper was holding it. */
   readonly heldByKeeper: number;
   readonly turns: number;
@@ -76,7 +76,7 @@ export function playMatch(
   let actions = 0;
   const limit = ACTIONS_PER_TURN_LIMIT * 14 * 14;
 
-  const byZone = new Array<number>(ZONE_COUNT).fill(0);
+  const byThird = new Array<number>(THIRD_COUNT).fill(0);
   let heldByKeeper = 0;
   let turns = 0;
   let sampled: string | null = null;
@@ -89,7 +89,7 @@ export function playMatch(
     if (sampled !== unitId) {
       sampled = unitId;
       const ball = ballAt(state);
-      byZone[zoneOf(ball.cell)]!++;
+      byThird[thirdOf(ball.cell)]!++;
       if (ball.keeper) heldByKeeper++;
       turns++;
     }
@@ -109,7 +109,7 @@ export function playMatch(
   }
 
   if (state.phase !== 'finished') throw new Error(`the match did not end in ${limit} actions`);
-  return { state, events, actions, ballTrack: { byZone, heldByKeeper, turns } };
+  return { state, events, actions, ballTrack: { byThird, heldByKeeper, turns } };
 }
 
 export function playSeed(spec: ArenaSpec, tier: Tier, seed: number): PlayResult {
@@ -145,16 +145,16 @@ export interface SweepReport {
   readonly meanEvacuated: number;
   readonly meanActions: number;
   /**
-   * Where the ball spends the match, as a share of turns in each zone, floor
-   * first.
+   * Where the ball spends the match, as a share of turns in each third of the
+   * pitch, Furnace A's end first.
    *
-   * This is the column that diagnosed the pitch. With both Furnaces in Zone 3
-   * it read 0 / 10 / 90 from round 6 on: the ball went up and never came back,
-   * and two thirds of the arena were scenery. On a pitch that runs end to end
-   * it should be spread, and a reading that collapses onto one zone again means
-   * the sport has found a new place to camp.
+   * This is the column that diagnosed the pitch. With both Furnaces at the same
+   * end it read 0 / 10 / 90 from round 6 on: the ball went there and never came
+   * back, and two thirds of the arena were scenery. On a pitch that runs end to
+   * end it should be spread, and a reading that collapses onto one third again
+   * means the sport has found a new place to camp.
    */
-  readonly ballZoneShare: readonly number[];
+  readonly ballThirdShare: readonly number[];
   /**
    * Share of turns the ball sits in a goalkeeper's hands.
    *
@@ -196,7 +196,7 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
   let sparkDecided = 0;
   let evacuated = 0;
   let actions = 0;
-  const ballZone = new Array<number>(ZONE_COUNT).fill(0);
+  const ballThird = new Array<number>(THIRD_COUNT).fill(0);
   let keeperHeld = 0;
   let ballTurns = 0;
 
@@ -226,7 +226,7 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     evacuated += state.units.filter((u) => u.status === 'evacuated').length;
     actions += played.actions;
 
-    for (let z = 0; z < ZONE_COUNT; z++) ballZone[z]! += played.ballTrack.byZone[z]!;
+    for (let t = 0; t < THIRD_COUNT; t++) ballThird[t]! += played.ballTrack.byThird[t]!;
     keeperHeld += played.ballTrack.heldByKeeper;
     ballTurns += played.ballTrack.turns;
   }
@@ -243,7 +243,7 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     sparkDecided,
     meanEvacuated: evacuated / matches,
     meanActions: actions / matches,
-    ballZoneShare: ballZone.map((n) => (ballTurns === 0 ? 0 : n / ballTurns)),
+    ballThirdShare: ballThird.map((n) => (ballTurns === 0 ? 0 : n / ballTurns)),
     keeperHeldShare: ballTurns === 0 ? 0 : keeperHeld / ballTurns,
   };
 }

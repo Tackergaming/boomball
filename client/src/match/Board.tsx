@@ -126,7 +126,7 @@ export function Board({
                   y={row}
                   width={1}
                   height={1}
-                  fill={cell === 'structure' ? 'rgba(9,12,14,.82)' : 'rgba(201,180,137,.16)'}
+                  fill={'rgba(9,12,14,.82)'}
                 />
               );
             }),
@@ -517,16 +517,6 @@ function UnitMark({
           the anchoring warning on the left, the hit points on the right. */}
       {carrying && (
         <circle cx={x + 0.21} cy={row + 0.66} r={0.13} fill="#c9b489" stroke="#05070a" strokeWidth={0.04} />
-      )}
-      {!unit.anchored && (
-        <text
-          x={x + 0.12}
-          y={row + 0.1 + px(10)}
-          fill="#d8a12a"
-          style={{ font: `700 ${px(11)}px 'IBM Plex Mono', monospace` }}
-        >
-          !
-        </text>
       )}
     </g>
   );
