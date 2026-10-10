@@ -18,6 +18,7 @@ import {
   Shots,
   act,
   farthest,
+  glideSeen,
   report,
   roundMarkers,
   stamp,
@@ -145,7 +146,24 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   await waitForArrival(page, legal3.unitId, to3);
   await shots.take('turn-3-moved');
 
+  // -- Turn 3, the house's reply at slow: the pieces glide (2H.5) -----------
+  //
+  // An animation is judged on two captures at different instants of the same
+  // beat. The replay is switched to slow, the turn is ended, and the tokens'
+  // screen boxes are sampled every tenth of a second until one of them has
+  // moved between two samples: that is a glide, not a jump. Both instants are
+  // captured for a human, or Claude, to read.
+  await page.getByRole('button', { name: 'slow', exact: true }).click();
   await page.getByRole('button', { name: 'End turn', exact: true }).click();
+  await page.waitForFunction(() => window.__boomball?.replaying === true, null, { timeout: 30_000 });
+  const glide = await glideSeen(page, shots);
+  expect(glide.moved, 'at least one token moved between two samples during the replay').toBe(true);
+  // A glide is a token between two cells: at some sample its box is not on
+  // the cell grid the instant layout would have put it on.
+  expect(glide.largestShift).toBeGreaterThan(2);
+  await page.getByRole('button', { name: 'instant', exact: true }).click();
+  await page.evaluate(() => window.__boomball?.skipReplay());
+
   expect(await waitForMyTurn(page)).toBe('turn');
   const afterThree = await view(page);
   expect(afterThree.seq).toBeGreaterThan(afterTwo.seq);

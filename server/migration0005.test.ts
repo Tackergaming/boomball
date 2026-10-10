@@ -1,15 +1,15 @@
 /**
- * Migration 0005 rewrites the `kill-silo` arena row for the horizontal pitch
- * (decision D11). The row is a mirror of the engine, so this holds the block in
- * the migration character for character against the one `buildSeedSql()`
- * generates from `engine/arenas/kill-silo.ts`.
+ * Migration 0005 rewrote the `kill-silo` arena row for the horizontal pitch
+ * (decision D11). Since 2026-10-10 (2H.5) migration 0006 superseded the row, so
+ * 0005 is kept as history: this checks it still says what it said when it was
+ * applied (the old kick-off line, y4 and y40), and no longer that it equals the
+ * seed. The live row is held equal to the engine in `migration0006.test.ts`.
  */
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import { buildSeedSql } from './seed.js';
 
 const START = 'insert into arenas (';
 const END = '  art = excluded.art;';
@@ -30,8 +30,15 @@ const migration = readFileSync(
 ).replace(/\r\n/g, '\n');
 
 describe('migration 0005, the horizontal arena row', () => {
-  it('carries the same arenas block as the seed generated from the engine', () => {
-    expect(arenasBlock(migration)).toBe(arenasBlock(buildSeedSql()));
+  // From 2026-10-10 the live row is the one in 0006 and in the seed; 0005 is
+  // kept as history, so it still carries the OLD kick-off line.
+  it('still carries the old kick-off line, y4 and y40 (history, superseded by 0006)', () => {
+    const startsLine = arenasBlock(migration)
+      .split('\n')
+      .find((l) => l.includes('"A":[{"x":7,"y":1}'));
+    expect(startsLine).toBeDefined();
+    expect(startsLine).toContain('"y":4');
+    expect(startsLine).toContain('"y":40');
   });
 
   it('carries every row of terrain literally', () => {

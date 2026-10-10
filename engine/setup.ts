@@ -12,6 +12,7 @@ import { BENCH_SIZE } from './constants.js';
 import { buildTurnOrder, rollHumanInitiative } from './initiative.js';
 import { drawNames } from './names.js';
 import { Rng } from './rng.js';
+import { crackerKickoffCells } from './rules/ordnance.js';
 import { TEAM_COMPOSITION, statsFor, type Role, type Tier } from './stats.js';
 import type { Cracker, MatchState, Unit } from './types.js';
 
@@ -49,10 +50,11 @@ export function createMatch(setup: MatchSetup): MatchState {
     throw new Error(`arena ${setup.arena.id} drops its ordnance on solid terrain`);
   }
 
-  const crackers: Cracker[] = [0, 1].map((i) => ({
+  // One either side of the ball, never on it (écart 43).
+  const crackers: Cracker[] = crackerKickoffCells(arena, ordnance).map((cell, i) => ({
     id: `cracker-${i + 1}`,
-    x: ordnance.x,
-    y: ordnance.y,
+    x: cell.x,
+    y: cell.y,
     state: 'live' as const,
     respawnOnRound: null,
   }));

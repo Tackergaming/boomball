@@ -22,10 +22,10 @@ import {
   PAYLOAD_RANGE_CELLS,
   SCATTER_DIE,
 } from '../constants.js';
-import { directionFromD8, distance, inBounds, type Point } from '../geometry.js';
+import { DIRECTIONS, directionFromD8, distance, inBounds, type Point } from '../geometry.js';
 import type { Rng } from '../rng.js';
 import { lineOfSight } from './sight.js';
-import { activeUnitsOf, type MatchState, type TeamId, type Unit } from '../types.js';
+import { activeUnitsOf, unitAt, type MatchState, type TeamId, type Unit } from '../types.js';
 
 export type ThrowRange =
   | { readonly ok: true; readonly mode: 'normal' | 'disadvantage'; readonly cells: number }
@@ -126,4 +126,51 @@ export function scatter(arena: Arena, from: Point, rng: Rng): { landing: Point; 
   }
 
   return { landing, cells, direction: roll };
+}
+
+/**
+ * Where a ball its carrier has just lost comes to rest (écart 42): on one of
+ * the eight cells around the carrier, rolled on a d8 like a missed pass.
+ *
+ * On the vertical silo the ball stayed on the carrier's own cell, kept by the
+ * arbitrage of 2026-09-01 so that a Shove took the ball without undoing the
+ * carrier's climb. On a floor where two players never share a cell that left
+ * the ball under the feet of the only player who could pick it up again, which
+ * Jérôme's first game found absurd. So it rolls one cell.
+ *
+ * **The fallback, written here because the d8 alone does not finish the rule.**
+ * The rolled cell may be an obstacle, off the pitch, or under another player;
+ * the ball is not lost in a crate and it does not land on somebody's boots. From
+ * the rolled face, turn one d8 face clockwise at a time (N, NE, E, and so round)
+ * and take the first free cell. Only when all eight are taken does the ball
+ * stay where it was lost, which no board of fourteen players produces but a
+ * rule has to say. The shover's own cell is taken, so a Shove never drops the
+ * ball straight into the shover's hands: it still has to step onto it.
+ *
+ * Pure in `dropLanding` so the eight faces and the fallback are tested without
+ * a die; `dropCell` is the same rule with the die rolled and the board read.
+ */
+export function dropLanding(
+  free: (p: Point) => boolean,
+  from: Point,
+  roll: number,
+): { landing: Point; direction: number } {
+  for (let turn = 0; turn < DIRECTIONS.length; turn++) {
+    const face = DIRECTIONS[(roll - 1 + turn) % DIRECTIONS.length]!;
+    const to = { x: from.x + face.x, y: from.y + face.y };
+    if (free(to)) return { landing: to, direction: roll };
+  }
+  return { landing: from, direction: roll };
+}
+
+/** `dropLanding` on a live board: a cell is free when it is open floor with nobody standing on it. */
+export function dropCell(
+  arena: Arena,
+  state: MatchState,
+  from: Point,
+  rng: Rng,
+): { landing: Point; direction: number } {
+  const roll = rng.die(8);
+  const free = (p: Point): boolean => arena.isOccupiable(p) && !unitAt(state, p.x, p.y);
+  return dropLanding(free, from, roll);
 }

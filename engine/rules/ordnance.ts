@@ -37,6 +37,65 @@ import type { Rng } from '../rng.js';
 import { activeUnits, type MatchState, type Unit } from '../types.js';
 import { bouncingRun } from './bounce.js';
 
+// -- Where the Crackers stand ------------------------------------------------
+
+/**
+ * The two cells the Crackers start on (écart 43): one either side of the
+ * ball, across the width of the pitch, on the halfway line. They used to share
+ * the ball's own cell and were drawn under it, so Jérôme's first game showed one
+ * Cracker where there were two. Either side across the width rather than along
+ * the length, so that each one stays exactly as far from both Furnaces as the
+ * ball is and neither side has a Cracker a cell nearer its own goal.
+ *
+ * Throws on an arena where those cells are not floor, because a Cracker born
+ * in a crate is a Cracker that never moves.
+ */
+export function crackerKickoffCells(arena: Arena, centre: Point): [Point, Point] {
+  const cells: [Point, Point] = [
+    { x: centre.x - 1, y: centre.y },
+    { x: centre.x + 1, y: centre.y },
+  ];
+  for (const cell of cells) {
+    if (!arena.isOccupiable(cell)) {
+      throw new Error(`arena ${arena.spec.id} has no floor beside its centre for a Cracker`);
+    }
+  }
+  return cells;
+}
+
+/**
+ * Where a spent Cracker comes back (écart 43): the free cell nearest the
+ * centre, the centre itself when it is free. A cell is taken by a loose ball,
+ * by a player, or by the other Cracker when it is live; a returning Cracker
+ * never lands on the ball, on anybody, or on its twin. Equidistant candidates
+ * are split by the dice, as `nearestUnit` does, so no direction is favoured.
+ */
+export function crackerRespawnCell(arena: Arena, state: MatchState, rng: Rng): Point {
+  const centre = arena.spec.ordnanceStart;
+  const taken = new Set<string>();
+  const key = (p: Point): string => `${p.x},${p.y}`;
+  for (const unit of activeUnits(state)) taken.add(key(unit));
+  for (const cracker of state.crackers) if (cracker.state === 'live') taken.add(key(cracker));
+  if (state.payload.carriedBy === null) taken.add(key(state.payload));
+
+  let best: Point[] = [];
+  let bestDistance = Infinity;
+  for (const cell of arena.occupiableCells()) {
+    if (taken.has(key(cell))) continue;
+    const d = distance(cell, centre);
+    if (d < bestDistance) {
+      bestDistance = d;
+      best = [cell];
+    } else if (d === bestDistance) {
+      best.push(cell);
+    }
+  }
+  if (best.length === 0) throw new Error('the arena has no free cell for a Cracker to return to');
+  return rng.pick(best);
+}
+
+// -- Runs --------------------------------------------------------------------
+
 /** A hazard's travel: the cells it crossed, where it stopped, and who it met. */
 export interface HazardRun {
   readonly path: readonly Point[];

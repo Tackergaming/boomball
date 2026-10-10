@@ -36,6 +36,7 @@ import type { Action } from '../../../engine/actions.js';
 import type { MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId } from '../../../engine/types.js';
 import { sendOrders, submitAction, supabase } from '../lib/supabase.js';
+import { timeMotion, type Motion } from './motion.js';
 import { toBeats, type Beat } from './replay.js';
 
 export type Speed = 'slow' | 'normal' | 'instant';
@@ -67,6 +68,13 @@ export interface MatchView {
    * to read their own roll instead of watching it flash past.
    */
   beat: Beat | null;
+  /**
+   * What is travelling on the board right now, timed at the chosen speed, or
+   * null when the board is simply the server's snapshot. Set with each beat
+   * and cleared with the re-read that ends the replay, so the board never
+   * animates towards a position that is no longer the one on screen.
+   */
+  motion: Motion | null;
   /** How far through the batch the replay is, for the progress pips. */
   progress: { at: number; of: number } | null;
   refusal: string | null;
@@ -124,6 +132,13 @@ const REPLAY_BUDGET_MS = 45_000;
 const MIN_BEAT_MS = 1600;
 
 /**
+ * Rest after the last thing in a beat has stopped moving, before the next beat
+ * starts, so an arrival is seen as an arrival and not as the start of the next
+ * departure. Only applies when the beat's motion outlasts its card.
+ */
+const SETTLE_MS = 180;
+
+/**
  * How long a card wants on screen at the current speed.
  *
  * Exported because `Match.tsx` waits before auto-passing an empty turn, and
@@ -156,6 +171,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   const [busy, setBusy] = useState(false);
   const [replaying, setReplaying] = useState(false);
   const [beat, setBeat] = useState<Beat | null>(null);
+  const [motion, setMotion] = useState<Motion | null>(null);
   const [progress, setProgress] = useState<{ at: number; of: number } | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
@@ -199,6 +215,8 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     ]);
 
     if (snapshot) {
+      // The server's board is drawn as it is: whatever was gliding stops there.
+      setMotion(null);
       setState(snapshot.snapshot as MatchState);
       setSeq(snapshot.seq as number);
       seqRef.current = snapshot.seq as number;
@@ -284,10 +302,22 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
       for (let i = 0; i < beats.length; i++) {
         if (skipRef.current || !liveRef.current) break;
         const one = beats[i]!;
+        // The beat's travel, timed now rather than in `toBeats`, because the
+        // player may change the speed between two batches. The board glides
+        // through it on its way to `one.state`; at `instant` it is all zero
+        // and the board simply draws the state.
+        const travel = timeMotion(i, one.motion, speedRef.current);
         setBeat(one);
+        setMotion(travel);
         setState(one.state);
         setProgress({ at: i + 1, of: beats.length });
-        if (holdFor(one, i === 0) > 0) await wait(holdFor(one, i === 0) * scale * perBeat);
+        // Held for the card, or for the glide, whichever is longer. The card's
+        // hold is still zero for the player's own uneventful first beat, but
+        // the walk they clicked for is now watched rather than skipped.
+        const card = holdFor(one, i === 0) * scale * perBeat;
+        const glide = travel.totalMs > 0 ? travel.totalMs + SETTLE_MS : 0;
+        const hold = Math.max(card, glide);
+        if (hold > 0) await wait(hold);
       }
 
       setProgress(null);
@@ -387,6 +417,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     busy,
     replaying,
     beat,
+    motion,
     progress,
     refusal,
     expired,

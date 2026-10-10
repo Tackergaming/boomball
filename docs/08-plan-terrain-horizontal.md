@@ -11,7 +11,9 @@
 > franchie** : la partie de Jérôme du 2026-10-10 a produit sept retours et quatre décisions, qui
 > forment une sous-phase 2H.5 avant la phase 3 : coup d'envoi à huit cases du ballon (écart 38
 > révisé), ballon perdu sur une case adjacente au d8 (écart 42), Crackers sur des cases distinctes
-> (écart 43), animation 2D avant le 2.5D. Le prompt est `05-reprise-chat-suivant.md`.
+> (écart 43), animation 2D avant le 2.5D. **2H.5 est construite le 2026-10-10 soir**, journal en
+> `07` §10 ; il reste à Jérôme la migration 0006, le redéploiement des deux fonctions, et sa partie
+> sur le plateau animé. Le prompt est `05-reprise-chat-suivant.md`.
 >
 > **Unité d'effort : la séance**, environ deux heures de Claude Code bornées à un commit.
 
@@ -214,9 +216,11 @@ aujourd'hui :
  0  ......###......   bouche de la Furnace A
 ```
 
-**Positions de départ proposées.** Bulwark en `(7, 1)` pour A et `(7, 43)` pour B. Les six joueurs de
-champ sur `y4` pour A et `y40` pour B, aux `x` 2, 4, 6, 8, 10, 12. Le ballon au centre, `(7, 22)`,
-comme aujourd'hui.
+**Positions de départ.** Bulwark en `(7, 1)` pour A et `(7, 43)` pour B. Les six joueurs de champ
+étaient proposés sur `y4` pour A et `y40` pour B, aux `x` 2, 4, 6, 8, 10, 12 ; **depuis le
+2026-10-10 soir, écart 38 révisé, ils partent de `y14` et `y30`**, mêmes `x`, à huit cases du
+ballon, parce qu'à dix-huit cases personne ne l'atteignait au premier tour. Le ballon au centre,
+`(7, 22)`, un Cracker de chaque côté en `(6, 22)` et `(8, 22)` (écart 43).
 
 **Le nom et la fiction, J3 tranché.** Le Kill-Silo reste un silo à missile nucléaire, un tube, mais
 couché à l'horizontale : la nostalgie de Bombara, le monde d'origine des Giff. L'identifiant
@@ -305,6 +309,7 @@ ligne de vue ; `07` garde D11 en §1.2 ; le skill `boomball` et `05` suivent ; `
 | **2H.2 IA** | Ancrage retiré, couverture et ligne de vue, A31 reproduit et corrigé | 1 | Le critère de dispersion dans le rapport de sweep |
 | **2H.3 Équilibrage** | La campagne de §4.3, arbitrages de Jérôme, écarts écrits | 0,5 à 1 | Trois Tiers dans la cible, équilibrage re-clos |
 | **2H.4 Serveur et client 2D** | A11, A28, A29, migration, redéploiement, plateau vu de dessus, briefing, harnais | 1,5 à 2 | `smoke.spec.ts` vert, `browser-path.py` vert, un playthrough entier, **Jérôme joue une partie en 2D et dit s'il comprend l'IA** |
+| **2H.5 Coup d'envoi, ballon perdu, Crackers, animation 2D** | Écarts 38 révisé, 42, 43 et 44 ; traits de trajectoire retirés ; les pions glissent et le ballon vole, un temps par action ; sweep de contrôle ; migration 0006 et redéploiement | 1 | `smoke.spec.ts` vert avec deux captures d'un même temps à des instants différents, **Jérôme rejoue une partie en 2D animée et dit s'il comprend ce que ses coéquipiers et la maison cherchent** |
 | 3 Scène 2.5D statique | Sol, obstacles, deux bouches depuis le layout ; caméra trois quarts, deux zooms, pas de rotation ; textures CC0 | 1 à 2 | Comme `07` : bijection layout vers solides, Jérôme reconnaît le terrain |
 | 4 Jouer en 2.5D | Lancer de rayon sur le sol, survol, clic, tuiles atteignables, **aperçu de la ligne de vue** sur les cibles, mini-carte 45 x 15 | 1 à 2 | Jérôme joue une partie en 3D sans basculer |
 | 5 Timeline | Marche, poussée, recul, frappe, dérive du Spark, arc de passe et de tir, éclat de but ; la caméra suit le ballon ; plus aucune chute à animer | 2 | Jérôme suit un round de la maison sans lire le fil |

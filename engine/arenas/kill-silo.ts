@@ -35,8 +35,8 @@ export const KILL_SILO: ArenaSpec = {
     '......###......', // 44  Furnace B: the mouth of the tube
     '...............', // 43  B's goalkeeper stands here, in front of the mouth
     '...............', // 42
-    '...............', // 41  the keeper's clearance
-    '...............', // 40  B's kick-off line
+    '...............', // 41
+    '...............', // 40
     '...##.....##...', // 39  the two posts
     '...##.....##...', // 38
     '...............', // 37
@@ -46,7 +46,7 @@ export const KILL_SILO: ArenaSpec = {
     '...............', // 33
     '.##.........##.', // 32  two side covers
     '.##.........##.', // 31
-    '...............', // 30
+    '...............', // 30  B's kick-off line: eight cells from the ball (écart 38)
     '...............', // 29
     '.......#.......', // 28  a central pillar
     '...............', // 27
@@ -63,7 +63,7 @@ export const KILL_SILO: ArenaSpec = {
     '...............', // 17
     '.......#.......', // 16  a central pillar
     '...............', // 15
-    '...............', // 14
+    '...............', // 14  A's kick-off line: eight cells from the ball (écart 38)
     '.##.........##.', // 13  two side covers
     '.##.........##.', // 12
     '...............', // 11
@@ -73,8 +73,8 @@ export const KILL_SILO: ArenaSpec = {
     '...............', // 7
     '...##.....##...', // 6   the two posts
     '...##.....##...', // 5
-    '...............', // 4   A's kick-off line
-    '...............', // 3   the keeper's clearance
+    '...............', // 4
+    '...............', // 3
     '...............', // 2
     '...............', // 1   A's goalkeeper stands here, in front of the mouth
     '......###......', // 0   Furnace A: the mouth of the tube
@@ -112,25 +112,31 @@ export const KILL_SILO: ArenaSpec = {
     // goalkeeper is off the field. It stands in its own goal mouth: one cell
     // from the hatch, inside `BULWARK_BLOCK_RANGE_CELLS`.
     //
-    // Then the six field players on a line of their own third, three cells
-    // clear of the mouth so the keeper has room to work (écart 38).
+    // Then the six field players on a line **eight cells from the ball**, y14
+    // for A and y30 for B, at the same six x (écart 38, revised 2026-10-10 at
+    // the gate of 2H.4). The first draft lined them up on y4 and y40, eighteen
+    // cells from the centre, and Jérôme's first game found that nobody could
+    // reach the ball on the first turn even with a Dash. Eight cells is one
+    // move: each of the six can stand on (7, 22) on turn one without a Dash,
+    // round the pillar and the covers, and `setup.test.ts` proves it for both
+    // sides. Still in their own third, still clear of the keeper.
     A: [
       { x: 7, y: 1 },
-      { x: 2, y: 4 },
-      { x: 4, y: 4 },
-      { x: 6, y: 4 },
-      { x: 8, y: 4 },
-      { x: 10, y: 4 },
-      { x: 12, y: 4 },
+      { x: 2, y: 14 },
+      { x: 4, y: 14 },
+      { x: 6, y: 14 },
+      { x: 8, y: 14 },
+      { x: 10, y: 14 },
+      { x: 12, y: 14 },
     ],
     B: [
       { x: 7, y: 43 },
-      { x: 2, y: 40 },
-      { x: 4, y: 40 },
-      { x: 6, y: 40 },
-      { x: 8, y: 40 },
-      { x: 10, y: 40 },
-      { x: 12, y: 40 },
+      { x: 2, y: 30 },
+      { x: 4, y: 30 },
+      { x: 6, y: 30 },
+      { x: 8, y: 30 },
+      { x: 10, y: 30 },
+      { x: 12, y: 30 },
     ],
   },
 

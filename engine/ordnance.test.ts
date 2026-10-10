@@ -9,6 +9,7 @@ import {
   CRACKER_DAMAGE_DICE,
   CRACKER_BAT_RANGE_CELLS,
   CRACKER_DAMAGE_DIE,
+  CRACKER_FIRST_DRIFT_ROUND,
   CRACKER_MOVE_CELLS,
   SPARK_ENTRY_ROUND,
   SPARK_MOVE_CELLS,
@@ -23,6 +24,8 @@ import { openMatch, reduce, type ReduceResult } from './reduce.js';
 import { Rng } from './rng.js';
 import {
   battedCrackerRun,
+  crackerKickoffCells,
+  crackerRespawnCell,
   crackerRun,
   shortestPath,
   sparkEntryCell,
@@ -60,17 +63,19 @@ function cleared(state: MatchState): MatchState {
 }
 
 /**
- * A cleared match, patched, then opened.
+ * A cleared match, patched, then opened **on round 2**.
  *
  * `openMatch` walks the ladder from the top, which means it resolves count 20.
  * Patching the board before opening it is therefore how a test drives the
- * Crackers without hand-rolling a round.
+ * Crackers without hand-rolling a round. Round 2 rather than 1 because the
+ * Crackers do not drift on the kick-off round (écart 44); the ladder built at
+ * kick-off is reused as it is, only the round number differs.
  */
 function opened(
   patch: (s: MatchState) => MatchState = (s) => s,
   seed = 5,
 ): { state: MatchState; events: readonly MatchEvent[] } {
-  return openMatch(arena, patch(cleared(fresh(seed))));
+  return openMatch(arena, { ...patch(cleared(fresh(seed))), round: CRACKER_FIRST_DRIFT_ROUND });
 }
 
 function place(state: MatchState, id: UnitId, at: Point): MatchState {
@@ -275,6 +280,38 @@ function homingOnOne(state: MatchState, secondCracker: Point = { x: 7, y: 22 }):
 }
 
 describe('the Crackers on the ladder', () => {
+  it('lets them lie still through the kick-off round, so no blast lands before anyone has acted (écart 44)', () => {
+    // The real kick-off board: lines eight cells from the centre, Crackers a
+    // cell either side of the ball, ten cells of roll. Left to drift on round 1
+    // they reached somebody every match. Opened as kick-off actually opens.
+    const { state, events } = openMatch(arena, fresh(5));
+    expect(state.round).toBe(1);
+    expect(events.some((e) => e.kind === 'crackerMoved')).toBe(false);
+    expect(events.some((e) => e.kind === 'crackerDetonated')).toBe(false);
+    for (const cracker of state.crackers) {
+      expect(cracker.state).toBe('live');
+      expect(distance(cracker, KILL_SILO.ordnanceStart)).toBe(1);
+    }
+    expect(CRACKER_FIRST_DRIFT_ROUND).toBe(2);
+  });
+
+  it('starts them hunting on round 2, on the same board', () => {
+    const { events } = openMatch(arena, { ...fresh(5), round: CRACKER_FIRST_DRIFT_ROUND });
+    const moved = events.findIndex((e) => e.kind === 'crackerMoved');
+    const firstTurn = events.findIndex((e) => e.kind === 'turnStarted');
+    expect(moved).toBeGreaterThan(-1);
+    expect(moved).toBeLessThan(firstTurn);
+  });
+
+  it('still lets a player bat one on the kick-off round', () => {
+    const board = openMatch(arena, fresh(5)).state;
+    const actorId = board.turn!.unitId;
+    const state = crackersAt(place(board, actorId, { x: 7, y: 20 }), { x: 7, y: 21 }, { x: 0, y: 0 });
+    const result = run(state, { kind: 'batCracker', crackerId: 'cracker-1', direction: 1 });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.events.some((e) => e.kind === 'crackerBatted')).toBe(true);
+  });
+
   it('resolves them at the top of the round, before anyone takes a turn', () => {
     const { events } = opened((s) => homingOnOne(s));
 
@@ -307,8 +344,44 @@ describe('the Crackers on the ladder', () => {
       seen = step.events.find((e) => e.kind === 'crackerRespawned' && e.crackerId === crackerId);
     }
 
-    expect(seen).toMatchObject({ at: KILL_SILO.ordnanceStart, round: 2 });
+    // Écart 43: back on the free cell nearest the centre. The ball still lies
+    // on the centre cell and the other Cracker stands there too, so the
+    // nearest free cell is one of the eight around it, never the centre. The
+    // blast was on the first drifting round, so the return is the one after.
+    expect(seen).toMatchObject({ round: CRACKER_FIRST_DRIFT_ROUND + 1 });
+    const at = (seen as { at: Point }).at;
+    expect(at).not.toEqual(KILL_SILO.ordnanceStart);
+    expect(distance(at, KILL_SILO.ordnanceStart)).toBe(1);
+    expect(arena.isOccupiable(at)).toBe(true);
+    // It is live again, and it has already rolled on count 20 of that round,
+    // so its cell is wherever the homing took it, not `at`.
     expect(current.crackers.find((c) => c.id === crackerId)!.state).toBe('live');
+  });
+
+  it('returns both Crackers to distinct cells when they went off in the same round', () => {
+    // Two targets, one beside each Cracker, both go off on count 20 of round 1.
+    const { state } = opened((s) => {
+      const a = someone(s, 'A');
+      const b = someone(s, 'B');
+      return place(place(crackersAt(s, { x: 6, y: 22 }, { x: 8, y: 22 }), a.id, { x: 5, y: 22 }), b.id, { x: 9, y: 22 });
+    });
+    expect(state.crackers.every((c) => c.state === 'destroyed')).toBe(true);
+
+    let current = cleared(state);
+    let events: MatchEvent[] = [];
+    for (let i = 0; i < 200 && events.filter((e) => e.kind === 'crackerRespawned').length < 2; i++) {
+      const step = must(current, { kind: 'endTurn' });
+      current = step.state;
+      events = [...events, ...step.events];
+    }
+    const back = events.filter((e): e is Extract<MatchEvent, { kind: 'crackerRespawned' }> => e.kind === 'crackerRespawned');
+    expect(back).toHaveLength(2);
+    expect(xy(back[0]!.at)).not.toEqual(xy(back[1]!.at));
+    for (const cracker of current.crackers) {
+      expect(cracker.state).toBe('live');
+      expect(xy(cracker)).not.toEqual(xy(current.payload));
+      expect(arena.isOccupiable(cracker)).toBe(true);
+    }
   });
 
   it('takes hit points off whoever it caught, and names the blast as the source', () => {
@@ -346,6 +419,90 @@ describe('the Crackers on the ladder', () => {
     expect(saw.saved).toBeGreaterThan(0);
     expect(saw.failed).toBeGreaterThan(0);
     expect(saw.overHalf).toBeGreaterThan(0);
+  });
+});
+
+describe('where a Cracker stands (écart 43)', () => {
+  it('starts the two Crackers either side of the ball across the width, on open floor', () => {
+    const cells = crackerKickoffCells(arena, KILL_SILO.ordnanceStart);
+    expect(cells).toEqual([
+      { x: 6, y: 22 },
+      { x: 8, y: 22 },
+    ]);
+    for (const cell of cells) expect(arena.isOccupiable(cell)).toBe(true);
+  });
+
+  it('refuses an arena whose centre has a crate beside it', () => {
+    // (1, 22) is beside the edge pillar (0, 22).
+    expect(() => crackerKickoffCells(arena, { x: 1, y: 22 })).toThrow(/beside its centre/);
+  });
+
+  it('returns a spent Cracker to the centre itself when the centre is free', () => {
+    const board = cleared(fresh());
+    const state: MatchState = {
+      ...board,
+      payload: { carriedBy: null, x: 3, y: 10 },
+      crackers: board.crackers.map((c) => ({ ...c, state: 'destroyed' as const, respawnOnRound: 2 })),
+    };
+    expect(crackerRespawnCell(arena, state, new Rng(1))).toEqual(KILL_SILO.ordnanceStart);
+  });
+
+  it('never returns a Cracker onto the loose ball', () => {
+    const board = cleared(fresh());
+    const state: MatchState = {
+      ...board,
+      payload: { carriedBy: null, x: 7, y: 22 },
+      crackers: board.crackers.map((c) => ({ ...c, state: 'destroyed' as const, respawnOnRound: 2 })),
+    };
+    for (let seed = 1; seed <= 40; seed++) {
+      const at = crackerRespawnCell(arena, state, new Rng(seed));
+      expect(at).not.toEqual({ x: 7, y: 22 });
+      expect(distance(at, { x: 7, y: 22 })).toBe(1);
+    }
+  });
+
+  it('never returns a Cracker onto a player or onto its live twin', () => {
+    const board = cleared(fresh());
+    const blockers = board.units.slice(0, 7);
+    const ring = [
+      { x: 6, y: 21 }, { x: 7, y: 21 }, { x: 8, y: 21 },
+      { x: 6, y: 22 }, { x: 8, y: 22 },
+      { x: 6, y: 23 }, { x: 7, y: 23 },
+    ];
+    let state: MatchState = {
+      ...board,
+      payload: { carriedBy: null, x: 7, y: 22 },
+      crackers: board.crackers.map((c, i) =>
+        i === 0
+          ? { ...c, x: 8, y: 23, state: 'live' as const, respawnOnRound: null }
+          : { ...c, state: 'destroyed' as const, respawnOnRound: 2 },
+      ),
+    };
+    blockers.forEach((u, i) => {
+      state = place(state, u.id, ring[i]!);
+    });
+    // Centre is the ball, the ring is players and the live twin: distance 2 it is.
+    for (let seed = 1; seed <= 20; seed++) {
+      const at = crackerRespawnCell(arena, state, new Rng(seed));
+      expect(distance(at, { x: 7, y: 22 })).toBe(2);
+      expect(arena.isOccupiable(at)).toBe(true);
+      expect(state.units.some((u) => u.x === at.x && u.y === at.y)).toBe(false);
+    }
+  });
+
+  it('splits equidistant cells by the dice rather than always the same way', () => {
+    const board = cleared(fresh());
+    const state: MatchState = {
+      ...board,
+      payload: { carriedBy: null, x: 7, y: 22 },
+      crackers: board.crackers.map((c) => ({ ...c, state: 'destroyed' as const, respawnOnRound: 2 })),
+    };
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 60; seed++) {
+      const at = crackerRespawnCell(arena, state, new Rng(seed));
+      seen.add(`${at.x},${at.y}`);
+    }
+    expect(seen.size).toBeGreaterThan(4);
   });
 });
 

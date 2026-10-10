@@ -32,11 +32,23 @@ const arena = new Arena(KILL_SILO);
 
 const CORNER: Point = { x: 0, y: 44 };
 
-/** A match opened with everyone parked away, so a test places what it means to. */
+/**
+ * A match opened with everyone parked away, so a test places what it means to.
+ *
+ * The Crackers are parked too, spent until a round no test reaches. They used
+ * to roll off towards the corner on count 20 of round 1 and be out of the way
+ * by accident; since écart 44 they lie still on round 1, a cell either side of
+ * the centre, which is exactly where these tests put their carriers, and a
+ * live charge beside a Breaker changes what it chooses. A test about the
+ * Crackers puts one back where it wants it.
+ */
 function board(seed = 5): MatchState {
   const created = createMatch({ arena: KILL_SILO, tier: 'rookie', humans: [], seed });
-  return openMatch(arena, { ...created, units: created.units.map((u) => ({ ...u, ...CORNER })) })
-    .state;
+  return openMatch(arena, {
+    ...created,
+    units: created.units.map((u) => ({ ...u, ...CORNER })),
+    crackers: created.crackers.map((c) => ({ ...c, state: 'destroyed' as const, respawnOnRound: 99 })),
+  }).state;
 }
 
 function put(state: MatchState, id: UnitId, at: Point, extra: Partial<Unit> = {}): MatchState {

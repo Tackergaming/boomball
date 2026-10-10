@@ -6,8 +6,12 @@ import {
   ARENA_HEIGHT,
   BENCH_SIZE,
   BULWARK_BLOCK_RANGE_CELLS,
+  CELL_FEET,
+  MOVE_SPEED_FEET,
   SPARK_ENTRY_ROUND,
 } from './constants.js';
+import { distance } from './geometry.js';
+import { pathTo, reachableCells } from './rules/movement.js';
 import { rangeToFurnace } from './rules/payload.js';
 import { buildTurnOrder, ladderRungs } from './initiative.js';
 import { createMatch, MAX_HUMANS, type MatchSetup } from './setup.js';
@@ -75,15 +79,50 @@ describe('the Kill-Silo as a pitch', () => {
     }
   });
 
-  it('lines the teams up on the new start cells, keeper in front of its own mouth', () => {
+  it('lines the teams up eight cells from the ball, keeper in front of its own mouth', () => {
     const state = createMatch(base);
     const at = (team: 'A' | 'B', role: string) =>
       activeUnitsOf(state, team).find((u) => u.role === role)!;
 
     expect({ x: at('A', 'bulwark').x, y: at('A', 'bulwark').y }).toEqual({ x: 7, y: 1 });
     expect({ x: at('B', 'bulwark').x, y: at('B', 'bulwark').y }).toEqual({ x: 7, y: 43 });
-    expect(activeUnitsOf(state, 'A').filter((u) => u.y === 4)).toHaveLength(6);
-    expect(activeUnitsOf(state, 'B').filter((u) => u.y === 40)).toHaveLength(6);
+    // Écart 38, revised 2026-10-10: y14 and y30 are eight cells from (7, 22),
+    // one move without a Dash. The first draft's y4 and y40 were eighteen.
+    expect(activeUnitsOf(state, 'A').filter((u) => u.y === 14)).toHaveLength(6);
+    expect(activeUnitsOf(state, 'B').filter((u) => u.y === 30)).toHaveLength(6);
+    for (const team of ['A', 'B'] as const) {
+      for (const unit of activeUnitsOf(state, team).filter((u) => u.role !== 'bulwark')) {
+        expect(distance(unit, KILL_SILO.ordnanceStart)).toBe(MOVE_SPEED_FEET / CELL_FEET);
+      }
+    }
+  });
+
+  /**
+   * The point of the revised line. Jérôme's first game on the horizontal pitch
+   * opened with nobody able to reach the ball, Dash included. The distance is
+   * eight, but a distance is not a route: the pillar at (7, 16) and the covers
+   * on rows 18 and 19 stand between the line and the centre, and the route is
+   * what `reachableCells` walks. Checked on the real kick-off board, so the
+   * team-mates on the same line count as the obstacles they are.
+   */
+  it('lets each of the six field players reach the ball on turn one without a Dash, both sides', () => {
+    const state = createMatch(base);
+    const ball = KILL_SILO.ordnanceStart;
+
+    for (const team of ['A', 'B'] as const) {
+      const field = activeUnitsOf(state, team).filter((u) => u.role !== 'bulwark');
+      expect(field).toHaveLength(6);
+      for (const unit of field) {
+        const reach = reachableCells(arena, state, unit, MOVE_SPEED_FEET);
+        const route = pathTo(reach, ball);
+        expect(route, `${unit.id} from (${unit.x}, ${unit.y}) cannot reach the ball`).not.toBeNull();
+        expect(route!.length).toBe(MOVE_SPEED_FEET / CELL_FEET);
+        for (const step of route!) expect(arena.isOccupiable(step)).toBe(true);
+      }
+      // And the keeper cannot: the line is the field players' and the mouth is the keeper's.
+      const keeper = activeUnitsOf(state, team).find((u) => u.role === 'bulwark')!;
+      expect(pathTo(reachableCells(arena, state, keeper, MOVE_SPEED_FEET), ball)).toBeNull();
+    }
   });
 
   it('starts each goalkeeper close enough to its own hatch to block a shot', () => {
@@ -161,14 +200,29 @@ describe('kick-off', () => {
     expect(bulwark?.maxHp).toBe(70);
   });
 
-  it('drops the Payload and both Crackers on the same centre cell', () => {
+  it('drops the Payload at the centre and a Cracker either side of it, never on it', () => {
+    // Écart 43. Both Crackers used to share the ball's cell and were drawn
+    // under it, so the first game showed one Cracker where there were two.
+    const arena = new Arena(KILL_SILO);
     const state = createMatch(base);
+    const centre = KILL_SILO.ordnanceStart;
     expect(state.payload.carriedBy).toBeNull();
-    expect({ x: state.payload.x, y: state.payload.y }).toEqual(KILL_SILO.ordnanceStart);
+    expect({ x: state.payload.x, y: state.payload.y }).toEqual(centre);
     expect(state.crackers).toHaveLength(2);
+    const cells = state.crackers.map((c) => `${c.x},${c.y}`);
+    expect(new Set(cells).size).toBe(2);
     for (const cracker of state.crackers) {
       expect(cracker.state).toBe('live');
-      expect({ x: cracker.x, y: cracker.y }).toEqual(KILL_SILO.ordnanceStart);
+      expect({ x: cracker.x, y: cracker.y }).not.toEqual(centre);
+      expect(cracker.y).toBe(centre.y);
+      expect(Math.abs(cracker.x - centre.x)).toBe(1);
+      expect(arena.isOccupiable(cracker)).toBe(true);
+    }
+    // Across the width, so each one is as far from both Furnaces as the ball.
+    for (const cracker of state.crackers) {
+      expect(rangeToFurnace(cracker, arena.furnaceOf('A'))).toBe(
+        rangeToFurnace(cracker, arena.furnaceOf('B')),
+      );
     }
   });
 

@@ -328,7 +328,7 @@ entre des caisses et des piliers.
 |---|---|---|---|
 | 27 | Vue de profil, trois zones empilées, `y` monte (écart 5, B1) | **Vue de dessus.** 15 cases de large sur 45 de long. `y` reste l'axe long, 0 côté Furnace A, 44 côté Furnace B ; `x` la largeur. Le miroir autour de `y = 22` tient. Les trois « zones » ne sont plus que les **trois tiers** du terrain, nommés pour le fil et pour l'entrée du Spark, sans aucune règle attachée | Les coordonnées du moteur ne changent pas, leur lecture change. C'est aussi la vue de la table |
 | 28 | Structure, chaîne centrale, crochets, passerelles, carte d'ancrage (écart 11) | **Obstacles.** Une case `#` est infranchissable et **coupe la ligne de vue**. Rien d'autre : la chaîne disparaît. Le layout est celui de `08` §3, accepté par Jérôme le 2026-10-10 | Un obstacle qui ne coupe pas la vue n'est qu'un détour |
-| 38 | Départs au-dessus des passerelles (B2, écart 24) | Bulwark en `(7, 1)` pour A et `(7, 43)` pour B. Les six joueurs de champ sur `y4` pour A et `y40` pour B, aux `x` 2, 4, 6, 8, 10, 12. Ballon en `(7, 22)` | Chacun dans son tiers, le gardien dans sa bouche |
+| 38 | Départs au-dessus des passerelles (B2, écart 24) | Bulwark en `(7, 1)` pour A et `(7, 43)` pour B. **Révisé le 2026-10-10 soir, à la porte de 2H.4** : les six joueurs de champ sur **`y14` pour A et `y30` pour B**, aux `x` 2, 4, 6, 8, 10, 12, soit **huit cases du ballon** en `(7, 22)`. Le premier brouillon les mettait sur `y4` et `y40`, à dix-huit cases : personne n'atteignait le ballon au premier tour, même en Dash (retour 1 de la partie de Jérôme). Vérifié par test : chacun des six atteint `(7, 22)` en huit cases malgré le pilier et les couvertures, pour les deux camps, et le gardien ne le peut pas | Le ballon est prenable dès le premier tour sans Dash ; chacun reste dans son tiers, le gardien dans sa bouche |
 
 ## C2. Déplacement
 
@@ -382,3 +382,17 @@ fin de 2H.3 : avec les écarts 39 à 41, les trois Tiers tiennent 1,10, 1,48 et 
 Jérôme à la place de la cible des 30 %. Hors d'une nouvelle sous-phase ouverte par lui, on n'y
 touche plus.
 
+## C7. Écarts de la sous-phase 2H.5, décidés par Jérôme le 2026-10-10 soir après sa partie
+
+> Écrits par le fil principal (Fable 5.1) en 2H.5. Les retours numérotés de la partie sont dans
+> `07` §10, sous 2H.4. Aucun de ces écarts ne change la forme d'un état ni d'un événement :
+> `ENGINE_VERSION` reste 2, les matchs ouverts continuent et jouent la règle au tour suivant.
+
+| # | Règle v2 | Règle après 2H.5 | Raison |
+|---|---|---|---|
+| 42 | Bousculade réussie contre un porteur : le ballon tombe **sur sa case** (écart 32, arbitrage du 2026-09-01). Évacuation : le ballon reste où l'unité est tombée | **Le ballon perdu roule sur une case adjacente tirée au d8**, comme une passe ratée, sur bousculade comme sur évacuation. Le porteur bousculé ne bouge toujours pas. **Repli** : si la case tirée est un obstacle, hors terrain ou occupée par une unité, le ballon prend **la case libre suivante dans le sens horaire** à partir de la face tirée, en tournant d'une face de d8 à la fois ; si les huit voisines sont prises, il reste sur la case du porteur. La case du bousculeur est occupée, donc une bousculade ne met jamais le ballon dans les mains du bousculeur : il doit encore marcher dessus. Deux événements existants le disent : `payloadDropped` pour les mains, `payloadScattered` à 1 case pour le sol, avec la face tirée | Retour 4 : sur un terrain où deux unités ne partagent jamais une case, un ballon sous les pieds du porteur n'était reprenable que par lui |
+| 44 | Les Crackers dérivent au compte 20 **dès le round 1** (B8) | **Pas de dérive au round 1.** Les Crackers sont posés mais immobiles pendant le round de coup d'envoi et chassent à partir du round 2. Les frapper au round 1 reste permis : c'est une décision, pas une taxe | Décidé par Jérôme le 2026-10-10 soir sur un effet mécanique de l'écart 38 révisé vu au harnais : nés à une case du centre avec dix cases de roulement, face à des lignes à huit cases, les deux Crackers atteignaient quelqu'un à chaque match avant qu'un joueur ait agi, deux 3d6 décidés par rien |
+| 43 | Les deux Crackers naissent et reviennent **sur la case du ballon**, `(7, 22)` (B8) | **Au coup d'envoi**, un Cracker de chaque côté du ballon **dans la largeur**, `(6, 22)` et `(8, 22)`, jamais sur la case du ballon : chacun reste à égale distance des deux Furnaces. **Au retour**, un Cracker prend **la case libre la plus proche du centre**, le centre lui-même s'il est libre, jamais la case du ballon au sol, jamais une case occupée par une unité, jamais la case de son jumeau encore en jeu ; les cases à égale distance sont départagées par le dé, comme le choix de la cible la plus proche. Les deux reviennent l'un après l'autre, le second voyant où le premier s'est posé | Retours 2 et 3 : empilés sous le disque du ballon, on n'en voyait qu'un, puis aucun |
+
+Hors règlement mais décidé en même temps : les traits de trajectoire du rejeu sont retirés du
+plateau (retour 7), et la passe d'animation 2D passe avant toute ligne de 2.5D (retour 5).

@@ -230,3 +230,63 @@ export async function roundMarkers(page: Page): Promise<Record<number, number>> 
   }
   return counts;
 }
+
+/** The screen boxes of every token, by unit id. */
+function tokenBoxes(page: Page): Promise<Record<string, { x: number; y: number }>> {
+  return page.evaluate(() => {
+    const out: Record<string, { x: number; y: number }> = {};
+    for (const node of document.querySelectorAll<SVGGElement>('[data-unit]')) {
+      const box = node.getBoundingClientRect();
+      out[node.dataset['unit']!] = { x: box.x, y: box.y };
+    }
+    return out;
+  });
+}
+
+/**
+ * Watches the board during a replay for a token in motion (2H.5).
+ *
+ * Samples the tokens' boxes every tenth of a second for up to twelve seconds.
+ * The first time a token's box differs from its previous sample by more than
+ * a pixel, two captures are taken, one at once and one a third of a second
+ * later, and the largest shift seen between consecutive samples is reported.
+ * A board that only ever jumps whole cells between beats shifts a token by a
+ * full cell, about twenty-odd pixels, in one sample, and never by less; a
+ * gliding token shows up as a run of small shifts. Both are reported so the
+ * spec can say which it saw.
+ */
+export async function glideSeen(
+  page: Page,
+  shots: Shots,
+): Promise<{ moved: boolean; largestShift: number; smallestShift: number }> {
+  let previous = await tokenBoxes(page);
+  let moved = false;
+  let largestShift = 0;
+  let smallestShift = Infinity;
+  const started = Date.now();
+  let captured = false;
+
+  while (Date.now() - started < 12_000) {
+    await page.waitForTimeout(100);
+    const now = await tokenBoxes(page);
+    for (const [id, box] of Object.entries(now)) {
+      const was = previous[id];
+      if (!was) continue;
+      const shift = Math.hypot(box.x - was.x, box.y - was.y);
+      if (shift > 1) {
+        moved = true;
+        largestShift = Math.max(largestShift, shift);
+        smallestShift = Math.min(smallestShift, shift);
+      }
+    }
+    previous = now;
+    if (moved && !captured) {
+      captured = true;
+      await shots.take('glide-a');
+      await page.waitForTimeout(300);
+      await shots.take('glide-b');
+    }
+    if (captured && Date.now() - started > 4_000) break;
+  }
+  return { moved, largestShift, smallestShift: Number.isFinite(smallestShift) ? smallestShift : 0 };
+}

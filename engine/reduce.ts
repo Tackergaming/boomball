@@ -18,6 +18,7 @@ import {
   CRACKER_AC,
   CRACKER_DAMAGE_DICE,
   CRACKER_DAMAGE_DIE,
+  CRACKER_FIRST_DRIFT_ROUND,
   CRACKER_RESPAWN_DELAY,
   CRACKER_SAVE_DC,
   GOAL_POINTS,
@@ -46,6 +47,7 @@ import { validatePath } from './rules/movement.js';
 import { opportunityAttackers, passInterceptors } from './rules/reactions.js';
 import {
   battedCrackerRun,
+  crackerRespawnCell,
   crackerRun,
   sparkEntryCell,
   sparkRun,
@@ -53,6 +55,7 @@ import {
 } from './rules/ordnance.js';
 import {
   blockingBulwark,
+  dropCell,
   scatter,
   shotTarget,
   throwRange,
@@ -393,7 +396,9 @@ function applyShove(ctx: TurnCtx, targetId: UnitId): ReduceResult {
   }
 
   // A Shove that takes the ball takes the ball and stops there (arbitrage of
-  // 2026-09-01, kept by écart 32).
+  // 2026-09-01, kept by écart 32): the carrier is not pushed. Since écart 42
+  // the ball does not stay under the carrier's feet either, it rolls to a cell
+  // beside it, never the shover's.
   //
   // Stripping the carrier and moving it in the same action did two jobs at
   // once: it won the ball back, which is good defence, and it undid the trip
@@ -474,15 +479,23 @@ function applyBatCracker(ctx: TurnCtx, crackerId: string, direction: number): Re
 }
 
 /**
- * Count 20. Each live Cracker rolls six cells towards whoever is nearest,
+ * Count 20. Each live Cracker rolls ten cells towards whoever is nearest,
  * friend or foe alike, round whatever is in the way, and goes off on the first
  * player it crosses.
+ *
+ * Not on the kick-off round (écart 44): with the lines eight cells from the
+ * centre, a Cracker that drifted on round 1 reached somebody every match
+ * before anyone had moved. They sit still through round 1 and hunt from
+ * round 2. A player may still bat one on round 1; that is a decision, not a
+ * toll.
  *
  * They resolve one after the other rather than at once, so the second one sees
  * a field the first one has already changed. A Cracker that just carried
  * someone off the field is not still hunting a player who is gone.
  */
 function resolveCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
+  if (state.round < CRACKER_FIRST_DRIFT_ROUND) return state;
+
   const rng = new Rng(state.rngSeed);
   const ctx: Ctx = { arena, log, rng };
   let current = state;
@@ -514,7 +527,7 @@ function runCracker(ctx: Ctx, state: MatchState, crackerId: string, run: HazardR
 
 /**
  * The blast. One save, one victim, and the Cracker is scrap until a fresh one
- * drops at the centre of the pitch next round.
+ * drops back in near the centre of the pitch next round.
  *
  * The damage is rolled whether or not the save landed, so the sequence of dice
  * is the same either way and a replay cannot drift on a lucky Dexterity roll.
@@ -544,21 +557,34 @@ function detonate(ctx: Ctx, state: MatchState, cracker: Cracker, targetId: UnitI
   return applyDamage(ctx, spent, targetId, damage, 'cracker');
 }
 
-/** A spent Cracker is replaced at the centre of the pitch, and starts hunting again. */
+/**
+ * A spent Cracker comes back on the free cell nearest the centre of the pitch
+ * (écart 43), never on the ball, on a player, or on the other Cracker, and
+ * starts hunting again. One after the other, so the second sees where the
+ * first landed.
+ */
 function respawnCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
-  const at = arena.spec.ordnanceStart;
+  const rng = new Rng(state.rngSeed);
+  let current = state;
   let changed = false;
 
-  const crackers = state.crackers.map((cracker) => {
-    if (cracker.state === 'live') return cracker;
-    if (cracker.respawnOnRound === null || cracker.respawnOnRound > state.round) return cracker;
+  for (const cracker of state.crackers) {
+    if (cracker.state === 'live') continue;
+    if (cracker.respawnOnRound === null || cracker.respawnOnRound > state.round) continue;
 
+    const at = crackerRespawnCell(arena, current, rng);
     changed = true;
     log.push({ kind: 'crackerRespawned', crackerId: cracker.id, at, round: state.round });
-    return { ...cracker, x: at.x, y: at.y, state: 'live' as const, respawnOnRound: null };
-  });
+    current = replaceCracker(current, {
+      ...cracker,
+      x: at.x,
+      y: at.y,
+      state: 'live' as const,
+      respawnOnRound: null,
+    });
+  }
 
-  return changed ? { ...state, crackers } : state;
+  return changed ? { ...current, rngSeed: rng.seed } : state;
 }
 
 // -- The Spark --------------------------------------------------------------
@@ -904,15 +930,30 @@ function applyDamage(
   });
 }
 
+/**
+ * The ball leaves its carrier's hands, on a Shove or an evacuation, and rolls
+ * to a cell beside it (écart 42). Two events, both already in the vocabulary:
+ * `payloadDropped` says whose hands and where, `payloadScattered` says where
+ * the one-cell roll took it, with the face it was rolled on. Only when every
+ * neighbouring cell is taken does the ball stay put and the second event is
+ * not written.
+ */
 function dropPayload(ctx: Ctx, state: MatchState, unitId: UnitId): MatchState {
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit || !unit.holdingPayload) return state;
 
-  ctx.log.push({ kind: 'payloadDropped', unitId, at: { x: unit.x, y: unit.y } });
-  return {
+  const lost = { x: unit.x, y: unit.y };
+  ctx.log.push({ kind: 'payloadDropped', unitId, at: lost });
+  const stripped: MatchState = {
     ...replaceUnit(state, { ...unit, holdingPayload: false }),
-    payload: { carriedBy: null, x: unit.x, y: unit.y },
+    payload: { carriedBy: null, x: lost.x, y: lost.y },
   };
+
+  const fell = dropCell(ctx.arena, stripped, lost, ctx.rng);
+  if (fell.landing.x === lost.x && fell.landing.y === lost.y) return stripped;
+
+  ctx.log.push({ kind: 'payloadScattered', to: fell.landing, cells: 1, direction: fell.direction });
+  return { ...stripped, payload: { carriedBy: null, x: fell.landing.x, y: fell.landing.y } };
 }
 
 /**

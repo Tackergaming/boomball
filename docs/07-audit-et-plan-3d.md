@@ -1000,3 +1000,63 @@ Le tout forme la **sous-phase 2H.5**, écrite dans `05-reprise-chat-suivant.md`,
 contrôle après les trois écarts et la migration 0006 pour les positions de départ. La porte reste
 la même : sa partie, sur le plateau animé.
 
+
+### Sous-phase 2H.5, « coup d'envoi, ballon perdu, Crackers, animation 2D », construite le 2026-10-10 soir, porte ouverte
+
+Par le fil principal (Fable 5.1), avec deux sous-agents Sonnet nommés ci-dessous, sur des fichiers
+disjoints comme `08` §9 le prévoit. Le fil principal a gardé `reduce.ts`, `setup.ts`, les règles
+`payload` et `ordnance`, `kill-silo.ts`, les écarts, le sweep, `motion.ts`, `replay.ts`,
+`useMatch.ts`, `Match.tsx`, le harnais et l'intégration. **Tout ce qui ne dépend pas de Jérôme est
+fait et vert** : `npm test` 382 tests sur 20 fichiers contre 348, `npm run typecheck` vert à la
+racine, dans `scripts/`, `e2e/` et `client/`, le build du client vert, `smoke.spec.ts` vert avec
+la nouvelle vérification de glissement, `check_drift.py` sans dérive. **La porte n'est pas
+franchie** : il reste la migration 0006, le redéploiement des deux fonctions, et la partie de
+Jérôme sur le plateau animé.
+
+| Tâche de `05` | État |
+|---|---|
+| a. Écart 38 révisé | Fait, fil principal. Les six joueurs de champ partent de `y14` pour A et `y30` pour B, mêmes `x`, à huit cases du ballon. `setup.test.ts` prouve sur le vrai plateau de coup d'envoi que chacun des six atteint `(7, 22)` en huit cases exactement malgré le pilier et les couvertures, pour les deux camps, et que le gardien ne le peut pas |
+| b. Écart 42 | Fait, fil principal. Le ballon perdu, sur bousculade ou évacuation, roule sur une case adjacente tirée au d8 ; repli écrit et testé : la case libre suivante dans le sens horaire, le ballon reste sur place seulement si les huit voisines sont prises. Règle pure `dropLanding` dans `rules/payload.ts`, 5 tests sans dé ; au plateau, `combat.test.ts` et `reduce.test.ts` vérifient qu'il ne tombe jamais dans un obstacle, hors terrain, sous un joueur ni sous le bousculeur. **Aucun événement nouveau** : `payloadDropped` puis `payloadScattered` à 1 case, donc `ENGINE_VERSION` reste 2 et les matchs ouverts continuent |
+| c. Écart 43 | Fait, fil principal. `crackerKickoffCells` met les deux Crackers en `(6, 22)` et `(8, 22)`, de part et d'autre du ballon dans la largeur pour que chacun reste à égale distance des deux Furnaces ; `crackerRespawnCell` rend un Cracker sur la case libre la plus proche du centre, jamais le ballon au sol, jamais une unité, jamais le jumeau en jeu, égalités départagées par le dé ; les deux reviennent l'un après l'autre. 6 tests neufs dans `ordnance.test.ts` |
+| d. Traits de trajectoire | Retirés du plateau, de `replay.ts` (`trailOf`) et de `Match.tsx` |
+| e. Animation 2D | Fait. **Le contrat de temps**, fil principal : `client/src/match/motion.ts`, qui extrait de chaque beat la liste de ce qui a voyagé dans l'ordre des événements (marche d'une unité le long de son chemin, poussée ou recul d'une case, roulement d'un Cracker ou du Spark, vol du ballon sur passe, tir ou dispersion), le minute à la vitesse choisie (110 ms la case à normal, 180 à slow, 500 ms un vol, 0 partout à instant), et ne transcrit que ce que les événements disent ; `replay.ts` donne son `motion` à chaque beat ; `useMatch.ts` tient le beat au moins le temps du glissement, le premier beat du propre déplacement du joueur compris. **Le plateau**, sous-agent (k), Sonnet effort élevé : `Board.tsx` garde une position d'affichage par pièce, joue les pas l'un après l'autre sur une seule boucle `requestAnimationFrame`, dessine le ballon en vol avec une ombre au sol et un disque qui grossit vers l'apex, et retombe sur l'état du serveur à la fin, au skip et à la relecture du snapshot ; à instant il dessine l'état directement, sans frame, ce dont le harnais dépend. Les couches statiques sont mémoïsées. 11 tests sur `motion.ts`, dont un sur un vrai match qui vérifie que chaque pas finit où l'état du beat met la pièce |
+| f. Sweep de contrôle | Fait, fil principal, 133 s, tableau et lecture dans `09` §9. **Le régime a bougé, dans la cible** : buts par match 1,02 / 1,34 / 1,49 contre 1,10 / 1,48 / 1,80 ; matchs sans but 67 / 39 / 48 contre 69 / 46 / 33 ; Spark décidant 46 / 44 / 56 % contre 54 / 55 / 54 % ; le ballon quitte le milieu, 40 / 32 / 33 % contre 49 / 46 / 43 %. Recommandation : laisser l'équilibrage clos ; le point à regarder est le star, 48 matchs sans but. **Jérôme tranche sur le tableau** |
+| g. Migration 0006 et redéploiement | **Fait le 2026-10-10 soir.** `supabase/migrations/0006_kickoff_line.sql`, sous-agent (c), Sonnet effort moyen, ne touche que `starts` de la ligne `arenas`, tenue égale au moteur par `server/migration0006.test.ts` ; `migration0005.test.ts` garde 0005 comme historique. Seed régénéré. `ENGINE_VERSION` reste 2 : aucune forme d'état ni d'événement n'a changé. **Appliquée par Jérôme via `/supabase-migrate`**, ligne relue avant (y4, y40) et après (y14, y30), puis **les deux fonctions redéployées avec son feu vert : `resolve-action` v9, `create-match` v8**. Vérifié au harnais sur un match neuf : les six de chaque camp sur y14 et y30, le gardien dans sa bouche. Le premier `e2e:playthrough` a échoué à la connexion sur une réponse 4xx du chemin de signature, le second est passé sans retouche : à surveiller, pas reproduit |
+
+**Ce que les captures ont montré.** Le smoke, au mode slow sur la réponse de la maison au troisième
+tour, échantillonne les boîtes des pions tous les dixièmes de seconde et prend deux captures au
+premier déplacement vu ; sur la paire du 2026-10-10, le ballon est dans les mains de Kregg Keg sur
+la première et en vol, disque et anneau, à mi-chemin d'une interception sur la seconde, à trois
+dixièmes d'écart. La capture d'ouverture montre encore l'ancien coup d'envoi, `y4` et `y40`, et
+les deux Crackers empilés sous le ballon : **c'est le match ouvert du compte e2e**, créé avant la
+migration par la fonction déployée, et c'est attendu. Un match neuf après 0006 et le redéploiement
+montrera les lignes à `y14` et `y30` et un Cracker de chaque côté.
+
+**Hors périmètre, laissé en vue.** Une unité évacuée pendant un beat disparaît au début du beat
+plutôt qu'à la fin de son dernier pas, choix du sous-agent (k) accepté pour cette passe. La marche
+est linéaire sans amorti aux extrémités. Les quatre observations d'IA de 2H.2 et 2H.3 et les poids
+de l'IA n'ont pas bougé : ils attendent le verdict de Jérôme sur le plateau animé. La dette
+`arenas.art` reste pour le plan d'assets de la phase 3, et A20 (React 19) reste le premier pas de
+la phase 3.
+
+**Un effet de l'écart 38 vu au harnais, à trancher par Jérôme.** Les Crackers naissent à une case
+du centre et roulent de 10 cases au compte 20 ; les lignes de coup d'envoi sont à 8 cases du
+centre. **Au compte 20 du round 1, avant qu'un seul joueur ait agi, les deux Crackers atteignent
+donc toujours quelqu'un et détonnent**, 3d6 chacun sur deux joueurs tirés au hasard du côté le plus
+proche. C'est mécanique, pas probabiliste : à y4 et y40 ils ne portaient pas, à y14 et y30 ils
+portent. Les deux matchs du harnais s'ouvrent ainsi, et le sweep de §9 le compte dans ses évacués en
+hausse. Deux options proposées, aucune appliquée : les Crackers ne dérivent pas au round 1, écart 44
+à écrire ; ou ils naissent à plus de 10 cases des lignes, ce que le layout ne permet pas sans
+toucher aux lignes. **Tranché par Jérôme le soir même : écart 44, pas de dérive au round 1.**
+`CRACKER_FIRST_DRIFT_ROUND = 2` dans `constants.ts`, une garde dans `resolveCrackers`, trois tests
+dans `ordnance.test.ts` (le vrai coup d'envoi n'explose personne, la chasse commence au round 2,
+frapper un Cracker au round 1 reste permis), les fixtures de `ai.test.ts` et d'`ordnance.test.ts`
+qui comptaient sur des Crackers partis au round 1 remises d'aplomb. 382 tests. Le sweep de
+confirmation est en `09` §10 : 1,12 / 1,40 / 2,00 but par match, le régime de §8 retrouvé, les
+deux explosions du coup d'envoi étaient ce qui tirait §9 vers le bas. **La fonction `resolve-action` déployée, v9, ne porte pas l'écart
+44** : le redéploiement attend un nouveau feu vert de Jérôme.
+
+**Ce qui attend Jérôme** : son feu vert pour redéployer `resolve-action` avec l'écart 44, puis
+**une partie en 2D animée, avec son verdict sur ce que ses coéquipiers et la maison cherchent**.
+L'équilibrage est **confirmé clos** par lui le 2026-10-10 soir sur le tableau de `09` §9. Sans le
+verdict, pas de phase 3.

@@ -25,6 +25,7 @@
 import { thirdOf, type Point } from '../../../engine/geometry.js';
 import type { DiceRoll, MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId, Unit, UnitId } from '../../../engine/types.js';
+import { motionOf, type MotionStep } from './motion.js';
 
 /** One watchable moment: a unit's turn, a round's hazards, or the final whistle. */
 export interface Beat {
@@ -33,6 +34,12 @@ export interface Beat {
   readonly events: readonly MatchEvent[];
   /** The board as it stands once this beat has played out. */
   readonly state: MatchState;
+  /**
+   * What travelled during the beat, in event order, for the board to glide
+   * through on its way to `state`. Untimed: `useMatch.ts` times it at the
+   * speed the player chose. See `motion.ts`.
+   */
+  readonly motion: readonly MotionStep[];
   /** What to say about it, at most a few lines. */
   readonly lines: readonly BeatLine[];
   /** Set when the beat is worth interrupting for: a goal, a knockout, the end. */
@@ -70,11 +77,15 @@ export function toBeats(base: MatchState, events: readonly MatchEvent[], own: Te
 
   const flush = () => {
     if (current.length === 0) return;
+    // Read against the board **before** the beat, which is where everything
+    // that moves in it starts from.
+    const motion = motionOf(board, current);
     board = project(board, current);
     beats.push({
       unitId: currentUnit,
       events: current,
       state: board,
+      motion,
       lines: describe(current, board, own),
       weight: loudness(current),
     });
@@ -382,7 +393,12 @@ function describe(
         });
         break;
       case 'payloadScattered':
-        lines.push({ text: `The Payload bounces ${event.cells} cells away` });
+        lines.push({
+          text:
+            event.cells === 1
+              ? 'The Payload rolls to the next cell'
+              : `The Payload bounces ${event.cells} cells away`,
+        });
         break;
       case 'crackerBatted':
         lines.push({
@@ -471,14 +487,4 @@ export function thirdName(at: Point, own: TeamId): string {
   const third = Math.min(2, Math.max(0, thirdOf(at)));
   const fromOwn = own === 'A' ? third : 2 - third;
   return ['own end', 'midfield', 'their end'][fromOwn]!;
-}
-
-/** Where a unit walked during a beat, for the trail drawn on the board. */
-export function trailOf(beat: Beat): { unitId: UnitId; path: readonly Point[] } | null {
-  for (const event of beat.events) {
-    if (event.kind === 'moved' && event.path.length > 0) {
-      return { unitId: event.unitId, path: [event.from, ...event.path] };
-    }
-  }
-  return null;
 }

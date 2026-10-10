@@ -138,6 +138,16 @@ export const CRACKER_DAMAGE_DIE = 6;
 /** Rounds between a Cracker detonating and its replacement dropping in. */
 export const CRACKER_RESPAWN_DELAY = 1;
 
+/**
+ * The first round the Crackers drift on count 20 (écart 44, 2026-10-10 soir).
+ * They are born a cell from the centre and roll ten cells; since écart 38 the
+ * kick-off lines stand eight cells from the centre. Left to drift on round 1
+ * they reached somebody every single match before a player had acted, two
+ * blasts of 3d6 decided by nothing. So they lie armed but still through the
+ * kick-off round, and start hunting on round 2. Batting one still sends it off.
+ */
+export const CRACKER_FIRST_DRIFT_ROUND = 2;
+
 // -- The Spark --------------------------------------------------------------
 
 export const SPARK_INITIATIVE = 10;

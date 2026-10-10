@@ -7,6 +7,7 @@ import { distance, neighbours, type Point } from '../geometry.js';
 import { createMatch } from '../setup.js';
 import type { MatchState, Unit } from '../types.js';
 import { key, pathCostFeet, pathTo, reachableCells, validatePath } from './movement.js';
+import { dropLanding } from './payload.js';
 
 const arena = new Arena(KILL_SILO);
 const state = createMatch({ arena: KILL_SILO, tier: 'rookie', humans: [], seed: 7 });
@@ -226,5 +227,58 @@ describe('reachable cells', () => {
     );
     expect(open.has('7,22')).toBe(true);
     expect(crowded.has('7,22')).toBe(false);
+  });
+});
+
+describe('where a lost ball rolls (écart 42)', () => {
+  const from: Point = { x: 7, y: 20 };
+  const everywhere = () => true;
+
+  it('takes the rolled face when that cell is free, one cell away', () => {
+    for (let roll = 1; roll <= 8; roll++) {
+      const { landing, direction } = dropLanding(everywhere, from, roll);
+      expect(direction).toBe(roll);
+      expect(distance(landing, from)).toBe(1);
+    }
+    // The faces are the d8 compass: 1 is north, towards Furnace B.
+    expect(dropLanding(everywhere, from, 1).landing).toEqual({ x: 7, y: 21 });
+    expect(dropLanding(everywhere, from, 3).landing).toEqual({ x: 8, y: 20 });
+    expect(dropLanding(everywhere, from, 5).landing).toEqual({ x: 7, y: 19 });
+    expect(dropLanding(everywhere, from, 7).landing).toEqual({ x: 6, y: 20 });
+  });
+
+  it('turns clockwise to the next free cell when the rolled one is taken', () => {
+    // North and north-east taken: a roll of 1 lands east, and says it rolled 1.
+    const taken = new Set(['7,21', '8,21']);
+    const free = (p: Point) => !taken.has(key(p));
+    expect(dropLanding(free, from, 1)).toEqual({ landing: { x: 8, y: 20 }, direction: 1 });
+    // A roll of 8 (north-west) is free and is taken as rolled.
+    expect(dropLanding(free, from, 8).landing).toEqual({ x: 6, y: 21 });
+  });
+
+  it('goes right round the compass if it has to', () => {
+    // Everything but south-west taken: every roll ends there.
+    const free = (p: Point) => p.x === 6 && p.y === 19;
+    for (let roll = 1; roll <= 8; roll++) {
+      expect(dropLanding(free, from, roll).landing).toEqual({ x: 6, y: 19 });
+    }
+  });
+
+  it('stays where it was lost only when all eight neighbours are taken', () => {
+    expect(dropLanding(() => false, from, 4)).toEqual({ landing: from, direction: 4 });
+  });
+
+  it('reads the real terrain: never into the pillar, never off the pitch', () => {
+    // Beside the edge pillar (0, 22), on the edge row x = 0 side.
+    const beside: Point = { x: 1, y: 22 };
+    const free = (p: Point) => arena.isOccupiable(p);
+    for (let roll = 1; roll <= 8; roll++) {
+      const { landing } = dropLanding(free, beside, roll);
+      expect(arena.isOccupiable(landing)).toBe(true);
+      expect(landing).not.toEqual({ x: 0, y: 22 });
+      expect(distance(landing, beside)).toBe(1);
+    }
+    // Rolled 7 (west) is the pillar: it turns to north-west, (0, 23).
+    expect(dropLanding(free, beside, 7).landing).toEqual({ x: 0, y: 23 });
   });
 });

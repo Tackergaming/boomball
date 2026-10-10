@@ -31,7 +31,6 @@ import { Briefing, hasBeenBriefed } from '../match/Briefing.js';
 import { Feed } from '../match/Feed.js';
 import { Ladder } from '../match/Ladder.js';
 import { SeatPanel } from '../match/SeatPanel.js';
-import { trailOf } from '../match/replay.js';
 import { cellToScreen, publishHook, summarise, withdrawHook } from '../match/testHook.js';
 import { beatHoldMs, useMatch, type Speed } from '../match/useMatch.js';
 
@@ -338,7 +337,7 @@ export function Match({
               selected={selected}
               yoursId={mineId}
               spotlight={match.beat?.unitId ?? null}
-              trail={match.beat ? trailOf(match.beat) : null}
+              motion={match.motion}
             />
 
             {match.beat && (

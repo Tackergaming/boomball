@@ -4,6 +4,7 @@ import { Arena } from './arena.js';
 import { KILL_SILO } from './arenas/kill-silo.js';
 import { MOVE_SPEED_FEET, MATCH_ROUNDS, SUDDEN_DEATH_ROUNDS } from './constants.js';
 import type { MatchEvent } from './events.js';
+import { distance } from './geometry.js';
 import { openMatch, reduce } from './reduce.js';
 import { pathTo, reachableCells } from './rules/movement.js';
 import { createMatch } from './setup.js';
@@ -187,7 +188,7 @@ describe('ending a turn', () => {
 
 describe('evacuation on the spot', () => {
   /** The acting unit, an enemy at 1 hp beside it, and a seed where the bat lands. */
-  function felled(): { before: MatchState; after: MatchState; events: readonly MatchEvent[]; victim: Unit } {
+  function felled(carrying = false): { before: MatchState; after: MatchState; events: readonly MatchEvent[]; victim: Unit } {
     for (let seed = 1; seed < 400; seed++) {
       const start = opened(seed);
       const actor = acting(start);
@@ -197,7 +198,10 @@ describe('evacuation on the spot', () => {
 
       const before: MatchState = {
         ...start,
-        units: start.units.map((u) => (u.id === enemy.id ? { ...u, ...spot, hp: 1 } : u)),
+        units: start.units.map((u) =>
+          u.id === enemy.id ? { ...u, ...spot, hp: 1, holdingPayload: carrying } : u,
+        ),
+        payload: carrying ? { carriedBy: enemy.id, x: spot.x, y: spot.y } : start.payload,
       };
       const result = reduce(arena, before, {
         unitId: actor.id,
@@ -210,6 +214,26 @@ describe('evacuation on the spot', () => {
     }
     throw new Error('no seed in range landed the killing blow');
   }
+
+  it('leaves a carried ball on a free cell beside where the carrier fell (écart 42)', () => {
+    const { after, events, victim } = felled(true);
+    const fell = { x: victim.x, y: victim.y };
+
+    expect(after.payload.carriedBy).toBeNull();
+    const ball = { x: after.payload.x, y: after.payload.y };
+    expect(ball).not.toEqual(fell);
+    expect(distance(ball, fell)).toBe(1);
+    expect(arena.isOccupiable(ball)).toBe(true);
+    expect(unitAt(after, ball.x, ball.y)).toBeUndefined();
+
+    const dropped = events.findIndex((e) => e.kind === 'payloadDropped');
+    const rolled = events.findIndex((e) => e.kind === 'payloadScattered');
+    const off = events.findIndex((e) => e.kind === 'evacuated');
+    expect(dropped).toBeGreaterThan(-1);
+    expect(rolled).toBeGreaterThan(dropped);
+    expect(off).toBeGreaterThan(rolled);
+    expect(events[rolled]).toMatchObject({ to: ball, cells: 1 });
+  });
 
   it('keeps the evacuated unit where it fell, with its status changed', () => {
     const { after, victim } = felled();
