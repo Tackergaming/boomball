@@ -11,9 +11,11 @@
 > franchie** : la partie de Jérôme du 2026-10-10 a produit sept retours et quatre décisions, qui
 > forment une sous-phase 2H.5 avant la phase 3 : coup d'envoi à huit cases du ballon (écart 38
 > révisé), ballon perdu sur une case adjacente au d8 (écart 42), Crackers sur des cases distinctes
-> (écart 43), animation 2D avant le 2.5D. **2H.5 est construite le 2026-10-10 soir**, journal en
-> `07` §10 ; il reste à Jérôme la migration 0006, le redéploiement des deux fonctions, et sa partie
-> sur le plateau animé. Le prompt est `05-reprise-chat-suivant.md`.
+> (écart 43), animation 2D avant le 2.5D. **2H.5 est construite et en ligne le 2026-10-10 soir**,
+> journal en `07` §10, écart 44 décidé le même soir. **Sa porte n'est pas franchie non plus** : la
+> partie de Jérôme sur le plateau animé a produit sept retours et six décisions, écarts 45 à 48 et
+> deux points ouverts dans `00` C8, qui forment **2H.6** (règles et le défaut de relecture) puis
+> **2H.7** (l'IA par rôle) avant la phase 3. Le prompt est `05-reprise-chat-suivant.md`.
 >
 > **Unité d'effort : la séance**, environ deux heures de Claude Code bornées à un commit.
 
@@ -310,6 +312,8 @@ ligne de vue ; `07` garde D11 en §1.2 ; le skill `boomball` et `05` suivent ; `
 | **2H.3 Équilibrage** | La campagne de §4.3, arbitrages de Jérôme, écarts écrits | 0,5 à 1 | Trois Tiers dans la cible, équilibrage re-clos |
 | **2H.4 Serveur et client 2D** | A11, A28, A29, migration, redéploiement, plateau vu de dessus, briefing, harnais | 1,5 à 2 | `smoke.spec.ts` vert, `browser-path.py` vert, un playthrough entier, **Jérôme joue une partie en 2D et dit s'il comprend l'IA** |
 | **2H.5 Coup d'envoi, ballon perdu, Crackers, animation 2D** | Écarts 38 révisé, 42, 43 et 44 ; traits de trajectoire retirés ; les pions glissent et le ballon vole, un temps par action ; sweep de contrôle ; migration 0006 et redéploiement | 1 | `smoke.spec.ts` vert avec deux captures d'un même temps à des instants différents, **Jérôme rejoue une partie en 2D animée et dit s'il comprend ce que ses coéquipiers et la maison cherchent** |
+| **2H.6 Crackers vers le ballon, parade du Breaker, écrans** | Le défaut de relecture pendant le rejeu (retour 1) ; écarts 45 (Crackers vers le ballon), 46 (un Cracker par pilier de bord), 47 (parade du Breaker, `ENGINE_VERSION` 3), 48 (la première case du vol ne compte pas) ; les deux points ouverts tranchés par Jérôme ; sweep, équilibrage rouvert le temps de le lire ; redéploiement | 1 à 1,5 | `npm test` vert, smoke vert, le plateau ne montre plus le futur, Jérôme lit le tableau |
+| **2H.7 L'IA par rôle** | Le Breaker garde du corps (entre ses Strikers et les menaces, frappe l'adjacent, pare et renvoie), les attaquants s'étalent autour de la bouche au lieu de s'empiler, le gardien et les défenseurs lisibles ; les quatre observations de 2H.2 et 2H.3 ; un critère par rôle dans le sweep | 1 à 2 | **Jérôme rejoue et dit qu'il comprend ce que chaque rôle cherche.** Sans ce verdict, pas de phase 3 |
 | 3 Scène 2.5D statique | Sol, obstacles, deux bouches depuis le layout ; caméra trois quarts, deux zooms, pas de rotation ; textures CC0 | 1 à 2 | Comme `07` : bijection layout vers solides, Jérôme reconnaît le terrain |
 | 4 Jouer en 2.5D | Lancer de rayon sur le sol, survol, clic, tuiles atteignables, **aperçu de la ligne de vue** sur les cibles, mini-carte 45 x 15 | 1 à 2 | Jérôme joue une partie en 3D sans basculer |
 | 5 Timeline | Marche, poussée, recul, frappe, dérive du Spark, arc de passe et de tir, éclat de but ; la caméra suit le ballon ; plus aucune chute à animer | 2 | Jérôme suit un round de la maison sans lire le fil |

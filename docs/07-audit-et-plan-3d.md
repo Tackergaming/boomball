@@ -1060,3 +1060,70 @@ deux explosions du coup d'envoi étaient ce qui tirait §9 vers le bas. **La fon
 **une partie en 2D animée, avec son verdict sur ce que ses coéquipiers et la maison cherchent**.
 L'équilibrage est **confirmé clos** par lui le 2026-10-10 soir sur le tableau de `09` §9. Sans le
 verdict, pas de phase 3.
+
+**La partie de Jérôme à la porte de 2H.5, le 2026-10-10 soir.** Jouée en 2D animée, en ligne, sur
+`resolve-action` v9, donc **sans l'écart 44** : les deux Crackers ont encore explosé au coup
+d'envoi. **La porte n'est pas franchie** : il ne dit pas qu'il comprend l'IA, et quatre de ses sept
+retours sont de l'IA. Ses retours, numérotés par le fil principal dans l'ordre où il les a donnés,
+avec ce que le code en dit, vérifié en le lisant :
+
+1. Au début de chaque tour de la maison on voit déjà l'emplacement final des joueurs, puis
+   seulement le tour de chaque IA commence. **Défaut, cause trouvée dans `useMatch.ts`** : la
+   diffusion Realtime de notre propre lot arrive avant la réponse HTTP, et le gestionnaire de
+   diffusion appelle `load()`, qui pose le snapshot final sur le plateau ; la réponse arrive ensuite
+   et rejoue les beats depuis le plateau d'avant. A9 avait dédoublonné le fil, pas cette relecture.
+   Invisible au harnais parce qu'il tourne en `instant`. Correctif : ne pas relire le snapshot
+   pendant qu'une requête de ce client est en vol, la réponse s'en charge.
+2. Les Crackers ne vont pas vers le groupe de joueurs le plus nombreux et le plus proche, mais vers
+   le joueur le plus proche. **C'est la règle écrite partout** : la fiche du vault dit « toward the
+   closest individual player », B8 et l'écart 35 aussi. Le groupe n'est écrit nulle part. Si Jérôme
+   le veut, c'est un écart nouveau à définir : le groupe, sa taille, l'égalité.
+3. Les Crackers doivent apparaître autour des piliers de bord de la ligne médiane, `(0, 22)` et
+   `(14, 22)`, nord ou sud à l'écran, et non au centre ; et leur vitesse pourrait descendre à 8
+   cases. **Décision de design, à préciser** : une case libre adjacente à chaque pilier, un Cracker
+   par pilier, au coup d'envoi comme au retour ; la vitesse rouvre l'équilibrage (écart 40).
+4. Frapper les Crackers par les Breakers « n'est pas en place », et leur IA ne protège pas les
+   Strikers. **La règle est en place** : toute unité sans ballon peut frapper un Cracker adjacent
+   (la fiche dit que tout rôle peut tout faire), et le Breaker de l'IA a `batCracker` 70, `attack`
+   60, `shove` 65. Ce qui manque est une **IA de garde du corps** : se placer entre ses Strikers et
+   les adversaires ou les Crackers, frapper l'adversaire adjacent, renvoyer un Cracker vers l'ennemi.
+   C'est la séance d'IA que `08` §8 prévoyait si l'IA restait illisible.
+5. Un joueur évacué qui revient à côté de sa Furnace est trop pénalisé ; il devrait revenir au
+   centre, où le ballon apparaît. **Décision de design** : écart 37 à réviser, la case libre la plus
+   proche du centre, comme un Cracker qui revient.
+6. Une passe interceptée par un adversaire adjacent « derrière » lui, hors trajectoire. **La règle
+   implémentée est celle qu'il propose** : `passInterceptors` ne retient que les adversaires à une
+   case d'une cellule du vol. Le vol commence à la case suivant le lanceur, donc un adversaire
+   **à côté** du lanceur, et non juste derrière, touche la première case du vol et peut intercepter.
+   C'est ce qu'il a vu. Option à trancher : la première case du vol ne compte pas, une passe qui
+   quitte les mains ne se vole pas par un voisin du lanceur.
+7. L'IA empile les joueurs autour de la Furnace, alliés comme ennemis. **A31 n'est pas réglé pour un
+   humain** : les attaquants convergent vers les cases qui voient la bouche, les défenseurs sur
+   `guardFurnace`, et personne ne lit une intention. Même séance d'IA que le retour 4.
+
+Ce que le fil principal en tire : un défaut d'écran à corriger d'abord (1), trois décisions de
+design qui attendent Jérôme (2, 3, 5, plus l'option de 6), et une séance d'IA (4 et 7), qui est le
+cas que `08` §8 avait nommé : on n'entre pas en 2.5D sur une IA qu'il ne comprend pas. Le
+redéploiement de `resolve-action` avec l'écart 44 attend toujours son feu vert.
+
+**Les réponses de Jérôme, le même soir**, point par point, écrites dans `00` partie C8 comme écarts
+décidés et non implémentés :
+
+- Retour 2 : **les Crackers se dirigent vers le ballon**, plus vers le joueur le plus proche ; sur la
+  case d'un ballon au sol, rien ne se passe, et pour le prendre il faut frapper le Cracker ou
+  accepter l'explosion. Écart 45.
+- Retour 3 : **un Cracker par pilier de bord**, nord et sud. Écart 46. La vitesse à 8 n'a pas été
+  confirmée : ouvert.
+- Retour 4 : la frappe d'un Cracker adjacent reste ouverte à tous ; **le Breaker gagne une parade en
+  Réaction** quand un Cracker lui arrive dessus, renvoi dans un arc de 120 degrés, AC 10 et 12 cases
+  réutilisées. Écart 47. Deux conséquences à lui présenter : `ENGINE_VERSION` 3, et le choix de
+  direction pour un humain.
+- Retour 5 : pas de réponse. Le remplaçant au centre reste une proposition, ouverte.
+- Retour 6 : **durci**, la première case du vol ne compte pas. Écart 48.
+- Retour 7 : **une séance dédiée au comportement de l'IA par rôle**, après les écarts.
+- Retour 1 : le défaut de relecture pendant le rejeu, à corriger en premier.
+
+Le tout forme **2H.6, « Crackers vers le ballon, parade du Breaker, écrans »**, puis **2H.7, « l'IA
+par rôle »**, écrites dans `08` §5 et dans `05-reprise-chat-suivant.md`. Le redéploiement de
+`resolve-action` avec l'écart 44 attend toujours son feu vert, et le dépôt porte ces notes non
+commitées en attendant son `/save` ou `/commit`.
