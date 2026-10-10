@@ -973,3 +973,30 @@ maintien en vie ; pousser le dépôt pour que la CI tourne ; **jouer une partie 
 comprend ce que ses coéquipiers et la maison cherchent**, avec des retours numérotés. Puis la phase
 3, la scène 2.5D, dont A20 est le premier pas.
 
+**La partie de Jérôme à la porte de 2H.4, le 2026-10-10.** Jouée en 2D sur le terrain horizontal,
+en ligne, sur le moteur 2. **La porte n'est pas franchie** : il ne peut pas juger l'IA sur un
+plateau qui téléporte. Ses retours, numérotés par le fil principal dans l'ordre où il les a donnés,
+avec ce que le moteur en dit et ce qu'il a décidé :
+
+1. Au coup d'envoi personne n'atteint le ballon, même en Dash. Mécanique : 18 cases entre les
+   lignes de départ de `08` §3 et le centre, pour 16 de déplacement avec Dash. **Décision : le
+   ballon doit être prenable dès le premier tour sans Dash**, donc les six joueurs de champ partent
+   à huit cases du ballon, y14 et y30. Écart 38 révisé, en 2H.5.
+2. et 3. Un seul Cracker visible au départ, et plus aucun après une explosion. Le règlement les fait
+   naître et revenir tous les deux sur la case du ballon, `(7, 22)` : ils sont empilés et dessinés
+   sous le disque du ballon, que 2H.4 a mis au-dessus de tout (A15). **Décision : jamais deux sur la
+   même case, jamais sur celle du ballon.** Écart 43, en 2H.5.
+4. Le ballon perdu reste sous les pieds du porteur, que seul lui peut donc reprendre. C'est
+   l'arbitrage du 2026-09-01 conservé à l'écart 32, devenu absurde sur un terrain où deux unités ne
+   partagent jamais une case. **Décision : le ballon tombe sur une case adjacente tirée au d8.**
+   Écart 42, en 2H.5.
+5. Sans animations on ne comprend rien, même à la vitesse normale. **Décision : la passe
+   d'animation 2D passe avant le 2.5D**, puis il rejoue. C'est le risque que `08` §8 nommait.
+6. L'IA semble un peu meilleure qu'avant, sans qu'il ait pu tout regarder. À confirmer après 5.
+7. Les traits de trajectoire du rejeu sont à côté de la plaque et inutiles dès que les pions
+   bougent. Retirés en 2H.5.
+
+Le tout forme la **sous-phase 2H.5**, écrite dans `05-reprise-chat-suivant.md`, avec un sweep de
+contrôle après les trois écarts et la migration 0006 pour les positions de départ. La porte reste
+la même : sa partie, sur le plateau animé.
+

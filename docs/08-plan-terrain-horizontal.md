@@ -7,9 +7,11 @@
 >
 > **Statut : GO DONNÉ PAR JÉRÔME LE 2026-10-10**, avec les sept arbitrages de §7 tranchés et deux
 > précisions reprises en §0. La partie C du règlement est écrite. **2H.1, 2H.2 et 2H.3 sont faites
-> le 2026-10-10, et 2H.4 est construite le même jour**, journal en `07` §10 ; sa porte de sortie,
-> la partie de Jérôme en 2D, reste à franchir. La suite est la phase 3 avec le prompt de
-> `05-reprise-chat-suivant.md`.
+> le 2026-10-10, et 2H.4 est construite le même jour**, journal en `07` §10. **Sa porte n'est pas
+> franchie** : la partie de Jérôme du 2026-10-10 a produit sept retours et quatre décisions, qui
+> forment une sous-phase 2H.5 avant la phase 3 : coup d'envoi à huit cases du ballon (écart 38
+> révisé), ballon perdu sur une case adjacente au d8 (écart 42), Crackers sur des cases distinctes
+> (écart 43), animation 2D avant le 2.5D. Le prompt est `05-reprise-chat-suivant.md`.
 >
 > **Unité d'effort : la séance**, environ deux heures de Claude Code bornées à un commit.
 
