@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import { MOVE_SPEED_FEET, SPARK_CATCH_DC } from '../engine/constants.js';
-import { distance, type Point } from '../engine/geometry.js';
+import { MOVE_SPEED_FEET, PAYLOAD_RANGE_CELLS, SPARK_CATCH_DC } from '../engine/constants.js';
+import { distance, lineTo, type Point } from '../engine/geometry.js';
 import type { Action } from '../engine/actions.js';
 import type { MatchEvent } from '../engine/events.js';
 import { openMatch, reduce } from '../engine/reduce.js';
@@ -11,9 +11,20 @@ import { battedCrackerRun } from '../engine/rules/ordnance.js';
 import { createMatch } from '../engine/setup.js';
 import type { MatchState, Unit, UnitId } from '../engine/types.js';
 import { chooseAction, rankActions } from './chooseAction.js';
-import { positionValue, buildBoard } from './evaluate.js';
+import { hasLineOfSight } from '../engine/rules/sight.js';
+import {
+  BLIND_DISCOUNT,
+  buildBoard,
+  laneCover,
+  outlet,
+  positionValue,
+  scoringNearness,
+  shotQuality,
+  visibleRange,
+} from './evaluate.js';
 import type { AllyOrder } from './orders.js';
 import { weightsFor } from './roles/index.js';
+import type { Role } from '../engine/stats.js';
 import { playSeed, sweep } from './selfPlay.js';
 import { legalActions } from '../engine/legalActions.js';
 
@@ -279,9 +290,16 @@ describe('the priority tables', () => {
     const legal = legalActions(arena, staged)!;
     const view = buildBoard(arena, staged, unit(staged, mate), legal, weightsFor('striker'), []);
 
-    expect(positionValue(view, { x: 7, y: 30 })).toBeGreaterThan(
-      positionValue(view, { x: 7, y: 26 }),
-    );
+    // One column off the axis: the pillar at (7, 28) hides (7, 30) from a
+    // carrier at (7, 22), and since écart 34 a cell the carrier cannot see is
+    // no outlet at all. Both cells here are in its sight, asserted so the test
+    // cannot pass for the wrong reason if the layout moves.
+    const further = { x: 6, y: 30 };
+    const nearer = { x: 6, y: 26 };
+    expect(hasLineOfSight(arena, { x: 7, y: 22 }, further)).toBe(true);
+    expect(hasLineOfSight(arena, { x: 7, y: 22 }, nearer)).toBe(true);
+
+    expect(positionValue(view, further)).toBeGreaterThan(positionValue(view, nearer));
   });
 
   it('brings somebody back into range of a goalkeeper holding the ball', () => {
@@ -326,6 +344,229 @@ describe('the priority tables', () => {
       const struck = battedCrackerRun(arena, staged, cracker, candidate.action.direction).struck;
       expect(struck?.team).not.toBe('A');
     }
+  });
+});
+
+// -- Sight and cover ---------------------------------------------------------
+
+describe('sight and cover', () => {
+  const furnaceA = arena.furnaceOf('A');
+  const BEHIND_CRATE: Point = { x: 7, y: 10 }; // the crate is (6..8, 9)
+  const BESIDE_CRATE: Point = { x: 4, y: 10 };
+
+  /** The board as `unit` sees it, with the weights of `role`. */
+  function viewOf(staged: MatchState, id: UnitId, role: Role) {
+    const legal = legalActions(arena, staged)!;
+    return buildBoard(arena, staged, unit(staged, id), legal, weightsFor(role), []);
+  }
+
+  /** B's Striker with the ball, attacking A's mouth from `at`. */
+  function strikerAt(at: Point): MatchState {
+    return giveTurnTo(carrying(put(board(), 'B-striker-2', at), 'B-striker-2'), 'B-striker-2');
+  }
+
+  it('a carrier behind the crate is worth less than one beside it, at the same distance to the mouth', () => {
+    expect(visibleRange(arena, BEHIND_CRATE, furnaceA)).toBeNull();
+    expect(visibleRange(arena, BESIDE_CRATE, furnaceA)).not.toBeNull();
+
+    const blind = scoringNearness(arena, BEHIND_CRATE, furnaceA);
+    expect(scoringNearness(arena, BESIDE_CRATE, furnaceA)).toBeGreaterThan(blind);
+    // (7,10) is one cell past clean range, so blind is the discount times a
+    // gradient a hair under one: the sighted value there would be that gradient.
+    const gradient = 1 - (distance(BEHIND_CRATE, furnaceA.cells[1]!) - PAYLOAD_RANGE_CELLS) / 36;
+    expect(blind).toBeCloseTo(BLIND_DISCOUNT * gradient, 10);
+  });
+
+  it('shotQuality is zero with no hatch in view, whatever the distance', () => {
+    const staged = strikerAt(BEHIND_CRATE);
+    const view = viewOf(staged, 'B-striker-2', 'striker');
+    const striker = unit(staged, 'B-striker-2');
+
+    expect(visibleRange(arena, BEHIND_CRATE, furnaceA)).toBeNull();
+    expect(visibleRange(arena, BESIDE_CRATE, furnaceA)).not.toBeNull();
+    expect(shotQuality(view, striker, BEHIND_CRATE)).toBe(0);
+    expect(shotQuality(view, striker, BESIDE_CRATE)).toBeGreaterThan(0);
+  });
+
+  it('the carrier steps into view of the mouth rather than closing distance blind', () => {
+    const start: Point = { x: 7, y: 11 };
+    expect(visibleRange(arena, start, furnaceA)).toBeNull();
+
+    const chosen = chooseAction(arena, strikerAt(start), 'B-striker-2');
+    expect(chosen.kind).toBe('move');
+    if (chosen.kind !== 'move') throw new Error('unreachable');
+
+    const landing = chosen.path[chosen.path.length - 1]!;
+    expect(visibleRange(arena, landing, furnaceA)).not.toBeNull();
+    expect(scoringNearness(arena, landing, furnaceA)).toBeGreaterThan(
+      scoringNearness(arena, start, furnaceA),
+    );
+  });
+
+  it('a support player gets ahead of its carrier, within a throw, rather than standing on its shoulder', () => {
+    const keeperCell: Point = { x: 7, y: 1 };
+    const near: Point = { x: 8, y: 2 };
+    const far: Point = { x: 7, y: 8 };
+    expect(arena.isSolid(far)).toBe(false);
+    expect(hasLineOfSight(arena, keeperCell, far)).toBe(true);
+    expect(hasLineOfSight(arena, keeperCell, near)).toBe(true);
+
+    let staged = carrying(put(board(), 'A-bulwark-1', keeperCell), 'A-bulwark-1');
+    staged = giveTurnTo(put(staged, 'A-striker-2', { x: 8, y: 3 }), 'A-striker-2');
+    const view = viewOf(staged, 'A-striker-2', 'striker');
+
+    expect(outlet(view, far)).toBeGreaterThan(outlet(view, near));
+    expect(positionValue(view, far)).toBeGreaterThan(positionValue(view, near));
+  });
+
+  it('an outlet the carrier cannot see is worth nothing', () => {
+    const carrier: Point = { x: 7, y: 7 };
+    const hidden: Point = { x: 7, y: 11 }; // behind the crate at y = 9
+    expect(arena.isSolid(carrier)).toBe(false);
+    expect(hasLineOfSight(arena, carrier, hidden)).toBe(false);
+
+    const visible = [
+      { x: 3, y: 11 },
+      { x: 11, y: 11 },
+    ].find((c) => hasLineOfSight(arena, carrier, c));
+    expect(visible).toBeDefined();
+
+    let staged = carrying(put(board(), 'A-breaker-5', carrier), 'A-breaker-5');
+    staged = giveTurnTo(put(staged, 'A-striker-2', { x: 7, y: 6 }), 'A-striker-2');
+    const view = viewOf(staged, 'A-striker-2', 'striker');
+
+    expect(outlet(view, hidden)).toBe(0);
+    expect(outlet(view, visible!)).toBeGreaterThan(0);
+    expect(positionValue(view, visible!)).toBeGreaterThan(positionValue(view, hidden));
+  });
+
+  it('cover: a lane with a defender beside it is worth less than a clean one', () => {
+    const carrier: Point = { x: 7, y: 20 };
+    const target: Point = { x: 7, y: 24 };
+    const guard: Point = { x: 8, y: 22 };
+    expect(hasLineOfSight(arena, carrier, target)).toBe(true);
+    expect(lineTo(carrier, target).some((c) => distance(c, guard) <= 1)).toBe(true);
+
+    let staged = carrying(put(board(), 'A-breaker-5', carrier), 'A-breaker-5');
+    staged = giveTurnTo(put(staged, 'A-striker-2', { x: 7, y: 19 }), 'A-striker-2');
+
+    const clean = viewOf(staged, 'A-striker-2', 'striker');
+    const marked = viewOf(put(staged, 'B-breaker-5', guard), 'A-striker-2', 'striker');
+    expect(unit(marked.state, 'B-breaker-5').reactionAvailable).toBe(true);
+
+    const open = laneCover(clean, target);
+    expect(open).toBeGreaterThan(0);
+    expect(laneCover(marked, target)).toBeCloseTo(open * 0.5, 10);
+    expect(positionValue(marked, target)).toBeLessThan(positionValue(clean, target));
+
+    // Out of reach (distance 19) and the carrier's own cell read nothing at all.
+    expect(laneCover(clean, { x: 7, y: 39 })).toBe(0);
+    expect(laneCover(clean, carrier)).toBe(0);
+  });
+
+  it('the goalkeeper reads no cover', () => {
+    expect(weightsFor('bulwark').cover).toBe(0);
+    for (const role of ['striker', 'breaker', 'bulwark', 'trajector'] as const) {
+      expect(typeof weightsFor(role).cover).toBe('number');
+    }
+  });
+});
+
+// -- A31: the goal that was scored ---------------------------------------------
+
+/**
+ * Drives one unit's turn with the real ladder set aside, the way `playOutTurn`
+ * does, and hands back the board it leaves behind rather than the log.
+ */
+function playTurnOf(start: MatchState, unitId: UnitId): MatchState {
+  let state = giveTurnTo(start, unitId);
+  for (let i = 0; i < 60; i++) {
+    const action = chooseAction(arena, state, unitId);
+    if (action.kind === 'endTurn') break;
+    const result = reduce(arena, state, { unitId, action });
+    if (!result.ok) throw new Error(`refused: ${result.reason}`);
+    state = result.state;
+    if (!state.turn || state.turn.unitId !== unitId) break;
+  }
+  return state;
+}
+
+describe('after a goal is scored', () => {
+  // Audit line A31, reproduced from Jérôme's first match on 2026-10-10: a goal
+  // goes in, the conceding goalkeeper is handed a fresh ball in its own mouth,
+  // its six field players gather round it and never leave. Measured in
+  // self-play before the fix: the keeper still held the ball on 77 % of the
+  // conceding side's next 28 turns, and a field player's best move from beside
+  // the keeper was worth under three points, so it swung at whoever was
+  // adjacent or dodged instead. The scene below is that moment, staged.
+  const keeper = 'A-bulwark-1';
+  const mouth = { x: 7, y: 1 };
+  const huddle: readonly [UnitId, Point][] = [
+    ['A-striker-2', { x: 5, y: 2 }],
+    ['A-striker-3', { x: 6, y: 2 }],
+    ['A-striker-4', { x: 8, y: 2 }],
+    ['A-breaker-5', { x: 9, y: 2 }],
+    ['A-breaker-6', { x: 6, y: 3 }],
+    ['A-trajector-7', { x: 8, y: 3 }],
+  ];
+
+  function conceded(): MatchState {
+    let staged = put(board(), keeper, mouth);
+    staged = carrying(staged, keeper);
+    for (const [id, at] of huddle) staged = put(staged, id, at);
+    // The scorers are back in their own half, out of everybody's reach, so
+    // nothing in this scene is a reaction to an opponent.
+    let x = 2;
+    for (const u of staged.units) {
+      if (u.team === 'B') staged = put(staged, u.id, { x: x++, y: 36 });
+    }
+    return staged;
+  }
+
+  it('the field players spread out ahead of their goalkeeper, in its sight and within a throw', () => {
+    let state = conceded();
+    for (const [id] of huddle) state = playTurnOf(state, id);
+
+    const mates = huddle.map(([id]) => unit(state, id));
+    const spread = mates.map((m) => distance(m, mouth));
+    const mean = spread.reduce((a, b) => a + b, 0) / spread.length;
+
+    // Nobody is left on the keeper's shoulder, and the side is a throw's
+    // length up the pitch on average: this is the dispersion the sweep now
+    // reports, asserted on the one scene it was added for.
+    expect(mates.filter((m) => distance(m, mouth) <= 2)).toHaveLength(0);
+    expect(mean).toBeGreaterThan(5);
+
+    // And they are outlets, not just far away: in reach, in view, up the pitch.
+    const outlets = mates.filter(
+      (m) =>
+        distance(m, mouth) <= PAYLOAD_RANGE_CELLS &&
+        hasLineOfSight(arena, mouth, m) &&
+        m.y > mouth.y + 3,
+    );
+    expect(outlets.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('and the goalkeeper throws the ball out to one of them', () => {
+    let state = conceded();
+    for (const [id] of huddle) state = playTurnOf(state, id);
+
+    const chosen = chooseAction(arena, giveTurnTo(state, keeper), keeper);
+    expect(chosen.kind).toBe('pass');
+    if (chosen.kind !== 'pass') throw new Error('unreachable');
+
+    const receiver = unit(state, chosen.targetId);
+    expect(receiver.y).toBeGreaterThan(mouth.y + 3);
+  });
+
+  it('spends no more than it did on the old pitch: a decision stays under fifty milliseconds', () => {
+    // `scoringNearness` and `outlet` now read lines of sight for every
+    // reachable cell. The Furnace table is memoised per arena, the carrier line
+    // is not, and this is the scene with the most reachable cells in sight.
+    const state = giveTurnTo(conceded(), 'A-striker-2');
+    const started = Date.now();
+    for (let i = 0; i < 20; i++) chooseAction(arena, state, 'A-striker-2');
+    expect((Date.now() - started) / 20).toBeLessThan(50);
   });
 });
 

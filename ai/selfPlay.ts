@@ -14,11 +14,11 @@
 import { Arena, type ArenaSpec } from '../engine/arena.js';
 import { THIRD_COUNT } from '../engine/constants.js';
 import type { MatchEvent } from '../engine/events.js';
-import { thirdOf, type Point } from '../engine/geometry.js';
+import { distance, thirdOf, type Point } from '../engine/geometry.js';
 import { openMatch, reduce } from '../engine/reduce.js';
 import { createMatch, type MatchSetup } from '../engine/setup.js';
 import type { Tier } from '../engine/stats.js';
-import type { MatchState, TeamId } from '../engine/types.js';
+import { activeUnits, type MatchState, type TeamId } from '../engine/types.js';
 import { chooseAction } from './chooseAction.js';
 import type { AllyOrder } from './orders.js';
 
@@ -41,6 +41,43 @@ export interface BallTrack {
   /** Of those turns, the ones where a goalkeeper was holding it. */
   readonly heldByKeeper: number;
   readonly turns: number;
+  /** Of those turns, the ones where somebody carried it. A loose ball is not counted. */
+  readonly carrierTurns: number;
+  /** Sum over the carried turns of the carrier's mean distance to its team-mates. */
+  readonly mateSpreadSum: number;
+  /** Sum over the carried turns of the team-mates within 2 cells of the carrier. */
+  readonly huddleSum: number;
+}
+
+/** Within this many cells of the carrier, a team-mate counts as huddled on it. */
+const HUDDLE_RADIUS = 2;
+
+/**
+ * How spread out the carrier's team-mates are on this turn, or null when the
+ * ball is loose or the carrier has nobody left standing beside it.
+ *
+ * Spread is the mean Chebyshev distance from the carrier to its active
+ * team-mates; huddle is how many of them sit within `HUDDLE_RADIUS`. Only the
+ * carrier's side is read, the opponents say nothing about getting open.
+ */
+export function mateSpread(state: MatchState): { spread: number; huddle: number } | null {
+  const carrierId = state.payload.carriedBy;
+  if (!carrierId) return null;
+
+  const carrier = state.units.find((u) => u.id === carrierId);
+  if (!carrier) return null;
+
+  const mates = activeUnits(state).filter((u) => u.team === carrier.team && u.id !== carrier.id);
+  if (mates.length === 0) return null;
+
+  let total = 0;
+  let huddle = 0;
+  for (const mate of mates) {
+    const d = distance(carrier, mate);
+    total += d;
+    if (d <= HUDDLE_RADIUS) huddle++;
+  }
+  return { spread: total / mates.length, huddle };
 }
 
 /**
@@ -79,6 +116,9 @@ export function playMatch(
   const byThird = new Array<number>(THIRD_COUNT).fill(0);
   let heldByKeeper = 0;
   let turns = 0;
+  let carrierTurns = 0;
+  let mateSpreadSum = 0;
+  let huddleSum = 0;
   let sampled: string | null = null;
 
   while (state.phase !== 'finished' && state.turn && actions < limit) {
@@ -92,6 +132,13 @@ export function playMatch(
       byThird[thirdOf(ball.cell)]!++;
       if (ball.keeper) heldByKeeper++;
       turns++;
+
+      const mates = mateSpread(state);
+      if (mates) {
+        carrierTurns++;
+        mateSpreadSum += mates.spread;
+        huddleSum += mates.huddle;
+      }
     }
 
     const result = reduce(arena, state, {
@@ -109,7 +156,8 @@ export function playMatch(
   }
 
   if (state.phase !== 'finished') throw new Error(`the match did not end in ${limit} actions`);
-  return { state, events, actions, ballTrack: { byThird, heldByKeeper, turns } };
+  return { state, events, actions, ballTrack: { byThird, heldByKeeper, turns, carrierTurns, mateSpreadSum, huddleSum },
+  };
 }
 
 export function playSeed(spec: ArenaSpec, tier: Tier, seed: number): PlayResult {
@@ -163,6 +211,21 @@ export interface SweepReport {
    * `passReach` in `ai/evaluate.ts` exists for this number.
    */
   readonly keeperHeldShare: number;
+  /**
+   * Mean distance, in cells, from the carrier to its active team-mates, over the
+   * turns where somebody carries the Payload.
+   *
+   * This column exists for audit line A31, team-mates massing around the
+   * goalkeeper after a goal. Read it with `meanHuddle`: a low spread with a high
+   * huddle means the team is hugging its carrier instead of getting open. It
+   * reads the carrier's side only.
+   */
+  readonly meanMateSpread: number;
+  /**
+   * Mean number of team-mates within 2 cells of the carrier, over the same
+   * turns as `meanMateSpread`. See there for how the two are read together.
+   */
+  readonly meanHuddle: number;
 }
 
 /**
@@ -199,6 +262,9 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
   const ballThird = new Array<number>(THIRD_COUNT).fill(0);
   let keeperHeld = 0;
   let ballTurns = 0;
+  let carrierTurns = 0;
+  let mateSpreadSum = 0;
+  let huddleSum = 0;
 
   for (let i = 0; i < matches; i++) {
     const played = playSeed(spec, tier, firstSeed + i);
@@ -229,6 +295,9 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     for (let t = 0; t < THIRD_COUNT; t++) ballThird[t]! += played.ballTrack.byThird[t]!;
     keeperHeld += played.ballTrack.heldByKeeper;
     ballTurns += played.ballTrack.turns;
+    carrierTurns += played.ballTrack.carrierTurns;
+    mateSpreadSum += played.ballTrack.mateSpreadSum;
+    huddleSum += played.ballTrack.huddleSum;
   }
 
   return {
@@ -245,6 +314,8 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     meanActions: actions / matches,
     ballThirdShare: ballThird.map((n) => (ballTurns === 0 ? 0 : n / ballTurns)),
     keeperHeldShare: ballTurns === 0 ? 0 : keeperHeld / ballTurns,
+    meanMateSpread: carrierTurns === 0 ? 0 : mateSpreadSum / carrierTurns,
+    meanHuddle: carrierTurns === 0 ? 0 : huddleSum / carrierTurns,
   };
 }
 

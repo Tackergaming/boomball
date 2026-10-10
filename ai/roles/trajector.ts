@@ -30,6 +30,7 @@ export const TRAJECTOR: RoleWeights = {
   guardFurnace: 6,
   screenCarrier: 30,
   supportAttack: 30,
+  cover: 25,
   pressCarrier: 12,
 
   avoidOpportunity: 7,

@@ -89,6 +89,15 @@ export interface RoleWeights {
    * drawn by the only shot of the match and never spent.
    */
   readonly supportAttack: number;
+  /**
+   * Being an outlet nobody is standing beside: in the carrier's reach and
+   * sight, on a lane no opponent could intercept. This is what the anchoring
+   * value of the vertical silo became once there was nothing to fall from. A
+   * crate on the floor is cover only in this sense: the place where a throw
+   * reaches you and a defender does not. Zero for the goalkeeper, which does
+   * not get open; highest for the Trajector, whose job is the throw.
+   */
+  readonly cover: number;
   /** Staying on the opponent who is carrying. */
   readonly pressCarrier: number;
 

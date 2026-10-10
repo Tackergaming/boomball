@@ -20,14 +20,17 @@ import {
   PAYLOAD_RANGE_CELLS,
   SPARK_CATCH_DC,
 } from '../engine/constants.js';
-import { distance, type Point } from '../engine/geometry.js';
+import { distance, lineTo, type Point } from '../engine/geometry.js';
 import type { LegalActions } from '../engine/legalActions.js';
 import {
   blockingBulwark,
   rangeToFurnace,
   shotTarget,
   throwRangeOver,
+  visibleRangeToFurnace,
 } from '../engine/rules/payload.js';
+import { passInterceptors } from '../engine/rules/reactions.js';
+import { hasLineOfSight } from '../engine/rules/sight.js';
 import { statsFor } from '../engine/stats.js';
 import {
   activeUnits,
@@ -124,41 +127,86 @@ export function furnaceNearness(from: Point, furnace: Furnace): number {
 }
 
 /**
- * How close a cell is to being able to **score**, which is not the same as how
- * close it is to the Furnace.
+ * What a cell is worth when the mouth cannot be seen from it.
  *
- * A flat distance gradient prices the first step across the silo the same as
- * the last step into shooting range, and a carrier scored on it drifts towards
- * the goal without ever arriving. This is flat at one inside clean throwing
- * range and falls away outside it, so the pull is strongest exactly where the
- * carrier still has something to gain.
+ * Since D11 a shot needs a line of sight (écart 34), and the layout is built so
+ * that no straight line runs from the halfway line to a mouth. A carrier priced
+ * on distance alone walks up to the crate in front of the goal and stands
+ * there, in clean range, holding a shot the door will never offer it. The first
+ * sweep of engine 2 read exactly that: three matches in four without a goal.
+ *
+ * So a blind cell is worth a fraction of the same cell with the mouth in view.
+ * Not zero: the gradient still has to pull a carrier across the pitch from its
+ * own end, where nothing is visible and nothing is in range. High enough that a
+ * step around the crate into the open is always worth taking, which is the
+ * lesson of `positionValue` applied to the shot: the cell that makes the action
+ * legal carries the action's worth.
  */
-export function scoringNearness(from: Point, furnace: Furnace): number {
-  const range = rangeToFurnace(from, furnace);
-  if (range <= PAYLOAD_RANGE_CELLS) return 1;
-  return Math.max(0, 1 - (range - PAYLOAD_RANGE_CELLS) / 30);
+export const BLIND_DISCOUNT = 0.8;
+
+/**
+ * The distance from a cell to the nearest hatch cell it can see, or null when
+ * the whole mouth is hidden. Pure terrain, so it is computed once per arena and
+ * Furnace and read from a table afterwards: `positionValue` asks this for every
+ * reachable cell of every decision, and a line of sight across half the pitch
+ * is not free.
+ */
+const visibleRangeTables = new WeakMap<Arena, Map<string, number | null>>();
+
+export function visibleRange(arena: Arena, from: Point, furnace: Furnace): number | null {
+  let table = visibleRangeTables.get(arena);
+  if (!table) {
+    table = new Map();
+    visibleRangeTables.set(arena, table);
+  }
+  const key = `${furnace.defendedBy}:${from.x},${from.y}`;
+  const known = table.get(key);
+  if (known !== undefined) return known;
+
+  const range = visibleRangeToFurnace(arena, from, furnace);
+  table.set(key, range);
+  return range;
 }
 
 /**
- * Whether a support player is somewhere the carrier could actually throw to.
+ * How close a cell is to being able to **score**, which is not the same as how
+ * close it is to the Furnace.
+ *
+ * A flat distance gradient prices the first step across the pitch the same as
+ * the last step into shooting range, and a carrier scored on it drifts towards
+ * the goal without ever arriving. This is flat at one from any cell that has
+ * the mouth **in view** and in clean throwing range, and falls away outside it
+ * all the way to the far end, so the pull is strongest exactly where the
+ * carrier still has something to gain and never flat where it has nothing.
+ *
+ * A cell the mouth cannot be seen from is discounted, whatever its distance:
+ * see `BLIND_DISCOUNT`. Inside clean range that is the whole difference between
+ * standing behind the crate and standing beside it.
+ */
+export function scoringNearness(arena: Arena, from: Point, furnace: Furnace): number {
+  const seen = visibleRange(arena, from, furnace);
+  if (seen !== null && seen <= PAYLOAD_RANGE_CELLS) return 1;
+
+  const range = rangeToFurnace(from, furnace);
+  const gradient = Math.min(
+    1,
+    Math.max(0, 1 - (range - PAYLOAD_RANGE_CELLS) / (ARENA_HEIGHT - PAYLOAD_RANGE_CELLS)),
+  );
+  return seen === null ? gradient * BLIND_DISCOUNT : gradient;
+}
+
+/**
+ * Whether a support player is somewhere the carrier could actually throw to,
+ * **on distance alone**. One at or inside clean throwing range, falling to zero
+ * at twice it. The line of sight a throw also needs is `outlet` below, because
+ * reach is a number and sight is a yes or no.
  *
  * Getting open is two things and the evaluator only ever priced one of them.
- * Advancing on the goal is the half that was there; **being reachable** is the
+ * Advancing on the goal is the half that was there; being reachable is the
  * half that was not, and on a fourteen-cell pitch its absence was invisible
- * because everyone was within a throw of everyone by accident.
- *
- * On a pitch that runs the height of the silo it is not invisible at all. A
- * team concedes, its goalkeeper is handed a fresh Payload in its own mouth, and
- * its Strikers price every cell by distance to the far goal, so they run away
- * from the one team-mate holding the ball. Two rounds later nothing is within
- * throwing distance of the keeper, `legal.pass` is empty, `guardFurnace` keeps
- * the keeper home, and the ball never comes out again.
- *
- * One at or inside clean throwing range, falling to zero at twice it. **That
- * makes it a no-op wherever the balance sweeps were actually run**: in the
- * regime the closed balance was measured in, every support cell scored a reach
- * of one and this multiplies by one. It only bites out past the range where the
- * old formula had never been measured and was simply wrong.
+ * because everyone was within a throw of everyone by accident. On a pitch that
+ * runs forty-five cells it is not invisible at all: a team concedes, its keeper
+ * is handed a fresh Payload in its own mouth, and nobody is within a throw.
  */
 export function passReach(cell: Point, carrier: Point): number {
   const beyond = Math.max(0, distance(cell, carrier) - PAYLOAD_RANGE_CELLS);
@@ -166,8 +214,78 @@ export function passReach(cell: Point, carrier: Point): number {
 }
 
 /**
+ * How good an outlet a cell makes for a team-mate of the carrier: zero to a
+ * little over one.
+ *
+ * Three things have to be true at once, and the product is zero if any fails.
+ * The ball can reach the cell (`passReach`); the carrier can see it (écart 34,
+ * a crate between them and there is no pass); and the throw would gain ground,
+ * measured as the range to the Furnace the carrier gives up by throwing here,
+ * one at a full clean throw's worth. A cell with a clean shot on the mouth is
+ * worth its shot on top, because a receiver who can score is the second
+ * shooter the goalkeeper's Reaction cannot cover.
+ *
+ * This is the A31 fix. Before it, a support player's only pull in its own half
+ * was the gradient towards its carrier, because the old nearness-to-goal term
+ * read zero that far from the Furnace. After a goal the conceding team's six
+ * field players therefore drifted onto their goalkeeper, who now held the ball,
+ * and stayed: nothing anywhere else was worth a step, and a keeper ringed by
+ * team-mates has nobody a throw's length up the pitch to pass to. An outlet is
+ * worth most **nine cells ahead** of the carrier, in its sight, which is where
+ * a team that wants the ball to come out has to stand.
+ */
+export function outlet(board: Board, cell: Point): number {
+  const carrier = board.carrier;
+  if (!carrier) return 0;
+
+  const reach = passReach(cell, carrier);
+  if (reach === 0) return 0;
+  if (!hasLineOfSight(board.arena, carrier, cell)) return 0;
+
+  const gained =
+    rangeToFurnace(carrier, board.targetFurnace) - rangeToFurnace(cell, board.targetFurnace);
+  const progress = Math.min(1, Math.max(0, gained / PAYLOAD_RANGE_CELLS));
+
+  return reach * (progress + shotQuality(board, board.unit, cell));
+}
+
+/**
+ * Cover: how safely a throw to this cell would arrive, zero to one.
+ *
+ * This is what took the place of the anchoring value of the vertical silo. A
+ * floor has no cell to fall from, but it has crates, and the use of a crate in
+ * this sport is to stand where the ball can reach you and the opposition
+ * cannot touch it on the way. A cell the carrier cannot see is not covered, it
+ * is hidden, and reads zero; so does a cell out of reach. In reach and in
+ * sight, every opponent standing beside the flight (`passInterceptors`) takes
+ * half of it away, so a lane with two defenders on it is worth nothing and a
+ * clean lane is worth the whole weight.
+ *
+ * Only a team-mate of the carrier reads it. The carrier itself has no ranged
+ * threat to hide from: nothing in the rules can reach it but a bat, and a bat
+ * is priced by `avoidOpportunity`.
+ */
+export function laneCover(board: Board, cell: Point): number {
+  const carrier = board.carrier;
+  if (!carrier) return 0;
+
+  const reach = passReach(cell, carrier);
+  if (reach === 0 || distance(cell, carrier) === 0) return 0;
+  if (!hasLineOfSight(board.arena, carrier, cell)) return 0;
+
+  const defenders = passInterceptors(
+    board.arena,
+    board.state,
+    carrier,
+    lineTo(carrier, cell),
+  ).length;
+  return reach * Math.max(0, 1 - defenders * 0.5);
+}
+
+/**
  * The odds this player would put the ball in the Furnace from this cell, or
- * zero if it cannot shoot from there at all.
+ * zero if it cannot shoot from there at all, which since écart 34 includes a
+ * cell from which no hatch is in view.
  *
  * This is what prices a pass. Ground gained is not the same as a chance
  * created: a Breaker on the edge of range is holding a shot worth one in a
@@ -175,7 +293,9 @@ export function passReach(cell: Point, carrier: Point): number {
  * Scored on distance alone, that throw looks like it gains nothing.
  */
 export function shotQuality(board: Board, unit: Unit, from: Point): number {
-  const range = throwRangeOver(rangeToFurnace(from, board.targetFurnace));
+  const seen = visibleRange(board.arena, from, board.targetFurnace);
+  if (seen === null) return 0;
+  const range = throwRangeOver(seen);
   if (!range.ok) return 0;
 
   const keeper = blockingBulwark(board.state, board.targetFurnace, board.targetFurnace.defendedBy);
@@ -197,7 +317,7 @@ export function positionValue(board: Board, cell: Point): number {
   let value = 0;
 
   if (unit.holdingPayload) {
-    value += w.carryToFurnace * scoringNearness(cell, board.targetFurnace);
+    value += w.carryToFurnace * scoringNearness(board.arena, cell, board.targetFurnace);
   } else if (state.payload.carriedBy === null) {
     value += w.chaseLoosePayload * nearness(cell, state.payload);
     // The cell the ball is actually lying in is worth the pickup, not one more
@@ -209,11 +329,14 @@ export function positionValue(board: Board, cell: Point): number {
     if (cell.x === state.payload.x && cell.y === state.payload.y) value += w.grabPayload;
   } else if (board.carrier && board.carrier.team === unit.team) {
     value += w.screenCarrier * nearness(cell, board.carrier);
-    // Advancing on goal only counts from somewhere the ball can reach. See
-    // `passReach`: this is the outlet half of getting open, and without it a
-    // support player walks to the far end of the silo and strands its own
-    // carrier with nobody to throw to.
-    value += w.supportAttack * scoringNearness(cell, board.targetFurnace) * passReach(cell, board.carrier);
+    // Getting open: reachable, in the carrier's sight, ahead of it, and ideally
+    // with a shot. See `outlet`. Without the sight and the ground gained, a
+    // support player either walks to the far end and strands its carrier, or,
+    // after a goal, stands on its goalkeeper's shoulder for the rest of the
+    // match (A31).
+    value += w.supportAttack * outlet(board, cell);
+    // And unmarked: a lane nobody is standing beside. See `laneCover`.
+    value += w.cover * laneCover(board, cell);
   } else if (board.carrier) {
     value += w.pressCarrier * nearness(cell, board.carrier);
   }

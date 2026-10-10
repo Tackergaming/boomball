@@ -99,7 +99,7 @@ Les lignes vues à l'écran dans ce chat sont marquées « vu ».
 | A28 | **Une action en retard est appliquée au tour suivant.** Trouvé au harnais le 2026-10-10. `resolve-action` règle l'expiration par `expireIfDue`, qui fait jouer la maison jusqu'au tour humain suivant, puis **soumet l'action reçue à ce nouveau tour** ; si elle y est légale elle est appliquée, et la réponse ne porte même pas `expired`. Seule une action illégale sur le nouveau plateau prend le chemin `expired`. Mesuré : match ouvert au round 2 avec un chrono passé, un `endTurn` envoyé, tour suivant au round 4. Un `endTurn` après le chrono, **dont le coup à la porte du client**, coûte donc deux tours | `supabase/functions/resolve-action/index.ts`, après `expireIfDue` | C'est une partie de ce que Jérôme décrivait quand « dix rounds avaient passé ». Correctif : quand `overdue` est non nul, ne pas soumettre l'action et répondre `expired` ; un test dans `session.test.ts` ; redéploiement de la fonction | Majeur | 0,5 |
 | A29 | **Les fonctions déployées sont en retard sur le moteur.** Trouvé en lisant les événements des deux matchs joués au harnais le 2026-10-10 : `scored(B, 50)` sur une prise du Spark, alors que `engine/constants.ts` dit `SPARK_POINTS = 20` depuis le commit c9be92c du 2026-09-02, « Ramène le Spark à deux buts », et que `04`, `CONTEXT.md` et `check_drift.py` disent 20. `resolve-action` v7 a donc été bundlée avant ce commit. Le jeu en ligne joue un Spark à cinq buts, et le tableau d'équilibrage de `04` ne décrit pas ce qui est déployé. Le commentaire de `scripts/live-match.ts` dit encore « 50 for the Spark » | `npm run deploy:function` pour les deux fonctions, `scripts/live-match.ts` | C'est exactement ce que A11 existe pour attraper : sans version sur les matchs, personne ne voit qu'un moteur déployé diverge. À redéployer avec le feu vert de Jérôme, parce que ça change le jeu en ligne, et A11 juste derrière | Majeur | 0,25, plus le feu vert |
 | A30 | **Le terrain ne se lit plus sous le noircissement** (retour 1 de la première partie de Jérôme, 2026-10-10). L'art est filtré à 50 % de luminosité, lavé d'un voile sombre, et chaque case de structure est peinte à 82 % d'opacité par-dessus : sur les captures, les passerelles de l'image disparaissent derrière le quadrillage | `client/src/match/Board.tsx`, `S.art`, `S.wash`, remplissage des cases | La 2D reste le repli derrière l'interrupteur jusqu'au bout, et c'est l'écran de la phase 2. Alléger le voile et l'opacité des cases, juger sur capture | Mineur | 0,25 |
-| A31 | **L'IA n'est ni lisible ni tactique pour un humain** (retours 3 et 4) : après un but marqué par Jérôme, tous ses alliés se sont massés autour de son Bulwark et n'en sont jamais repartis ; dans l'ensemble il n'a pas compris ce que la maison et ses coéquipiers cherchaient. L'équilibrage est mesuré IA contre IA, il ne dit rien de ce qu'un humain comprend. Le `payloadReset` après un but et la valeur de position « défendre » sont les premiers suspects, et la leçon de `positionValue` s'applique : une heuristique doit valoriser la case qui rend une action possible | `ai/`, à reproduire d'abord au harnais avec une capture après un but | **L'équilibrage reste clos** : il s'agit d'une reproduction mesurée puis d'un correctif ciblé, suivi d'un sweep pour vérifier que les moyennes n'ont pas bougé. Un correctif qui bouge les moyennes est un arbitrage de Jérôme | Majeur | 1 à 2 |
+| A31 | **L'IA n'est ni lisible ni tactique pour un humain** (retours 3 et 4) : après un but marqué par Jérôme, tous ses alliés se sont massés autour de son Bulwark et n'en sont jamais repartis ; dans l'ensemble il n'a pas compris ce que la maison et ses coéquipiers cherchaient. L'équilibrage est mesuré IA contre IA, il ne dit rien de ce qu'un humain comprend. Le `payloadReset` après un but et la valeur de position « défendre » sont les premiers suspects, et la leçon de `positionValue` s'applique : une heuristique doit valoriser la case qui rend une action possible | `ai/`, à reproduire d'abord au harnais avec une capture après un but | **Reproduit et corrigé en 2H.2 le 2026-10-10**, voir §10 : la cause était un coéquipier sans aucune raison de s'écarter de son gardien dans sa propre moitié, corrigée par la valeur de relais `outlet`. Le sweep de contrôle a bougé, signalé en §10. La partie « lisible pour un humain » se juge à la porte de 2H.4 | Corrigé, à juger en 2H.4 | 0 |
 | A32 | **La portée de tir a paru trop longue** (retour 6) : `PAYLOAD_RANGE_CELLS` 9 et `PAYLOAD_LONG_RANGE_CELLS` 12, soit 45 et 60 pieds. C'est une règle de `00-reglement-v2.md`, donc un arbitrage de Jérôme, mesuré avant : une ligne de plus dans le sweep de la phase 2, à côté des Crackers | `engine/constants.ts`, `docs/00` | Même méthode que D4 : sweep, tableau, arbitrage, écart au règlement si appliqué | Mineur | fondu dans A5 |
 
 ### 2.B Ce qui n'est pas optimisé
@@ -835,3 +835,55 @@ moyennes se lisent, et elles disent que le jeu a changé de régime.
 les deux fonctions déployées jouent encore le moteur 1, les images de zone sont encore référencées
 par le client, A8 et A30 n'ont plus d'objet mais restent écrits en §2.A jusqu'à ce que le plateau
 soit redessiné.
+
+
+### Sous-phase 2H.2, « IA », construite le 2026-10-10
+
+Par le fil principal (Fable 5.1), avec deux sous-agents Sonnet à effort moyen, nommés ci-dessous.
+Le fil principal a gardé `ai/evaluate.ts`, les quatre fiches de rôle et `weights.ts`, la
+reproduction de A31, son correctif, le scénario du but marqué dans `ai.test.ts` et l'intégration.
+**La sous-phase est close** : `npm test` vert, 19 fichiers et 342 tests contre 17 et 328 ;
+`npm run typecheck` vert ; le sweep de contrôle est ci-dessous. Aucune constante de `00` n'a bougé.
+`CONTEXT.md` attend `/update` : `check_drift.py` signale 328 tests et 0,42 à 0,50 buts jusque-là.
+
+| Tâche de `08` §4.2 | État |
+|---|---|
+| La ligne de vue dans l'IA | Fait, fil principal. `shotQuality` lit la portée **visible** vers la bouche et vaut zéro quand aucune case de la bouche ne se voit ; `scoringNearness` vaut 1 depuis toute case qui voit la bouche à portée propre, et une case aveugle est escomptée à 80 % quelle que soit sa distance (`BLIND_DISCOUNT`), pour qu'un pas de côté hors de la caisse vaille toujours plus qu'un pas de plus vers elle. Le gradient va jusqu'au bout du terrain au lieu de s'aplatir à zéro au-delà de 39 cases. La portée visible est mémoïsée par arène et par Furnace, parce que `positionValue` la demande pour chaque case atteignable |
+| La valeur de couverture à la place de l'ancrage | Fait, fil principal. Poids `cover` dans les quatre fiches (Striker 20, Trajector 25, Breaker 10, Bulwark 0) et fonction `laneCover` : pour un coéquipier du porteur, une case **à portée, en vue du porteur, et dont la trajectoire de passe n'a aucun adversaire à côté**. Chaque intercepteur possible retire la moitié. Le porteur ne la lit pas : rien dans les règles ne l'atteint à distance |
+| A31 reproduit | Fait, fil principal, **dans le harnais de self-play et pas à l'écran** : le harnais Playwright joue les fonctions déployées, donc le moteur 1, et une capture n'aurait rien dit du moteur 2. Script de mesure : 60 graines par Tier, après chaque but, les 28 tours suivants du camp qui a encaissé. **Avant correctif, rookie** : le gardien tient encore le ballon sur 77 % de ces tours, 0,98 coéquipier à deux cases ou moins du porteur, et le meilleur déplacement d'un joueur de champ près de son gardien vaut moins de trois points, donc il frappe l'adversaire adjacent ou esquive. La cause n'est pas `payloadReset` : c'est que dans sa propre moitié un coéquipier n'avait **aucune raison de s'écarter**, `scoringNearness` lisait zéro à plus de 39 cases de la bouche adverse, et le seul gradient restant, `screenCarrier`, le tirait vers le porteur |
+| A31 corrigé | Fait, fil principal. Nouvelle fonction `outlet` : pour un coéquipier du porteur, le produit de la portée de passe (`passReach`), de la ligne de vue depuis le porteur, et du **terrain gagné** par la passe, à 1 pour une passe propre entière, plus la qualité de tir depuis la case. Un relais vaut le plus **neuf cases devant le porteur, dans sa vue**. `supportAttack` multiplie `outlet` au lieu de l'ancien produit distance-au-but fois portée. **Après correctif, rookie** : gardien à 58 % des tours suivants, 0,68 coéquipier collé, distance moyenne 9,4 à 10,3 ; veteran 60 % et 0,85 ; star 52 % et 0,86. Le gardien passe dès son premier tour dans la médiane des cas |
+| Dispersion dans le rapport de sweep | Fait, **sous-agent (e), Sonnet effort moyen**. `BallTrack` gagne `carrierTurns`, `mateSpreadSum`, `huddleSum` ; `SweepReport` gagne `meanMateSpread` (distance de Chebyshev moyenne du porteur à ses coéquipiers actifs, échantillonnée une fois par tour quand le ballon est porté) et `meanHuddle` (coéquipiers à deux cases ou moins) ; colonnes `spread` et `huddle` dans le rapport ; `ai/selfPlay.test.ts` neuf, 4 tests, dont l'arithmétique sur un plateau posé à la main |
+| `ai.test.ts` | Bloc « sight and cover », 7 tests, **sous-agent (f), Sonnet effort moyen**, sur la spécification du fil principal, chaque affirmation de ligne de vue gardée par `hasLineOfSight` pour qu'un layout qui bouge fasse échouer le test au lieu de le laisser passer pour la mauvaise raison. Bloc « after a goal is scored », 3 tests, fil principal : les six joueurs de champ s'écartent de leur gardien, aucun ne reste à deux cases, au moins trois sont des relais en vue et à portée ; le gardien choisit la passe vers l'un d'eux ; une décision reste sous 50 ms. Un test existant corrigé par le fil principal : « still prefers the cell further up the pitch » comparait (7, 30) à (7, 26) depuis un porteur en (7, 22), et le pilier (7, 28) cache désormais la première ; décalé d'une colonne, lignes de vue gardées |
+
+**Sweep de contrôle du moteur 2 après 2H.2**, 200 matchs par Tier, 141 s, aucune constante de `00`
+touchée, les poids de l'IA seuls ayant bougé. **Les moyennes ont bougé, et c'est à signaler, pas à
+cacher** : la cible de 1 à 2 buts par match est atteinte sur les trois Tiers par le seul fait que
+l'IA voit les caisses, avant toute campagne d'équilibrage.
+
+| Tier | A | B | nuls | buts/match | sans but | Spark pris | essais/match | décidés par le Spark | évacués | ballon A/milieu/B | gardien | dispersion | collés |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| rookie | 95 | 88 | 17 | 1,05 | 60 | 133 | 2,33 | 94 | 1,85 | 26 / 45 / 29 % | 6 % | 9,5 | 1,30 |
+| veteran | 89 | 98 | 13 | 1,37 | 50 | 161 | 1,96 | 99 | 1,44 | 26 / 44 / 29 % | 8 % | 9,1 | 1,44 |
+| star | 96 | 90 | 14 | 1,59 | 36 | 186 | 1,65 | 113 | 0,85 | 29 / 41 / 30 % | 9 % | 9,2 | 1,44 |
+
+Lecture, contre la référence de 2H.1. Buts par match de 0,42 à 0,50 vers **1,05 à 1,59**, dans la
+cible. Matchs sans but de 143 à 147 vers **36 à 60** sur 200. Matchs décidés par le Spark de 122 à
+159 vers **94 à 113**, soit 47 à 57 % : encore loin des 30 % visés, c'est le levier de 2H.3, où le
+prix du Spark se discute contre un taux de buts qui a triplé. La part A/B reste équilibrée, le
+ballon reste réparti sur les trois tiers. La part du gardien monte de 3 à 6 à 9 % : plus de buts,
+donc plus de remises en jeu par le gardien, pas un ballon qui dort. La colonne « collés » n'a pas de
+référence dans le sweep de 2H.1 ; le script de reproduction la mesurait à 1,85 en rookie avant le
+correctif, 1,23 après, sur 60 graines. Le sweep est passé de 135 à 141 s.
+
+**Deux observations hors périmètre, pour 2H.3 ou 2H.4.** Un gardien qui rate sa passe **court
+chercher son propre ballon perdu** jusqu'à sept ou huit cases de sa bouche, parce que la case du
+ballon vaut `grabPayload` 80 et que `guardFurnace` ne perd que 95/45 par case : vu sur la graine 2
+rookie, le gardien B rate deux passes de suite et finit à treize cases de son but. Ce n'est pas A31
+et ça ne date pas de 2H.2, mais c'est de la lisibilité, et Jérôme en jugera à la porte de 2H.4.
+Et un Striker à plus de dix-huit cases de son gardien porteur n'a plus aucune raison de revenir,
+`passReach` étant nul au-delà : ce sont les Breakers et le Trajector qui ramènent le ballon, ce qui
+est défendable mais non décidé.
+
+**Ce qui attend 2H.3** : la campagne de `08` §4.3 sur ce nouveau régime, les Crackers à 6 et 10,
+la portée de tir à 9/12, 7/10 et 6/9, et le prix du Spark à discuter sur le tableau, puisque la
+part décidée par le Spark est la seule colonne encore hors cible.

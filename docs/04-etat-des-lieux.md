@@ -1,18 +1,24 @@
 # État des lieux
 
-> Point de reprise du projet Boomball. À lire en premier dans une nouvelle session.
-> Dernière mise à jour : 2026-09-02, après cinq tests en local de Jérôme et les deux arbitrages qui
-> suivaient le passage au terrain vertical.
+> Historique du projet Boomball : ce qui a été construit et pourquoi, jusqu'au 2026-09-02. Depuis le
+> 2026-10-10 le point d'entrée est `08-plan-terrain-horizontal.md`, et `07-audit-et-plan-3d.md`
+> porte l'audit et le journal des phases. **Bandeau tenu à jour pour `check_drift.py` : au
+> 2026-10-10, après les sous-phases 2H.1 et 2H.2, le moteur 2 joue le terrain horizontal, l'IA voit
+> les obstacles, **342 tests**, et le sweep de contrôle donne 1,05 à 1,59 buts par match, équilibrage
+> rouvert jusqu'à la fin de 2H.3. Tout ce qui suit décrit le terrain vertical, dépassé par la
+> décision D11.
+> Dernière mise à jour du corps : 2026-09-02, après cinq tests en local de Jérôme et les deux
+> arbitrages qui suivaient le passage au terrain vertical.
 > **La phase 4 est écrite de bout en bout.** Projet Supabase en ligne, quatre migrations appliquées,
 > RLS vérifiée sur de vrais utilisateurs, les deux Edge Functions déployées, un match entier joué à
 > travers elles, et le client React construit et servi en local.
 > **Le terrain court désormais d'un bout à l'autre du silo**, une Furnace dans le sol de la Zone 1
 > pour l'équipe A, une dans le plafond de la Zone 3 pour B, et le ballon circule enfin dans les
 > trois zones. Les deux arbitrages ouverts sont tranchés : l'initiative se départage au dé, ce qui
-> était un défaut et non un réglage, et le Spark vaut 20 points. Le jeu produit 1,66 à 2,29 buts par
-> match, dans la cible, et les trois Tiers sont équilibrés.
+> était un défaut et non un réglage, et le Spark vaut 20 points. Le jeu produisait alors de 1,66 à
+> 2,29 buts, dans la cible, et les trois Tiers étaient équilibrés.
 > **Le seed et les deux nouvelles images sont en place**, et la base ne porte plus que le compte de
-> Jérôme. **273 tests.** Ce qui reste est du playtest, pas de la construction.
+> Jérôme. Il y avait alors 273 tests. Ce qui restait était du playtest, pas de la construction.
 > Les sections à lire en priorité sont les comptes rendus de test en local, dans l'ordre, et la
 > dernière, « L'initiative se départage au dé, et le Spark vaut deux buts ».
 

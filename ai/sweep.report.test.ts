@@ -15,6 +15,10 @@
  *     once the Spark's points come back out. That last one is what the Spark's
  *     value has to be set against: if it settles most of the matches it turns
  *     up in, the Payload is decoration.
+ *   - **spread and huddle.** Mean distance from the carrier to its team-mates,
+ *     and how many stand within 2 cells of it (audit line A31). A low spread
+ *     with a high huddle means the team hugs its carrier instead of getting
+ *     open. Carrier's side only, loose-ball turns excluded.
  *   - **wins.** A and B share everything but their end of the pitch, so a split
  *     far off even is the arena being asymmetric.
  */
@@ -51,7 +55,11 @@ describe('balance', () => {
           // the scoreline: a share that collapses onto one third means the sport
           // has found somewhere to camp again.
           `ball ${report.ballThirdShare.map((n) => `${Math.round(n * 100)}%`).join('/')}`.padEnd(20),
-          `keeper ${Math.round(report.keeperHeldShare * 100)}%`,
+          `keeper ${Math.round(report.keeperHeldShare * 100)}%`.padEnd(11),
+          // Audit A31: how far the carrier's team-mates stand from it, and how
+          // many are within 2 cells.
+          `spread ${report.meanMateSpread.toFixed(1)}`.padEnd(13),
+          `huddle ${report.meanHuddle.toFixed(2)}`,
         ].join(' '),
       );
     }
