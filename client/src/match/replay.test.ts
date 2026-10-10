@@ -183,3 +183,42 @@ describe('the replay projects, it does not invent', () => {
     expect(lines.some((line) => /parries/.test(line.text) && /CLEAN/.test(line.text))).toBe(true);
   });
 });
+
+describe('Dig in (écart 52)', () => {
+  it('gives the brace a card line', () => {
+    const state = open(7).session.state;
+    const unitId = state.units[0]!.id;
+    const event: MatchEvent = { kind: 'braced', unitId };
+    const lines = toBeats(state, [event], 'A').flatMap((beat) => beat.lines);
+    expect(lines.some((line) => /digs in · harder to shove/.test(line.text))).toBe(true);
+  });
+});
+
+describe('the Spark rules of écarts 49 and 50', () => {
+  const state = createMatch({ arena: KILL_SILO, tier: 'rookie', humans: HUMAN, seed: 5 });
+  const unitId = state.units[0]!.id;
+  const roll = { sides: 20, natural: 15, total: 15, dc: 10 } as never;
+
+  it('gives the escape a card line and leaves a drift silent', () => {
+    const from = { x: 5, y: 5 };
+    const to = { x: 6, y: 5 };
+    const moved = (cause: 'drift' | 'escape'): MatchEvent => ({
+      kind: 'sparkMoved',
+      from,
+      to,
+      direction: 0,
+      path: [to],
+      cause,
+    });
+    const lines = (cause: 'drift' | 'escape') =>
+      toBeats(state, [moved(cause)], 'A').flatMap((beat) => beat.lines.map((l) => l.text));
+    expect(lines('escape')).toContain('The Spark skips away');
+    expect(lines('drift')).not.toContain('The Spark skips away');
+  });
+
+  it('reads a caught Spark as pending, since it rolls back next round', () => {
+    const caught: MatchEvent = { kind: 'sparkCaught', unitId, roll, caught: true };
+    const beats = toBeats(state, [caught], 'A');
+    expect(beats[beats.length - 1]!.state.spark.state).toBe('pending');
+  });
+});

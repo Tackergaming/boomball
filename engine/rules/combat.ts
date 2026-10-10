@@ -7,7 +7,7 @@
  */
 
 import type { Arena } from '../arena.js';
-import { BAT_RECOIL_CELLS, SHOVE_PUSH_CELLS } from '../constants.js';
+import { BAT_RECOIL_CELLS, BRACE_SHOVE_PENALTY, SHOVE_PUSH_CELLS } from '../constants.js';
 import type { DiceRoll } from '../events.js';
 import { inBounds, type Point } from '../geometry.js';
 import type { Rng } from '../rng.js';
@@ -61,8 +61,9 @@ export function opposedRoll(
   rng: Rng,
   challengerBonus: number,
   defenderBonus: number,
+  challengerMode: 'normal' | 'advantage' | 'disadvantage' = 'normal',
 ): OpposedOutcome {
-  const challengerRolled = rng.d20();
+  const challengerRolled = rng.d20With(challengerMode);
   const defenderRolled = rng.d20();
   const challengerTotal = challengerRolled + challengerBonus;
   const defenderTotal = defenderRolled + defenderBonus;
@@ -74,7 +75,7 @@ export function opposedRoll(
       bonus: challengerBonus,
       total: challengerTotal,
       against: defenderTotal,
-      mode: 'normal',
+      mode: challengerMode,
     },
     defenderRoll: {
       die: 20,
@@ -99,10 +100,14 @@ export function resolveShove(rng: Rng, shover: Unit, target: Unit): {
   readonly success: boolean;
 } {
   const targetStats = statsFor(target.role, target.tier);
+  // A braced Bulwark (écart 52) is shoved at disadvantage and minus three.
+  // Jérôme had watched two opponents walk his keeper out of the mouth and
+  // leave it nothing to protect; this is the keeper's answer.
   const outcome = opposedRoll(
     rng,
-    statsFor(shover.role, shover.tier).might,
+    statsFor(shover.role, shover.tier).might - (target.braced ? BRACE_SHOVE_PENALTY : 0),
     Math.max(targetStats.might, targetStats.agility),
+    target.braced ? 'disadvantage' : 'normal',
   );
 
   return {

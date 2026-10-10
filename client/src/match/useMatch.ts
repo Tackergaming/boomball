@@ -176,6 +176,12 @@ function storedSpeed(): Speed {
   return 'normal';
 }
 
+/** The house's opening, to be watched from the kick-off board. */
+interface Opening {
+  readonly from: MatchState;
+  readonly events: readonly MatchEvent[];
+}
+
 export function useMatch(matchId: string, own: TeamId): MatchView {
   const [state, setState] = useState<MatchState | null>(null);
   const [seq, setSeq] = useState(-1);
@@ -228,26 +234,55 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     }
   }, []);
 
-  const load = useCallback(async () => {
+  /**
+   * Whether the opening has been shown. `create-match` plays the house up to
+   * the first human before the snapshot is written, so a fresh match loads
+   * with the house already in place and the player never sees it get there
+   * (Jérôme's retour 2 on the engine 3 game). The function keeps the board
+   * before the opening in `matches.kickoff` with the seq the opening ends on
+   * (migration 0007); the first `load()` of a match still standing on that
+   * seq hands the opening back instead of drawing the snapshot, and the
+   * effect below replays it. Once, by this ref: a reload mid-opening replays
+   * it again, which is harmless, a reload after the first action does not.
+   */
+  const openingRef = useRef(false);
+
+  const load = useCallback(async (): Promise<Opening | null> => {
     const [{ data: snapshot }, { data: row }] = await Promise.all([
       supabase.from('match_state').select('seq, snapshot').eq('match_id', matchId).maybeSingle(),
-      supabase.from('matches').select('turn_deadline').eq('id', matchId).maybeSingle(),
+      supabase.from('matches').select('turn_deadline, kickoff').eq('id', matchId).maybeSingle(),
     ]);
 
-    if (snapshot) {
-      // The server's board is drawn as it is: whatever was gliding stops there.
-      setMotion(null);
-      setState(snapshot.snapshot as MatchState);
-      setSeq(snapshot.seq as number);
-      seqRef.current = snapshot.seq as number;
-    }
     const at = (row?.turn_deadline as string | null) ?? null;
     setDeadline(at ? Date.parse(at) : null);
-  }, [matchId]);
+    if (!snapshot) return null;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+    const kickoff = (row?.kickoff as { state: MatchState; lastSeq: number } | null) ?? null;
+    const seqNow = snapshot.seq as number;
+    let opening: Opening | null = null;
+    if (kickoff && !openingRef.current && seqNow === kickoff.lastSeq) {
+      openingRef.current = true;
+      const { data: rows } = await supabase
+        .from('match_events')
+        .select('seq, payload')
+        .eq('match_id', matchId)
+        .lte('seq', kickoff.lastSeq)
+        .order('seq', { ascending: true });
+      const events = ((rows ?? []) as { payload: MatchEvent }[]).map((r) => r.payload);
+      // The opening batch starts at 0; the feed effect loads it on its own.
+      seenRef.current.add(0);
+      if (events.length > 0) opening = { from: kickoff.state, events };
+    }
+
+    // The server's board is drawn as it is: whatever was gliding stops there.
+    // With an opening to replay, the board drawn is the kick-off and the
+    // replay walks from it to the snapshot, which `play` re-reads at the end.
+    setMotion(null);
+    setState(opening ? opening.from : (snapshot.snapshot as MatchState));
+    setSeq(seqNow);
+    seqRef.current = seqNow;
+    return opening;
+  }, [matchId]);
 
   /** The opening events, so the feed does not start blank on a fresh match. */
   useEffect(() => {
@@ -338,7 +373,9 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         // Held for the card, or for the glide, whichever is longer. The card's
         // hold is still zero for the player's own uneventful first beat, but
         // the walk they clicked for is now watched rather than skipped.
-        const card = holdFor(one, i === 0) * scale * perBeat;
+        // Read again per beat, so switching to `instant` mid-replay takes
+        // effect at the next beat instead of at the next batch.
+        const card = holdFor(one, i === 0) * scale * BEAT_MS[speedRef.current];
         const glide = travel.totalMs > 0 ? travel.totalMs + SETTLE_MS : 0;
         const hold = Math.max(card, glide);
         if (hold > 0) await wait(hold);
@@ -352,6 +389,26 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     },
     [load, own],
   );
+
+  /**
+   * The first read of the match, and the opening replay when there is one.
+   * Counted as in flight so the broadcast handler leaves the board alone
+   * while the house's opening is being walked, as for any replay.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    inFlightRef.current += 1;
+    void load()
+      .then(async (opening) => {
+        if (opening && !cancelled) await play(opening.from, opening.events);
+      })
+      .finally(() => {
+        inFlightRef.current -= 1;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [load, play]);
 
   const send = useCallback(
     async (action: Action) => {

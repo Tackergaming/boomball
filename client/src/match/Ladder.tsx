@@ -1,14 +1,18 @@
 /**
  * Artboard 1b, the initiative ladder.
  *
- * The order is a flat queue, one unit per entry, and units that share a
- * `blockId` act as one rung. `ladderRungs` does that grouping in the engine, so
- * the display cannot invent a grouping the resolution does not use.
+ * The order is a flat queue, one unit per entry, numbered by `rank` (écart 51,
+ * which replaced the initiative counts). The Spark comes first when it is on
+ * the field, then the side with a human on it, then the Crackers right after
+ * the side that carries the ball, then the other side; inside a side the order
+ * is Trajector, Strikers, Breakers, Bulwark. `ladderRungs` reads that order
+ * from the engine, so the display cannot invent one the resolution does not use.
  *
  * The two hazard rungs are the point of showing this at all. A player who can
- * see that the Crackers count down two rungs from now can decide to spend the
+ * see that the Crackers go off two rungs from now can decide to spend the
  * turn moving out of the blast instead of swinging, and that is a decision the
- * rules give them only if the interface tells them.
+ * rules give them only if the interface tells them. They carry no number: the
+ * rank on the left is the whole position.
  */
 
 import { ladderRungs } from '../../../engine/initiative.js';
@@ -26,6 +30,10 @@ export function Ladder({
   const rungs = ladderRungs(state.turnOrder);
   const current = state.turn?.unitId ?? null;
   const when = whenIPlay(state, own, rungs, current);
+  // The rung after the one on the clock, wrapping to the top of the ladder, so
+  // this panel names the same "next" as the TurnStrip above the board.
+  const nowAt = rungs.findIndex((r) => r.unitIds.includes(current ?? ''));
+  const nextAt = nowAt < 0 || rungs.length < 2 ? -1 : (nowAt + 1) % rungs.length;
 
   return (
     <div style={S.panel}>
@@ -48,9 +56,12 @@ export function Ladder({
             return (
               <div key={`h${i}`} style={{ ...S.rung, ...S.hazardRung }}>
                 <span className="label" style={{ color: 'var(--danger)' }}>
+                  <span style={S.num}>{rung.rank}.</span>
                   {rung.hazard === 'crackers' ? 'The Crackers' : 'The Spark'}
                 </span>
-                <span style={S.count}>{rung.count}</span>
+                <span style={S.count}>
+                  {i === nextAt && <span className="label" style={S.nextTag}>next</span>}
+                </span>
               </div>
             );
           }
@@ -59,6 +70,7 @@ export function Ladder({
           return (
             <div key={`u${i}`} style={{ ...S.rung, ...(live ? S.liveRung : null) }}>
               <div style={S.rungUnits}>
+                <span style={S.num}>{rung.rank}.</span>
                 {rung.unitIds.map((id) => {
                   const unit = safeUnit(state, id);
                   if (!unit) return null;
@@ -83,6 +95,11 @@ export function Ladder({
                   );
                 })}
               </div>
+              {i === nextAt && (
+                <span className="label" style={S.nextTag}>
+                  next
+                </span>
+              )}
               {rung.unitIds.length > 1 && (
                 <span className="label" style={{ color: 'var(--text-faint)' }}>
                   block
@@ -169,5 +186,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: '1px 5px',
     whiteSpace: 'nowrap',
   },
+  num: { fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--text-faint)', marginRight: 3 },
+  nextTag: { color: 'var(--text-faint)', marginRight: 4 },
   count: { fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--text-faint)' },
 };

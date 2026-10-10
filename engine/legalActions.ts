@@ -86,6 +86,8 @@ export interface LegalActions {
   readonly canDash: boolean;
   readonly canDodge: boolean;
   readonly canDisengage: boolean;
+  /** Brace, the Bulwark's dig-in (écart 52): only that role, Action in hand. */
+  readonly canBrace: boolean;
   /** Every action above that needs no further choice, ready to send as is. */
   readonly simple: readonly Action[];
 }
@@ -169,8 +171,11 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
     state.payload.x === unit.x &&
     state.payload.y === unit.y;
 
+  const canBrace = hasAction && unit.role === 'bulwark';
+
   const simple: Action[] = [{ kind: 'endTurn' }];
   if (hasAction) simple.push({ kind: 'dash' }, { kind: 'dodge' }, { kind: 'disengage' });
+  if (canBrace) simple.push({ kind: 'brace' });
   if (canGrabPayload) simple.push({ kind: 'grabPayload' });
   if (catchSpark) simple.push({ kind: 'catchSpark' });
 
@@ -187,6 +192,7 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
     canDash: hasAction,
     canDodge: hasAction,
     canDisengage: hasAction,
+    canBrace,
     simple,
   };
 }
@@ -213,7 +219,8 @@ export function onlyEndTurnLeft(legal: LegalActions): boolean {
     !legal.canGrabPayload &&
     !legal.canDash &&
     !legal.canDodge &&
-    !legal.canDisengage
+    !legal.canDisengage &&
+    !legal.canBrace
   );
 }
 

@@ -20,6 +20,7 @@ import {
 } from './constants.js';
 import type { MatchEvent } from './events.js';
 import { distance, thirdOf, type Point } from './geometry.js';
+import { buildTurnOrder } from './initiative.js';
 import { legalActions } from './legalActions.js';
 import { openMatch, reduce, type ReduceResult } from './reduce.js';
 import { Rng } from './rng.js';
@@ -39,7 +40,7 @@ import {
 } from './rules/ordnance.js';
 import { createMatch } from './setup.js';
 import { statsFor } from './stats.js';
-import type { MatchState, TeamId, Unit, UnitId } from './types.js';
+import { unitAt, unitById, type MatchState, type TeamId, type Unit, type UnitId } from './types.js';
 
 const arena = new Arena(KILL_SILO);
 
@@ -70,19 +71,40 @@ function cleared(state: MatchState): MatchState {
 }
 
 /**
- * A cleared match, patched, then opened **on round 2**.
+ * A cleared match, patched, opened **on round 2**, and walked with empty turns
+ * until the Crackers have rolled.
  *
- * `openMatch` walks the ladder from the top, which means it resolves count 20.
- * Patching the board before opening it is therefore how a test drives the
- * Crackers without hand-rolling a round. Round 2 rather than 1 because the
- * Crackers do not drift on the kick-off round (écart 44); the ladder built at
- * kick-off is reused as it is, only the round number differs.
+ * Since écart 51 the Crackers follow the side that carries, or carried last,
+ * on the ladder. `lastCarrierTeam` is set to A here so that they roll between
+ * the two sides: team A's seven empty turns go by first, then the Crackers,
+ * and the walk stops on team B's first turn, before any unit of B has had its
+ * Reaction refreshed by `beginTurn`. Nobody moves on an empty turn, so the
+ * board the Crackers read is the one the test patched. Round 2 rather than 1
+ * because the Crackers do not drift on the kick-off round (écart 44).
  */
 function opened(
   patch: (s: MatchState) => MatchState = (s) => s,
   seed = 5,
 ): { state: MatchState; events: readonly MatchEvent[] } {
-  return openMatch(arena, { ...patch(cleared(fresh(seed))), round: CRACKER_FIRST_DRIFT_ROUND });
+  const patched: MatchState = {
+    ...patch(cleared(fresh(seed))),
+    round: CRACKER_FIRST_DRIFT_ROUND,
+    lastCarrierTeam: 'A',
+    // A opens round 2 (`sideOrder`), so the Crackers roll after A and before B.
+    initiativeNonce: 0,
+  };
+  // The ladder is built from the patched board, as a round start would.
+  const start: MatchState = { ...patched, turnOrder: buildTurnOrder(arena, patched) };
+  const openedMatch = openMatch(arena, start);
+  let state = openedMatch.state;
+  const log: MatchEvent[] = [...openedMatch.events];
+  const rung = state.turnOrder.findIndex((slot) => slot.actor.kind === 'crackers');
+  for (let i = 0; i < 40 && rung >= 0 && state.turnIndex <= rung && state.phase !== 'finished'; i++) {
+    const step = must(state, { kind: 'endTurn' });
+    state = step.state;
+    log.push(...step.events);
+  }
+  return { state, events: log };
 }
 
 function place(state: MatchState, id: UnitId, at: Point): MatchState {
@@ -393,11 +415,10 @@ describe('the Crackers on the ladder', () => {
   });
 
   it('starts them hunting on round 2, on the same board', () => {
-    const { events } = openMatch(arena, { ...fresh(5), round: CRACKER_FIRST_DRIFT_ROUND });
-    const moved = events.findIndex((e) => e.kind === 'crackerMoved');
-    const firstTurn = events.findIndex((e) => e.kind === 'turnStarted');
-    expect(moved).toBeGreaterThan(-1);
-    expect(moved).toBeLessThan(firstTurn);
+    const { events } = opened((s) => ({ ...s, units: fresh(5).units }));
+    expect(events.some((e) => e.kind === 'crackerMoved')).toBe(true);
+    // Empty turns only: the board they read is the kick-off board.
+    expect(events.some((e) => e.kind === 'moved')).toBe(false);
   });
 
   it('still lets a player bat one on the kick-off round', () => {
@@ -409,14 +430,17 @@ describe('the Crackers on the ladder', () => {
     expect(result.ok && result.events.some((e) => e.kind === 'crackerBatted')).toBe(true);
   });
 
-  it('resolves them at the top of the round, before anyone takes a turn', () => {
-    const { events } = opened((s) => homingOnOne(s));
+  it('resolves them on their own rung, right after the carrying side, with nobody taking a turn (écart 51)', () => {
+    const { state, events } = opened((s) => homingOnOne(s));
 
     const moved = events.findIndex((e) => e.kind === 'crackerMoved');
-    const firstTurn = events.findIndex((e) => e.kind === 'turnStarted');
-
     expect(moved).toBeGreaterThan(-1);
-    expect(moved).toBeLessThan(firstTurn);
+    // The rung sits between the last turn of A and the first turn of B.
+    const before = events.slice(0, moved).filter((e) => e.kind === 'turnStarted');
+    const after = events.slice(moved).filter((e) => e.kind === 'turnStarted');
+    expect(before.every((e) => e.kind === 'turnStarted' && e.unitId.startsWith('A-'))).toBe(true);
+    expect(after.every((e) => e.kind === 'turnStarted' && e.unitId.startsWith('B-'))).toBe(true);
+    expect(state.turnOrder[state.turnIndex]?.team).toBe('B');
   });
 
   it('spends the Cracker on detonation and drops a fresh one next round', () => {
@@ -1121,7 +1145,7 @@ describe('the Spark in a match', () => {
     expect(before.turnOrder.some((slot) => slot.actor.kind === 'spark')).toBe(false);
   });
 
-  it('arrives at the top of round 6 and takes its rung on count 10', () => {
+  it('arrives at the top of round 6 and takes the first rung', () => {
     const arrived = until(opened().state, (s) => s.round === SPARK_ENTRY_ROUND);
 
     expect(arrived.spark.state).toBe('live');
@@ -1129,7 +1153,7 @@ describe('the Spark in a match', () => {
     expect(arrived.spark.heading).toBeLessThanOrEqual(8);
     expect(thirdOf(arrived.spark)).toBe(SPARK_SPAWN_THIRD);
     expect(arena.isOccupiable(arrived.spark)).toBe(true);
-    expect(arrived.turnOrder.find((slot) => slot.actor.kind === 'spark')?.count).toBe(10);
+    expect(arrived.turnOrder[0]!.actor.kind).toBe('spark');
   });
 
   it('darts on its own rung once it is in play', () => {
@@ -1201,7 +1225,7 @@ describe('catching the Spark', () => {
       if (!events.some((e) => e.kind === 'sparkCaught' && e.caught)) continue;
 
       expect(after.score[actor.team]).toBe(SPARK_POINTS);
-      expect(after.spark.state).toBe('caught');
+      expect(after.spark.state).toBe('pending');
       // The whole of what changed in lot 3: no whistle. There is still a
       // Payload on the field and rounds left to play it in.
       expect(after.phase).toBe('playing');
@@ -1227,18 +1251,76 @@ describe('catching the Spark', () => {
     throw new Error('no seed in range caught the Spark');
   });
 
-  it('is gone for good and does not drop back in at the top of a round', () => {
+  it('drops back in at the top of the next round, worth as much again (écart 50)', () => {
     for (let seed = 1; seed < 400; seed++) {
-      const state = staged(seed);
+      const state = { ...staged(seed), round: SPARK_ENTRY_ROUND };
+      const actor = state.units.find((u) => u.id === state.turn!.unitId)!;
       const { state: after, events } = must(state, { kind: 'catchSpark' });
       if (!events.some((e) => e.kind === 'sparkCaught' && e.caught)) continue;
 
-      const later = until(after, (s) => s.round >= after.round + 2);
-      expect(later.spark.state).toBe('caught');
-      expect(later.turnOrder.some((slot) => slot.actor.kind === 'spark')).toBe(false);
-      return;
+      // Off the field and off the ladder for the rest of this round.
+      expect(after.spark.state).toBe('pending');
+      const rest = until(after, (s) => s.round === after.round + 1);
+      expect(rest.spark.state).toBe('live');
+      expect(thirdOf(rest.spark)).toBe(SPARK_SPAWN_THIRD);
+      expect(rest.turnOrder[0]!.actor.kind).toBe('spark');
+
+      // And a second catch scores again: the prize is not a once-only.
+      const again: MatchState = {
+        ...rest,
+        spark: { ...rest.spark, x: unitById(rest, rest.turn!.unitId).x, y: unitById(rest, rest.turn!.unitId).y },
+      };
+      for (let s = 1; s < 400; s++) {
+        const twice = must({ ...again, rngSeed: s }, { kind: 'catchSpark' });
+        if (!twice.events.some((e) => e.kind === 'sparkCaught' && e.caught)) continue;
+        const scorer = unitById(rest, rest.turn!.unitId);
+        const expected = (scorer.team === actor.team ? SPARK_POINTS : 0) + SPARK_POINTS;
+        expect(twice.state.score[scorer.team]).toBe(expected);
+        return;
+      }
+      throw new Error('no seed in range caught the Spark a second time');
     }
     throw new Error('no seed in range caught the Spark');
+  });
+
+  it('skips a cell away at the end of a turn finished standing on it (écart 49)', () => {
+    // Fumbled, then the turn ends: the Spark is no longer under the minder.
+    for (let seed = 1; seed < 400; seed++) {
+      const state = staged(seed);
+      const actor = state.units.find((u) => u.id === state.turn!.unitId)!;
+      const { state: fumbled, events } = must(state, { kind: 'catchSpark' });
+      if (!events.some((e) => e.kind === 'sparkCaught' && !e.caught)) continue;
+
+      const ended = must(fumbled, { kind: 'endTurn' });
+      const escape = ended.events.find((e) => e.kind === 'sparkMoved' && e.cause === 'escape');
+      expect(escape).toBeDefined();
+      if (!escape || escape.kind !== 'sparkMoved') throw new Error('unreachable');
+      expect(escape.from).toEqual({ x: actor.x, y: actor.y });
+      expect(escape.path).toEqual([escape.to]);
+      expect(distance(escape.from, escape.to)).toBe(1);
+      expect(arena.isOccupiable(escape.to)).toBe(true);
+      expect(unitAt(ended.state, escape.to.x, escape.to.y)).toBeUndefined();
+      // The heading is kept: a nudge, not a new drift.
+      expect(ended.state.spark.heading).toBe(fumbled.spark.heading);
+      return;
+    }
+    throw new Error('no seed in range fumbled the Spark');
+  });
+
+  it('skips away even when the minder never reached for it', () => {
+    const state = staged();
+    const actor = state.units.find((u) => u.id === state.turn!.unitId)!;
+    const ended = must(state, { kind: 'endTurn' });
+    const escape = ended.events.find((e) => e.kind === 'sparkMoved' && e.cause === 'escape');
+    expect(escape).toBeDefined();
+    expect({ x: ended.state.spark.x, y: ended.state.spark.y }).not.toEqual({ x: actor.x, y: actor.y });
+  });
+
+  it('stays where it is when a turn ends anywhere else', () => {
+    const state = staged();
+    const away: MatchState = { ...state, spark: { ...state.spark, x: 7, y: 20 } };
+    const ended = must(away, { kind: 'endTurn' });
+    expect(ended.events.some((e) => e.kind === 'sparkMoved' && e.cause === 'escape')).toBe(false);
   });
 
   it('spends the Action and leaves the Spark in play on a fumble', () => {

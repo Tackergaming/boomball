@@ -18,18 +18,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { Action } from '../../../engine/actions.js';
+import type { Point } from '../../../engine/geometry.js';
 import { legalActions, onlyEndTurnLeft } from '../../../engine/legalActions.js';
 import { BENCH_SIZE, MATCH_ROUNDS, TURN_TIMER_SECONDS } from '../../../engine/constants.js';
 import { pathTo } from '../../../engine/rules/movement.js';
 import { isHuman } from '../../../engine/types.js';
 import { arena } from '../lib/arena.js';
 import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
-import { ActionBar } from '../match/ActionBar.js';
+import { ActionBar, type Pending } from '../match/ActionBar.js';
 import { Announce } from '../match/Announce.js';
 import { Board } from '../match/Board.js';
 import { Briefing, hasBeenBriefed } from '../match/Briefing.js';
 import { Feed } from '../match/Feed.js';
 import { Ladder } from '../match/Ladder.js';
+import { TurnStrip } from '../match/TurnStrip.js';
 import { SeatPanel } from '../match/SeatPanel.js';
 import { cellToScreen, publishHook, summarise, withdrawHook } from '../match/testHook.js';
 import { beatHoldMs, useMatch, type Speed } from '../match/useMatch.js';
@@ -50,6 +53,25 @@ export function Match({
 
   const match = useMatch(matchId, own);
   const [selected, setSelected] = useState<string | null>(null);
+
+  /**
+   * What the action bar has started (a Swing waiting for its target, say). It
+   * lives here and not in the bar so the board can read it as well: a pending
+   * Swing rings the enemies on the board and a click on one is the answer.
+   * Dropped whenever the board moves on, because a half-made choice aimed at a
+   * position that no longer exists is how a player swings at the wrong Giff.
+   */
+  const [pending, setPending] = useState<Pending>(null);
+
+  /**
+   * Route plotting. While `plotting` is on, a click on a cell appends the
+   * shortest segment to `route` instead of moving, and `Go` sends the lot. The
+   * board asks the engine for each segment; this only holds the cells. The
+   * route is dropped on every new snapshot, since it was drawn on a board that
+   * is gone.
+   */
+  const [plotting, setPlotting] = useState(false);
+  const [route, setRoute] = useState<readonly Point[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [briefing, setBriefing] = useState(() => !hasBeenBriefed());
 
@@ -98,6 +120,13 @@ export function Match({
   }, [state?.phase, onFinished]);
 
   const send = match.send;
+
+  useEffect(() => {
+    setPending(null);
+  }, [match.seq]);
+  useEffect(() => {
+    setRoute((r) => (r.length === 0 ? r : []));
+  }, [match.seq, state]);
 
   /**
    * A turn with nothing left in it passes itself on.
@@ -250,6 +279,12 @@ export function Match({
     setCalled(false);
   }, [onClock?.x, onClock?.y]);
 
+  /** Every action goes through here, so a pending choice is over once it is made. */
+  const act = (action: Action) => {
+    setPending(null);
+    void send(action);
+  };
+
   if (!state) {
     return (
       <div style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
@@ -327,6 +362,10 @@ export function Match({
 
       <div style={S.body}>
         <div style={S.left}>
+          {/* The chain of turns, read left to right: who is up, who is next,
+              then next. Jérôme could not tell from the side ladder alone. */}
+          <TurnStrip state={state} own={own} yoursId={mineId} onSelect={setSelected} />
+
           <div style={S.boardWrap}>
             <Board
               state={state}
@@ -338,6 +377,10 @@ export function Match({
               yoursId={mineId}
               spotlight={match.beat?.unitId ?? null}
               motion={match.motion}
+              pending={pending}
+              onAct={canAct ? act : null}
+              plot={{ on: plotting && canAct, route }}
+              onPlotStep={canAct ? (segment) => setRoute((r) => [...r, ...segment]) : null}
             />
 
             {match.beat && (
@@ -436,7 +479,22 @@ export function Match({
             yours={canAct}
             busy={match.busy}
             movementFeet={state.turn?.movementFeetRemaining ?? 0}
-            onAct={(action) => void send(action)}
+            onAct={act}
+            pending={pending}
+            onPending={setPending}
+            selectedId={selected}
+            plotting={plotting}
+            plotLength={route.length}
+            onTogglePlot={() => {
+              setPlotting((on) => !on);
+              setRoute([]);
+            }}
+            onGo={() => {
+              if (route.length === 0) return;
+              void send({ kind: 'move', path: [...route] });
+              setRoute([]);
+            }}
+            onClearPlot={() => setRoute([])}
           />
         </div>
 

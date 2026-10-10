@@ -72,6 +72,7 @@ describe('balance', () => {
           // many are within 2 cells.
           `spread ${report.meanMateSpread.toFixed(1)}`.padEnd(13),
           `huddle ${report.meanHuddle.toFixed(2)}`,
+          `dodge ${report.meanDodges.toFixed(2)}`,
         ].join(' '),
       );
     }

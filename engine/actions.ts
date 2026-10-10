@@ -78,6 +78,14 @@ export interface ShootAction {
   readonly kind: 'shoot';
 }
 
+/**
+ * The Bulwark digs in (écart 52): until its next turn, or until it moves, a
+ * Shove against it rolls at disadvantage and minus `BRACE_SHOVE_PENALTY`.
+ */
+export interface BraceAction {
+  readonly kind: 'brace';
+}
+
 export interface EndTurnAction {
   readonly kind: 'endTurn';
 }
@@ -94,6 +102,7 @@ export type Action =
   | GrabPayloadAction
   | PassAction
   | ShootAction
+  | BraceAction
   | EndTurnAction;
 
 export type ActionKind = Action['kind'];

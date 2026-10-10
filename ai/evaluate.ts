@@ -16,7 +16,6 @@
 import type { Arena, Furnace } from '../engine/arena.js';
 import {
   ARENA_HEIGHT,
-  CRACKER_MOVE_CELLS,
   PAYLOAD_RANGE_CELLS,
   SPARK_CATCH_DC,
 } from '../engine/constants.js';
@@ -29,6 +28,8 @@ import {
   throwRangeOver,
   visibleRangeToFurnace,
 } from '../engine/rules/payload.js';
+import { hasPlayedThisRound } from '../engine/initiative.js';
+import { crackerRun } from '../engine/rules/ordnance.js';
 import { passInterceptors } from '../engine/rules/reactions.js';
 import { hasLineOfSight } from '../engine/rules/sight.js';
 import { statsFor } from '../engine/stats.js';
@@ -40,7 +41,7 @@ import {
   type UnitId,
 } from '../engine/types.js';
 import { findOrder, type AllyOrder } from './orders.js';
-import type { RoleWeights } from './roles/index.js';
+import { weightsFor, type RoleWeights } from './roles/index.js';
 
 /**
  * How hard an order pulls, on the same scale as the role weights. High enough
@@ -64,6 +65,15 @@ export interface Board {
   readonly carrier: Unit | null;
   readonly mates: readonly Unit[];
   readonly enemies: readonly Unit[];
+  /**
+   * The cells each live Cracker will roll through at the next count 20, on
+   * its way to the ball (écart 45), worked out with **this unit taken off the
+   * board** so the line is the one it would be stepping onto rather than one
+   * cut short by where it happens to stand now. Everybody else still stops a
+   * line where they stand, because they would take the blast first. One
+   * array per live Cracker, empty when it would not move.
+   */
+  readonly crackerLines: readonly (readonly Point[])[];
 }
 
 export function buildBoard(
@@ -77,6 +87,11 @@ export function buildBoard(
   const carried = state.payload.carriedBy;
   const others = activeUnits(state).filter((u) => u.id !== unit.id);
 
+  const without: MatchState = { ...state, units: state.units.filter((u) => u.id !== unit.id) };
+  const crackerLines = state.crackers
+    .filter((c) => c.state === 'live')
+    .map((c) => crackerRun(arena, without, c).path);
+
   return {
     arena,
     state,
@@ -89,6 +104,7 @@ export function buildBoard(
     carrier: carried ? (state.units.find((u) => u.id === carried) ?? null) : null,
     mates: others.filter((u) => u.team === unit.team),
     enemies: others.filter((u) => u.team !== unit.team),
+    crackerLines,
   };
 }
 
@@ -302,6 +318,135 @@ export function shotQuality(board: Board, unit: Unit, from: Point): number {
   return chance(statsFor(unit.role, unit.tier).aim, shotTarget(keeper), range.mode);
 }
 
+// -- The bodyguard ------------------------------------------------------------
+
+/**
+ * The shoulder that matters: how good a cell is for standing between our own
+ * carrier and the nearest opponent, zero to one.
+ *
+ * Two factors. Closeness to the carrier, one on its shoulder, a little less a
+ * cell further out, and a thin gradient beyond so a Breaker across the pitch
+ * still walks over. And the side: a cell nearer the threat than the carrier
+ * is reads one, a cell on the far shoulder reads half. With no opponent on
+ * the field any shoulder is as good as another.
+ *
+ * It is the carrier and never a Striker by name, by Jérôme's arbitration of
+ * 2026-10-10: the thing to protect is whoever has the ball, and when the
+ * ball is loose or on the other side there is nobody to escort and the
+ * Breaker is a hunter (`pressCarrier`) or a parry post instead.
+ */
+export function escort(board: Board, cell: Point): number {
+  const carrier = board.carrier;
+  if (!carrier || carrier.team !== board.unit.team || carrier.id === board.unit.id) return 0;
+  // A goalkeeper at home wants outlets, not shoulders: see `wantsEscort`.
+  const wanted = weightsFor(carrier.role).wantsEscort;
+  if (wanted === 0) return 0;
+  return wanted * shoulder(cell, carrier, nearestTo(board.enemies, carrier));
+}
+
+/**
+ * How good `cell` is as a shoulder of `protectee` against `threat`: one beside
+ * it on the threat's side, half on the far side, fading with distance.
+ */
+function shoulder(cell: Point, protectee: Point, threat: Unit | null): number {
+  const gap = distance(cell, protectee);
+  const close = gap === 0 ? 0 : gap === 1 ? 1 : gap === 2 ? 0.6 : 0.3 * nearness(cell, protectee);
+  const side = threat === null ? 1 : distance(cell, threat) < distance(protectee, threat) ? 1 : 0.5;
+  return close * side;
+}
+
+/**
+ * The bodyguard in defence (2H.7): when the other side has the ball, or
+ * nobody does, stand between the nearest opponent and whichever team-mate
+ * handles the ball (`wantsEscort`, which is everybody but the keeper), so
+ * that opponent cannot finish its move beside them. The best shoulder over
+ * all such team-mates, with a threat more than twelve cells off counting for
+ * little: there is nothing to block yet.
+ */
+export function screen(board: Board, cell: Point): number {
+  if (board.carrier && board.carrier.team === board.unit.team) return 0;
+  let best = 0;
+  for (const mate of board.mates) {
+    if (weightsFor(mate.role).wantsEscort === 0) continue;
+    const threat = nearestTo(board.enemies, mate);
+    if (threat === null) continue;
+    const urgency = distance(threat, mate) <= 12 ? 1 : 0.3;
+    best = Math.max(best, urgency * shoulder(cell, mate, threat));
+  }
+  return best;
+}
+
+/**
+ * The chain reads the ladder (écart 51). The next own unit still to play this
+ * round, after this one, or null when this unit is the last of its side to
+ * act: then it is the **last link**, and the rule about not throwing to
+ * somebody who has played is lifted, because everybody has.
+ */
+export function nextToPlay(board: Board): Unit | null {
+  const { state, unit } = board;
+  for (let i = state.turnIndex + 1; i < state.turnOrder.length; i++) {
+    const slot = state.turnOrder[i]!;
+    if (slot.actor.kind !== 'unit' || slot.team !== unit.team) continue;
+    const next = state.units.find((u) => u.id === (slot.actor as { unitId: UnitId }).unitId);
+    if (next && next.status === 'active' && next.id !== unit.id) return next;
+  }
+  return null;
+}
+
+export function isLastLink(board: Board): boolean {
+  return nextToPlay(board) === null;
+}
+
+export { hasPlayedThisRound };
+
+function nearestTo(units: readonly Unit[], to: Point): Unit | null {
+  let best: Unit | null = null;
+  let bestGap = Infinity;
+  for (const unit of units) {
+    const gap = distance(unit, to);
+    if (gap < bestGap) {
+      best = unit;
+      bestGap = gap;
+    }
+  }
+  return best;
+}
+
+/**
+ * Whether a team-mate who wants a loose ball more is already within two cells
+ * of it. Read through the weights so the table stays data: a Breaker yields
+ * to a Striker because 55 is more than 45, not because of the word Striker.
+ */
+export function keenerMateNear(board: Board): boolean {
+  const { state, unit, weights: w } = board;
+  if (state.payload.carriedBy !== null) return false;
+  return board.mates.some(
+    (mate) =>
+      distance(mate, state.payload) <= 2 &&
+      weightsFor(mate.role).chaseLoosePayload > w.chaseLoosePayload,
+  );
+}
+
+/** The share of a loose ball this unit still wants, once a keener mate is near. */
+function loosePayloadShare(board: Board): number {
+  return keenerMateNear(board) ? 1 - board.weights.yieldToKeener : 1;
+}
+
+/**
+ * One on a cell a Cracker will roll through at the next count 20, zero
+ * elsewhere, for a unit that can parry it there: not holding the ball (a
+ * carrier does not swing, écart 47). The Breaker's positive reading of the
+ * Cracker line; see `crackerPressure` for everybody else's.
+ */
+export function parryPost(board: Board, cell: Point): number {
+  if (board.unit.holdingPayload) return 0;
+  return onCrackerLine(board, cell) ? 1 : 0;
+}
+
+function onCrackerLine(board: Board, cell: Point): boolean {
+  return board.crackerLines.some((line) => line.some((p) => p.x === cell.x && p.y === cell.y));
+}
+
 // -- The value of standing somewhere ----------------------------------------
 
 /**
@@ -319,16 +464,23 @@ export function positionValue(board: Board, cell: Point): number {
   if (unit.holdingPayload) {
     value += w.carryToFurnace * scoringNearness(board.arena, cell, board.targetFurnace);
   } else if (state.payload.carriedBy === null) {
-    value += w.chaseLoosePayload * nearness(cell, state.payload);
+    // A Breaker leaves the ball to a Striker standing beside it: see
+    // `keenerMateNear`. Everybody else reads a share of one. And a keeper only
+    // goes for a ball lying within its reach (`looseBallReach`).
+    const share =
+      distance(unit, state.payload) > w.looseBallReach ? 0 : loosePayloadShare(board);
+    value += w.chaseLoosePayload * share * nearness(cell, state.payload);
     // The cell the ball is actually lying in is worth the pickup, not one more
     // step of gradient. Without this the last cell gains `chaseLoosePayload/45`,
     // about one point, and a unit will stand beside a loose Payload for the
     // whole match rather than step onto it. A proximity term cannot express
     // "and then I may have the ball": only the value of the action it unlocks
     // can, and `grabPayload` is free, so nothing is being double counted.
-    if (cell.x === state.payload.x && cell.y === state.payload.y) value += w.grabPayload;
+    if (cell.x === state.payload.x && cell.y === state.payload.y) value += w.grabPayload * share;
   } else if (board.carrier && board.carrier.team === unit.team) {
     value += w.screenCarrier * nearness(cell, board.carrier);
+    // The bodyguard's shoulder: beside the carrier, facing the threat.
+    value += w.escort * escort(board, cell);
     // Getting open: reachable, in the carrier's sight, ahead of it, and ideally
     // with a shot. See `outlet`. Without the sight and the ground gained, a
     // support player either walks to the far end and strands its carrier, or,
@@ -337,9 +489,15 @@ export function positionValue(board: Board, cell: Point): number {
     value += w.supportAttack * outlet(board, cell);
     // And unmarked: a lane nobody is standing beside. See `laneCover`.
     value += w.cover * laneCover(board, cell);
+    // Out of the carrier's reach altogether, every term above is zero and a
+    // Striker up the pitch had nothing to come back for. See `rejoin`.
+    if (passReach(unit, board.carrier) === 0) value += w.rejoin * nearness(cell, board.carrier);
   } else if (board.carrier) {
     value += w.pressCarrier * nearness(cell, board.carrier);
   }
+
+  // The bodyguard's stance when the ball is not ours. See `screen`.
+  value += w.screen * screen(board, cell);
 
   // `chaseSpark` is the switch for the whole Spark hunt, and it is zero for
   // every role but the Trajector. A Striker that finds itself in the Spark's
@@ -356,7 +514,12 @@ export function positionValue(board: Board, cell: Point): number {
 
   value += w.guardFurnace * furnaceNearness(cell, board.ownFurnace);
 
-  value -= w.avoidCrackers * crackerPressure(state, cell);
+  value -= w.avoidCrackers * crackerPressure(board, cell);
+  value += w.parryPost * parryPost(board, cell);
+
+  // The keeper's tether (`leash`): a cell further from its own mouth than the
+  // role allows is not a place it goes, whatever else is out there.
+  if (rangeToFurnace(cell, board.ownFurnace) > w.leash) value -= 500;
 
   const hold = findOrder(board.orders, 'holdZone');
   if (hold) value += ORDER_PULL * nearness(cell, hold.at);
@@ -365,18 +528,27 @@ export function positionValue(board: Board, cell: Point): number {
 }
 
 /**
- * How exposed a cell is to a Cracker on the next count 20. Zero out of reach,
- * one on top of the thing. It is a proximity reading and not a prediction:
- * a Cracker goes for whoever is nearest, so standing close to one is a bet on
- * somebody else being closer.
+ * How exposed a cell is to a Cracker on the next count 20: one on a cell it
+ * will roll through, half a cell beside that line, zero two cells off it.
+ *
+ * Until 2H.7 this read the distance to the Cracker, which was right when a
+ * Cracker went for whoever was nearest (B8) and wrong from écart 45 on: a
+ * Cracker rolls at the ball, so the danger is on the line between the two and
+ * nowhere else, and a unit six cells from a Cracker but on its way to the
+ * carrier was reading itself safe. The line is `Board.crackerLines`, the
+ * engine's own run with this unit taken off the board, so it is the line as
+ * it would be with this unit standing on the cell. The cell beside the line
+ * still reads something because the ball moves before the count comes.
  */
-export function crackerPressure(state: MatchState, cell: Point): number {
+export function crackerPressure(board: Board, cell: Point): number {
   let worst = 0;
-  for (const cracker of state.crackers) {
-    if (cracker.state !== 'live') continue;
-    const gap = distance(cell, cracker);
-    if (gap > CRACKER_MOVE_CELLS) continue;
-    worst = Math.max(worst, 1 - gap / (CRACKER_MOVE_CELLS + 1));
+  for (const line of board.crackerLines) {
+    for (const p of line) {
+      const gap = distance(cell, p);
+      if (gap >= 2) continue;
+      worst = Math.max(worst, gap === 0 ? 1 : 0.5);
+      if (worst === 1) return 1;
+    }
   }
   return worst;
 }

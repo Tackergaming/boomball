@@ -32,11 +32,13 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * another (audit line A11). Version 1 was the vertical silo with anchoring and
  * falls; version 2 is the horizontal pitch of D11, 2026-10-10; version 3 adds
  * the Breaker's parry and its `crackerParried` event (écart 47, 2H.6, decided
- * by Jérôme on 2026-10-10 soir). Nothing in the engine reads it: the server
- * stamps it on `matches` and refuses a mismatch, and the client archives what
- * it cannot play.
+ * by Jérôme on 2026-10-10 soir); version 4 is 2H.7: `sparkMoved` carries a
+ * `cause`, the Spark skips away from a minder (écart 49) and comes back after a
+ * catch (écart 50), so `Spark.state` loses `caught`. Nothing in the engine
+ * reads it: the server stamps it on `matches` and refuses a mismatch, and the
+ * client archives what it cannot play.
  */
-export const ENGINE_VERSION = 3;
+export const ENGINE_VERSION = 4;
 
 // -- Movement ---------------------------------------------------------------
 
@@ -121,8 +123,6 @@ export const BULWARK_BLOCK_BONUS: Readonly<Record<Tier, number>> = {
 
 // -- The Crackers -----------------------------------------------------------
 
-export const CRACKER_COUNT = 2;
-export const CRACKER_INITIATIVE = 20;
 /**
  * Eight, since 2H.6 (écart 40 bis, decided by Jérôme on 2026-10-10 soir).
  *
@@ -166,8 +166,6 @@ export const CRACKER_RESPAWN_DELAY = 1;
 export const CRACKER_FIRST_DRIFT_ROUND = 2;
 
 // -- The Spark --------------------------------------------------------------
-
-export const SPARK_INITIATIVE = 10;
 
 /** The Spark stays out of play until the start of this round. */
 export const SPARK_ENTRY_ROUND = 6;
@@ -230,9 +228,12 @@ export const SPARK_CATCH_DC = 20;
 export const SPARK_POINTS = 20;
 
 // -- Initiative -------------------------------------------------------------
+//
+// No counts since écart 51 (2H.7): the ladder is an order, built in
+// `engine/initiative.ts` from who has a human, who carries, and the board.
 
-export const INITIATIVE_ENEMY_FAST = 15;
-export const INITIATIVE_ENEMY_SLOW = 10;
+/** Brace (écart 52): a Shove against a braced Bulwark rolls at disadvantage and loses this much. */
+export const BRACE_SHOVE_PENALTY = 3;
 
 // -- Match ------------------------------------------------------------------
 

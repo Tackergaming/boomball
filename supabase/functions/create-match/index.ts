@@ -145,7 +145,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   });
   if (!opened.ok) return refuse(opened.reason);
 
-  const { session, events, seats: assigned } = opened.opening;
+  const { session, events, seats: assigned, kickoff } = opened.opening;
   const state = session.state;
 
   const { data: created, error: createError } = await db
@@ -161,6 +161,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
       // Stamped at birth, so `resolve-action` can refuse this match the day the
       // engine moves on, instead of replaying a snapshot it cannot read.
       engine_version: ENGINE_VERSION,
+      // The board before the house played its opening, and the sequence number
+      // the opening ends on, so a client loading the match fresh can watch the
+      // house get into place instead of finding it there (migration 0007).
+      kickoff: { state: kickoff, lastSeq: events.length - 1 },
     })
     .select('id')
     .single();

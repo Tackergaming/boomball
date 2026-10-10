@@ -101,6 +101,82 @@ export interface RoleWeights {
   /** Staying on the opponent who is carrying. */
   readonly pressCarrier: number;
 
+  // -- The bodyguard, 2H.7 ------------------------------------------------
+  /**
+   * Standing beside the team-mate who carries, **on the side the nearest
+   * opponent is coming from**. `screenCarrier` prices closeness alone and put
+   * the Breaker on whatever shoulder was free; this prices the shoulder that
+   * matters. Decided by Jérôme on 2026-10-10: the Breaker's charge is always
+   * the carrier, never a Striker by name. Zero for every other role.
+   */
+  readonly escort: number;
+  /**
+   * Whether this role, when it carries, is worth escorting: one for a field
+   * player, zero for the goalkeeper. A keeper handed a fresh ball after a goal
+   * needs outlets up the pitch, not two Breakers on its shoulders in the mouth;
+   * that was the A31 huddle, and this is what keeps the bodyguard out of it.
+   * Read off the **carrier's** table by `escort`.
+   */
+  readonly wantsEscort: number;
+  /**
+   * Hitting or shoving an opponent who is standing on our carrier, on top of
+   * the plain appetite for a swing. Zero for every other role.
+   */
+  readonly guardStrike: number;
+  /**
+   * Standing on the line a Cracker will roll down towards the ball at the next
+   * count 20, so that it arrives on this unit and the parry (écart 47) fires.
+   * The one positive reading of `crackerPressure`, and the Breaker's weapon:
+   * Jérôme chose to have it go and post there on purpose, 3d6 on a miss being
+   * the price of the role. Zero for every other role, which run from the line.
+   */
+  readonly parryPost: number;
+  /**
+   * Leaving a loose ball to a team-mate who wants it more. One means: when a
+   * mate within two cells of the ball has a higher `chaseLoosePayload`, this
+   * unit neither walks onto the ball nor picks it up. Zero means it takes
+   * whatever is at its feet. A number rather than a role test so the table
+   * stays data.
+   */
+  readonly yieldToKeener: number;
+  /**
+   * A flat appetite for throwing the ball to anybody, added to every pass,
+   * for a unit that should not be the one carrying. It makes a pass that
+   * gains no ground still beat walking with the ball.
+   */
+  readonly handOff: number;
+  /**
+   * Coming back into throwing range of our own carrier when out of it. A
+   * Striker eighteen cells up the pitch had no reason to turn round, because
+   * every outlet term reads zero out of reach; this is the reason. Zero for
+   * the roles that do not run ahead.
+   */
+  readonly rejoin: number;
+  /**
+   * Standing between an opponent and a team-mate who handles the ball, when
+   * the other side has it: the bodyguard's defensive stance, Jérôme's words,
+   * "so that no opponent can finish adjacent to a Striker". First priority of
+   * the Breaker's position in defence, the Cracker line second. Zero for
+   * every other role.
+   */
+  readonly screen: number;
+
+  // -- The goalkeeper's tether, 2H.7 ------------------------------------------
+  /**
+   * The furthest from its own mouth this role will stand, in cells of range
+   * to the Furnace. Four for the Bulwark, by Jérôme's arbitration: out to
+   * shove a carrier, never further. A very large number for everybody else.
+   */
+  readonly leash: number;
+  /**
+   * How far away a loose ball may lie for this role to go and fetch it. Three
+   * for the Bulwark, which otherwise ran seven or eight cells after its own
+   * fumbled throw (observed in 2H.2); unbounded for everybody else.
+   */
+  readonly looseBallReach: number;
+  /** Appetite for digging in (écart 52) when an opponent is two cells away. Bulwark only. */
+  readonly brace: number;
+
   // -- Caution --------------------------------------------------------------
   /** Penalty per opponent a route would walk out of the reach of. */
   readonly avoidOpportunity: number;

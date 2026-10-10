@@ -414,6 +414,56 @@ plateau (retour 7), et la passe d'animation 2D passe avant toute ligne de 2.5D (
 | 48 | Interception possible par tout adversaire à une case d'une cellule du vol, la première comprise (B7, écart 34) | **La première case du vol ne compte pas** : une passe qui quitte les mains ne se vole pas par un voisin du lanceur. Un adversaire doit être sur la trajectoire ou à une case d'une cellule du vol à partir de la deuxième. Conséquences : une passe à un coéquipier adjacent ne s'intercepte jamais ; un adversaire voisin du lanceur compte encore s'il est aussi à une case de la deuxième cellule | Jérôme, retour 6, sur la proposition du fil principal | **Fait en 2H.6**, sous-agent Sonnet, `passInterceptors` dans `rules/reactions.ts` |
 | 37 bis | Le remplaçant entre à côté de la bouche de sa Furnace (écart 37) | **La case libre la plus proche du centre**, le centre lui-même s'il est libre, jamais le ballon au sol, une unité ni un Cracker vivant, égalités au dé | Jérôme, tranché au départ de 2H.6 sur le retour 5 : revenir à côté de sa Furnace était trop pénalisant | **Fait en 2H.6.** Dérivé de `ordnanceStart` dans le moteur, règle `nearestFreeCell` de `rules/placement.ts` partagée avec les Crackers ; la colonne `substitute_entry` de la ligne `arenas` et le champ du spec restent et ne sont plus lus, pas de migration |
 
+## C9. Écarts décidés le 2026-10-10 après la partie à la porte de 2H.6, **dans le code depuis 2H.7, pas encore en ligne**
+
+> Écrits par le fil principal (Fable 5.1) sur les retours de Jérôme après sa partie sur le moteur 3
+> (`07` §10, sous 2H.6), tranchés par lui en une question chacun au départ de 2H.7, puis implémentés
+> le jour même. Les deux écarts touchent le Spark. L'écart 49 ajoute un champ `cause` à l'événement
+> `sparkMoved`, l'écart 50 retire l'état `caught` du Spark, l'écart 51 change la forme de
+> `turnOrder` et l'écart 52 ajoute un drapeau et un événement : **`ENGINE_VERSION` monte à 4**, les
+> matchs ouverts du moteur 3 sont archivés au redéploiement.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 49 | Attraper le Spark est une Action depuis sa case, DC 20 ; manqué, l'Action est dépensée et le Spark reste en jeu (B9). Rien n'interdit de finir son tour sur sa case | **Le Spark s'échappe de la case d'un gardien.** À la fin de tout tour qui se termine sur la case du Spark sans l'avoir attrapé, tentative ratée ou pas de tentative, le Spark saute **d'une case au d8**, avec le repli horaire de l'écart 42 : la première case libre à partir de la face tirée, jamais un obstacle, jamais une unité. Si les huit voisines sont prises il reste. Son cap ne change pas : c'est un saut, pas une nouvelle dérive, et la course du compte 10 repart de la nouvelle case. Un Spark attrapé ne s'échappe pas, il est parti | Jérôme, retour 1 : une case occupée ne s'entre pas, donc une unité assise sur le Spark en interdisait l'accès à tout le monde jusqu'à ce qu'elle bouge, « couver le Spark ». La formulation « à la fin du tour » couvre l'échec et le parking sans interdire d'y marcher, ce qu'il faut pour l'attraper | **Fait en 2H.7**, `sparkEscape` dans `reduce.ts`, appelé par `applyEndTurn` ; événement `sparkMoved` avec `cause: 'escape'`, la dérive portant `cause: 'drift'` |
+| 51 | B4 en entier : comptes 20, 15 et 10, d20 + Acrobaties par humain, blocs IA, d2 de départage (écart 25) | **L'initiative devient un ordre, sans comptes.** Dans le round : **le Spark** s'il est sur le terrain ; **l'équipe qui a un humain** ; **les Crackers juste après l'équipe qui porte la balle** (la dernière à l'avoir portée si elle est au sol, en tout dernier au coup d'envoi) ; **l'autre équipe**. Dans une équipe : **Trajector, Strikers, Breakers, Bulwark**. Un humain joue en premier dans son rôle ; plusieurs humains du même rôle sont ordonnés une fois au coup d'envoi par un d20 relancé jusqu'à les séparer. L'ordre des IA d'un même rôle est fixé **au début du round par la situation** : en attaque le porteur d'abord puis du plus en arrière au plus avancé, en défense du plus proche du porteur adverse au plus loin, balle au sol du plus proche de la balle. Sans humain d'aucun côté, les deux camps alternent de round en round depuis un dé de coup d'envoi. L'échelle est fixée au début du round, la balle qui change de mains en cours de round ne la bouge pas | Jérôme, le 2026-10-10 au soir, pour que la balle puisse remonter toute la chaîne de son équipe dans un même round et que la lecture de l'échelle soit immédiate. L'ordre dans un rôle vit dans le moteur et non dans l'IA : c'est une règle de l'échelle, les deux camps lisent la même | **Fait en 2H.7**, `engine/initiative.ts` récrit, `TurnSlot` porte un `rank` et plus de `count`, l'état porte `lastCarrierTeam` ; les comptes disparaissent des constantes |
+| 52 | Aucune action propre au Bulwark hors son blocage en Réaction | **Se planter (Brace, « Dig in »).** Action du **Bulwark seul**. Jusqu'au début de son prochain tour, ou jusqu'à ce qu'il se déplace, toute bousculade contre lui est lancée **avec désavantage et moins 3** (`BRACE_SHOVE_PENALTY`). Le blocage en Réaction n'est pas touché | Jérôme : il a trop vu deux adversaires pousser le Bulwark hors de sa bouche, après quoi il ne protège plus rien | **Fait en 2H.7**, action `brace`, drapeau `braced`, événement `braced`, `canBrace` dans `legalActions` |
+| 50 | Attrapé, le Spark quitte le terrain définitivement et ne réapparaît pas (B9, écart 41 « jamais pris deux fois ») | **Le Spark revient le round suivant.** Attrapé, il repasse en attente et rentre au début du round suivant par la règle d'entrée habituelle (écart 36 : tiers central, à 4 cases ou plus de toute unité, cap d8 tiré à l'entrée), **toujours 20 points**, autant de fois qu'il est pris. En mort subite la prise termine le match comme avant | Jérôme, retour 5 : pris une fois au round 7, il laissait trois rounds sans rien d'autre à jouer que le ballon. **Rouvre l'équilibrage** : le prix de 20 avait été arbitré sur « jamais pris deux fois ». Mesuré dans `09` §12 | **Fait en 2H.7**, `applyCatchSpark` remet `pending`, `enterSpark` le fait rentrer ; `Spark.state` perd `caught` |
+
+**Hors règlement, décidé en même temps, 2H.7 : l'IA par rôle**, dictée par Jérôme en chat le
+2026-10-10, écrite dans les quatre fiches de `ai/roles/` et dans `ai/evaluate.ts` et
+`ai/chooseAction.ts`. Les mots sont les siens.
+
+- **La chaîne, en attaque.** Aller le plus vite possible vers le but adverse sans perdre la balle :
+  maximiser les cases parcourues par l'équipe dans le round. Le porteur avance, tire s'il voit la
+  bouche à portée propre, et **ne passe jamais à quelqu'un qui a déjà joué ce round**, sauf s'il est
+  le **dernier maillon** de son équipe (le Bulwark après un but, typiquement), qui passe alors au
+  plus loin **sans intercepteur d'abord, loin ensuite**, et jamais ne garde la balle par peur d'une
+  interception. Le receveur est devant ou sur la même ligne, ou **à 1 à 3 cases derrière s'il est le
+  tout prochain à jouer**, parce que ses huit cases porteront la balle plus loin. Tout rôle peut
+  participer, priorité aux Strikers et au Trajector tant que le Spark n'est pas sur le terrain.
+  Le Trajector, qui joue toujours en premier, est **le lanceur du round** ; s'il est le plus avancé
+  et que personne n'ira aussi loin, il garde et tire.
+- **« Presser »**, par rôle. Striker et Trajector : en défense, **bousculade pour faire tomber la
+  balle** ; en attaque ils pressent rarement, et si c'est la seule chose à faire, c'est une attaque.
+  Breaker : **attaque pour les dégâts** en attaque comme en défense, **bousculade** contre le porteur.
+- **Le Breaker, garde du corps.** Son protégé est **toujours le porteur** : escorte du porteur allié
+  sur l'épaule qui fait face à la menace, frappe de l'adversaire collé au porteur. En défense, sa
+  position vise **d'abord le chemin des adversaires vers ses Strikers**, pour qu'aucun ne finisse
+  adjacent à eux, **ensuite la ligne des Crackers**, où il se poste exprès pour parer. Il laisse un
+  ballon perdu à un Striker ou un Trajector à deux cases et passe à la première occasion.
+- **Le Striker** revient à portée de passe quand il est trop loin devant.
+- **Le Bulwark** reste au centre de sa bouche, ne va chercher qu'une balle au sol à **trois cases ou
+  moins**, sort bousculer jusqu'à **quatre cases de son but** et pas plus, se plante quand un
+  adversaire approche et qu'il n'a rien de mieux.
+- **Dodge est le dernier recours** : seulement abîmé de moitié et sans rien à frapper, bousculer,
+  passer ni tirer. Le sweep gagne une colonne Dodge par match pour le vérifier.
+- `crackerPressure` lit désormais **la ligne Cracker-ballon**, plus la distance à l'unité.
+
+Et quatre retours d'écran sans règle : l'ouverture rejouée depuis le plateau de coup d'envoi
+(migration 0007, colonne `matches.kickoff`), agir en cliquant un pion, tracer sa trajectoire, la
+chaîne d'initiative au-dessus du plateau.
+
 **Ce que ces écarts changent ensemble, mesuré.** Le sweep de contrôle de 2H.6 est en `09` §11,
 `constants crackers 8 range 9/12 spark 20`, 200 matchs par Tier : 1,18 / 1,69 / 2,21 but par match
 contre 1,12 / 1,40 / 2,00 en `09` §10, et surtout **trois fois moins d'évacués** (0,88 / 0,58 /

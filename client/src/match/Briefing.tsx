@@ -73,7 +73,7 @@ export function Briefing({ onClose }: { onClose: () => void }) {
           <Item
             mark={<span style={{ ...S.dot, background: '#fffce8' }} />}
             title="The Spark"
-            body={`Rolls onto the pitch at round six and drifts, bouncing off crates and edges. Catch it, from its own cell, and it is worth ${SPARK_POINTS}.`}
+            body={`Rolls onto the pitch at round six and drifts, bouncing off crates and edges. Catch it, from its own cell, and it is worth ${SPARK_POINTS}; it rolls back on next round, worth as much again. Finish a turn standing on it without catching it and it skips a cell away, so nobody can sit on it.`}
           />
           <Item
             mark={<span style={S.shove}>&rarr;</span>}
@@ -93,7 +93,7 @@ export function Briefing({ onClose }: { onClose: () => void }) {
           <Item
             mark={<span style={S.clock}>{TURN_TIMER_SECONDS}</span>}
             title="Your turn"
-            body={`One move and one action, in any order, within ${TURN_TIMER_SECONDS} seconds. Run out and the clock takes cover for you and passes the turn on.`}
+            body={`One move and one action, in any order, within ${TURN_TIMER_SECONDS} seconds. Run out and the clock takes cover for you and passes the turn on. A Bulwark can dig in for its Action: until its next turn, or until it moves, shoving it rolls at disadvantage and minus 3.`}
           />
         </div>
 

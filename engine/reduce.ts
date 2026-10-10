@@ -125,6 +125,8 @@ function apply(arena: Arena, state: MatchState, unit: Unit, action: Action): Red
       return applyDash(ctx);
     case 'dodge':
       return applySelfAction(ctx, 'dodging');
+    case 'brace':
+      return applyBrace(ctx);
     case 'disengage':
       return applySelfAction(ctx, 'disengaged');
     case 'attack':
@@ -148,7 +150,21 @@ function apply(arena: Arena, state: MatchState, unit: Unit, action: Action): Red
 
 /** Seals a handler's result, writing the RNG cursor back into the state. */
 function done(ctx: Ctx, state: MatchState): ReduceResult {
-  return { ok: true, state: { ...state, rngSeed: ctx.rng.seed }, events: ctx.log };
+  return { ok: true, state: rememberCarrier({ ...state, rngSeed: ctx.rng.seed }), events: ctx.log };
+}
+
+/**
+ * The side holding the ball, written down whenever a handler finishes with it
+ * in somebody's hands, so the ladder can put the Crackers after the carrying
+ * side even when the ball is loose at the top of the round (écart 51). Every
+ * change of hands goes through a handler and so through `done`.
+ */
+function rememberCarrier(state: MatchState): MatchState {
+  const carrier = state.payload.carriedBy;
+  if (carrier === null) return state;
+  const unit = state.units.find((u) => u.id === carrier);
+  if (!unit || unit.team === state.lastCarrierTeam) return state;
+  return { ...state, lastCarrierTeam: unit.team };
 }
 
 // -- Movement ---------------------------------------------------------------
@@ -219,6 +235,10 @@ function applyMove(ctx: TurnCtx, path: readonly Point[]): ReduceResult {
   }
 
   flush();
+
+  // A braced Bulwark that walks is no longer dug in (écart 52).
+  const walker = next.units.find((u) => u.id === unit.id)!;
+  if (walker.braced && path.length > 0) next = replaceUnit(next, { ...walker, braced: false });
 
   const spent: MatchState = {
     ...next,
@@ -315,6 +335,26 @@ function applySelfAction(ctx: TurnCtx, effect: 'dodging' | 'disengaged'): Reduce
       ? { ...replaceUnit(state, { ...unit, dodging: true }), turn: { ...turn, actionUsed: true } }
       : { ...state, turn: { ...turn, actionUsed: true, disengaged: true } },
   );
+}
+
+/**
+ * The Bulwark digs in (écart 52, 2H.7). Its Action; from then until its next
+ * turn, or until it takes a step, a Shove against it rolls at disadvantage and
+ * minus three (`resolveShove`). The blocking Reaction is untouched, which is
+ * the point: a keeper that cannot be walked out of the mouth is a keeper that
+ * still has a mouth to block.
+ */
+function applyBrace(ctx: TurnCtx): ReduceResult {
+  const { state, unit } = ctx;
+  const turn = state.turn!;
+  if (turn.actionUsed) return { ok: false, reason: `${unit.name} has already acted` };
+  if (unit.role !== 'bulwark') return { ok: false, reason: 'only a Bulwark can dig in' };
+
+  ctx.log.push({ kind: 'braced', unitId: unit.id });
+  return done(ctx, {
+    ...replaceUnit(state, { ...unit, braced: true }),
+    turn: { ...turn, actionUsed: true },
+  });
 }
 
 // -- Violence ---------------------------------------------------------------
@@ -685,8 +725,15 @@ function respawnCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): Ma
  * It used to end the match on the spot for a hundred and fifty. Now that it is
  * catchable on purpose rather than by accident, an instant win would have made
  * it the only thing worth playing: the points go on the board and the match
- * runs its rounds out. It is gone for good either way, so the prize is there
- * to be taken once and the field has to fight over the Payload for the rest.
+ * runs its rounds out.
+ *
+ * It is not gone for good any more (écart 50, 2H.7). A caught Spark goes back
+ * to `pending` and `enterSpark` drops it in again at the top of the next
+ * round, on a fresh cell and heading, worth as much again. Jérôme asked for it
+ * after the engine 3 game: a prize that is taken once by round seven leaves
+ * three rounds with nothing but the Payload to play for. What that does to
+ * the share of matches the Spark settles is measured in the 2H.7 sweep, and
+ * the price stays his call.
  *
  * In sudden death it ends the match like any other score, because that is the
  * sudden-death rule and not the Spark's.
@@ -714,7 +761,7 @@ function applyCatchSpark(ctx: TurnCtx): ReduceResult {
   ctx.log.push({ kind: 'scored', team: unit.team, points: SPARK_POINTS, source: 'spark' });
   const caught: MatchState = {
     ...next,
-    spark: { ...next.spark, state: 'caught', heading: null },
+    spark: { ...next.spark, state: 'pending', heading: null },
     score: { ...next.score, [unit.team]: next.score[unit.team] + SPARK_POINTS },
   };
 
@@ -746,6 +793,7 @@ function resolveSpark(arena: Arena, state: MatchState, log: MatchEvent[]): Match
     to: run.landing,
     direction: run.direction,
     path: [...run.path],
+    cause: 'drift',
   });
 
   return {
@@ -755,12 +803,45 @@ function resolveSpark(arena: Arena, state: MatchState, log: MatchEvent[]): Match
 }
 
 /**
+ * The Spark skipping away from under a minder (écart 49, 2H.7).
+ *
+ * A unit that finishes its turn standing on the Spark without having caught
+ * it, whether it tried and fumbled or never tried, was sitting on the prize:
+ * a cell with a unit on it cannot be entered, so nobody else could reach for
+ * it until the minder moved. Jérôme saw it in his engine 3 game and called it
+ * "couver le Spark". So at the end of any such turn the Spark hops one cell
+ * away on a d8, with the same clockwise fallback as a dropped ball (écart 42,
+ * `dropLanding`): the first free neighbour from the rolled face. If all eight
+ * are taken it stays, which the layout makes rare and a test keeps honest.
+ *
+ * The heading is kept: the hop is a nudge, not a new drift, and the count-10
+ * run carries on from the new cell. The event is a `sparkMoved` with
+ * `cause: 'escape'` so the client can say what happened without guessing.
+ */
+function sparkEscape(arena: Arena, state: MatchState, unit: Unit, log: MatchEvent[]): MatchState {
+  if (!sparkIsLive(state.spark)) return state;
+  if (state.spark.x !== unit.x || state.spark.y !== unit.y) return state;
+
+  const rng = new Rng(state.rngSeed);
+  const from = { x: state.spark.x, y: state.spark.y };
+  const { landing, direction } = dropCell(arena, state, from, rng);
+  if (landing.x === from.x && landing.y === from.y) return { ...state, rngSeed: rng.seed };
+
+  log.push({ kind: 'sparkMoved', from, to: landing, direction, path: [landing], cause: 'escape' });
+  return {
+    ...state,
+    spark: { ...state.spark, x: landing.x, y: landing.y },
+    rngSeed: rng.seed,
+  };
+}
+
+/**
  * The Spark drops in at the top of round 6, on a cell and a heading rolled
  * once and for all. Holding it back that long is what keeps it from deciding
  * the match before anyone has had a chance to score a goal.
  *
- * The guard is on `pending` rather than on being off the field, because a
- * caught Spark is also off the field and must not drop back in next round.
+ * The guard is on `pending` and the round: a caught Spark is `pending` again
+ * (écart 50) and comes back through here at the next round.
  */
 function enterSpark(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
   if (state.spark.state !== 'pending' || state.round < SPARK_ENTRY_ROUND) return state;
@@ -1094,7 +1175,11 @@ function returnSubstitutes(arena: Arena, state: MatchState, log: MatchEvent[]): 
 
 function applyEndTurn(arena: Arena, state: MatchState, unit: Unit): ReduceResult {
   const events: MatchEvent[] = [{ kind: 'turnEnded', unitId: unit.id }];
-  return advance(arena, { ...state, turn: null }, events);
+  // Read the unit off the state rather than trusting the argument: the turn
+  // may have moved it. The Spark leaves before the ladder moves on (écart 49).
+  const standing = state.units.find((u) => u.id === unit.id) ?? unit;
+  const cleared = sparkEscape(arena, state, standing, events);
+  return advance(arena, { ...cleared, turn: null }, events);
 }
 
 /**
@@ -1148,7 +1233,7 @@ function advance(arena: Arena, state: MatchState, events: MatchEvent[]): ReduceR
 function beginTurn(state: MatchState, unit: Unit, log: MatchEvent[]): MatchState {
   log.push({ kind: 'turnStarted', unitId: unit.id, round: state.round });
 
-  const acting: Unit = { ...unit, dodging: false, reactionAvailable: true };
+  const acting: Unit = { ...unit, dodging: false, braced: false, reactionAvailable: true };
   return {
     ...replaceUnit(state, acting),
     turn: {
@@ -1213,7 +1298,7 @@ function rebuild(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState
     turnIndex: 0,
     turn: null,
   };
-  return { ...refreshed, turnOrder: buildTurnOrder(refreshed) };
+  return { ...refreshed, turnOrder: buildTurnOrder(arena, refreshed) };
 }
 
 // -- Kick-off ---------------------------------------------------------------

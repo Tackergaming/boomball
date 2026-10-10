@@ -27,11 +27,14 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
-import { pathTo } from '../../../engine/rules/movement.js';
+import { pathCostFeet, pathTo, reachableCells, type Reachable } from '../../../engine/rules/movement.js';
+import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
 import { ARENA_HEIGHT, ARENA_WIDTH, THIRD_LENGTH, arena, spec } from '../lib/arena.js';
+import type { Pending } from './ActionBar.js';
 import type { Motion, MotionStep } from './motion.js';
 
 /** Columns on screen, which is the pitch's length. */
@@ -60,7 +63,52 @@ export interface BoardProps {
    * board draws `state` as it stands.
    */
   motion?: Motion | null;
+  /**
+   * What the action bar has started. With a Swing, Shove or Pass pending, the
+   * tokens that action may target wear a ring and a click on one is the answer.
+   */
+  pending?: Pending;
+  /** Null when this client may not act, as for `onMove`. */
+  onAct?: ((action: Action) => void) | null;
+  /**
+   * Route plotting. `on` turns a click on a cell into a waypoint; `route` is
+   * the cells chosen so far, origin excluded, ready to be sent whole as a move.
+   * The board only draws it and asks the engine for each next segment: the
+   * state lives in the match screen, which clears it whenever the board moves.
+   */
+  plot?: { readonly on: boolean; readonly route: readonly Point[] } | null;
+  onPlotStep?: ((segment: Point[]) => void) | null;
 }
+
+/** The unit as it would stand on `cell`, so the engine can be asked about the walk from there. */
+function unitAt(unit: Unit, cell: Point): Unit {
+  return { ...unit, x: cell.x, y: cell.y };
+}
+
+/**
+ * Opportunity attacks a route would draw: the engine's own count, through
+ * `provokedAlong`, for the plotted waypoints followed by the shortest way to
+ * `cell` from the last of them.
+ */
+function swingsTo(
+  state: MatchState,
+  mover: Unit,
+  planned: readonly Point[],
+  reach: ReadonlyMap<string, Reachable>,
+  cell: Point,
+): { segment: Point[]; swings: number } | null {
+  const segment = pathTo(reach, cell);
+  if (!segment) return null;
+  return { segment, swings: provokedAlong(state, mover, [...planned, ...segment]).length };
+}
+
+const NO_ROUTE: readonly Point[] = [];
+
+const swingsText = (n: number): string => (n === 0 ? 'clean' : `${n} swing${n === 1 ? '' : 's'} on the way`);
+
+/** The cell centres of a route as SVG points, starting from `from`. */
+const polyline = (from: Point, route: readonly Point[]): string =>
+  [from, ...route].map((p) => `${p.y + 0.5},${p.x + 0.5}`).join(' ');
 
 // -- Motion -------------------------------------------------------------------
 
@@ -275,9 +323,92 @@ export function Board({
   yoursId = null,
   spotlight = null,
   motion = null,
+  pending = null,
+  onAct = null,
+  plot = null,
+  onPlotStep = null,
 }: BoardProps) {
-  const reachable = legal && onMove ? legal.destinations : null;
   const units = activeUnits(state);
+
+  // -- Routes ------------------------------------------------------------------
+  // Everything below asks the engine and decides nothing: where the unit can
+  // stand comes from `reachableCells`, a route from `pathTo`, and what a route
+  // costs in swings from `provokedAlong`.
+  const canMove = onMove !== null;
+  const mover = legal ? (state.units.find((u) => u.id === legal.unitId) ?? null) : null;
+  const plotting = plot?.on ?? false;
+  const planned = plotting && plot ? plot.route : NO_ROUTE;
+  const [hover, setHover] = useState<Point | null>(null);
+
+  /**
+   * Where the unit could stand next. With nothing plotted that is `legal`'s own
+   * answer. Once there are waypoints it is asked afresh from the last one, with
+   * the feet the plotted cells have not yet used, on a copy of the state where
+   * the unit stands at that waypoint.
+   */
+  const reachable = useMemo((): ReadonlyMap<string, Reachable> | null => {
+    if (!legal || !canMove || !mover) return null;
+    if (planned.length === 0) return legal.destinations;
+    const waypoint = planned[planned.length - 1]!;
+    const spent = pathCostFeet({ x: mover.x, y: mover.y }, planned);
+    const moved = unitAt(mover, waypoint);
+    const there: MatchState = { ...state, units: state.units.map((u) => (u.id === mover.id ? moved : u)) };
+    return reachableCells(arena, there, moved, (state.turn?.movementFeetRemaining ?? 0) - spent);
+  }, [legal, canMove, mover, planned, state]);
+
+  /**
+   * The cells that are watched. `opportunityAttackers(state, mover, from, to)`
+   * answers "who is passed by stepping from one cell to the next", which needs
+   * a destination the player has not chosen, so it cannot say whether a cell on
+   * its own is inside someone's reach without inventing a `to`. Rather than
+   * invent one, a cell is marked when the shortest route that arrives there
+   * draws at least one swing (`provokedAlong(...).length > 0`). That is also
+   * what the player is deciding about: arriving in a reach costs nothing, it is
+   * the walk that went through one on the way that does.
+   */
+  const watched = useMemo(() => {
+    const out = new Set<string>();
+    if (!reachable || !mover) return out;
+    for (const [key, step] of reachable) {
+      const found = swingsTo(state, mover, planned, reachable, step.cell);
+      if (found && found.swings > 0) out.add(key);
+    }
+    return out;
+  }, [reachable, mover, planned, state]);
+
+  const origin: Point | null = mover ? { x: mover.x, y: mover.y } : null;
+  const ahead = hover && reachable && mover ? swingsTo(state, mover, planned, reachable, hover) : null;
+  const plannedSwings = planned.length > 0 && mover ? provokedAlong(state, mover, planned).length : 0;
+
+  // -- Tokens as targets -------------------------------------------------------
+  // Rings come from the same three lists the action bar's tray reads. A pending
+  // Swing, Shove or Pass rings only what that action may target; with nothing
+  // pending every unit that is a target of anything wears a faint ring.
+  const targetKind = pending === 'attack' || pending === 'shove' || pending === 'pass' ? pending : null;
+  const targets =
+    legal && onAct
+      ? {
+          attack: new Set<string>(legal.attack.map((t) => t.unitId)),
+          shove: new Set<string>(legal.shove.map((t) => t.unitId)),
+          pass: new Set<string>(legal.pass.map((t) => t.unitId)),
+        }
+      : null;
+  const ringFor = (id: UnitId): 'hot' | 'faint' | null => {
+    if (!targets) return null;
+    if (targetKind) return targets[targetKind].has(id) ? 'hot' : null;
+    return targets.attack.has(id) || targets.shove.has(id) || targets.pass.has(id) ? 'faint' : null;
+  };
+  const answer = (id: UnitId): boolean => {
+    if (!onAct || !targets || !targetKind || !targets[targetKind].has(id)) return false;
+    onAct(
+      targetKind === 'attack'
+        ? { kind: 'attack', targetId: id }
+        : targetKind === 'shove'
+          ? { kind: 'shove', targetId: id }
+          : { kind: 'pass', targetId: id },
+    );
+    return true;
+  };
 
   /**
    * Taking in a new beat, or noticing that the board moved on, happens here in
@@ -383,12 +514,68 @@ export function Board({
                 stroke="rgba(60,224,240,.5)"
                 strokeWidth={0.04}
                 style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setHover(step.cell)}
+                onMouseLeave={() => setHover((h) => (h && h.x === step.cell.x && h.y === step.cell.y ? null : h))}
                 onClick={() => {
                   const route = pathTo(reachable, step.cell);
-                  if (route && onMove) onMove(route);
+                  if (!route) return;
+                  // Plotting: the click adds a waypoint and sends nothing.
+                  // The cell may stop being a destination once the route grows,
+                  // and a rect that goes away never reports the mouse leaving.
+                  if (plotting) {
+                    setHover(null);
+                    onPlotStep?.(route);
+                  } else if (onMove) onMove(route);
                 }}
               />
             ))}
+
+          {/* 6b. Cells whose shortest way in draws a swing, in amber inside the
+              cell. Painted over the cyan and deaf to the mouse. */}
+          {reachable &&
+            [...watched].map((key) => {
+              const step = reachable.get(key)!;
+              return (
+                <rect
+                  key={`w${key}`}
+                  x={step.cell.y + 0.2}
+                  y={step.cell.x + 0.2}
+                  width={0.6}
+                  height={0.6}
+                  fill="none"
+                  stroke="#ff8a3d"
+                  strokeWidth={0.07}
+                  opacity={0.9}
+                  style={{ pointerEvents: 'none' }}
+                />
+              );
+            })}
+
+          {/* 6c. Routes. The plotted one is solid; the one under the cursor is
+              dotted and carries on from the last waypoint (or from the unit). */}
+          {origin && planned.length > 0 && (
+            <polyline
+              points={polyline(origin, planned)}
+              fill="none"
+              stroke="#3ce0f0"
+              strokeWidth={0.12}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              opacity={0.9}
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+          {origin && ahead && (
+            <polyline
+              points={polyline(planned.length > 0 ? planned[planned.length - 1]! : origin, ahead.segment)}
+              fill="none"
+              stroke={ahead.swings > 0 ? '#ff8a3d' : '#3ce0f0'}
+              strokeWidth={0.1}
+              strokeDasharray="0.02 0.22"
+              strokeLinecap="round"
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
 
           {/* 7. Crackers. One the beat destroys is still drawn until its roll
               is over, because it rolled before it went. */}
@@ -465,7 +652,14 @@ export function Board({
                 // flight, not on whoever will end up holding it.
                 carrying={!ball && state.payload.carriedBy === unit.id}
                 px={px}
-                onClick={() => onSelectUnit(selected === unit.id ? null : unit.id)}
+                ring={ringFor(unit.id)}
+                ringKind={targetKind ?? (targets?.pass.has(unit.id) ? 'pass' : 'attack')}
+                onClick={() => {
+                  // A pending action takes the click when this unit is a target
+                  // of it; any other click is a selection, as it always was.
+                  if (answer(unit.id)) return;
+                  onSelectUnit(selected === unit.id ? null : unit.id);
+                }}
               />
             );
           })}
@@ -492,6 +686,19 @@ export function Board({
               <LooseBall col={ball.at.y} row={ball.at.x} px={px} />
             ))}
           {ball?.kind === 'air' && <FlyingBall ball={ball} />}
+
+          {/* 12. What the route would cost, last so nothing hides it. While
+              the cursor is on a cell it is about the whole route to that cell;
+              otherwise, when a route is plotted, about the plotted one. */}
+          {hover && ahead && <RouteLabel cell={hover} text={swingsText(ahead.swings)} bad={ahead.swings > 0} px={px} />}
+          {!ahead && planned.length > 0 && (
+            <RouteLabel
+              cell={planned[planned.length - 1]!}
+              text={swingsText(plannedSwings)}
+              bad={plannedSwings > 0}
+              px={px}
+            />
+          )}
         </svg>
       </div>
     </div>
@@ -583,6 +790,50 @@ const Backdrop = memo(function Backdrop({ own }: { own: 'A' | 'B' }) {
     </g>
   );
 });
+
+/**
+ * "2 swings on the way" or "clean", hung beside a cell. To the right of it
+ * unless that would run off the stage, and kept inside the top and bottom rows.
+ */
+function RouteLabel({
+  cell,
+  text,
+  bad,
+  px,
+}: {
+  cell: Point;
+  text: string;
+  bad: boolean;
+  px: (size: number) => number;
+}) {
+  const size = px(10);
+  const height = px(15);
+  const width = text.length * size * 0.6 + px(10);
+  const left = cell.y + 1.15 + width > COLS ? cell.y - 0.15 - width : cell.y + 1.15;
+  const top = Math.min(Math.max(cell.x + 0.5 - height / 2, 0), ROWS - height);
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      <rect
+        x={left}
+        y={top}
+        width={width}
+        height={height}
+        fill="rgba(5,7,10,.92)"
+        stroke={bad ? '#ff8a3d' : '#3ce0f0'}
+        strokeWidth={0.04}
+      />
+      <text
+        x={left + width / 2}
+        y={top + height - px(4.5)}
+        textAnchor="middle"
+        fill={bad ? '#ff8a3d' : '#3ce0f0'}
+        style={{ font: `600 ${size}px 'IBM Plex Mono', monospace` }}
+      >
+        {text}
+      </text>
+    </g>
+  );
+}
 
 /** The Payload lying on the floor, at a (possibly fractional) screen position. */
 function LooseBall({ col, row, px }: { col: number; row: number; px: (size: number) => number }) {
@@ -712,6 +963,8 @@ function UnitMark({
   selected,
   carrying,
   px,
+  ring,
+  ringKind,
   onClick,
 }: {
   unit: Unit;
@@ -729,6 +982,14 @@ function UnitMark({
   carrying: boolean;
   /** A size in screen pixels, in the SVG units the viewBox counts in. */
   px: (size: number) => number;
+  /**
+   * Whether this unit is a target: `hot` when the pending action may take it
+   * (a click answers it), `faint` when nothing is pending and it merely could
+   * be one, so a player learns that a token is something to click.
+   */
+  ring: 'hot' | 'faint' | null;
+  /** Which of the three it is a target of, which picks the colour of the ring. */
+  ringKind: 'attack' | 'shove' | 'pass';
   onClick: () => void;
 }) {
   // Three colours, not two. Every shirt on your own side was one cyan, so the
@@ -767,6 +1028,22 @@ function UnitMark({
           points={`${x + 0.5},${row - 0.3} ${x + 0.32},${row - 0.02} ${x + 0.68},${row - 0.02}`}
           fill={colour}
         />
+      )}
+      {ring && (
+        <rect
+          x={x - 0.1}
+          y={row - 0.1}
+          width={1.2}
+          height={1.2}
+          fill="none"
+          stroke={ringKind === 'pass' ? '#ffc14d' : ringKind === 'shove' ? '#d8a12a' : '#ff6b6b'}
+          strokeWidth={ring === 'hot' ? 0.1 : 0.05}
+          strokeDasharray={ring === 'hot' ? undefined : '0.18 0.12'}
+          opacity={ring === 'hot' ? 1 : 0.5}
+          style={{ pointerEvents: 'none' }}
+        >
+          {ring === 'hot' && <animate attributeName="opacity" values="1;0.45;1" dur="1.2s" repeatCount="indefinite" />}
+        </rect>
       )}
       {onTheClock && (
         <rect

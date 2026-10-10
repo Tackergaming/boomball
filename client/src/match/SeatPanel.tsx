@@ -88,6 +88,7 @@ export function SeatPanel({
       <div style={S.flags}>
         <Flag on={carrying} label="Carrying the Payload" tone="var(--brass)" />
         <Flag on={unit.dodging} label="Dodging" tone="var(--team-own)" />
+        <Flag on={unit.braced} label="Dug in" tone="var(--team-own)" />
         <Flag on={!unit.reactionAvailable} label="Reaction spent" tone="var(--text-faint)" />
         <Flag on={unit.status !== 'active'} label={`Off the field · ${unit.status}`} tone="var(--team-foe)" />
       </div>

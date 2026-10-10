@@ -1,40 +1,47 @@
 /**
- * Building the initiative ladder for one round.
+ * Building the initiative ladder for one round (écart 51, 2H.7).
  *
- * The table fiche groups enemy NPCs into two blocks so a match stays fast. It
- * says nothing about AI team-mates, because at Jérôme's table they did not
- * exist. Two structures therefore live here, and they exist for two different
- * jobs.
+ * Decided by Jérôme on 2026-10-10 after his engine 3 game, replacing the
+ * counts of the table fiche (20, 15, 10 and a d20 per human) with an **order**:
  *
- * **A team with humans on it** rolls individual initiative for each human, and
- * its remaining AI units resolve as one block placed immediately after the last
- * human. That ordering is deliberate: an order posted to a team-mate during a
- * human turn is carried out in the same round, which is the whole reason the
- * order channel is worth having in solo.
+ *   1. the Spark, when it is on the field;
+ *   2. the team with a human on it, before the team that is all AI;
+ *   3. the Crackers, right after the team that carries the ball;
+ *   4. the other team.
  *
- * **A team with no humans** uses the enemy structure instead, fast group on 15
- * and slow group on 10. That makes an AI against AI match perfectly symmetric,
- * which is the only way the thousand-run balance sweeps mean anything.
+ * "Carries" is read at the top of the round: the carrier's side, or, with the
+ * ball loose, the side that carried it last (`lastCarrierTeam`), or nobody at
+ * kick-off, in which case the Crackers go last. The ladder is fixed when it is
+ * built; a ball that changes hands mid-round does not move it.
  *
- * A block is not a slot. The ladder stays a **flat queue of one unit each**, so
- * the engine walks it with a single index and has no nested cursor to lose.
- * Units of the same block share a `blockId`, which is all the interface needs
- * to draw them as one rung.
+ * **Within a team** the roles go Trajector, Strikers, Breakers, Bulwark. A
+ * human plays first in its role; two or three humans of the same role are
+ * ordered once, at kick-off, by a d20 rerolled until it separates them. The AI
+ * units of a role are ordered **by the situation at the top of the round**, a
+ * rule Jérôme accepted in those words: attacking, the carrier first if it is
+ * one of them, then from the rearmost to the most advanced, so the ball can
+ * climb the whole chain in one round; defending, from the nearest to the enemy
+ * carrier outwards, so the first who can swing swings; ball loose, nearest to
+ * the ball first. This lives in the engine and not in `ai/` because it is a
+ * rule of the ladder, deterministic, and both sides get the same one.
  *
- * **Two teams on the same count are separated by `initiativeNonce`, not by
- * their name.** Both AI blocks resolve on 15 and on 10, so every slot of team A
- * ties with a slot of team B, and the tie used to fall to a stable string key
- * that begins with the team letter. A therefore moved before B on every count,
- * of every round, of every match. That is the same defect already fixed for
- * Cracker proximity, where a tie broken by identifier always aimed at the same
- * side; it is invisible in one match and it decides a sweep.
+ * With no human on either side, the sides alternate round by round from a die
+ * rolled at kick-off (`initiativeNonce`), which keeps a balance sweep
+ * symmetric. Both AI sides read the same ordering rule, so a sweep measures the
+ * rule and not a bias.
+ *
+ * The ladder stays a **flat queue of one unit each** and the engine walks it
+ * with a single index. `blockId` is kept on the slot for the interface and is
+ * null everywhere since écart 51: the order inside a role is the point now,
+ * and a rung that hid it would hide the chain.
  */
 
-import { INITIATIVE_ENEMY_FAST, INITIATIVE_ENEMY_SLOW } from './constants.js';
+import type { Arena } from './arena.js';
+import { distance } from './geometry.js';
 import type { Rng } from './rng.js';
-import { statsFor } from './stats.js';
+import { rangeToFurnace } from './rules/payload.js';
+import type { Role } from './stats.js';
 import {
-  SLOT_PRIORITY,
   TEAMS,
   activeUnitsOf,
   isHuman,
@@ -45,151 +52,159 @@ import {
   type Unit,
 } from './types.js';
 
-/** Roles that move on the fast count when a team resolves in blocks. */
-const FAST_ROLES = new Set(['striker', 'trajector']);
+/** The order of the roles inside a team's part of the ladder. */
+export const ROLE_ORDER: readonly Role[] = ['trajector', 'striker', 'breaker', 'bulwark'];
 
 /**
- * Roll initiative for the humans of a match. Called once at kick-off; the
- * numbers then hold for the whole match, as they do at a table.
+ * Roll the humans' order within their role. Called once at kick-off; the
+ * numbers then hold for the whole match. Two humans of the same side and role
+ * who tie are rerolled together until they do not, so the order is always
+ * established and never falls to an identifier.
  */
 export function rollHumanInitiative(units: readonly Unit[], rng: Rng): Unit[] {
-  return units.map((unit) => {
-    if (!isHuman(unit)) return { ...unit, initiative: null };
-    const agility = statsFor(unit.role, unit.tier).agility;
-    return { ...unit, initiative: rng.d20() + agility };
-  });
+  const rolled = units.map((unit) => ({
+    ...unit,
+    initiative: isHuman(unit) ? rng.d20() : null,
+  }));
+
+  for (const team of TEAMS) {
+    for (const role of ROLE_ORDER) {
+      const group = rolled.filter((u) => u.team === team && u.role === role && isHuman(u));
+      for (let guard = 0; guard < 100 && hasTie(group); guard++) {
+        for (const unit of group) {
+          const i = rolled.findIndex((u) => u.id === unit.id);
+          rolled[i] = { ...rolled[i]!, initiative: rng.d20() };
+          unit.initiative = rolled[i]!.initiative;
+        }
+      }
+    }
+  }
+  return rolled;
+}
+
+function hasTie(group: { initiative: number | null }[]): boolean {
+  const seen = new Set<number>();
+  for (const unit of group) {
+    if (unit.initiative === null) continue;
+    if (seen.has(unit.initiative)) return true;
+    seen.add(unit.initiative);
+  }
+  return false;
 }
 
 /**
- * The ordered slots of one round, highest count first. Rebuilt every round, so
- * evacuated units drop out and returning substitutes drop back in on their own.
+ * The ordered slots of one round, first to act first. Rebuilt every round, so
+ * evacuated units drop out, returning substitutes drop back in, and the order
+ * inside each role follows the board as it stands at the top of the round.
  */
-export function buildTurnOrder(state: MatchState): TurnSlot[] {
-  const slots: TurnSlot[] = [];
-
-  if (state.crackers.some((c) => c.state === 'live')) {
-    slots.push({
-      count: 20,
-      priority: SLOT_PRIORITY.crackers,
-      actor: { kind: 'crackers' },
-      blockId: null,
-      team: null,
-    });
-  }
+export function buildTurnOrder(arena: Arena, state: MatchState): TurnSlot[] {
+  const slots: Omit<TurnSlot, 'rank'>[] = [];
 
   if (sparkIsLive(state.spark)) {
-    slots.push({
-      count: 10,
-      priority: SLOT_PRIORITY.spark,
-      actor: { kind: 'spark' },
-      blockId: null,
-      team: null,
+    slots.push({ actor: { kind: 'spark' }, blockId: null, team: null });
+  }
+
+  const [first, second] = sideOrder(state);
+  const carrying = carryingSide(state);
+  const crackersLive = state.crackers.some((c) => c.state === 'live');
+  const crackers: Omit<TurnSlot, 'rank'> = { actor: { kind: 'crackers' }, blockId: null, team: null };
+
+  slots.push(...teamSlots(arena, state, first));
+  if (crackersLive && carrying === first) slots.push(crackers);
+  slots.push(...teamSlots(arena, state, second));
+  if (crackersLive && carrying !== first) slots.push(crackers);
+
+  return slots.map((slot, i) => ({ ...slot, rank: i + 1 }));
+}
+
+/**
+ * The side that acts first this round. A side with a human on it goes first;
+ * with humans on both or on neither, the sides alternate from the kick-off die
+ * so that over a sweep each opens round 6, the Spark's round, half the time.
+ */
+export function sideOrder(state: MatchState): readonly [TeamId, TeamId] {
+  const humansOn = (team: TeamId): boolean => activeUnitsOf(state, team).some(isHuman);
+  const aHuman = humansOn('A');
+  const bHuman = humansOn('B');
+  if (aHuman !== bHuman) return aHuman ? ['A', 'B'] : ['B', 'A'];
+  return (state.initiativeNonce + state.round) % 2 === 0 ? ['A', 'B'] : ['B', 'A'];
+}
+
+/** The side the Crackers follow this round, or null when nobody has had the ball yet. */
+function carryingSide(state: MatchState): TeamId | null {
+  const carrier = state.payload.carriedBy;
+  if (carrier !== null) {
+    const unit = state.units.find((u) => u.id === carrier);
+    if (unit) return unit.team;
+  }
+  return state.lastCarrierTeam;
+}
+
+function teamSlots(arena: Arena, state: MatchState, team: TeamId): Omit<TurnSlot, 'rank'>[] {
+  const units = activeUnitsOf(state, team);
+  const out: Omit<TurnSlot, 'rank'>[] = [];
+
+  for (const role of ROLE_ORDER) {
+    const ofRole = units.filter((u) => u.role === role);
+    const humans = ofRole
+      .filter(isHuman)
+      .sort((a, b) => (b.initiative ?? 0) - (a.initiative ?? 0) || a.id.localeCompare(b.id));
+    const ai = orderBySituation(arena, state, team, ofRole.filter((u) => !isHuman(u)));
+
+    for (const unit of [...humans, ...ai]) {
+      out.push({ actor: { kind: 'unit', unitId: unit.id }, blockId: null, team });
+    }
+  }
+  return out;
+}
+
+/**
+ * The AI units of one role, in the order the situation calls for. Attacking:
+ * the carrier, then rearmost first, so each can throw to the next up the pitch
+ * within the round. Defending: nearest to the enemy carrier first. Ball loose:
+ * nearest to it first. Ties fall to the identifier so a replay is identical.
+ */
+function orderBySituation(arena: Arena, state: MatchState, team: TeamId, units: Unit[]): Unit[] {
+  const carrierId = state.payload.carriedBy;
+  const carrier = carrierId ? state.units.find((u) => u.id === carrierId) ?? null : null;
+  const byId = (a: Unit, b: Unit): number => a.id.localeCompare(b.id);
+
+  if (carrier && carrier.team === team) {
+    const target = arena.targetFurnaceOf(team);
+    return [...units].sort((a, b) => {
+      if (a.id === carrier.id) return -1;
+      if (b.id === carrier.id) return 1;
+      return rangeToFurnace(b, target) - rangeToFurnace(a, target) || byId(a, b);
     });
   }
 
-  for (const team of TEAMS) slots.push(...teamSlots(state, team));
-
-  return sortSlots(slots, firstTeamOfRound(state));
+  const focus = carrier ?? { x: state.payload.x, y: state.payload.y };
+  return [...units].sort((a, b) => distance(a, focus) - distance(b, focus) || byId(a, b));
 }
 
 /**
- * The side that wins ties this round. Alternates every round from a value
- * rolled at kick-off, so over a sweep each team opens round 6 exactly half the
- * time. A plain alternation from a fixed start would not do: the Spark enters
- * on a fixed round, so one side would always reach it first, which trades one
- * permanent bias for its mirror image.
+ * Whether a unit has already taken its turn this round: its slot is behind the
+ * cursor. The unit on the clock has not "played" yet in this sense, and a unit
+ * with no slot (evacuated after the ladder was built) reads as played, since
+ * it will not act. This is what the chain reads before throwing (2H.7): a pass
+ * to somebody who has played is a pass that waits a whole round.
  */
-function firstTeamOfRound(state: MatchState): TeamId {
-  return (state.initiativeNonce + state.round) % 2 === 0 ? 'A' : 'B';
-}
-
-function teamSlots(state: MatchState, team: TeamId): TurnSlot[] {
-  const units = activeUnitsOf(state, team);
-  if (units.length === 0) return [];
-
-  const humans = units.filter(isHuman);
-  if (humans.length === 0) {
-    return [
-      ...groupSlots(team, 'fast', INITIATIVE_ENEMY_FAST, units.filter((u) => FAST_ROLES.has(u.role))),
-      ...groupSlots(team, 'slow', INITIATIVE_ENEMY_SLOW, units.filter((u) => !FAST_ROLES.has(u.role))),
-    ];
-  }
-
-  const slots: TurnSlot[] = humans.map((unit) => ({
-    count: unit.initiative ?? 0,
-    priority: SLOT_PRIORITY.units,
-    actor: { kind: 'unit' as const, unitId: unit.id },
-    blockId: null,
-    team,
-  }));
-
-  // Immediately after the last human, so orders given this round land this
-  // round. Clamped at zero: a human who rolls a 1 with a low agility bonus must
-  // not push the block off the bottom of the ladder.
-  const allies = units.filter((u) => !isHuman(u));
-  const lastHuman = Math.min(...humans.map((u) => u.initiative ?? 0));
-  slots.push(...groupSlots(team, 'allies', Math.max(0, lastHuman - 1), allies));
-
-  return slots;
-}
-
-function groupSlots(
-  team: TeamId,
-  label: string,
-  count: number,
-  units: readonly Unit[],
-): TurnSlot[] {
-  if (units.length === 0) return [];
-  const blockId = `${team}-${label}`;
-  return units.map((unit) => ({
-    count,
-    priority: SLOT_PRIORITY.units,
-    actor: { kind: 'unit' as const, unitId: unit.id },
-    blockId,
-    team,
-  }));
-}
-
-/**
- * Highest count first, then the fixed within-count priority, then the side that
- * wins ties this round, then a stable key so the ladder is identical on every
- * replay of the same state.
- *
- * The team rank sits above the stable key and not below it, because the stable
- * key is exactly what used to decide the tie and it can only ever answer the
- * same way.
- */
-function sortSlots(slots: TurnSlot[], firstTeam: TeamId): TurnSlot[] {
-  const teamRank = (slot: TurnSlot): number => {
-    if (slot.team === null) return 0;
-    return slot.team === firstTeam ? 0 : 1;
-  };
-
-  return [...slots].sort((a, b) => {
-    if (a.count !== b.count) return b.count - a.count;
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    if (teamRank(a) !== teamRank(b)) return teamRank(a) - teamRank(b);
-    return actorKey(a).localeCompare(actorKey(b));
-  });
-}
-
-function actorKey(slot: TurnSlot): string {
-  switch (slot.actor.kind) {
-    case 'crackers':
-      return 'crackers';
-    case 'spark':
-      return 'spark';
-    case 'unit':
-      return `${slot.blockId ?? ''}:${slot.actor.unitId}`;
-  }
+export function hasPlayedThisRound(state: MatchState, unitId: string): boolean {
+  const at = state.turnOrder.findIndex(
+    (slot) => slot.actor.kind === 'unit' && slot.actor.unitId === unitId,
+  );
+  if (at < 0) return true;
+  return at < state.turnIndex;
 }
 
 /**
  * The ladder as the interface draws it: consecutive slots sharing a blockId
- * collapse into one rung. Display only, never used to drive resolution.
+ * collapse into one rung. Display only, never used to drive resolution. Since
+ * écart 51 every slot is its own rung, but the grouping is kept so a future
+ * block does not need a new reader.
  */
 export function ladderRungs(order: readonly TurnSlot[]): {
-  count: number;
+  rank: number;
   blockId: string | null;
   unitIds: string[];
   hazard: 'crackers' | 'spark' | null;
@@ -198,7 +213,7 @@ export function ladderRungs(order: readonly TurnSlot[]): {
 
   for (const slot of order) {
     if (slot.actor.kind !== 'unit') {
-      rungs.push({ count: slot.count, blockId: null, unitIds: [], hazard: slot.actor.kind });
+      rungs.push({ rank: slot.rank, blockId: null, unitIds: [], hazard: slot.actor.kind });
       continue;
     }
 
@@ -206,12 +221,7 @@ export function ladderRungs(order: readonly TurnSlot[]): {
     if (last && slot.blockId !== null && last.blockId === slot.blockId) {
       last.unitIds.push(slot.actor.unitId);
     } else {
-      rungs.push({
-        count: slot.count,
-        blockId: slot.blockId,
-        unitIds: [slot.actor.unitId],
-        hazard: null,
-      });
+      rungs.push({ rank: slot.rank, blockId: slot.blockId, unitIds: [slot.actor.unitId], hazard: null });
     }
   }
 

@@ -140,6 +140,13 @@ export type MatchEvent =
       readonly to: Point;
       readonly direction: number;
       readonly path: readonly Point[];
+      /**
+       * Why it moved. `drift` is its own count-10 run; `escape` is écart 49, the
+       * one cell it skips away at the end of a turn somebody finished standing
+       * on it without catching it. Absent on events written before 2H.7, which
+       * were all drifts.
+       */
+      readonly cause?: 'drift' | 'escape';
     }
   | {
       readonly kind: 'sparkCaught';
@@ -147,6 +154,8 @@ export type MatchEvent =
       readonly roll: DiceRoll;
       readonly caught: boolean;
     }
+  /** The Bulwark digs in (écart 52). */
+  | { readonly kind: 'braced'; readonly unitId: UnitId }
   | { readonly kind: 'payloadGrabbed'; readonly unitId: UnitId }
   | { readonly kind: 'payloadDropped'; readonly unitId: UnitId; readonly at: Point }
   | {

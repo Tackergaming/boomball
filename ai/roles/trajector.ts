@@ -20,8 +20,8 @@ export const TRAJECTOR: RoleWeights = {
   chaseLoosePayload: 60,
 
   attack: 8,
-  shove: 10,
-  stripCarrier: 20,
+  shove: 25,
+  stripCarrier: 70,
   batCracker: 14,
 
   catchSpark: 300,
@@ -31,11 +31,23 @@ export const TRAJECTOR: RoleWeights = {
   screenCarrier: 30,
   supportAttack: 30,
   cover: 25,
-  pressCarrier: 12,
+  escort: 0,
+  wantsEscort: 1,
+  guardStrike: 0,
+  parryPost: 0,
+  yieldToKeener: 0,
+  handOff: 0,
+  rejoin: 30,
+  screen: 0,
+  leash: 99,
+  looseBallReach: 99,
+  brace: 0,
+
+  pressCarrier: 45,
 
   avoidOpportunity: 7,
   avoidCrackers: 14,
-  dodgeWhenHurt: 18,
+  dodgeWhenHurt: 8,
   dash: 9,
   disengage: 22,
 };

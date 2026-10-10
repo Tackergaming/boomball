@@ -13,6 +13,7 @@
 
 import { useEffect, useRef } from 'react';
 
+import { SUBSTITUTE_DELAY_ROUNDS } from '../../../engine/constants.js';
 import type { MatchEvent } from '../../../engine/events.js';
 import type { MatchState } from '../../../engine/types.js';
 
@@ -76,12 +77,14 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
       return `${name(event.unitId)} dashes.`;
     case 'dodging':
       return `${name(event.unitId)} goes low.`;
+    case 'braced':
+      return `${name(event.unitId)} digs in. Shoving it now rolls at disadvantage and minus 3.`;
     case 'disengaged':
       return `${name(event.unitId)} breaks contact.`;
     case 'damaged':
       return `${name(event.unitId)} takes ${event.amount}.`;
     case 'evacuated':
-      return `${name(event.unitId)} is carried off in round ${event.round}.`;
+      return `${name(event.unitId)} is knocked out and carried off. A substitute comes on in ${SUBSTITUTE_DELAY_ROUNDS} rounds.`;
     case 'attacked':
       return `${name(event.attackerId)} swings at ${name(event.targetId)}${event.hit ? '' : ' and misses'}.`;
     case 'opportunityAttacked':
@@ -107,10 +110,10 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'sparkEntered':
       return 'The Spark rolls onto the pitch.';
     case 'sparkMoved':
-      return null;
+      return event.cause === 'escape' ? 'The Spark skips a cell away from under its minder.' : null;
     case 'sparkCaught':
       return event.caught
-        ? `${name(event.unitId)} has the Spark.`
+        ? `${name(event.unitId)} has the Spark. It rolls back on next round.`
         : `${name(event.unitId)} grabs at the Spark and misses.`;
     case 'payloadGrabbed':
       return `${name(event.unitId)} takes the Payload.`;

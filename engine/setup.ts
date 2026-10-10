@@ -75,6 +75,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     turn: null,
     units: rollHumanInitiative(units, rng),
     payload,
+    lastCarrierTeam: null,
     crackers,
     // The Spark stays off the field until the start of round 6.
     spark: { state: 'pending', x: ordnance.x, y: ordnance.y, heading: null },
@@ -85,7 +86,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     result: null,
   };
 
-  return { ...state, turnOrder: buildTurnOrder(state) };
+  return { ...state, turnOrder: buildTurnOrder(arena, state) };
 }
 
 /**
@@ -164,6 +165,7 @@ function buildTeam(
       holdingPayload: false,
       reactionAvailable: true,
       dodging: false,
+      braced: false,
       status: 'active',
       evacuatedOnRound: null,
       initiative: null,

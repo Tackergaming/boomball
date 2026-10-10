@@ -47,12 +47,21 @@ export interface Unit {
   readonly reactionAvailable: boolean;
   /** Set by the Dodge action. Holds until this unit's next turn begins. */
   readonly dodging: boolean;
+  /**
+   * Set by the Bulwark's Brace action (écart 52, 2H.7): a Shove against this
+   * unit rolls at disadvantage and minus three. Holds until this unit's next
+   * turn begins, and drops the moment it moves.
+   */
+  readonly braced: boolean;
 
   readonly status: 'active' | 'evacuated';
   /** The round this unit dropped to 0 HP, which starts the substitute delay. */
   readonly evacuatedOnRound: number | null;
 
-  /** Rolled at kick-off for human-controlled units only. */
+  /**
+   * Rolled at kick-off for human-controlled units only: a d20 that orders the
+   * humans of the same side and role, rerolled on a tie (écart 51).
+   */
   readonly initiative: number | null;
 }
 
@@ -76,12 +85,13 @@ export interface Cracker {
 
 export interface Spark {
   /**
-   * `pending` until the start of round 6, `caught` for good once somebody has
-   * a hand on it. Three states rather than a flag because catching it no
-   * longer ends the match: a spent Spark has to be told apart from one that
-   * has not arrived, or it would drop back in at the top of the next round.
+   * `pending` until the start of round 6, `live` on the pitch. A catch puts it
+   * back to `pending`: since écart 50 (2H.7, Jérôme's retour 5 on the engine 3
+   * game) a caught Spark drops back in at the top of the next round, worth as
+   * much again, instead of being gone for good. Before that there was a third
+   * state, `caught`, whose whole job was to stop exactly that.
    */
-  readonly state: 'pending' | 'live' | 'caught';
+  readonly state: 'pending' | 'live';
   readonly x: number;
   readonly y: number;
   /**
@@ -111,13 +121,12 @@ export type TurnActor =
   | { readonly kind: 'unit'; readonly unitId: UnitId };
 
 export interface TurnSlot {
-  /** The initiative count, shown on the ladder in the interface. */
-  readonly count: number;
   /**
-   * Order within the same count. The Crackers detonate before anyone moves,
-   * and the Spark darts before the slow enemy block that shares its count.
+   * Position on the ladder, 1 first. Since écart 51 (2H.7) the ladder is an
+   * order and not a count: the Spark, the side with a human, the Crackers
+   * after the side that carries, the other side. See `engine/initiative.ts`.
    */
-  readonly priority: number;
+  readonly rank: number;
   readonly actor: TurnActor;
   /**
    * Units that resolve back to back as one rung of the ladder share a blockId.
@@ -146,8 +155,6 @@ export interface TurnState {
   readonly disengaged: boolean;
 }
 
-export const SLOT_PRIORITY = { crackers: 0, spark: 1, units: 2 } as const;
-
 // -- The match ---------------------------------------------------------------
 
 export type MatchPhase = 'playing' | 'suddenDeath' | 'finished';
@@ -167,6 +174,12 @@ export interface MatchState {
 
   readonly units: readonly Unit[];
   readonly payload: Payload;
+  /**
+   * The last side to hold the ball, kept so the Crackers can follow the
+   * carrying side on the ladder when the ball is loose at the top of a round
+   * (écart 51). Null until somebody picks it up.
+   */
+  readonly lastCarrierTeam: TeamId | null;
   readonly crackers: readonly Cracker[];
   readonly spark: Spark;
 

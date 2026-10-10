@@ -15,6 +15,8 @@ import { hasLineOfSight } from '../engine/rules/sight.js';
 import {
   BLIND_DISCOUNT,
   buildBoard,
+  crackerPressure,
+  hasPlayedThisRound,
   laneCover,
   outlet,
   positionValue,
@@ -44,11 +46,18 @@ const CORNER: Point = { x: 0, y: 44 };
  */
 function board(seed = 5): MatchState {
   const created = createMatch({ arena: KILL_SILO, tier: 'rookie', humans: [], seed });
-  return openMatch(arena, {
+  const opened = openMatch(arena, {
     ...created,
     units: created.units.map((u) => ({ ...u, ...CORNER })),
     crackers: created.crackers.map((c) => ({ ...c, state: 'destroyed' as const, respawnOnRound: 99 })),
   }).state;
+  // The clock is handed to OPENER, cursor and all, so the chain's reading of
+  // who has played (écart 51) is the one a real round would give: everybody
+  // before OPENER on the ladder has, everybody after has not.
+  const at = opened.turnOrder.findIndex(
+    (s) => s.actor.kind === 'unit' && s.actor.unitId === OPENER,
+  );
+  return giveTurnTo({ ...opened, turnIndex: at }, OPENER);
 }
 
 function put(state: MatchState, id: UnitId, at: Point, extra: Partial<Unit> = {}): MatchState {
@@ -113,8 +122,8 @@ function carrying(state: MatchState, id: UnitId): MatchState {
   };
 }
 
-// The ladder is deterministic for a match with no humans, and the fast block of
-// team A sorts first, so the opening turn always belongs to this shirt.
+// The shirt `board()` hands the clock to: team A's first Striker, second on
+// its side's ladder behind the Trajector (écart 51).
 const OPENER = 'A-striker-2';
 
 // -- The contract with the engine -------------------------------------------
@@ -356,6 +365,225 @@ describe('the priority tables', () => {
       const struck = battedCrackerRun(arena, staged, cracker, candidate.action.direction).struck;
       expect(struck?.team).not.toBe('A');
     }
+  });
+});
+
+// -- The bodyguard, 2H.7 -----------------------------------------------------
+
+/**
+ * What Jérôme asked of the Breaker after his engine 3 game, 2026-10-10: its
+ * charge is the carrier, it stands on the threatened shoulder, it swings at
+ * whoever is on the carrier, it posts itself on a Cracker's line to parry, and
+ * it leaves a loose ball to a Striker beside it. One test per sentence.
+ */
+describe('the Breaker, bodyguard', () => {
+  const breaker = 'A-breaker-5';
+
+  function liveCracker(state: MatchState, at: Point): MatchState {
+    return {
+      ...state,
+      crackers: state.crackers.map((c, i) =>
+        i === 0 ? { ...c, ...at, state: 'live' as const, respawnOnRound: null } : c,
+      ),
+    };
+  }
+
+  function destinationOf(action: Action): Point | null {
+    return action.kind === 'move' ? action.path[action.path.length - 1]! : null;
+  }
+
+  it('stands on the shoulder of its own carrier that faces the nearest opponent', () => {
+    let staged = giveTurnTo(put(board(), breaker, { x: 7, y: 15 }), breaker);
+    staged = carrying(put(staged, 'A-striker-2', { x: 7, y: 21 }), 'A-striker-2');
+    staged = put(staged, 'B-striker-2', { x: 7, y: 26 }); // ahead of the carrier, up the pitch
+
+    const to = destinationOf(chooseAction(arena, staged, breaker));
+    expect(to).not.toBeNull();
+    expect(distance(to!, { x: 7, y: 21 })).toBe(1);
+    // Nearer the threat than the carrier is: the shoulder that matters.
+    expect(distance(to!, { x: 7, y: 26 })).toBeLessThan(distance({ x: 7, y: 21 }, { x: 7, y: 26 }));
+  });
+
+  it('swings at the opponent standing on its carrier rather than at any other', () => {
+    let staged = giveTurnTo(put(board(), breaker, { x: 7, y: 21 }), breaker);
+    staged = carrying(put(staged, 'A-striker-2', { x: 8, y: 22 }), 'A-striker-2');
+    staged = put(staged, 'B-striker-2', { x: 8, y: 21 }); // on the carrier, and on the Breaker
+    staged = put(staged, 'B-striker-3', { x: 6, y: 20 }); // on the Breaker only
+
+    const legal = legalActions(arena, staged)!;
+    expect(legal.attack.map((o) => o.unitId).sort()).toEqual(['B-striker-2', 'B-striker-3']);
+
+    const best = rankActions(arena, staged, breaker)[0]!;
+    expect(['attack', 'shove']).toContain(best.action.kind);
+    expect((best.action as { targetId: UnitId }).targetId).toBe('B-striker-2');
+  });
+
+  it('leaves a loose ball to a Striker standing beside it, and takes it when nobody better is near', () => {
+    const loose: MatchState = {
+      ...giveTurnTo(put(board(), breaker, { x: 7, y: 24 }), breaker),
+      payload: { carriedBy: null, x: 7, y: 22 },
+    };
+
+    const alone = playOutTurn(loose, breaker);
+    expect(alone.some((e) => e.kind === 'payloadGrabbed')).toBe(true);
+
+    const withStriker = put(loose, 'A-striker-2', { x: 6, y: 22 });
+    const yielded = playOutTurn(withStriker, breaker);
+    expect(yielded.some((e) => e.kind === 'payloadGrabbed')).toBe(false);
+    expect(yielded.some((e) => e.kind === 'moved' && e.to.x === 7 && e.to.y === 22)).toBe(false);
+  });
+
+  it('posts itself on the line a Cracker will roll down, where the parry fires', () => {
+    // A live charge due west of a loose ball a Striker is about to take; the
+    // Breaker, off to one side, has nothing else to do.
+    let staged = giveTurnTo(put(board(), breaker, { x: 6, y: 19 }), breaker);
+    staged = put(staged, 'A-striker-2', { x: 10, y: 22 });
+    staged = liveCracker({ ...staged, payload: { carriedBy: null, x: 9, y: 22 } }, { x: 3, y: 22 });
+
+    const to = destinationOf(chooseAction(arena, staged, breaker));
+    expect(to).not.toBeNull();
+    expect(to!.y).toBe(22);
+    // The line runs from the charge to the ball's own cell, included.
+    expect(to!.x).toBeGreaterThanOrEqual(4);
+    expect(to!.x).toBeLessThanOrEqual(9);
+  });
+
+  it('is the one role that reads the Cracker line as a place to stand, the others read it as danger', () => {
+    let staged = giveTurnTo(put(board(), breaker, { x: 6, y: 19 }), breaker);
+    staged = liveCracker({ ...staged, payload: { carriedBy: null, x: 9, y: 22 } }, { x: 3, y: 22 });
+    const legal = legalActions(arena, staged)!;
+
+    const onLine = { x: 5, y: 22 };
+    const beside = { x: 5, y: 21 };
+    const away = { x: 5, y: 17 };
+
+    const asBreaker = buildBoard(arena, staged, unit(staged, breaker), legal, weightsFor('breaker'), []);
+    expect(crackerPressure(asBreaker, onLine)).toBe(1);
+    expect(crackerPressure(asBreaker, beside)).toBe(0.5);
+    expect(crackerPressure(asBreaker, away)).toBe(0);
+    expect(positionValue(asBreaker, onLine)).toBeGreaterThan(positionValue(asBreaker, away));
+
+    const asStriker = buildBoard(arena, staged, unit(staged, breaker), legal, weightsFor('striker'), []);
+    // Same cells, a Striker's table: the line costs and nothing pays for it.
+    expect(positionValue(asStriker, onLine) - positionValue(asStriker, away)).toBeLessThan(
+      positionValue(asBreaker, onLine) - positionValue(asBreaker, away),
+    );
+  });
+
+  it('hands the ball off at the first chance when it does end up holding it', () => {
+    let staged = carrying(giveTurnTo(put(board(), breaker, { x: 7, y: 22 }), breaker), breaker);
+    staged = put(staged, 'A-striker-2', { x: 7, y: 24 }); // two cells on, in sight, gains next to nothing
+
+    const chosen = chooseAction(arena, staged, breaker);
+    expect(chosen).toEqual({ kind: 'pass', targetId: 'A-striker-2' });
+  });
+});
+
+// -- The chain, écart 51 -----------------------------------------------------
+
+/**
+ * Jérôme's rule for the ball in attack (2026-10-10): never throw to a team-mate
+ * who has already played this round, except from the last link; throw ahead,
+ * or to the very next to play when it stands at most three cells behind; and
+ * the keeper, last on its side, throws to the farthest safe receiver rather
+ * than hold.
+ */
+describe('the chain', () => {
+  /** OPENER carries at (7, 22); the Trajector has played, the other Strikers have not. */
+  function staged(): MatchState {
+    return carrying(put(board(), OPENER, { x: 7, y: 22 }), OPENER);
+  }
+
+  it('never throws to a team-mate who has already played this round', () => {
+    // The Trajector is first on the ladder, so it has played. Put it in the
+    // best possible outlet and a Striker still to play in a worse one.
+    let state = put(staged(), 'A-trajector-7', { x: 7, y: 30 });
+    state = put(state, 'A-striker-3', { x: 7, y: 26 });
+    expect(hasPlayedThisRound(state, 'A-trajector-7')).toBe(true);
+    expect(hasPlayedThisRound(state, 'A-striker-3')).toBe(false);
+
+    const passes = rankActions(arena, state, OPENER).filter((c) => c.action.kind === 'pass');
+    expect(passes.map((c) => (c.action as { targetId: string }).targetId)).not.toContain('A-trajector-7');
+    expect(passes.map((c) => (c.action as { targetId: string }).targetId)).toContain('A-striker-3');
+  });
+
+  it('throws a little backwards to the very next to play, never further back', () => {
+    // A-striker-3 is the next on the ladder after OPENER.
+    let state = put(staged(), 'A-striker-3', { x: 7, y: 20 }); // two behind
+    state = put(state, 'A-striker-4', { x: 7, y: 17 }); // five behind, and not next
+    const targets = rankActions(arena, state, OPENER)
+      .filter((c) => c.action.kind === 'pass')
+      .map((c) => (c.action as { targetId: string }).targetId);
+    expect(targets).toContain('A-striker-3');
+    expect(targets).not.toContain('A-striker-4');
+  });
+
+  it('lets the last link throw to the farthest safe receiver instead of holding', () => {
+    // The keeper carries after a goal: everybody else on its side has played.
+    const keeper = 'A-bulwark-1';
+    let state = board();
+    const at = state.turnOrder.findIndex((s) => s.actor.kind === 'unit' && s.actor.unitId === keeper);
+    state = giveTurnTo({ ...state, turnIndex: at }, keeper);
+    const mouth = arena.furnaceOf('A').cells[1]!;
+    state = carrying(put(state, keeper, { x: mouth.x, y: mouth.y + 1 }), keeper);
+    state = put(state, 'A-striker-2', { x: mouth.x, y: mouth.y + 5 });
+    state = put(state, 'A-striker-3', { x: mouth.x, y: mouth.y + 9 });
+    expect(hasPlayedThisRound(state, 'A-striker-3')).toBe(true);
+
+    const chosen = chooseAction(arena, state, keeper);
+    expect(chosen).toEqual({ kind: 'pass', targetId: 'A-striker-3' });
+  });
+});
+
+// -- The keeper, 2H.7 --------------------------------------------------------
+
+describe('the Bulwark, tethered', () => {
+  const keeper = 'A-bulwark-1';
+  const mouth = () => arena.furnaceOf('A').cells[1]!;
+
+  function onClock(state: MatchState): MatchState {
+    const at = state.turnOrder.findIndex((s) => s.actor.kind === 'unit' && s.actor.unitId === keeper);
+    return giveTurnTo({ ...state, turnIndex: at }, keeper);
+  }
+
+  it('leaves a loose ball lying more than three cells away', () => {
+    const home = { x: mouth().x, y: mouth().y + 1 };
+    const state: MatchState = {
+      ...onClock(put(board(), keeper, home)),
+      payload: { carriedBy: null, x: home.x, y: home.y + 6 },
+    };
+    const events = playOutTurn(state, keeper);
+    expect(events.some((e) => e.kind === 'payloadGrabbed')).toBe(false);
+    const after = events.filter((e) => e.kind === 'moved');
+    for (const m of after) if (m.kind === 'moved') expect(distance(m.to, home)).toBeLessThanOrEqual(2);
+  });
+
+  it('never walks further than four cells from its own mouth', () => {
+    const home = { x: mouth().x, y: mouth().y + 1 };
+    let state = onClock(put(board(), keeper, home));
+    state = carrying(put(state, 'B-striker-2', { x: mouth().x, y: mouth().y + 7 }), 'B-striker-2');
+    const legal = legalActions(arena, state)!;
+    const view = buildBoard(arena, state, unit(state, keeper), legal, weightsFor('bulwark'), []);
+    const far = { x: mouth().x, y: mouth().y + 6 };
+    const near = { x: mouth().x, y: mouth().y + 3 };
+    expect(positionValue(view, far)).toBeLessThan(positionValue(view, near) - 100);
+  });
+
+  it('digs in when an opponent is two cells off and there is nobody to shove', () => {
+    const home = { x: mouth().x, y: mouth().y + 1 };
+    let state = onClock(put(board(), keeper, home));
+    state = put(state, 'B-breaker-5', { x: home.x, y: home.y + 2 });
+    const best = rankActions(arena, state, keeper)[0]!;
+    expect(best.action).toEqual({ kind: 'brace' });
+  });
+
+  it('dodges only when badly hurt and with nothing else to do', () => {
+    const striker = OPENER;
+    const fresh = board();
+    expect(rankActions(arena, fresh, striker).some((c) => c.action.kind === 'dodge')).toBe(false);
+    const hurt = put(fresh, striker, { x: 7, y: 22 }, { hp: 2 });
+    const candidates = rankActions(arena, hurt, striker);
+    expect(candidates.some((c) => c.action.kind === 'dodge')).toBe(true);
   });
 });
 

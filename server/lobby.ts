@@ -36,7 +36,7 @@ import type { ArenaSpec } from '../engine/arena.js';
 import { Arena } from '../engine/arena.js';
 import { createMatch, MAX_HUMANS, type HumanSeat } from '../engine/setup.js';
 import { ROLES, TEAM_COMPOSITION, type Role, type Tier } from '../engine/stats.js';
-import { isHuman, type UnitId } from '../engine/types.js';
+import { isHuman, type MatchState, type UnitId } from '../engine/types.js';
 import { openSession, type Refusal, type SessionStep } from './session.js';
 
 /** What the `character_name` columns accept, and so what the lobby accepts. */
@@ -68,6 +68,15 @@ export interface SeatAssignment {
 
 export interface OpenedMatch extends SessionStep {
   readonly seats: readonly SeatAssignment[];
+  /**
+   * The board as it stood **before** the opening events: every unit on its
+   * start cell, the ball at the centre, nobody on the clock. The snapshot the
+   * function writes is the board after the house has played up to the first
+   * human, so without this a client that loads a fresh match sees the house
+   * already in place and never watches it get there (Jérôme's retour 2 on the
+   * engine 3 game). The client replays `events` from here, once.
+   */
+  readonly kickoff: MatchState;
 }
 
 export type LobbyResult = { readonly ok: true; readonly opening: OpenedMatch } | Refusal;
@@ -146,5 +155,5 @@ export function openLobbyMatch(arena: ArenaSpec, request: LobbyRequest): LobbyRe
       characterName: unit.name,
     }));
 
-  return { ok: true, opening: { ...step, seats: assigned } };
+  return { ok: true, opening: { ...step, seats: assigned, kickoff: state } };
 }

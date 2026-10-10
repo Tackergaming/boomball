@@ -316,87 +316,151 @@ describe('names', () => {
   });
 });
 
-describe('the initiative ladder', () => {
-  it('descends from the highest count to the lowest', () => {
-    const counts = fullMatch().turnOrder.map((s) => s.count);
-    expect([...counts].sort((a, b) => b - a)).toEqual(counts);
+describe('the initiative ladder (écart 51)', () => {
+  const arena = new Arena(KILL_SILO);
+  const ids = (state: MatchState) =>
+    state.turnOrder.map((s) => (s.actor.kind === 'unit' ? s.actor.unitId : s.actor.kind));
+  const roleOf = (state: MatchState, id: string) => state.units.find((u) => u.id === id)!.role;
+
+  it('ranks the slots 1, 2, 3 in the order they act', () => {
+    const ranks = fullMatch().turnOrder.map((s) => s.rank);
+    expect(ranks).toEqual(ranks.map((_, i) => i + 1));
   });
 
-  it('moves the Crackers on count 20, above every unit that did not beat it', () => {
+  it('puts the side with a human before the side that is all AI', () => {
     const state = fullMatch();
-    const crackers = state.turnOrder.find((s) => s.actor.kind === 'crackers');
-    expect(crackers?.count).toBe(20);
+    const sides = state.turnOrder.filter((s) => s.team !== null).map((s) => s.team);
+    const firstB = sides.indexOf('B');
+    expect(sides.slice(0, firstB).every((t) => t === 'A')).toBe(true);
+    expect(sides.slice(firstB).every((t) => t === 'B')).toBe(true);
+  });
 
-    // A human rolling d20 plus its agility bonus can pass 20 and get the drop
-    // on the Crackers. That is what individual initiative is for, and it is the
-    // reward a Trajector's agility buys.
-    const above = state.turnOrder.slice(0, state.turnOrder.indexOf(crackers!));
-    for (const slot of above) {
-      expect(slot.actor.kind).toBe('unit');
-      expect(slot.count).toBeGreaterThan(20);
+  it('runs each side Trajector, Strikers, Breakers, Bulwark', () => {
+    const state = fullMatch();
+    for (const team of ['A', 'B'] as const) {
+      const roles = ids(state)
+        .filter((id) => id.startsWith(`${team}-`))
+        .map((id) => roleOf(state, id));
+      expect(roles).toEqual([
+        'trajector',
+        'striker',
+        'striker',
+        'striker',
+        'breaker',
+        'breaker',
+        'bulwark',
+      ]);
     }
   });
 
-  it('leaves the Spark out of the ladder until it is in play', () => {
+  it('plays a human first within its role', () => {
+    const state = fullMatch();
+    const listed = ids(state);
+    for (const human of state.units.filter(isHuman)) {
+      const first = listed.find((id) => id.startsWith('A-') && roleOf(state, id) === human.role);
+      expect(first).toBe(human.id);
+      expect(human.initiative).not.toBeNull();
+    }
+  });
+
+  it('orders two humans of the same role by their kick-off d20, never tied', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const state = createMatch({
+        ...base,
+        seed,
+        humans: [
+          { humanId: 'jerome', role: 'striker' },
+          { humanId: 'ami-1', role: 'striker' },
+          { humanId: 'ami-2', role: 'striker' },
+        ],
+      });
+      const humans = state.units.filter(isHuman);
+      const rolls = humans.map((u) => u.initiative!);
+      expect(new Set(rolls).size).toBe(3);
+      const listed = ids(state).filter((id) => humans.some((u) => u.id === id));
+      const expected = [...humans].sort((a, b) => b.initiative! - a.initiative!).map((u) => u.id);
+      expect(listed).toEqual(expected);
+    }
+  });
+
+  it('leaves the Spark out of the ladder until it is in play, then puts it first', () => {
     const state = fullMatch();
     expect(state.turnOrder.some((s) => s.actor.kind === 'spark')).toBe(false);
+    const live = { ...state, spark: { state: 'live' as const, x: 7, y: 22, heading: 1 } };
+    expect(buildTurnOrder(arena, live)[0]!.actor.kind).toBe('spark');
   });
 
-  it('gives every human its own slot and rolls it initiative', () => {
+  it('rolls the Crackers last at kick-off, when nobody has carried yet', () => {
     const state = fullMatch();
-    const humans = state.units.filter(isHuman);
-    for (const human of humans) {
-      expect(human.initiative).not.toBeNull();
-      const slot = state.turnOrder.find(
-        (s) => s.actor.kind === 'unit' && s.actor.unitId === human.id,
-      );
-      expect(slot, `${human.id} has no slot of its own`).toBeDefined();
-      expect(slot?.count).toBe(human.initiative);
-    }
+    expect(state.lastCarrierTeam).toBeNull();
+    expect(ids(state)[ids(state).length - 1]).toBe('crackers');
   });
 
-  it('resolves the AI team-mates as one rung just after the last human', () => {
+  it('rolls the Crackers right after the side that carries, or carried last', () => {
     const state = fullMatch();
-    const humans = state.units.filter(isHuman);
-    const lastHuman = Math.min(...humans.map((u) => u.initiative ?? 0));
+    const carrierB = state.units.find((u) => u.team === 'B' && u.role === 'striker')!;
+    const carriedByB: MatchState = {
+      ...state,
+      units: state.units.map((u) => (u.id === carrierB.id ? { ...u, holdingPayload: true } : u)),
+      payload: { carriedBy: carrierB.id, x: carrierB.x, y: carrierB.y },
+    };
+    const withB = ids({ ...state, turnOrder: buildTurnOrder(arena, carriedByB) });
+    expect(withB.indexOf('crackers')).toBe(withB.length - 1);
+    expect(withB[withB.length - 2]!.startsWith('B-')).toBe(true);
 
-    const allyRungs = ladderRungs(state.turnOrder).filter((r) => r.blockId === 'A-allies');
-    expect(allyRungs).toHaveLength(1);
-    expect(allyRungs[0]!.count).toBe(Math.max(0, lastHuman - 1));
-    expect(allyRungs[0]!.unitIds).toHaveLength(4);
+    const looseAfterA: MatchState = { ...state, lastCarrierTeam: 'A' };
+    const afterA = ids({ ...state, turnOrder: buildTurnOrder(arena, looseAfterA) });
+    const at = afterA.indexOf('crackers');
+    expect(afterA[at - 1]!.startsWith('A-')).toBe(true);
+    expect(afterA[at + 1]!.startsWith('B-')).toBe(true);
   });
 
-  it('runs the enemy in two rungs, fast on 15 and slow on 10', () => {
-    const state = fullMatch();
-    const enemy = ladderRungs(state.turnOrder).filter((r) => r.blockId?.startsWith('B-'));
-    expect(enemy.map((r) => r.count).sort((a, b) => b - a)).toEqual([15, 10]);
-
-    const fast = enemy.find((r) => r.count === 15)!;
-    const fastRoles = fast.unitIds.map((id) => state.units.find((u) => u.id === id)!.role);
-    expect(new Set(fastRoles)).toEqual(new Set(['striker', 'trajector']));
+  it('attacking, plays the carrier first in its role and then the rearmost first', () => {
+    const state = createMatch(base);
+    const strikers = state.units.filter((u) => u.team === 'A' && u.role === 'striker');
+    // Spread along the pitch: s[0] furthest forward, s[2] rearmost, s[1] carries.
+    const placed = state.units.map((u) => {
+      if (u.id === strikers[0]!.id) return { ...u, x: 7, y: 30 };
+      if (u.id === strikers[1]!.id) return { ...u, x: 5, y: 22, holdingPayload: true };
+      if (u.id === strikers[2]!.id) return { ...u, x: 9, y: 14 };
+      return u;
+    });
+    const carrying: MatchState = {
+      ...state,
+      units: placed,
+      payload: { carriedBy: strikers[1]!.id, x: 5, y: 22 },
+    };
+    const order = ids({ ...state, turnOrder: buildTurnOrder(arena, carrying) }).filter((id) =>
+      strikers.some((s) => s.id === id),
+    );
+    expect(order).toEqual([strikers[1]!.id, strikers[2]!.id, strikers[0]!.id]);
   });
 
-  it('darts the Spark before the slow block that shares its count', () => {
-    const state = { ...fullMatch(), spark: { state: 'live' as const, x: 7, y: 22, heading: 1 } };
-    const tens = buildTurnOrder(state).filter((s) => s.count === 10);
-    expect(tens[0]?.actor.kind).toBe('spark');
+  it('defending, plays the unit nearest the enemy carrier first', () => {
+    const state = createMatch(base);
+    const carrier = state.units.find((u) => u.team === 'B' && u.role === 'striker')!;
+    const breakers = state.units.filter((u) => u.team === 'A' && u.role === 'breaker');
+    const placed = state.units.map((u) => {
+      if (u.id === carrier.id) return { ...u, x: 7, y: 20, holdingPayload: true };
+      if (u.id === breakers[0]!.id) return { ...u, x: 7, y: 10 };
+      if (u.id === breakers[1]!.id) return { ...u, x: 7, y: 17 };
+      return u;
+    });
+    const defending: MatchState = {
+      ...state,
+      units: placed,
+      payload: { carriedBy: carrier.id, x: 7, y: 20 },
+    };
+    const order = ids({ ...state, turnOrder: buildTurnOrder(arena, defending) }).filter((id) =>
+      breakers.some((b) => b.id === id),
+    );
+    expect(order).toEqual([breakers[1]!.id, breakers[0]!.id]);
   });
 
-  it('mirrors both teams when no human plays, so balance runs are unbiased', () => {
-    const rungs = ladderRungs(createMatch(base).turnOrder);
-    for (const team of ['A', 'B'] as const) {
-      const counts = rungs
-        .filter((r) => r.blockId?.startsWith(`${team}-`))
-        .map((r) => r.count)
-        .sort((a, b) => b - a);
-      expect(counts).toEqual([15, 10]);
-    }
-  });
-
-  it('alternates which side wins an initiative tie, round by round', () => {
+  it('alternates which side opens when no human plays, round by round', () => {
     const state = createMatch(base);
     const openerOn = (round: number) =>
-      buildTurnOrder({ ...state, round }).find((s) => s.count === 15)!.team;
+      buildTurnOrder(arena, { ...state, round }).find((s) => s.team !== null)!.team;
 
     for (let round = 1; round < 6; round++) {
       expect(openerOn(round), `round ${round} and ${round + 1} share an opener`).not.toBe(
@@ -405,19 +469,17 @@ describe('the initiative ladder', () => {
     }
   });
 
-  it('hands the tie to the other side when the kick-off die falls the other way', () => {
+  it('hands the opening to the other side when the kick-off die falls the other way', () => {
     const state = createMatch(base);
     const openerWith = (initiativeNonce: number) =>
-      buildTurnOrder({ ...state, initiativeNonce }).find((s) => s.count === 15)!.team;
+      buildTurnOrder(arena, { ...state, initiativeNonce }).find((s) => s.team !== null)!.team;
 
     expect(openerWith(0)).not.toBe(openerWith(1));
   });
 
   /**
-   * The Spark enters on a fixed round and is worth several goals, so first
-   * reach at it must not belong to the same side every match. Before the
-   * kick-off die, the tie fell to a stable key beginning with the team letter
-   * and A opened round 6 two hundred times out of two hundred.
+   * The Spark enters on a fixed round and is worth two goals, so first reach at
+   * it must not belong to the same side every match in a sweep.
    */
   it('opens the Spark round for each side about half the time', () => {
     let openedByA = 0;
@@ -425,8 +487,8 @@ describe('the initiative ladder', () => {
 
     for (let seed = 1; seed <= runs; seed++) {
       const state = createMatch({ ...base, seed });
-      const opener = buildTurnOrder({ ...state, round: SPARK_ENTRY_ROUND }).find(
-        (s) => s.count === 15,
+      const opener = buildTurnOrder(arena, { ...state, round: SPARK_ENTRY_ROUND }).find(
+        (s) => s.team !== null,
       )!.team;
       if (opener === 'A') openedByA++;
     }

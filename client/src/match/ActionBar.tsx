@@ -22,13 +22,19 @@
  * be pressed. Only the sentence explaining the absence is written here.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { Action } from '../../../engine/actions.js';
 import type { LegalActions, TargetOption } from '../../../engine/legalActions.js';
 import { DIRECTIONS } from '../../../engine/geometry.js';
 
-type Pending = 'attack' | 'shove' | 'pass' | 'cracker' | null;
+/**
+ * What the player has started and not finished. Lifted out of this component
+ * into `Match.tsx` so the board can read it too: with a Swing pending, the
+ * enemies on the board wear a target ring and a click on one is the answer, so
+ * the tray below and the tokens above are two ways of giving one choice.
+ */
+export type Pending = 'attack' | 'shove' | 'pass' | 'cracker' | null;
 
 const MODE_MARK: Record<TargetOption['mode'], string> = {
   normal: '',
@@ -42,6 +48,14 @@ export function ActionBar({
   busy,
   movementFeet,
   onAct,
+  pending,
+  onPending,
+  selectedId,
+  plotting,
+  plotLength,
+  onTogglePlot,
+  onGo,
+  onClearPlot,
 }: {
   legal: LegalActions | null;
   /** False while the house is playing, which is most of a solo round. */
@@ -49,9 +63,28 @@ export function ActionBar({
   busy: boolean;
   movementFeet: number;
   onAct: (action: Action) => void;
+  /** Owned by the match screen, so the board can answer it with a click on a token. */
+  pending: Pending;
+  onPending: (pending: Pending) => void;
+  /** The unit picked on the board or the ladder, whose own options get a tray. */
+  selectedId: string | null;
+  /** Whether a click on a cell adds a waypoint instead of moving. */
+  plotting: boolean;
+  /** Cells in the plotted route so far; zero means nothing to send. */
+  plotLength: number;
+  onTogglePlot: () => void;
+  onGo: () => void;
+  onClearPlot: () => void;
 }) {
-  const [pending, setPending] = useState<Pending>(null);
+  const setPending = onPending;
   const [cracker, setCracker] = useState<string | null>(null);
+
+  // The Cracker choice is half of a two-step pick that lives here. Whoever
+  // clears `pending` from outside (a new turn, a click on a token) must not
+  // leave the first half behind for the next time Bat a Cracker is pressed.
+  useEffect(() => {
+    if (pending !== 'cracker') setCracker(null);
+  }, [pending]);
 
   if (!legal || !yours) {
     return (
@@ -78,8 +111,37 @@ export function ActionBar({
           ? legal.pass
           : [];
 
+  // The options the selected unit offers, read from the same lists the tray
+  // below reads. Only what `legal` carries is offered, so a unit that is not a
+  // target of anything gets nothing here and is just selected, as before.
+  const picked =
+    !pending && selectedId
+      ? ([
+          ['attack', 'Swing at', legal.attack.find((t) => t.unitId === selectedId)],
+          ['shove', 'Shove', legal.shove.find((t) => t.unitId === selectedId)],
+          ['pass', 'Pass to', legal.pass.find((t) => t.unitId === selectedId)],
+        ] as const).flatMap(([kind, verb, option]) => (option ? [{ kind, verb, option }] : []))
+      : [];
+
   return (
     <div style={S.wrap}>
+      {picked.length > 0 && (
+        <div style={S.tray}>
+          {picked.map(({ kind, verb, option }) => (
+            <button
+              key={kind}
+              className="ghost"
+              style={S.trayButton}
+              disabled={busy}
+              onClick={() => act({ kind, targetId: option.unitId })}
+            >
+              {verb} {option.name} · {option.against}
+              {MODE_MARK[option.mode]}
+            </button>
+          ))}
+        </div>
+      )}
+
       {pending && pending !== 'cracker' && (
         <div style={S.tray}>
           <span className="label">Pick a target</span>
@@ -220,6 +282,29 @@ export function ActionBar({
           off={legal.canDisengage ? null : 'the Action is already spent'}
           onClick={() => act({ kind: 'disengage' })}
         />
+        {/* Brace (écart 52). Neutral like Pass: it is a posture, not an attack. */}
+        <Act
+          label="Dig in"
+          busy={busy}
+          off={legal.canBrace ? null : 'only the Bulwark digs in, with its Action in hand'}
+          onClick={() => act({ kind: 'brace' })}
+        />
+
+        {/* Choosing the route. Off, a click on a cell walks the shortest way at
+            once; on, it adds a waypoint and nothing is sent until Go. */}
+        <Act
+          label="Plot route"
+          on={plotting}
+          busy={busy}
+          off={legal.destinations.size > 0 || plotting ? null : 'no cell within reach'}
+          onClick={onTogglePlot}
+        />
+        {plotting && (
+          <>
+            <Act label="Go" tone="brass" busy={busy} off={plotLength > 0 ? null : 'click cells to plot'} onClick={onGo} />
+            <Act label="Clear" busy={busy} off={plotLength > 0 ? null : 'nothing plotted'} onClick={onClearPlot} />
+          </>
+        )}
 
         <div style={{ marginLeft: 'auto' }}>
           <Act label="End turn" busy={busy} off={null} onClick={() => act({ kind: 'endTurn' })} />
@@ -233,6 +318,7 @@ function Act({
   label,
   hint,
   tone,
+  on,
   busy,
   off,
   onClick,
@@ -240,13 +326,15 @@ function Act({
   label: string;
   hint?: string | undefined;
   tone?: 'brass' | 'danger' | 'spark';
+  /** A toggle that is switched on: lit in the brass the speed buttons use. */
+  on?: boolean;
   busy: boolean;
   /** Why this action is unavailable, or null when it can be taken. */
   off: string | null;
   onClick: () => void;
 }) {
   const colour =
-    tone === 'brass' ? '#c9b489' : tone === 'danger' ? '#d8a12a' : tone === 'spark' ? '#fffce8' : undefined;
+    on ? 'var(--brass)' : tone === 'brass' ? '#c9b489' : tone === 'danger' ? '#d8a12a' : tone === 'spark' ? '#fffce8' : undefined;
   const note = off ?? hint;
 
   return (

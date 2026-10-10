@@ -25,6 +25,7 @@
 import { thirdOf, type Point } from '../../../engine/geometry.js';
 import type { DiceRoll, MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId, Unit, UnitId } from '../../../engine/types.js';
+import { SUBSTITUTE_DELAY_ROUNDS } from '../../../engine/constants.js';
 import { motionOf, type MotionStep } from './motion.js';
 
 /** One watchable moment: a unit's turn, a round's hazards, or the final whistle. */
@@ -95,10 +96,14 @@ export function toBeats(base: MatchState, events: readonly MatchEvent[], own: Te
 
   for (const event of events) {
     // A turn starting closes whatever came before it: the hazards of a round,
-    // or the previous unit's turn.
-    if (event.kind === 'turnStarted') {
+    // or the previous unit's turn. So does a round starting: since écart 51
+    // the Crackers can roll as the last rung of a round, and their roll, the
+    // blast and the fresh charge dropped in at the top of the next round
+    // would otherwise share one beat, with the charge drawn at its new post
+    // before it had been seen to roll.
+    if (event.kind === 'turnStarted' || event.kind === 'roundStarted') {
       flush();
-      currentUnit = event.unitId;
+      if (event.kind === 'turnStarted') currentUnit = event.unitId;
     }
     current.push(event);
     if (event.kind === 'turnEnded') flush();
@@ -220,7 +225,10 @@ function project(base: MatchState, events: readonly MatchEvent[]): MatchState {
         spark = { ...spark, x: event.to.x, y: event.to.y };
         break;
       case 'sparkCaught':
-        if (event.caught) spark = { ...spark, state: 'caught' as const };
+        // A caught Spark is not gone for good (écart 50): it comes back next
+        // round through `sparkEntered`, so between the catch and that entry it
+        // is `pending`, exactly as the engine holds it.
+        if (event.caught) spark = { ...spark, state: 'pending' as const };
         break;
       // A goal puts a fresh ball straight back into play. The event exists
       // because the log did not say where it went, and a replay that guessed
@@ -316,6 +324,12 @@ function describe(
       case 'dodging':
         lines.push({ text: `${name(event.unitId)} takes cover` });
         break;
+      case 'braced':
+        lines.push({
+          text: `${name(event.unitId)} digs in · harder to shove`,
+          outcome: mine(event.unitId) ? 'good' : 'bad',
+        });
+        break;
       case 'disengaged':
         lines.push({ text: `${name(event.unitId)} disengages` });
         break;
@@ -346,7 +360,7 @@ function describe(
         break;
       case 'evacuated':
         lines.push({
-          text: `${name(event.unitId)} is carried off the field`,
+          text: `${name(event.unitId)} is knocked out and carried off · back in ${SUBSTITUTE_DELAY_ROUNDS} rounds`,
           outcome: mine(event.unitId) ? 'bad' : 'good',
         });
         break;
@@ -448,6 +462,12 @@ function describe(
         break;
       case 'sparkEntered':
         lines.push({ text: 'The Spark rolls onto the pitch', outcome: 'neutral' });
+        break;
+      // Only the escape earns a line (écart 49); a drift stays silent as before.
+      case 'sparkMoved':
+        if (event.cause === 'escape') {
+          lines.push({ text: 'The Spark skips away', outcome: 'neutral' });
+        }
         break;
       case 'sparkCaught':
         lines.push({

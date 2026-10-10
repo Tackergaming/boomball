@@ -16,9 +16,9 @@ export const STRIKER: RoleWeights = {
   carryToFurnace: 70,
   chaseLoosePayload: 55,
 
-  attack: 22,
-  shove: 20,
-  stripCarrier: 35,
+  attack: 15,
+  shove: 30,
+  stripCarrier: 80,
   batCracker: 18,
 
   catchSpark: 300,
@@ -28,11 +28,23 @@ export const STRIKER: RoleWeights = {
   screenCarrier: 14,
   supportAttack: 45,
   cover: 20,
-  pressCarrier: 20,
+  escort: 0,
+  wantsEscort: 1,
+  guardStrike: 0,
+  parryPost: 0,
+  yieldToKeener: 0,
+  handOff: 0,
+  rejoin: 40,
+  screen: 0,
+  leash: 99,
+  looseBallReach: 99,
+  brace: 0,
+
+  pressCarrier: 55,
 
   avoidOpportunity: 4,
   avoidCrackers: 10,
-  dodgeWhenHurt: 10,
+  dodgeWhenHurt: 6,
   dash: 8,
   disengage: 16,
 };

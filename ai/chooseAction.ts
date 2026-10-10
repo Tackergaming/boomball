@@ -16,8 +16,8 @@
 
 import type { Action } from '../engine/actions.js';
 import type { Arena } from '../engine/arena.js';
-import { CRACKER_AC, PAYLOAD_PASS_AC } from '../engine/constants.js';
-import { lineTo, type Point } from '../engine/geometry.js';
+import { CRACKER_AC, MOVE_SPEED_FEET, PAYLOAD_PASS_AC } from '../engine/constants.js';
+import { distance, lineTo, type Point } from '../engine/geometry.js';
 import { legalActions } from '../engine/legalActions.js';
 import { battedCrackerRun } from '../engine/rules/ordnance.js';
 import { pathTo } from '../engine/rules/movement.js';
@@ -29,6 +29,10 @@ import {
   buildBoard,
   chance,
   contestChance,
+  hasPlayedThisRound,
+  isLastLink,
+  keenerMateNear,
+  nextToPlay,
   ORDER_PULL,
   positionValue,
   shotQuality,
@@ -105,10 +109,13 @@ function ballCandidates(board: Board): Candidate[] {
   const aim = statsFor(unit.role, unit.tier).aim;
 
   if (legal.canGrabPayload) {
+    // A Breaker standing on the ball with a Striker beside it leaves it there
+    // (`yieldToKeener`); every other role takes what is at its feet.
+    const share = keenerMateNear(board) ? 1 - w.yieldToKeener : 1;
     out.push({
       action: { kind: 'grabPayload' },
-      score: w.grabPayload,
-      why: 'the Payload is loose in this cell',
+      score: w.grabPayload * share,
+      why: share === 1 ? 'the Payload is loose in this cell' : 'the Payload is loose here, but a mate wants it more',
     });
   }
 
@@ -123,16 +130,34 @@ function ballCandidates(board: Board): Candidate[] {
 
   const called = findOrder(board.orders, 'callForPass');
 
+  // The chain (2H.7, Jérôme's rule). A throw goes to a team-mate who has not
+  // played yet this round, so that its own move carries the ball further: the
+  // ball climbs the ladder within the round. Never to somebody who has played,
+  // except from the **last link**, the last of our side to act (the keeper
+  // after a goal, typically), who throws to the best-placed receiver so the
+  // ball starts next round in good hands. The receiver is ahead, or on the
+  // same line, or at most three cells behind when it is the very next to play,
+  // because its eight cells of movement will still carry the ball past us.
+  const lastLink = isLastLink(board);
+  const next = nextToPlay(board);
+  const moveCells = MOVE_SPEED_FEET / 5;
+
   for (const option of legal.pass) {
     const mate = unitOf(state, option.unitId);
     const odds = chance(aim, PAYLOAD_PASS_AC, option.mode);
 
-    // A pass is worth the ground it gains and nothing else. Priced with a floor
-    // instead, the ball goes round the team sideways all match: every throw
-    // looks like progress because it is a throw.
+    const played = hasPlayedThisRound(state, mate.id);
+    if (played && !lastLink) continue;
+
     const gained =
       rangeToFurnace(unit, board.targetFurnace) - rangeToFurnace(mate, board.targetFurnace);
-    let progress = Math.min(1.5, Math.max(0, gained / 8));
+    if (gained < 0 && !lastLink && (next?.id !== mate.id || -gained > 3)) continue;
+
+    // Worth the ground the ball will have gained once the receiver has moved
+    // too: a receiver still to play adds its whole run. Capped so a chain of
+    // three does not price one throw at the whole pitch.
+    const potential = Math.min(2, Math.max(0, gained + (played ? 0 : moveCells)) / moveCells);
+    let progress = potential;
 
     // Except as a way out. Handing the ball to somebody nobody is standing on
     // is worth a throw even when it gains no ground at all.
@@ -147,13 +172,22 @@ function ballCandidates(board: Board): Candidate[] {
     const theirs = shotQuality(board, mate, { x: mate.x, y: mate.y });
     const opening = Math.max(0, theirs - mine);
 
+    // Every defender beside the flight halves what the throw is worth: safe
+    // first, far second, as Jérôme ordered the keeper's choice. It never
+    // reaches zero, so a risky throw still beats holding the ball for ever.
     const risk = passInterceptors(arena, state, unit, lineTo(unit, mate)).length;
+    const safety = 1 / (1 + risk);
     const ordered = called?.receiverId === mate.id ? ORDER_PULL : 0;
 
+    // `handOff` is the flat appetite of a role that should not be carrying at
+    // all: for a Breaker a throw that gains nothing still beats walking.
     out.push({
       action: { kind: 'pass', targetId: mate.id },
-      score: w.pass * odds * (progress + opening * 3) + ordered - risk * w.avoidOpportunity,
-      why: `pass to ${mate.name}, ${gained} cells on, shot ${Math.round(mine * 100)} to ${Math.round(theirs * 100)}`,
+      score:
+        (w.pass * odds * (progress + opening * 3) + w.handOff * odds) * safety +
+        ordered -
+        risk * w.avoidOpportunity,
+      why: `pass to ${mate.name}, ${gained} cells on${played ? ', last link' : ''}, shot ${Math.round(mine * 100)} to ${Math.round(theirs * 100)}, ${risk} in the lane`,
     });
   }
 
@@ -173,6 +207,12 @@ function violenceCandidates(board: Board): Candidate[] {
   const stats = statsFor(unit.role, unit.tier);
   const marked = findOrder(board.orders, 'markTarget');
 
+  // The bodyguard's target: an opponent standing on our own carrier. Zero for
+  // every role but the Breaker, whose charge is the carrier (2H.7).
+  const ownCarrier = board.carrier && board.carrier.team === unit.team ? board.carrier : null;
+  const onOurCarrier = (target: Unit): boolean =>
+    ownCarrier !== null && ownCarrier.id !== unit.id && distance(target, ownCarrier) <= 1;
+
   for (const option of legal.attack) {
     const target = unitOf(state, option.unitId);
     const odds = chance(stats.might, option.against, option.mode);
@@ -180,6 +220,7 @@ function violenceCandidates(board: Board): Candidate[] {
     // A swing does not make anyone drop the ball, so a carrier is only worth
     // half of the appetite for stripping one. The Shove below is the real tool.
     let value = w.attack + (target.holdingPayload ? w.stripCarrier * 0.5 : 0);
+    if (onOurCarrier(target)) value += w.guardStrike;
     if (marked?.targetId === target.id) value += ORDER_PULL;
     if (target.hp <= 4.5 + stats.might) value *= 1.4;
 
@@ -197,6 +238,7 @@ function violenceCandidates(board: Board): Candidate[] {
     // A successful Shove takes the ball, which is the only way to get it off
     // somebody without waiting for a pass.
     let value = w.shove + (target.holdingPayload ? w.stripCarrier : 0);
+    if (onOurCarrier(target)) value += w.guardStrike;
     if (marked?.targetId === target.id) value += ORDER_PULL * 0.5;
 
     // A player holding the Payload is not a defender. Its Action is the shot or
@@ -274,7 +316,7 @@ function sparkCandidates(board: Board): Candidate[] {
     {
       action: { kind: 'catchSpark' },
       score: w.catchSpark * odds,
-      why: 'the Spark is in this cell and it ends the match',
+      why: 'the Spark is in this cell and it is worth two goals',
     },
   ];
 }
@@ -336,13 +378,34 @@ function stanceCandidates(board: Board, walking: Walking): Candidate[] {
   const out: Candidate[] = [];
   const bestMove = walking.candidates[0]?.score ?? 0;
 
-  if (legal.canDodge) {
+  // Dodge is the last resort, not a default (Jérôme, 2H.7: too many Dodges
+  // where a Dash or a Shove was there). Only when badly hurt, and only when
+  // there is nothing to swing at, shove, throw or shoot.
+  const nothingToDo =
+    legal.attack.length === 0 &&
+    legal.shove.length === 0 &&
+    legal.pass.length === 0 &&
+    legal.shoot === null &&
+    legal.batCracker.length === 0;
+  if (legal.canDodge && nothingToDo) {
     const hurt = 1 - unit.hp / unit.maxHp;
-    out.push({
-      action: { kind: 'dodge' },
-      score: w.dodgeWhenHurt * hurt,
-      why: `dodge on ${unit.hp} of ${unit.maxHp}`,
-    });
+    if (hurt >= 0.5) {
+      out.push({
+        action: { kind: 'dodge' },
+        score: w.dodgeWhenHurt * (hurt - 0.5) * 2,
+        why: `dodge on ${unit.hp} of ${unit.maxHp}, nothing else to do`,
+      });
+    }
+  }
+
+  // Dig in (écart 52): the keeper with an opponent two cells away and its
+  // Action still in hand. Not if already braced, and never a pass or a shove
+  // forgone: those score higher when they are on.
+  if (legal.canBrace && !unit.braced) {
+    const close = board.enemies.some((e) => distance(e, unit) <= 2);
+    if (close) {
+      out.push({ action: { kind: 'brace' }, score: w.brace, why: 'dig in, somebody is coming' });
+    }
   }
 
   if (legal.canDash) {

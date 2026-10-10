@@ -1174,3 +1174,63 @@ animée sur le moteur 3**, avec son verdict sur ce que ses coéquipiers et la ma
 ouvre 2H.7, l'IA par rôle. L'équilibrage est **re-clos par lui sur `09` §11** le 2026-10-10,
 Crackers 8, portée 9/12, Spark 20, le star à 2,21 accepté. Sans son verdict sur l'IA, pas de
 phase 3.
+
+**La partie de Jérôme à la porte de 2H.6, le 2026-10-10 soir**, sur le moteur 3. Ses retours,
+numérotés par le fil principal dans l'ordre où il les a donnés, et ce que le code en disait :
+
+1. Un joueur sur la case du Spark qui rate la prise devrait le voir sauter d'une case au d8, et
+   personne ne devrait pouvoir finir son tour dessus : « couver le Spark ». Vrai, `applyCatchSpark`
+   ne bougeait rien. **Écart 49.**
+2. Quand il n'a pas l'initiative, les adversaires apparaissent déjà placés au coup d'envoi. Vrai,
+   `load()` dessinait le snapshot et les événements d'ouverture n'allaient qu'au fil. **Migration
+   0007, colonne `matches.kickoff`**, rejouée une fois par le client.
+3. Agir en cliquant sur le pion, pas seulement dans la barre. Client seul.
+4. Choisir sa trajectoire pour éviter une attaque d'opportunité. Le moteur l'acceptait déjà, le
+   client envoyait le plus court. Client seul.
+5. Le Spark doit revenir quelque part au hasard après une prise. **Écart 50.**
+6. « carried off the field » incompris. Trois lignes de texte.
+7. Une façon très visuelle de lire l'ordre d'initiative, le suivant, puis le suivant. Client seul.
+8. Le reste est l'IA par rôle, à faire rôle par rôle en chat.
+
+### Sous-phase 2H.7, « l'IA par rôle, l'initiative, le Spark, l'écran », codée le 2026-10-10 soir, porte ouverte
+
+Par le fil principal (Fable 5.1), avec trois sous-agents Sonnet nommés ci-dessous, sur des fichiers
+disjoints. Le fil principal a gardé le moteur (`reduce.ts`, `initiative.ts` récrit, `types.ts`,
+`constants.ts`, `events.ts`, `actions.ts`, `legalActions.ts`, `rules/combat.ts`, `setup.ts`), l'IA
+en entier (`evaluate.ts`, `chooseAction.ts`, les quatre fiches, `weights.ts`, `selfPlay.ts`),
+`server/lobby.ts`, la fonction `create-match`, la migration 0007, `useMatch.ts`, le montage de la
+bande d'initiative dans `Match.tsx`, le découpage des beats dans `replay.ts`, les tests et les
+écarts. **Tout ce qui ne dépend pas de Jérôme est codé et vert** : `npm test` 429 tests sur 20
+fichiers contre 408, `npm run typecheck` vert à la racine, dans `scripts/`, `e2e/` et `client/`, le
+build du client vert. **Rien n'est en ligne et rien n'est passé au harnais** : le client lit la
+colonne `kickoff`, qui n'existe pas en base avant la migration 0007, et le harnais ne tourne donc
+qu'après elle. **Le sweep n'a pas tourné**, à la demande de Jérôme : un seul, à la fin.
+
+Le design a été dicté par Jérôme en chat, question par question, après qu'il a refusé les
+questions à choix sur un concept qu'il n'avait pas encore décrit (mémoire mise à jour). Les
+décisions sont dans `00` C9, écarts 49 à 52 et le bloc « l'IA par rôle ». Deux rôles ont été
+reformulés en cours de route : le Breaker en défense passe de « presser le porteur partout » à
+« d'abord le chemin des adversaires vers les Strikers, ensuite la ligne des Crackers » ; et le terme
+« la maison » est abandonné dans nos échanges au profit de « l'équipe qui a la balle » et « l'équipe
+qui ne l'a pas », l'étiquette « The House » restant à l'écran.
+
+| Quoi | État |
+|---|---|
+| Écart 49, le Spark s'échappe | Fait, fil principal. `sparkEscape` dans `applyEndTurn`, `dropCell` réutilisé, `sparkMoved` gagne `cause: 'drift' \| 'escape'`. 3 tests |
+| Écart 50, le Spark revient | Fait, fil principal. `applyCatchSpark` remet `pending`, `Spark.state` perd `caught`. Test réécrit : il rentre au round suivant et une seconde prise marque encore |
+| Écart 51, l'initiative | Fait, fil principal. `engine/initiative.ts` récrit : Spark, équipe avec humain, Crackers après l'équipe porteuse, autre équipe ; Trajector, Strikers, Breakers, Bulwark ; humains d'abord, d20 relancé entre humains du même rôle ; ordre des IA d'un rôle par la situation (`orderBySituation`) ; alternance sans humain. `TurnSlot` porte `rank`, l'état `lastCarrierTeam` écrit par `done()`. `buildTurnOrder(arena, state)`. `hasPlayedThisRound` exporté pour la chaîne. 14 tests récrits dans `setup.test.ts`, l'aide `opened()` d'`ordnance.test.ts` marche l'échelle jusqu'aux Crackers |
+| Écart 52, se planter | Fait, fil principal. Action `brace`, `Unit.braced`, événement `braced`, `canBrace`, `BRACE_SHOVE_PENALTY = 3`, `opposedRoll` prend un mode pour le challenger, levé à `beginTurn` et au premier pas |
+| `ENGINE_VERSION` 4 | Fait. Les quatre écarts changent la forme de l'état ou des événements |
+| L'IA : la chaîne | Fait, fil principal. `ballCandidates` lit `hasPlayedThisRound`, `nextToPlay`, `isLastLink` ; jamais à quelqu'un qui a joué sauf dernier maillon ; devant, même ligne, ou 1 à 3 derrière pour le tout prochain ; `potential` compte les huit cases que le receveur a encore ; `safety = 1 / (1 + intercepteurs)` ; `handOff` et `rejoin`. 3 tests |
+| L'IA : le Breaker | Fait, fil principal. `escort` (épaule qui fait face à la menace, porteur allié, `wantsEscort` 0 pour le gardien), `guardStrike`, `screen` (en défense, entre l'adversaire et chaque coéquipier qui manie la balle, poids 60), `parryPost` (30), `yieldToKeener`, `crackerPressure` sur la ligne Cracker-ballon via `Board.crackerLines`. 6 tests |
+| L'IA : Striker, Trajector, Bulwark, Dodge | Fait, fil principal. Presser par rôle (`stripCarrier` 80 et 70, `pressCarrier` 55 et 45, `attack` bas), `rejoin` 40 et 30 ; Bulwark `leash` 4, `looseBallReach` 3, `brace` 40, `pressCarrier` 60 ; Dodge seulement abîmé de moitié et sans rien d'autre à faire. 4 tests. Le sweep imprime `dodge` |
+| Retour 2, l'ouverture rejouée | Fait, fil principal. `OpenedMatch.kickoff`, `create-match` écrit `matches.kickoff = { state, lastSeq }`, **migration 0007 écrite, pas appliquée** ; `useMatch.load()` rend l'ouverture une fois quand le `seq` est encore celui de l'ouverture, et l'effet initial la rejoue. Le hold d'un beat relit la vitesse à chaque beat |
+| Retours 3 et 4, agir au clic, tracer sa route | Fait, **sous-agent Sonnet effort élevé** : `pending` remonté dans `Match.tsx`, anneaux de cible sur les pions, tray de contexte, bouton `Plot route`, `Go`, `Clear`, route au survol avec le compte de coups, cases dont la route la plus courte provoque marquées ; `data-cell`, `clickCell` et le clic simple inchangés. Compromis dit par l'agent : la marque lit « la route la plus courte provoque » et non « la case est sous allonge » |
+| Retours 6 et 7, textes et bande d'initiative | Fait, **sous-agent Sonnet effort moyen** : `TurnStrip.tsx` neuf, monté par le fil principal au-dessus du plateau ; « knocked out and carried off · back in 2 rounds » ; textes du Spark. Puis **un troisième sous-agent Sonnet effort moyen** : rangs à la place des comptes dans l'échelle et la bande, bouton `Dig in`, lignes `braced` dans le fil, le rejeu et la fiche, phrase du briefing |
+| Le rejeu | Fait, fil principal : un beat se ferme aussi sur `roundStarted`, sinon le roulement d'un Cracker en dernier barreau et sa réapparition au round suivant partageaient un beat |
+
+**Ce qui attend Jérôme, dans l'ordre** : `/supabase-migrate` avec `0007_kickoff_board.sql` ; puis le
+fil principal passe le harnais avec `ENGINE_VERSION` à 3 le temps du run ; puis son feu vert pour
+redéployer `resolve-action` et `create-match` au moteur 4 ; puis le harnais sur le moteur 4 avec
+l'ouverture rejouée ; puis **le sweep unique**, `09` §12, qu'il tranche ; puis `/update`, `/commit`
+et **sa partie**, dont le verdict sur ce que chaque rôle cherche ouvre la phase 3.

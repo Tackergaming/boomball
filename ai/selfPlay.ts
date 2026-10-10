@@ -191,6 +191,11 @@ export interface SweepReport {
   readonly sparkDecided: number;
   /** Mean players still off the field when the whistle goes. */
   readonly meanEvacuated: number;
+  /**
+   * Dodges per match, both sides. Jérôme asked for Dodge to be a last resort
+   * (2H.7); this is the column that says whether it is.
+   */
+  readonly meanDodges: number;
   readonly meanActions: number;
   /**
    * Where the ball spends the match, as a share of turns in each third of the
@@ -258,6 +263,7 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
   let sparkAttempts = 0;
   let sparkDecided = 0;
   let evacuated = 0;
+  let dodges = 0;
   let actions = 0;
   const ballThird = new Array<number>(THIRD_COUNT).fill(0);
   let keeperHeld = 0;
@@ -290,6 +296,7 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     }
 
     evacuated += state.units.filter((u) => u.status === 'evacuated').length;
+    dodges += played.events.filter((e) => e.kind === 'dodging').length;
     actions += played.actions;
 
     for (let t = 0; t < THIRD_COUNT; t++) ballThird[t]! += played.ballTrack.byThird[t]!;
@@ -311,6 +318,7 @@ export function sweep(spec: ArenaSpec, tier: Tier, matches: number, firstSeed = 
     meanSparkAttempts: sparkAttempts / matches,
     sparkDecided,
     meanEvacuated: evacuated / matches,
+    meanDodges: dodges / matches,
     meanActions: actions / matches,
     ballThirdShare: ballThird.map((n) => (ballTurns === 0 ? 0 : n / ballTurns)),
     keeperHeldShare: ballTurns === 0 ? 0 : keeperHeld / ballTurns,
