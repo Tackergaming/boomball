@@ -26,6 +26,7 @@ import {
   roundMarkers,
   stamp,
   startSendWatch,
+  state,
   stopSendWatch,
   summary,
   unitAt,
@@ -115,9 +116,28 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   expect(afterOne.seq).toBeGreaterThan(at.seq);
   await shots.take('turn-1-house-played');
 
-  // -- Turn 2: an action and the end of turn, through the real buttons -------
+  // -- Turn 2: a click on a pawn, then an action and the end of turn --------
 
   await page.evaluate(() => window.__boomball!.dismissBeat());
+
+  // A pawn is clickable since 2H.7: a target of a Swing, Shove or Pass gets a
+  // tray of those options under the bar, any other pawn is merely selected
+  // and its sheet shows. Prefer a target when the board offers one, otherwise
+  // the first opposing pawn, then put the selection back on our own Giff.
+  const legalTwo = await summary(page);
+  const boardTwo = await state(page);
+  const me = boardTwo.units.find((u) => u.id === legalTwo.unitId)!;
+  const targetId = legalTwo.attack[0] ?? legalTwo.shove[0] ?? legalTwo.pass[0] ?? null;
+  const pawnId = targetId ?? boardTwo.units.find((u) => u.team !== me.team && u.hp > 0)!.id;
+  const pawn = boardTwo.units.find((u) => u.id === pawnId)!;
+  await page.locator(`[data-unit="${pawnId}"]`).click();
+  await expect(page.getByText(pawn.name, { exact: true }).first()).toBeVisible();
+  if (targetId) {
+    await expect(page.getByRole('button', { name: /^(Swing at|Shove|Pass to) / })).toBeVisible();
+  }
+  await shots.take(targetId ? 'pawn-clicked-target' : 'pawn-clicked');
+  await page.locator(`[data-unit="${me.id}"]`).click();
+
   await page.getByRole('button', { name: 'Dodge', exact: true }).click();
   await page.waitForFunction(
     () => window.__boomball?.state?.turn?.actionUsed === true && !window.__boomball.busy,

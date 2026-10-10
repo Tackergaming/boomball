@@ -3,13 +3,14 @@
 > Historique du projet Boomball : ce qui a été construit et pourquoi, jusqu'au 2026-09-02. Depuis le
 > 2026-10-10 le point d'entrée est `08-plan-terrain-horizontal.md`, et `07-audit-et-plan-3d.md`
 > porte l'audit et le journal des phases. **Bandeau tenu à jour pour `check_drift.py` : au
-> 2026-10-10, après les sous-phases 2H.1 à 2H.6, le moteur 3 joue le terrain horizontal, les
-> Crackers roulent vers le ballon et le Breaker les pare, l'IA voit les obstacles, **408 tests**,
-> et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6, Crackers à 8,
-> portée 9/12, Spark 20, le sweep donne 1,18 à 2,21 buts par match (`09` §11), équilibrage
-> re-clos par Jérôme sur ce tableau le 2026-10-10. **Le moteur 3 est le jeu en ligne** :
-> `resolve-action` v11 et `create-match` v9 déployées le 2026-10-10 avec son feu vert, les
-> matchs du moteur 2 archivés par le client, la première parade jouée en ligne le même jour.
+> 2026-10-10, après les sous-phases 2H.1 à 2H.7, le moteur 4 joue le terrain horizontal, les
+> Crackers roulent vers le ballon et le Breaker les pare, l'initiative est un ordre sans comptes,
+> le Spark s'échappe et revient, l'IA des quatre rôles suit les mots de Jérôme, **429 tests**,
+> et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et 2H.7, Crackers à 8,
+> portée 9/12, Spark 20, le sweep donne 1,46 à 1,80 buts par match (`09` §12), équilibrage
+> re-clos par Jérôme sur ce tableau le 2026-10-10. **Le moteur 4 est le jeu en ligne** :
+> `resolve-action` v12 et `create-match` v10 déployées le 2026-10-10 avec son feu vert, les
+> matchs du moteur 3 archivés par le client, l'ouverture rejouée depuis le coup d'envoi.
 > Tout ce qui suit décrit le terrain vertical, dépassé par la décision D11.
 > Dernière mise à jour du corps : 2026-09-02, après cinq tests en local de Jérôme et les deux
 > arbitrages qui suivaient le passage au terrain vertical.
@@ -79,7 +80,7 @@ celui de la racine et celui de `scripts/`, pour la raison expliquée plus bas.
 | `server/seed` | Le seed SQL généré depuis le moteur, pour que `role_stats` et l'arène ne dérivent pas |
 | `server/lobby` | Qui a le droit d'ouvrir un match, et le coup d'envoi. Sans base, comme `session` |
 | `server/arenaRow` | La ligne `arenas` remise dans la forme du moteur. Partagée par les deux fonctions, testée en aller-retour contre `KILL_SILO` |
-| `supabase/migrations/*.sql` | Le schéma, les enums et la RLS. **Les cinq sont appliqués au projet.** `0002` corrige la lecture d'une équipe par son propriétaire, `0003` enregistre une victoire, `0004` porte les ordres alliés, **`0005` appliquée par Jérôme le 2026-10-10 en 2H.4** : la ligne `arenas` réécrite en terrain horizontal, vérifiée champ par champ contre `engine/arenas/kill-silo.ts`, et la colonne `matches.engine_version`, les huit matchs existants, tous terminés, lisant 1. **`0006` appliquée par Jérôme le 2026-10-10 soir en 2H.5** : seule la colonne `starts` de la ligne `kill-silo` change, les six joueurs de champ à `y14` et `y30` (écart 38 révisé), vérifiée en lecture avant et après ; `ENGINE_VERSION` reste 2. Les deux fonctions redéployées dans la foulée avec son feu vert : `resolve-action` v9, `create-match` v8 |
+| `supabase/migrations/*.sql` | Le schéma, les enums et la RLS. **Les sept sont appliqués au projet.** `0002` corrige la lecture d'une équipe par son propriétaire, `0003` enregistre une victoire, `0004` porte les ordres alliés, **`0005` appliquée par Jérôme le 2026-10-10 en 2H.4** : la ligne `arenas` réécrite en terrain horizontal, vérifiée champ par champ contre `engine/arenas/kill-silo.ts`, et la colonne `matches.engine_version`, les huit matchs existants, tous terminés, lisant 1. **`0006` appliquée par Jérôme le 2026-10-10 soir en 2H.5** : seule la colonne `starts` de la ligne `kill-silo` change, les six joueurs de champ à `y14` et `y30` (écart 38 révisé), vérifiée en lecture avant et après ; `ENGINE_VERSION` reste 2. Les deux fonctions redéployées dans la foulée avec son feu vert : `resolve-action` v9, `create-match` v8. **`0007` appliquée par Jérôme le 2026-10-10 en 2H.7** : la seule colonne `matches.kickoff`, jsonb nullable, le plateau d'avant l'ouverture et le `seq` où elle finit, vérifiée en lecture avant (absente) et après (présente, avec son commentaire) ; les fonctions v11 et v9 du moteur 3 l'ignorent, seule `create-match` du moteur 4 l'écrit |
 | `scripts/apply-migration.mjs` | Applique un fichier SQL par l'API Management. Pas un migrateur, pas de registre |
 | `supabase/checks/rls-check.py` | 24 assertions de RLS contre le projet vivant, deux utilisateurs et de vrais JWT. Hors `npm test`, il lui faut le réseau |
 | `supabase/checks/browser-path.py` | 16 assertions sur le parcours exact du navigateur, **préflight CORS compris**. Le seul contrôle qui voit ce que Node ne peut pas voir. Hors `npm test`, il lui faut le réseau |

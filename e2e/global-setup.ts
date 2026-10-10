@@ -40,10 +40,19 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     // The sign-in path is the one the smoke test never sees, so it is watched
     // here: a response of 400 or above fails the run before any test starts.
     const failed: string[] = [];
+    const pending: Promise<void>[] = [];
     page.on('response', (response) => {
       if (response.status() < 400) return;
       const url = new URL(response.url());
-      failed.push(`${response.status()} ${response.request().method()} ${url.pathname}`);
+      const line = `${response.status()} ${response.request().method()} ${url.pathname}`;
+      // The body says why, which the status alone never does: a 401 from
+      // PostgREST names the JWT fault, and that is what gets read.
+      pending.push(
+        response.text().then(
+          (body) => void failed.push(`${line} · ${body.slice(0, 200)}`),
+          () => void failed.push(line),
+        ),
+      );
     });
 
     await page.goto(baseURL);
@@ -58,6 +67,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       .first()
       .waitFor({ timeout: 30_000 });
 
+    await Promise.all(pending);
     if (failed.length > 0) {
       throw new Error(`the sign-in path answered with failures: ${failed.join(', ')}`);
     }

@@ -1229,8 +1229,20 @@ qui ne l'a pas », l'étiquette « The House » restant à l'écran.
 | Retours 6 et 7, textes et bande d'initiative | Fait, **sous-agent Sonnet effort moyen** : `TurnStrip.tsx` neuf, monté par le fil principal au-dessus du plateau ; « knocked out and carried off · back in 2 rounds » ; textes du Spark. Puis **un troisième sous-agent Sonnet effort moyen** : rangs à la place des comptes dans l'échelle et la bande, bouton `Dig in`, lignes `braced` dans le fil, le rejeu et la fiche, phrase du briefing |
 | Le rejeu | Fait, fil principal : un beat se ferme aussi sur `roundStarted`, sinon le roulement d'un Cracker en dernier barreau et sa réapparition au round suivant partageaient un beat |
 
-**Ce qui attend Jérôme, dans l'ordre** : `/supabase-migrate` avec `0007_kickoff_board.sql` ; puis le
-fil principal passe le harnais avec `ENGINE_VERSION` à 3 le temps du run ; puis son feu vert pour
-redéployer `resolve-action` et `create-match` au moteur 4 ; puis le harnais sur le moteur 4 avec
-l'ouverture rejouée ; puis **le sweep unique**, `09` §12, qu'il tranche ; puis `/update`, `/commit`
-et **sa partie**, dont le verdict sur ce que chaque rôle cherche ouvre la phase 3.
+**La mise en ligne, le 2026-10-10 dans le chat suivant**, par le fil principal (Fable 5.1), dans
+l'ordre que Jérôme avait fixé :
+
+| Quoi | État |
+|---|---|
+| Migration 0007 | **Appliquée par Jérôme** via `/supabase-migrate`, la colonne `matches.kickoff` vérifiée en lecture avant et après, consignée dans `04` |
+| Harnais sur le moteur 3 | Smoke et playthrough verts avec `ENGINE_VERSION` à 3 le temps des runs, remise à 4 avant toute autre chose. Captures lues : la bande d'initiative au-dessus du plateau (encore en blocs par compte sur le moteur 3, attendu), `Plot route` actif puis grisé « no cell within reach », les cases dont la route la plus courte provoque en liseré orange, `Dig in` grisé pour un Striker |
+| Le clic sur un pion | Le smoke ne l'exerçait pas : **étape ajoutée au tour 2** de `smoke.spec.ts`, qui clique une cible de Swing, Shove ou Pass si le plateau en offre une, sinon le premier pion adverse, et affirme la fiche. Capture lue : la fiche bascule sur l'adversaire cliqué. Le tray n'a pas encore été vu, aucune cible à portée dans les deux parties |
+| Redéploiement | **Feu vert de Jérôme**, `resolve-action` v12 et `create-match` v10, **moteur 4 en ligne**, vérifié par l'API de gestion |
+| Harnais sur le moteur 4 | **Un défaut trouvé au premier run** : sur un match neuf, le plateau restait sur le coup d'envoi avec le Trajector « NOW » et personne n'était jamais sur le chrono. Cause : deux `load()` en vol en même temps, le `StrictMode` de React montant l'effet initial deux fois en développement ; le premier avait réclamé l'ouverture, le second dessinait le snapshot, puis le premier revenait en dernier, dessinait le plateau d'avant l'ouverture et était annulé avant de la rejouer. **Corrigé dans `useMatch.ts`** : un compteur de génération, une lecture dépassée n'applique rien et ne réclame pas l'ouverture. Smoke et playthrough verts ensuite, 18 requêtes humaines, 0 refusée |
+| Ce que les captures du moteur 4 montrent | L'ouverture rejouée depuis le coup d'envoi (le fil : « Quill Ironmaw takes the Payload. Quill Ironmaw dashes. », le Trajector allié prend le ballon et file à huit cases de la ligne adverse) ; la bande et l'échelle en **rangs numérotés**, Trajector allié en 1, Giff en 2, les Strikers puis les Breakers puis le Bulwark ; **les Crackers juste après l'équipe qui a la balle**, lus dans les événements des rounds 2 à 4 ; dans un rôle, le porteur d'abord. Sur le match joué jusqu'au sifflet : le Spark s'est échappé trois fois (`sparkMoved` cause `escape`), a été pris au round 9 et **est rentré au round 10** (écart 50), le Bulwark s'est planté une fois, cinq parades réussies sur sept |
+| Un aléa resté ouvert | Un **401 sur `GET /rest/v1/role_stats`** au moment de la connexion du compte e2e, 2 runs sur 7, jamais deux fois de suite, code du hub inchangé depuis 2H.6. `global-setup.ts` imprime désormais le corps de la réponse en échec pour lire la raison la prochaine fois |
+| Le sweep unique | `09` §12, lancé une fois après tout ce qui précède, constantes inchangées |
+
+**Ce qui attend Jérôme** : trancher `09` §12, dont le prix du Spark maintenant qu'il revient après une
+prise ; `/update`, `/commit` ; puis **sa partie**, dont le verdict sur ce que chaque rôle cherche
+ouvre la phase 3.

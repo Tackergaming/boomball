@@ -247,11 +247,25 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
    */
   const openingRef = useRef(false);
 
+  /**
+   * Which `load()` is the latest. Two can be in flight at once: React's
+   * StrictMode mounts the effect below twice in development, and a broadcast
+   * can land while a read is still out. The first one back used to win, and on
+   * a fresh match it won with the kick-off board and no replay to walk from
+   * it: the first read had claimed the opening, the second drew the snapshot,
+   * then the first came back last, drew the board before the opening and was
+   * cancelled before it could replay. Nobody was ever on the clock. A read
+   * that has been overtaken now applies nothing and claims nothing.
+   */
+  const loadGen = useRef(0);
+
   const load = useCallback(async (): Promise<Opening | null> => {
+    const gen = ++loadGen.current;
     const [{ data: snapshot }, { data: row }] = await Promise.all([
       supabase.from('match_state').select('seq, snapshot').eq('match_id', matchId).maybeSingle(),
       supabase.from('matches').select('turn_deadline, kickoff').eq('id', matchId).maybeSingle(),
     ]);
+    if (gen !== loadGen.current) return null;
 
     const at = (row?.turn_deadline as string | null) ?? null;
     setDeadline(at ? Date.parse(at) : null);
@@ -261,13 +275,16 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     const seqNow = snapshot.seq as number;
     let opening: Opening | null = null;
     if (kickoff && !openingRef.current && seqNow === kickoff.lastSeq) {
-      openingRef.current = true;
       const { data: rows } = await supabase
         .from('match_events')
         .select('seq, payload')
         .eq('match_id', matchId)
         .lte('seq', kickoff.lastSeq)
         .order('seq', { ascending: true });
+      // Claimed only once the events are in hand and this read is still the
+      // latest: an overtaken read must leave the opening to the one after it.
+      if (gen !== loadGen.current) return null;
+      openingRef.current = true;
       const events = ((rows ?? []) as { payload: MatchEvent }[]).map((r) => r.payload);
       // The opening batch starts at 0; the feed effect loads it on its own.
       seenRef.current.add(0);
