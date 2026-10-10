@@ -46,13 +46,16 @@ import {
 import { validatePath } from './rules/movement.js';
 import { opportunityAttackers, passInterceptors } from './rules/reactions.js';
 import {
+  arrivalFace,
   battedCrackerRun,
   crackerRespawnCell,
   crackerRun,
+  parryDirection,
   sparkEntryCell,
   sparkRun,
   type HazardRun,
 } from './rules/ordnance.js';
+import { nearestFreeCell, takenOn } from './rules/placement.js';
 import {
   blockingBulwark,
   dropCell,
@@ -472,16 +475,22 @@ function applyBatCracker(ctx: TurnCtx, crackerId: string, direction: number): Re
 
   let next: MatchState = { ...state, turn: { ...turn, actionUsed: true } };
   if (outcome.hit) {
-    next = runCracker(ctx, next, cracker.id, battedCrackerRun(ctx.arena, next, cracker, direction));
+    next = runCracker(
+      ctx,
+      next,
+      cracker.id,
+      battedCrackerRun(ctx.arena, next, cracker, direction),
+      'batted',
+    );
   }
 
   return done(ctx, recoilFrom(ctx, next, unit.id, { x: cracker.x, y: cracker.y }));
 }
 
 /**
- * Count 20. Each live Cracker rolls ten cells towards whoever is nearest,
- * friend or foe alike, round whatever is in the way, and goes off on the first
- * player it crosses.
+ * Count 20. Each live Cracker rolls `CRACKER_MOVE_CELLS` cells towards the
+ * ball, posed or carried (écart 45), round whatever is in the way, and goes
+ * off on the first player it crosses, friend or foe alike.
  *
  * Not on the kick-off round (écart 44): with the lines eight cells from the
  * centre, a Cracker that drifted on round 1 reached somebody every match
@@ -491,7 +500,8 @@ function applyBatCracker(ctx: TurnCtx, crackerId: string, direction: number): Re
  *
  * They resolve one after the other rather than at once, so the second one sees
  * a field the first one has already changed. A Cracker that just carried
- * someone off the field is not still hunting a player who is gone.
+ * someone off the field is not still hunting a player who is gone, and a
+ * Cracker that stopped on the ball is a cell the second one will not enter.
  */
 function resolveCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
   if (state.round < CRACKER_FIRST_DRIFT_ROUND) return state;
@@ -503,14 +513,25 @@ function resolveCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): Ma
   for (const { id } of state.crackers) {
     const cracker = current.crackers.find((c) => c.id === id)!;
     if (cracker.state !== 'live') continue;
-    current = runCracker(ctx, current, id, crackerRun(arena, current, cracker, rng));
+    current = runCracker(ctx, current, id, crackerRun(arena, current, cracker), 'drift');
   }
 
   return { ...current, rngSeed: rng.seed };
 }
 
-/** Walks a Cracker along a resolved run: it either goes off on someone, or it comes to rest. */
-function runCracker(ctx: Ctx, state: MatchState, crackerId: string, run: HazardRun): MatchState {
+/**
+ * Walks a Cracker along a resolved run: it either goes off on someone, or it
+ * comes to rest. A run in **drift** that ends on a Breaker is offered to the
+ * Breaker's bat first (écart 47); a run sent by a bat is not, so a parried
+ * Cracker cannot be parried again down the line.
+ */
+function runCracker(
+  ctx: Ctx,
+  state: MatchState,
+  crackerId: string,
+  run: HazardRun,
+  mode: 'drift' | 'batted',
+): MatchState {
   const cracker = state.crackers.find((c) => c.id === crackerId)!;
   const from = { x: cracker.x, y: cracker.y };
 
@@ -522,7 +543,75 @@ function runCracker(ctx: Ctx, state: MatchState, crackerId: string, run: HazardR
   const next = replaceCracker(state, moved);
   if (!run.struck) return next;
 
+  if (mode === 'drift') {
+    const parried = parry(ctx, next, moved, from, run);
+    if (parried.sent) return parried.state;
+    return detonate(ctx, parried.state, moved, run.struck.id);
+  }
+
   return detonate(ctx, next, moved, run.struck.id);
+}
+
+/**
+ * The Breaker's parry (écart 47). A Cracker in drift has just rolled onto a
+ * Breaker's cell. Before it goes off, a Breaker with its Reaction still in
+ * hand, and its hands free, swings at it: a melee attack against `CRACKER_AC`.
+ * On a hit the Cracker is sent `CRACKER_BAT_RANGE_CELLS` back down a face of
+ * the 120 degree arc in front of the Breaker, the face it came in through and
+ * its two neighbours, bouncing as a batted Cracker does and going off on the
+ * first player it meets, whoever that is. On a miss it goes off on the Breaker
+ * as it always did. Either way the Reaction is spent.
+ *
+ * The direction is chosen by `parryDirection`, automatically, for the AI and
+ * for a human alike: see there for the rule Jérôme accepted and for why.
+ *
+ * Three edges, decided here and told to Jérôme. A Breaker carrying the ball
+ * does not parry, because every other swing of the bat is barred to a carrier
+ * and the parry is a swing. A Breaker standing on a Cracker when count 20
+ * comes is not parrying anything: the Cracker arrived from nowhere and goes
+ * off where it lies. And the swing does not recoil the Breaker, because the
+ * recoil is measured away from what was hit and the Cracker is on the
+ * Breaker's own cell: there is no direction to recoil along.
+ */
+function parry(
+  ctx: Ctx,
+  state: MatchState,
+  cracker: Cracker,
+  from: Point,
+  run: HazardRun,
+): { readonly state: MatchState; readonly sent: boolean } {
+  const breaker = state.units.find((u) => u.id === run.struck!.id);
+  if (!breaker || breaker.role !== 'breaker' || breaker.status !== 'active') {
+    return { state, sent: false };
+  }
+  if (!breaker.reactionAvailable || breaker.holdingPayload) return { state, sent: false };
+
+  const arrival = arrivalFace(from, run);
+  if (arrival === null) return { state, sent: false };
+
+  const guarded = replaceUnit(state, { ...breaker, reactionAvailable: false });
+  const might = statsFor(breaker.role, breaker.tier).might;
+  const outcome = rollAgainst(ctx.rng, might, CRACKER_AC);
+  const direction = parryDirection(ctx.arena, guarded, breaker, arrival);
+  ctx.log.push({
+    kind: 'crackerParried',
+    unitId: breaker.id,
+    crackerId: cracker.id,
+    roll: outcome.roll,
+    hit: outcome.hit,
+    direction,
+  });
+
+  if (!outcome.hit) return { state: guarded, sent: false };
+
+  const sent = runCracker(
+    ctx,
+    guarded,
+    cracker.id,
+    battedCrackerRun(ctx.arena, guarded, cracker, direction),
+    'batted',
+  );
+  return { state: sent, sent: true };
 }
 
 /**
@@ -558,8 +647,8 @@ function detonate(ctx: Ctx, state: MatchState, cracker: Cracker, targetId: UnitI
 }
 
 /**
- * A spent Cracker comes back on the free cell nearest the centre of the pitch
- * (écart 43), never on the ball, on a player, or on the other Cracker, and
+ * A spent Cracker comes back beside its own edge post of the halfway line
+ * (écart 46), never on the ball, on a player, or on the other Cracker, and
  * starts hunting again. One after the other, so the second sees where the
  * first landed.
  */
@@ -568,11 +657,11 @@ function respawnCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): Ma
   let current = state;
   let changed = false;
 
-  for (const cracker of state.crackers) {
-    if (cracker.state === 'live') continue;
-    if (cracker.respawnOnRound === null || cracker.respawnOnRound > state.round) continue;
+  state.crackers.forEach((cracker, index) => {
+    if (cracker.state === 'live') return;
+    if (cracker.respawnOnRound === null || cracker.respawnOnRound > state.round) return;
 
-    const at = crackerRespawnCell(arena, current, rng);
+    const at = crackerRespawnCell(arena, current, index, rng);
     changed = true;
     log.push({ kind: 'crackerRespawned', crackerId: cracker.id, at, round: state.round });
     current = replaceCracker(current, {
@@ -582,7 +671,7 @@ function respawnCrackers(arena: Arena, state: MatchState, log: MatchEvent[]): Ma
       state: 'live' as const,
       respawnOnRound: null,
     });
-  }
+  });
 
   return changed ? { ...current, rngSeed: rng.seed } : state;
 }
@@ -958,7 +1047,13 @@ function dropPayload(ctx: Ctx, state: MatchState, unitId: UnitId): MatchState {
 
 /**
  * Substitutes. Two rounds after going down, a player is replaced from the bench
- * at the same role and Tier, entering beside its own Furnace.
+ * at the same role and Tier, entering on **the free cell nearest the centre of
+ * the pitch** (écart 37 bis, 2H.6), the centre itself when it is free, never
+ * the loose ball, a player or a live Cracker, ties split by the dice. It used
+ * to come back beside its own Furnace mouth (écart 37), which Jérôme's second
+ * game found too punishing: twenty cells from where the ball was. The
+ * `substituteEntry` of the arena spec and the `substitute_entry` column stay
+ * in place and are no longer read.
  *
  * The unit keeps its id and its name rather than becoming a new Giff. That is a
  * simplification of the fiche and a deliberate one: mechanically it is the same
@@ -966,17 +1061,17 @@ function dropPayload(ctx: Ctx, state: MatchState, unitId: UnitId): MatchState {
  * not want it swapped out from under them mid-match.
  */
 function returnSubstitutes(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
+  const rng = new Rng(state.rngSeed);
   let next = state;
+  let changed = false;
 
   for (const unit of state.units) {
     if (unit.status !== 'evacuated' || unit.evacuatedOnRound === null) continue;
     if (state.round - unit.evacuatedOnRound < SUBSTITUTE_DELAY_ROUNDS) continue;
     if (next.bench[unit.team] <= 0) continue;
 
-    const entry = arena.spec.substituteEntry[unit.team];
-    const taken = activeUnits(next).some((u) => u.x === entry.x && u.y === entry.y);
-    if (taken) continue;
-
+    const entry = nearestFreeCell(arena, takenOn(next), arena.spec.ordnanceStart, rng);
+    changed = true;
     log.push({ kind: 'substituteEntered', unitId: unit.id, round: state.round, at: entry });
     next = {
       ...replaceUnit(next, {
@@ -992,7 +1087,7 @@ function returnSubstitutes(arena: Arena, state: MatchState, log: MatchEvent[]): 
     };
   }
 
-  return next;
+  return changed ? { ...next, rngSeed: rng.seed } : state;
 }
 
 // -- End of turn and the ladder ---------------------------------------------

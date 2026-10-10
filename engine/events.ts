@@ -100,6 +100,23 @@ export type MatchEvent =
       readonly direction: number;
     }
   | {
+      /**
+       * The Breaker's parry (écart 47, 2H.6). A Cracker in drift rolled onto a
+       * Breaker's cell and the Breaker spent its Reaction to bat it before it
+       * went off. `hit` says whether the swing connected; `direction` is the
+       * d8 face the Cracker is sent back down on a hit, chosen inside the arc
+       * in front of the Breaker, and the face it would have been sent down on
+       * a miss. The run that follows is a `crackerMoved`, the blast, if any,
+       * a `crackerDetonated`. New in engine version 3.
+       */
+      readonly kind: 'crackerParried';
+      readonly unitId: UnitId;
+      readonly crackerId: string;
+      readonly roll: DiceRoll;
+      readonly hit: boolean;
+      readonly direction: number;
+    }
+  | {
       readonly kind: 'crackerDetonated';
       readonly crackerId: string;
       readonly at: Point;

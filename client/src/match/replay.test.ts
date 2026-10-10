@@ -173,4 +173,13 @@ describe('the replay projects, it does not invent', () => {
 
     throw new Error('no goal was scored in sixty turns, so the loud path went unchecked');
   });
+
+  it('gives a Cracker parry a line of its own', () => {
+    const state = open(7).session.state;
+    const unitId = state.units[0]!.id;
+    const roll = { die: 20, rolled: 14, bonus: 3, total: 17, against: 10, mode: 'normal' as const };
+    const event: MatchEvent = { kind: 'crackerParried', unitId, crackerId: 'cracker-1', roll, hit: true, direction: 3 };
+    const lines = toBeats(state, [event], 'A').flatMap((beat) => beat.lines);
+    expect(lines.some((line) => /parries/.test(line.text) && /CLEAN/.test(line.text))).toBe(true);
+  });
 });

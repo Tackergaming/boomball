@@ -17,11 +17,16 @@ import { expect, test } from '@playwright/test';
 import {
   Shots,
   act,
+  boardOf,
   farthest,
+  firstChangedBoard,
   glideSeen,
+  judgeSend,
   report,
   roundMarkers,
   stamp,
+  startSendWatch,
+  stopSendWatch,
   summary,
   unitAt,
   view,
@@ -153,8 +158,17 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   // screen boxes are sampled every tenth of a second until one of them has
   // moved between two samples: that is a glide, not a jump. Both instants are
   // captured for a human, or Claude, to read.
+  //
+  // The same click is watched for audit line "retour 1 de 2H.5": between the
+  // click and the first beat, the board and `seq` must still be the ones the
+  // player was looking at. The sampler runs in the page, the captures here.
   await page.getByRole('button', { name: 'slow', exact: true }).click();
+  const seqBeforeSend = (await view(page)).seq;
+  const boardBeforeSend = await boardOf(page);
+  await startSendWatch(page);
   await page.getByRole('button', { name: 'End turn', exact: true }).click();
+  await firstChangedBoard(page, boardBeforeSend);
+  await shots.take('first-board-after-send');
   await page.waitForFunction(() => window.__boomball?.replaying === true, null, { timeout: 30_000 });
   const glide = await glideSeen(page, shots);
   expect(glide.moved, 'at least one token moved between two samples during the replay').toBe(true);
@@ -165,6 +179,12 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   await page.evaluate(() => window.__boomball?.skipReplay());
 
   expect(await waitForMyTurn(page)).toBe('turn');
+  const samplesOfSend = await stopSendWatch(page);
+  const boardAfterSend = await boardOf(page);
+  await shots.take('final-board');
+  const verdict = judgeSend(samplesOfSend, seqBeforeSend, boardBeforeSend, boardAfterSend);
+  expect(verdict.seqJump, 'seq stays put until the replay starts').toBeNull();
+  expect(verdict.firstBoard, 'the first board after the send is a beat, not the final board').toBeNull();
   const afterThree = await view(page);
   expect(afterThree.seq).toBeGreaterThan(afterTwo.seq);
   await shots.take('turn-3-house-played');

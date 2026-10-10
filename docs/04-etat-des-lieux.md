@@ -3,10 +3,13 @@
 > Historique du projet Boomball : ce qui a été construit et pourquoi, jusqu'au 2026-09-02. Depuis le
 > 2026-10-10 le point d'entrée est `08-plan-terrain-horizontal.md`, et `07-audit-et-plan-3d.md`
 > porte l'audit et le journal des phases. **Bandeau tenu à jour pour `check_drift.py` : au
-> 2026-10-10, après les sous-phases 2H.1 à 2H.5, le moteur 2 joue le terrain horizontal, l'IA voit
-> les obstacles, **382 tests**, et après la campagne 2H.3 et les arbitrages de Jérôme, Crackers à 10,
-> portée 9/12, Spark 20, le sweep donne 1,10 à 1,80 buts par match, équilibrage re-clos le
-> 2026-10-10 et confirmé clos par Jérôme le soir même sur le sweep de contrôle de 2H.5 (1,02 à 1,49).
+> 2026-10-10, après les sous-phases 2H.1 à 2H.6, le moteur 3 joue le terrain horizontal, les
+> Crackers roulent vers le ballon et le Breaker les pare, l'IA voit les obstacles, **408 tests**,
+> et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6, Crackers à 8,
+> portée 9/12, Spark 20, le sweep donne 1,18 à 2,21 buts par match (`09` §11), équilibrage
+> re-clos par Jérôme sur ce tableau le 2026-10-10. **Le moteur 3 est le jeu en ligne** :
+> `resolve-action` v11 et `create-match` v9 déployées le 2026-10-10 avec son feu vert, les
+> matchs du moteur 2 archivés par le client, la première parade jouée en ligne le même jour.
 > Tout ce qui suit décrit le terrain vertical, dépassé par la décision D11.
 > Dernière mise à jour du corps : 2026-09-02, après cinq tests en local de Jérôme et les deux
 > arbitrages qui suivaient le passage au terrain vertical.

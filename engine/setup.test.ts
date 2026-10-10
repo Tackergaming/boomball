@@ -14,6 +14,7 @@ import { distance } from './geometry.js';
 import { pathTo, reachableCells } from './rules/movement.js';
 import { rangeToFurnace } from './rules/payload.js';
 import { buildTurnOrder, ladderRungs } from './initiative.js';
+import { crackerPost } from './rules/ordnance.js';
 import { createMatch, MAX_HUMANS, type MatchSetup } from './setup.js';
 import { TEAM_COMPOSITION } from './stats.js';
 import { activeUnitsOf, isHuman, type MatchState } from './types.js';
@@ -200,9 +201,11 @@ describe('kick-off', () => {
     expect(bulwark?.maxHp).toBe(70);
   });
 
-  it('drops the Payload at the centre and a Cracker either side of it, never on it', () => {
-    // Écart 43. Both Crackers used to share the ball's cell and were drawn
-    // under it, so the first game showed one Cracker where there were two.
+  it('drops the Payload at the centre and a Cracker beside each edge post of the halfway line', () => {
+    // Écart 46. They used to start beside the ball (écart 43) and before that
+    // on it; born in the kick-off scrum they went off before anyone had moved.
+    // Seven cells out at the two pillars of the halfway line, they join the
+    // game on round 2 instead of opening it.
     const arena = new Arena(KILL_SILO);
     const state = createMatch(base);
     const centre = KILL_SILO.ordnanceStart;
@@ -211,18 +214,21 @@ describe('kick-off', () => {
     expect(state.crackers).toHaveLength(2);
     const cells = state.crackers.map((c) => `${c.x},${c.y}`);
     expect(new Set(cells).size).toBe(2);
-    for (const cracker of state.crackers) {
+    state.crackers.forEach((cracker, i) => {
       expect(cracker.state).toBe('live');
-      expect({ x: cracker.x, y: cracker.y }).not.toEqual(centre);
-      expect(cracker.y).toBe(centre.y);
-      expect(Math.abs(cracker.x - centre.x)).toBe(1);
+      expect(cracker.id).toBe(`cracker-${i + 1}`);
+      expect(distance(cracker, crackerPost(arena, i))).toBe(1);
       expect(arena.isOccupiable(cracker)).toBe(true);
-    }
-    // Across the width, so each one is as far from both Furnaces as the ball.
+      expect(state.units.some((u) => u.x === cracker.x && u.y === cracker.y)).toBe(false);
+    });
+    // On the halfway line or a cell off it, so each one is as far from both
+    // Furnaces as the ball is, give or take that cell.
     for (const cracker of state.crackers) {
-      expect(rangeToFurnace(cracker, arena.furnaceOf('A'))).toBe(
-        rangeToFurnace(cracker, arena.furnaceOf('B')),
-      );
+      expect(
+        Math.abs(
+          rangeToFurnace(cracker, arena.furnaceOf('A')) - rangeToFurnace(cracker, arena.furnaceOf('B')),
+        ),
+      ).toBeLessThanOrEqual(2);
     }
   });
 

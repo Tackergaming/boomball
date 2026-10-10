@@ -121,13 +121,20 @@ describe('what a beat moves', () => {
   });
 
   it('rolls a Cracker and the Spark along their paths', () => {
+    // The Cracker starts wherever the kick-off put it (beside its post since
+    // écart 46); the step reads its origin off the board, not off the event.
+    const home = { x: base.crackers[0]!.x, y: base.crackers[0]!.y };
+    const path = [
+      { x: home.x + 1, y: home.y },
+      { x: home.x + 2, y: home.y },
+    ];
     const steps = motionOf(base, [
-      { kind: 'crackerMoved', crackerId: 'cracker-1', from: { x: 6, y: 22 }, to: { x: 6, y: 24 }, path: [{ x: 6, y: 23 }, { x: 6, y: 24 }] },
+      { kind: 'crackerMoved', crackerId: 'cracker-1', from: home, to: path[1]!, path },
       { kind: 'sparkEntered', at: { x: 3, y: 20 }, round: 6 },
       { kind: 'sparkMoved', from: { x: 3, y: 20 }, to: { x: 3, y: 21 }, direction: 1, path: [{ x: 3, y: 21 }] },
     ]);
     expect(steps).toEqual([
-      { kind: 'cracker', crackerId: 'cracker-1', from: { x: 6, y: 22 }, path: [{ x: 6, y: 23 }, { x: 6, y: 24 }] },
+      { kind: 'cracker', crackerId: 'cracker-1', from: home, path },
       { kind: 'spark', from: { x: 3, y: 20 }, path: [{ x: 3, y: 21 }] },
     ]);
   });

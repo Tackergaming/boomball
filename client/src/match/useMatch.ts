@@ -27,6 +27,19 @@
  * reply to its own request, so a broadcast that never arrives costs nothing.
  * The reconnection story the plan asks for is the same code path: on waking up,
  * compare `seq` and re-read if it moved.
+ *
+ * **The broadcast of our own batch lands before our own reply**, and that is
+ * the one place the two paths fought. Audit line A9 stopped the echo from
+ * putting every line in the feed twice; it did not stop its handler re-reading
+ * the snapshot, which put the final board on screen a few hundred milliseconds
+ * before the replay started walking from the old one (Jérôme's retour 1 at
+ * the gate of 2H.5: "at the start of each house round I already see where
+ * everybody ends up"). So while a request of this client is in flight, the
+ * broadcast handler takes the feed and leaves the board alone: the reply
+ * replays the batch and re-reads the snapshot itself, in that order. In solo
+ * nobody else writes, so nothing is missed; in co-op a batch somebody else
+ * produced while ours is in flight is caught by the re-read that ends our own
+ * replay, since `load()` reads whatever the server holds by then.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -187,6 +200,13 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
    * thing both copies share (audit line A9).
    */
   const seenRef = useRef(new Set<number>());
+  /**
+   * How many requests of this client are in flight, replay included. While
+   * it is above zero the broadcast handler must not re-read the snapshot: the
+   * reply is about to replay this very batch from the board on screen, and a
+   * re-read in between shows the end of the round before its beginning.
+   */
+  const inFlightRef = useRef(0);
   const speedRef = useRef(speed);
   const skipRef = useRef(false);
   const liveRef = useRef(true);
@@ -262,6 +282,10 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         if (payload.events) {
           setFeed((old) => [...old, ...payload.events!].slice(-FEED_LIMIT));
         }
+        // Our own batch, echoed ahead of our reply: the reply replays it and
+        // re-reads the board at the end. Re-reading here instead showed the
+        // final positions before the replay had begun (retour 1 de 2H.5).
+        if (inFlightRef.current > 0) return;
         void load();
       })
       .subscribe();
@@ -338,6 +362,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
       setRefusal(null);
       setExpired(false);
       setBeat(null);
+      inFlightRef.current += 1;
       // `busy` locks the action bar, so every path out of here has to clear it.
       // One that did not is what left the lobby button stuck forever, and in a
       // match the same mistake costs a player the rest of the game.
@@ -383,6 +408,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         console.error('the turn could not be sent', failure);
         setRefusal('the turn could not be sent. Check your connection and try again.');
       } finally {
+        inFlightRef.current -= 1;
         setBusy(false);
       }
     },

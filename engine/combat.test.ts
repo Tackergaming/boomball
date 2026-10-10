@@ -606,7 +606,23 @@ describe('going down and coming back', () => {
     const back = state.units.find((u) => u.id === victim.id)!;
     expect(back.status).toBe('active');
     expect(back.hp).toBe(back.maxHp);
-    expect({ x: back.x, y: back.y }).toEqual(KILL_SILO.substituteEntry.B);
+    // Écart 37 bis: on the free cell nearest the centre of the pitch, not
+    // beside its own Furnace any more. Nobody else stands there and it is not
+    // the loose ball.
+    const centre = KILL_SILO.ordnanceStart;
+    const others = state.units.filter((u) => u.id !== back.id && u.status === 'active');
+    expect(others.some((u) => u.x === back.x && u.y === back.y)).toBe(false);
+    if (state.payload.carriedBy === null) {
+      expect({ x: back.x, y: back.y }).not.toEqual({ x: state.payload.x, y: state.payload.y });
+    }
+    const nearerFree = [...arena.occupiableCells()].filter(
+      (c) =>
+        distance(c, centre) < distance(back, centre) &&
+        !others.some((u) => u.x === c.x && u.y === c.y) &&
+        !(state.payload.carriedBy === null && state.payload.x === c.x && state.payload.y === c.y) &&
+        !state.crackers.some((k) => k.state === 'live' && k.x === c.x && k.y === c.y),
+    );
+    expect(nearerFree).toHaveLength(0);
     expect(state.bench.B).toBe(BENCH_SIZE - 1);
   });
 

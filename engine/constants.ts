@@ -30,10 +30,13 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * Which engine wrote a match. Bumped when a `MatchState` or an event changes
  * shape or meaning, so a match opened under one engine is never replayed by
  * another (audit line A11). Version 1 was the vertical silo with anchoring and
- * falls; version 2 is the horizontal pitch of D11, 2026-10-10. Nothing in the
- * engine reads it yet: the server stamps it on `matches` and refuses a mismatch.
+ * falls; version 2 is the horizontal pitch of D11, 2026-10-10; version 3 adds
+ * the Breaker's parry and its `crackerParried` event (écart 47, 2H.6, decided
+ * by Jérôme on 2026-10-10 soir). Nothing in the engine reads it: the server
+ * stamps it on `matches` and refuses a mismatch, and the client archives what
+ * it cannot play.
  */
-export const ENGINE_VERSION = 2;
+export const ENGINE_VERSION = 3;
 
 // -- Movement ---------------------------------------------------------------
 
@@ -121,16 +124,30 @@ export const BULWARK_BLOCK_BONUS: Readonly<Record<Tier, number>> = {
 export const CRACKER_COUNT = 2;
 export const CRACKER_INITIATIVE = 20;
 /**
- * Ten, since 2026-10-10 (écart 40, decision D4). Six was the fiche's number and
- * on the horizontal pitch the Crackers barely reached anyone: Jérôme's first
- * game read them as balls that hardly moved. Measured at ten on the 2H.3 sweep,
- * 200 matches per Tier: one more player evacuated every three or four matches,
- * the goal rate holds at 1.10 to 1.80 per match across the Tiers, nothing else
- * moves. The table is in docs/09-equilibrage-2H3-2026-10-10.md.
+ * Eight, since 2H.6 (écart 40 bis, decided by Jérôme on 2026-10-10 soir).
+ *
+ * Six was the fiche's number and on the horizontal pitch the Crackers barely
+ * reached anyone: Jérôme's first game read them as balls that hardly moved.
+ * Ten was measured on the 2H.3 sweep and kept (écart 40, decision D4), with
+ * the Crackers born a cell from the ball. Since écart 46 they are born at the
+ * edge posts of the halfway line, seven cells from the centre, and since écart
+ * 45 they roll at the ball rather than at the nearest player; Jérôme brought
+ * them down to eight at the same time. The 2H.6 control sweep measures the
+ * three changes together, docs/09-equilibrage-2H3-2026-10-10.md §11.
  */
-export const CRACKER_MOVE_CELLS = 10;
+export const CRACKER_MOVE_CELLS = 8;
 export const CRACKER_BAT_RANGE_CELLS = 12;
 export const CRACKER_AC = 10;
+
+/**
+ * The Breaker's parry (écart 47, 2H.6). A Cracker in drift that rolls onto a
+ * Breaker's cell is met with the bat before it goes off: a Reaction, a melee
+ * attack against `CRACKER_AC`, and on a hit the Cracker is sent back
+ * `CRACKER_BAT_RANGE_CELLS` down one of the faces of a 120 degree arc in front
+ * of the Breaker, the face it came in through and its two neighbours. One face
+ * either side of the arrival face is what 120 degrees is on a d8.
+ */
+export const CRACKER_PARRY_ARC_HALF_WIDTH = 1;
 export const CRACKER_SAVE_DC = 15;
 export const CRACKER_DAMAGE_DICE = 3;
 export const CRACKER_DAMAGE_DIE = 6;

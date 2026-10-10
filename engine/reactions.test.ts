@@ -83,6 +83,45 @@ describe('who an opportunity attack is drawn from', () => {
     expect(opportunityAttackers(staged, mover, { x: 5, y: 22 }, { x: 4, y: 22 })).toHaveLength(0);
   });
 
+  it('does not name an opponent beside the thrower who is off the line', () => {
+    const state = board();
+    const thrower = actorOf(state);
+    const neighbour = enemyOf(state, thrower, 'striker');
+    const flight = straight({ x: 5, y: 22 }, { x: 11, y: 22 });
+
+    // (5, 21) touches the first cell (6, 22) but is two from (7, 22) onward.
+    for (const at of [
+      { x: 4, y: 21 },
+      { x: 5, y: 21 },
+    ]) {
+      const staged = put(state, neighbour.id, at);
+      expect(passInterceptors(arena, staged, thrower, flight), `${at.x},${at.y}`).toHaveLength(0);
+    }
+  });
+
+  it('still names an opponent beside the first cell when he is beside the second too', () => {
+    const state = board();
+    const thrower = actorOf(state);
+    const near = enemyOf(state, thrower, 'striker');
+    // One from (7, 22), the second cell of the flight.
+    const staged = put(state, near.id, { x: 6, y: 21 });
+
+    const flight = straight({ x: 5, y: 22 }, { x: 11, y: 22 });
+    expect(passInterceptors(arena, staged, thrower, flight).map((u) => u.id)).toEqual([near.id]);
+  });
+
+  it('names nobody on a pass to an adjacent team-mate', () => {
+    const state = board();
+    const thrower = actorOf(state);
+    const near = enemyOf(state, thrower, 'striker');
+    const other = enemyOf(state, thrower, 'breaker');
+    const staged = put(put(state, near.id, { x: 6, y: 21 }), other.id, { x: 5, y: 23 });
+
+    const flight = straight({ x: 5, y: 22 }, { x: 6, y: 22 });
+    expect(flight).toHaveLength(1);
+    expect(passInterceptors(arena, staged, thrower, flight)).toHaveLength(0);
+  });
+
   it('names nobody who has already spent its Reaction', () => {
     const state = board();
     const mover = actorOf(state);
@@ -191,8 +230,9 @@ describe('who may snatch a pass', () => {
       const state = board();
       const thrower = actorOf(state);
       const lurker = enemyOf(state, thrower, 'striker');
-      // One from (6, 15), which is open floor.
-      const staged = put(state, lurker.id, { x: 6, y: 16 });
+      // One from (8, 16), which is open floor and past the first cell of the
+      // flight: écart 48 leaves the cell beside the thrower out of it.
+      const staged = put(state, lurker.id, { x: 9, y: 17 });
 
       expect(passInterceptors(arena, staged, thrower, flight).map((u) => u.id)).toEqual([
         lurker.id,
@@ -393,6 +433,21 @@ describe('snatching a pass in a match', () => {
 
     expect(events.some((e) => e.kind === 'passIntercepted')).toBe(true);
     expect(after.units.find((u) => u.id === thiefId)!.reactionAvailable).toBe(false);
+  });
+
+  it('never lets a neighbour of the thrower snatch a pass that has barely left the hands', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const { state, mateId, thiefId } = staged(seed, { x: 5, y: 21 });
+      const { state: after, events } = must(state, { kind: 'pass', targetId: mateId });
+
+      expect(
+        events.some((e) => e.kind === 'passIntercepted'),
+        `seed ${seed}`,
+      ).toBe(false);
+      expect(after.units.find((u) => u.id === thiefId)!.reactionAvailable, `seed ${seed}`).toBe(
+        true,
+      );
+    }
   });
 
   it('leaves an undefended lane alone', () => {

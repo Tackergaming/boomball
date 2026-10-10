@@ -87,6 +87,15 @@ export function provokedAlong(state: MatchState, mover: Unit, path: readonly Poi
  * walks Chebyshev steps and may clip the corner of a crate the real line
  * misses, so those cells are skipped rather than counted.
  *
+ * Écart 48 (2026-10-10): the first cell of the flight does not count. A pass
+ * that has just left the hands cannot be snatched by a neighbour of the
+ * thrower, which in play read as a theft of a ball nobody had yet seen fly. An
+ * opponent has to be on the trajectory, or within one cell of it, counting from
+ * the second cell onward. A pass to an adjacent team-mate, a flight of one
+ * cell, can therefore never be intercepted. A defender standing on or beside
+ * the first cell still counts when he is also within one cell of the second,
+ * because that follows from the rule as written and not from a special case.
+ *
  * Each of them gets one attempt, and the first to win it takes the ball, which
  * is what makes a long throw across the middle third a real gamble.
  */
@@ -103,7 +112,7 @@ export function passInterceptors(
   const found: Unit[] = [];
   const seen = new Set<string>();
 
-  for (const cell of flight) {
+  for (const cell of flight.slice(1)) {
     if (arena.isSolid(cell)) continue;
     for (const enemy of enemies) {
       if (seen.has(enemy.id)) continue;

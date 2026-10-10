@@ -94,6 +94,10 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
         : `${name(event.shoverId)} shoves at ${name(event.targetId)} and it holds.`;
     case 'crackerBatted':
       return `${name(event.unitId)} bats ${event.crackerId} away.`;
+    case 'crackerParried':
+      return event.hit
+        ? `${name(event.unitId)} gets the bat on ${event.crackerId} as it comes in.`
+        : `${name(event.unitId)} swings at ${event.crackerId} as it comes in, and misses.`;
     case 'crackerDetonated':
       return `${event.crackerId} goes off on ${name(event.targetId)} for ${event.damage}${event.saved ? ', half caught' : ''}.`;
     case 'crackerRespawned':

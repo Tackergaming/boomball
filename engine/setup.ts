@@ -50,8 +50,10 @@ export function createMatch(setup: MatchSetup): MatchState {
     throw new Error(`arena ${setup.arena.id} drops its ordnance on solid terrain`);
   }
 
-  // One either side of the ball, never on it (écart 43).
-  const crackers: Cracker[] = crackerKickoffCells(arena, ordnance).map((cell, i) => ({
+  // One beside each edge post of the halfway line, never on the ball, never
+  // on a player (écart 46). The ball lies loose at the centre at kick-off.
+  const payload = { carriedBy: null, x: ordnance.x, y: ordnance.y };
+  const crackers: Cracker[] = crackerKickoffCells(arena, units, payload, rng).map((cell, i) => ({
     id: `cracker-${i + 1}`,
     x: cell.x,
     y: cell.y,
@@ -72,7 +74,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     turnIndex: 0,
     turn: null,
     units: rollHumanInitiative(units, rng),
-    payload: { carriedBy: null, x: ordnance.x, y: ordnance.y },
+    payload,
     crackers,
     // The Spark stays off the field until the start of round 6.
     spark: { state: 'pending', x: ordnance.x, y: ordnance.y, heading: null },

@@ -6,6 +6,7 @@ import { KILL_SILO } from './arenas/kill-silo.js';
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
+  CRACKER_AC,
   CRACKER_DAMAGE_DICE,
   CRACKER_BAT_RANGE_CELLS,
   CRACKER_DAMAGE_DIE,
@@ -23,15 +24,21 @@ import { legalActions } from './legalActions.js';
 import { openMatch, reduce, type ReduceResult } from './reduce.js';
 import { Rng } from './rng.js';
 import {
+  arrivalFace,
+  ballCell,
   battedCrackerRun,
   crackerKickoffCells,
+  crackerPost,
   crackerRespawnCell,
   crackerRun,
+  parryDirection,
+  parryFaces,
   shortestPath,
   sparkEntryCell,
   sparkRun,
 } from './rules/ordnance.js';
 import { createMatch } from './setup.js';
+import { statsFor } from './stats.js';
 import type { MatchState, TeamId, Unit, UnitId } from './types.js';
 
 const arena = new Arena(KILL_SILO);
@@ -124,101 +131,188 @@ function loneTarget(at: Point, team: TeamId = 'B'): { state: MatchState; target:
   return { state, target: state.units.find((u) => u.id === target.id)! };
 }
 
+/** The ball lying loose on a cell, nobody holding it. */
+function ballAt(state: MatchState, at: Point): MatchState {
+  return {
+    ...state,
+    units: state.units.map((u) => ({ ...u, holdingPayload: false })),
+    payload: { carriedBy: null, x: at.x, y: at.y },
+  };
+}
+
+/** The ball in a player's hands. */
+function carrying(state: MatchState, id: UnitId): MatchState {
+  const carrier = state.units.find((u) => u.id === id)!;
+  return {
+    ...state,
+    units: state.units.map((u) => ({ ...u, holdingPayload: u.id === id })),
+    payload: { carriedBy: id, x: carrier.x, y: carrier.y },
+  };
+}
+
+/** A fresh, cleared Cracker record standing on a cell, for the pure homing rule. */
+function crackerOn(at: Point, id = 'cracker-1') {
+  return { id, x: at.x, y: at.y, state: 'live' as const, respawnOnRound: null };
+}
+
 // -- The homing rule, on its own --------------------------------------------
 
-describe('a Cracker on count 20', () => {
-  it('walks to the nearest player and goes off on them', () => {
+describe('a Cracker on count 20 (écart 45)', () => {
+  it('rolls at a loose ball, stops on its cell, and nothing happens', () => {
+    const state = ballAt(cleared(fresh()), { x: 7, y: 25 });
+    const outcome = crackerRun(arena, state, crackerOn({ x: 7, y: 22 }));
+
+    expect(outcome.struck).toBeNull();
+    expect(outcome.path).toHaveLength(3);
+    expect(outcome.landing).toEqual({ x: 7, y: 25 });
+  });
+
+  it('rolls at the carrier and goes off on them', () => {
     const { state, target } = loneTarget({ x: 7, y: 25 });
-    const outcome = crackerRun(arena, state, { x: 7, y: 22 }, new Rng(1));
+    const outcome = crackerRun(arena, carrying(state, target.id), crackerOn({ x: 7, y: 22 }));
 
     expect(outcome.struck?.id).toBe(target.id);
     expect(xy(outcome.landing)).toEqual({ x: 7, y: 25 });
     expect(outcome.path).toHaveLength(3);
   });
 
-  it('goes off on the first player it crosses, not on the one it was aiming at', () => {
-    const board = cleared(fresh());
-    const aimedAt = someone(board, 'B');
-    const bystander = someone(board, 'A');
-    const state = place(place(board, aimedAt.id, { x: 7, y: 27 }), bystander.id, { x: 7, y: 24 });
+  it('reads a carried ball off the carrier, not off the stale payload cell', () => {
+    const { state, target } = loneTarget({ x: 11, y: 30 });
+    const stale: MatchState = {
+      ...state,
+      units: state.units.map((u) => ({ ...u, holdingPayload: u.id === target.id })),
+      payload: { carriedBy: target.id, x: 3, y: 3 },
+    };
+    expect(ballCell(stale)).toEqual({ x: 11, y: 30 });
+  });
 
-    const outcome = crackerRun(arena, state, { x: 7, y: 22 }, new Rng(1));
+  it('goes off on the first player it crosses on the way to the ball, not on the one holding it', () => {
+    const board = cleared(fresh());
+    const bystander = someone(board, 'A');
+    const state = ballAt(place(board, bystander.id, { x: 7, y: 24 }), { x: 7, y: 27 });
+
+    const outcome = crackerRun(arena, state, crackerOn({ x: 7, y: 22 }));
 
     expect(outcome.struck?.id).toBe(bystander.id);
     expect(xy(outcome.landing)).toEqual({ x: 7, y: 24 });
   });
 
-  it('covers its whole move and no more, and hurts nobody when it falls short', () => {
-    // Column 11 is open from y = 22 to y = 37, so the route is a straight line
-    // and the target at y = 40 is out of reach whatever the move is, as long as
-    // it stays under the eighteen rows to the target.
-    expect(CRACKER_MOVE_CELLS).toBeLessThan(15);
-    const { state } = loneTarget({ x: 11, y: 40 });
-    const outcome = crackerRun(arena, state, { x: 11, y: 22 }, new Rng(1));
+  it('ignores a player who is nearer than the ball but not on the way', () => {
+    // Column 11 is open from y = 22 to y = 37. The player stands a cell east
+    // of the Cracker; under the old rule it was the nearest thing and got hit.
+    const { state } = loneTarget({ x: 12, y: 22 });
+    const outcome = crackerRun(arena, ballAt(state, { x: 11, y: 32 }), crackerOn({ x: 11, y: 22 }));
 
     expect(outcome.struck).toBeNull();
     expect(outcome.path).toHaveLength(CRACKER_MOVE_CELLS);
     expect(outcome.landing).toEqual({ x: 11, y: 22 + CRACKER_MOVE_CELLS });
   });
 
-  it('goes off where it lies when a player is standing on it', () => {
+  it('covers its whole move and no more when the ball is out of reach', () => {
+    expect(CRACKER_MOVE_CELLS).toBeLessThan(15);
+    const state = ballAt(cleared(fresh()), { x: 11, y: 37 });
+    const outcome = crackerRun(arena, state, crackerOn({ x: 11, y: 22 }));
+
+    expect(outcome.struck).toBeNull();
+    expect(outcome.path).toHaveLength(CRACKER_MOVE_CELLS);
+    expect(outcome.landing).toEqual({ x: 11, y: 22 + CRACKER_MOVE_CELLS });
+  });
+
+  it('does nothing when it is already sitting on the loose ball', () => {
+    const state = ballAt(cleared(fresh()), { x: 7, y: 22 });
+    const outcome = crackerRun(arena, state, crackerOn({ x: 7, y: 22 }));
+
+    expect(outcome.struck).toBeNull();
+    expect(outcome.path).toHaveLength(0);
+    expect(outcome.landing).toEqual({ x: 7, y: 22 });
+  });
+
+  it('goes off where it lies when a player is standing on it, ball or no ball', () => {
     const { state, target } = loneTarget({ x: 7, y: 22 });
-    const outcome = crackerRun(arena, state, { x: 7, y: 22 }, new Rng(1));
+    const outcome = crackerRun(arena, ballAt(state, { x: 3, y: 10 }), crackerOn({ x: 7, y: 22 }));
 
     expect(outcome.struck?.id).toBe(target.id);
     expect(outcome.path).toHaveLength(0);
     expect(outcome.landing).toEqual({ x: 7, y: 22 });
   });
 
-  it('goes round an obstacle to reach someone behind it', () => {
-    // The pillar at (7, 16) is dead between the Cracker and its target.
+  it('rolls in a straight line when one exists, whichever way the ball lies', () => {
+    // Row 22 is open from x = 1 to x = 13. Three cells west: three steps west,
+    // not a step south-east and two north-west, which is as short and which
+    // the first search produced.
+    const state = ballAt(cleared(fresh()), { x: 7, y: 22 });
+    const outcome = crackerRun(arena, state, crackerOn({ x: 10, y: 22 }));
+    expect(outcome.path.map(xy)).toEqual([
+      { x: 9, y: 22 },
+      { x: 8, y: 22 },
+      { x: 7, y: 22 },
+    ]);
+    const back = crackerRun(arena, state, crackerOn({ x: 4, y: 22 }));
+    expect(back.path.map(xy)).toEqual([
+      { x: 5, y: 22 },
+      { x: 6, y: 22 },
+      { x: 7, y: 22 },
+    ]);
+  });
+
+  it('goes round an obstacle to reach a ball behind it', () => {
+    // The pillar at (7, 16) is dead between the Cracker and the ball.
     expect(arena.isSolid({ x: 7, y: 16 })).toBe(true);
 
-    const { state, target } = loneTarget({ x: 7, y: 18 });
     const from: Point = { x: 7, y: 14 };
-    const outcome = crackerRun(arena, state, from, new Rng(1));
+    const state = ballAt(cleared(fresh()), { x: 7, y: 18 });
+    const outcome = crackerRun(arena, state, crackerOn(from));
 
     for (const cell of outcome.path) expect(arena.isSolid(cell)).toBe(false);
-    expect(outcome.path.length).toBeLessThanOrEqual(CRACKER_MOVE_CELLS);
-
     // Four rows to climb and one diagonal to step round the pillar: four steps,
     // worked out by hand and then held equal to what the search returns.
     const route = shortestPath(arena, from, { x: 7, y: 18 }, CRACKER_MOVE_CELLS);
     expect(route).toHaveLength(4);
     expect(outcome.path.map(xy)).toEqual(route.map(xy));
-
-    expect(outcome.struck?.id).toBe(target.id);
-    expect(xy(outcome.landing)).toEqual({ x: 7, y: 18 });
+    expect(outcome.struck).toBeNull();
+    expect(outcome.landing).toEqual({ x: 7, y: 18 });
   });
 
-  it('stops short of a target the route to which is longer than its move', () => {
-    // From (7, 12) past the pillar at (7, 16): the pillar costs nothing on a
-    // diagonal grid, but the target sits four rows beyond the Cracker's move,
-    // so it still falls short. Column 7 is open there apart from that pillar.
-    const targetY = 12 + CRACKER_MOVE_CELLS + 4;
-    expect(arena.isSolid({ x: 7, y: targetY })).toBe(false);
-    const { state } = loneTarget({ x: 7, y: targetY });
-    const outcome = crackerRun(arena, state, { x: 7, y: 12 }, new Rng(1));
+  it('stops on the last free cell before the other Cracker rather than rolling through it', () => {
+    const board = ballAt(cleared(fresh()), { x: 11, y: 30 });
+    const state = crackersAt(board, { x: 11, y: 22 }, { x: 11, y: 25 });
+    const outcome = crackerRun(arena, state, state.crackers[0]!);
 
     expect(outcome.struck).toBeNull();
-    expect(outcome.path).toHaveLength(CRACKER_MOVE_CELLS);
-    for (const cell of outcome.path) expect(arena.isSolid(cell)).toBe(false);
+    expect(outcome.path.map(xy)).toEqual([
+      { x: 11, y: 23 },
+      { x: 11, y: 24 },
+    ]);
+    expect(outcome.landing).toEqual({ x: 11, y: 24 });
   });
 
-  it('never stops because of an obstacle, from any open cell near the target', () => {
-    // Targets on either side of the pillar and of the crate at y = 9.
+  it('does not stop for its twin once the twin is spent', () => {
+    const board = ballAt(cleared(fresh()), { x: 11, y: 30 });
+    const placed = crackersAt(board, { x: 11, y: 22 }, { x: 11, y: 25 });
+    const state: MatchState = {
+      ...placed,
+      crackers: placed.crackers.map((c, i) =>
+        i === 1 ? { ...c, state: 'destroyed' as const, respawnOnRound: 3 } : c,
+      ),
+    };
+    const outcome = crackerRun(arena, state, state.crackers[0]!);
+    expect(outcome.landing).toEqual({ x: 11, y: 30 });
+  });
+
+  it('never stops because of an obstacle, from any open cell near the ball', () => {
+    // Balls on either side of the pillar and of the crate at y = 9.
     for (const at of [
       { x: 7, y: 17 },
       { x: 7, y: 15 },
       { x: 7, y: 10 },
       { x: 7, y: 8 },
     ]) {
-      const { state } = loneTarget(at);
+      const state = ballAt(cleared(fresh()), at);
       for (const cell of arena.occupiableCells()) {
         const away = distance(cell, at);
         if (away === 0 || away > 12) continue;
 
-        const outcome = crackerRun(arena, state, cell, new Rng(1));
+        const outcome = crackerRun(arena, state, crackerOn(cell));
         expect(outcome.path.length, `from ${cell.x},${cell.y} to ${at.x},${at.y}`).toBeGreaterThan(0);
         for (const step of outcome.path) expect(arena.isSolid(step)).toBe(false);
       }
@@ -270,12 +364,15 @@ describe('a batted Cracker', () => {
 
 // -- The Crackers through the engine ----------------------------------------
 
-/** Both Crackers on the kick-off cell, and one victim three cells above them. */
-function homingOnOne(state: MatchState, secondCracker: Point = { x: 7, y: 22 }): MatchState {
-  return place(
-    crackersAt(state, { x: 7, y: 22 }, secondCracker),
-    someone(state, 'B').id,
-    { x: 7, y: 25 },
+/**
+ * One Cracker at the centre, the ball loose three cells beyond a victim: the
+ * Cracker rolls at the ball and goes off on the victim on the way. The second
+ * Cracker is parked far away unless a test puts it somewhere.
+ */
+function homingOnOne(state: MatchState, secondCracker: Point = { x: 0, y: 0 }): MatchState {
+  return ballAt(
+    place(crackersAt(state, { x: 7, y: 22 }, secondCracker), someone(state, 'B').id, { x: 7, y: 25 }),
+    { x: 7, y: 27 },
   );
 }
 
@@ -288,10 +385,10 @@ describe('the Crackers on the ladder', () => {
     expect(state.round).toBe(1);
     expect(events.some((e) => e.kind === 'crackerMoved')).toBe(false);
     expect(events.some((e) => e.kind === 'crackerDetonated')).toBe(false);
-    for (const cracker of state.crackers) {
+    state.crackers.forEach((cracker, i) => {
       expect(cracker.state).toBe('live');
-      expect(distance(cracker, KILL_SILO.ordnanceStart)).toBe(1);
-    }
+      expect(distance(cracker, crackerPost(arena, i))).toBe(1);
+    });
     expect(CRACKER_FIRST_DRIFT_ROUND).toBe(2);
   });
 
@@ -344,14 +441,12 @@ describe('the Crackers on the ladder', () => {
       seen = step.events.find((e) => e.kind === 'crackerRespawned' && e.crackerId === crackerId);
     }
 
-    // Écart 43: back on the free cell nearest the centre. The ball still lies
-    // on the centre cell and the other Cracker stands there too, so the
-    // nearest free cell is one of the eight around it, never the centre. The
-    // blast was on the first drifting round, so the return is the one after.
+    // Écart 46: back beside its own edge post of the halfway line. The blast
+    // was on the first drifting round, so the return is the one after.
     expect(seen).toMatchObject({ round: CRACKER_FIRST_DRIFT_ROUND + 1 });
     const at = (seen as { at: Point }).at;
-    expect(at).not.toEqual(KILL_SILO.ordnanceStart);
-    expect(distance(at, KILL_SILO.ordnanceStart)).toBe(1);
+    const index = state.crackers.findIndex((c) => c.id === crackerId);
+    expect(distance(at, crackerPost(arena, index))).toBe(1);
     expect(arena.isOccupiable(at)).toBe(true);
     // It is live again, and it has already rolled on count 20 of that round,
     // so its cell is wherever the homing took it, not `at`.
@@ -359,11 +454,15 @@ describe('the Crackers on the ladder', () => {
   });
 
   it('returns both Crackers to distinct cells when they went off in the same round', () => {
-    // Two targets, one beside each Cracker, both go off on count 20 of round 1.
+    // The ball at the centre, a victim between each Cracker and the ball: both
+    // go off on count 20 of the first drifting round.
     const { state } = opened((s) => {
       const a = someone(s, 'A');
       const b = someone(s, 'B');
-      return place(place(crackersAt(s, { x: 6, y: 22 }, { x: 8, y: 22 }), a.id, { x: 5, y: 22 }), b.id, { x: 9, y: 22 });
+      return ballAt(
+        place(place(crackersAt(s, { x: 4, y: 22 }, { x: 10, y: 22 }), a.id, { x: 5, y: 22 }), b.id, { x: 9, y: 22 }),
+        { x: 7, y: 22 },
+      );
     });
     expect(state.crackers.every((c) => c.state === 'destroyed')).toBe(true);
 
@@ -377,9 +476,16 @@ describe('the Crackers on the ladder', () => {
     const back = events.filter((e): e is Extract<MatchEvent, { kind: 'crackerRespawned' }> => e.kind === 'crackerRespawned');
     expect(back).toHaveLength(2);
     expect(xy(back[0]!.at)).not.toEqual(xy(back[1]!.at));
+    for (const returned of back) {
+      const index = current.crackers.findIndex((c) => c.id === returned.crackerId);
+      expect(distance(returned.at, crackerPost(arena, index))).toBe(1);
+    }
+    // Each came back beside its post and has since rolled at the ball on
+    // count 20; one of them may well be sitting on it now, which écart 45
+    // allows. What it never did is come back **onto** the ball.
+    for (const returned of back) expect(xy(returned.at)).not.toEqual(xy(current.payload));
     for (const cracker of current.crackers) {
       expect(cracker.state).toBe('live');
-      expect(xy(cracker)).not.toEqual(xy(current.payload));
       expect(arena.isOccupiable(cracker)).toBe(true);
     }
   });
@@ -422,75 +528,80 @@ describe('the Crackers on the ladder', () => {
   });
 });
 
-describe('where a Cracker stands (écart 43)', () => {
-  it('starts the two Crackers either side of the ball across the width, on open floor', () => {
-    const cells = crackerKickoffCells(arena, KILL_SILO.ordnanceStart);
-    expect(cells).toEqual([
-      { x: 6, y: 22 },
-      { x: 8, y: 22 },
-    ]);
-    for (const cell of cells) expect(arena.isOccupiable(cell)).toBe(true);
+describe('where a Cracker stands (écart 46)', () => {
+  it('names the two edge posts of the halfway line, which are pillars', () => {
+    expect(crackerPost(arena, 0)).toEqual({ x: 0, y: 22 });
+    expect(crackerPost(arena, 1)).toEqual({ x: 14, y: 22 });
+    expect(arena.isSolid(crackerPost(arena, 0))).toBe(true);
+    expect(arena.isSolid(crackerPost(arena, 1))).toBe(true);
   });
 
-  it('refuses an arena whose centre has a crate beside it', () => {
-    // (1, 22) is beside the edge pillar (0, 22).
-    expect(() => crackerKickoffCells(arena, { x: 1, y: 22 })).toThrow(/beside its centre/);
+  it('starts cracker-1 beside the west post and cracker-2 beside the east post, on open floor', () => {
+    const board = fresh();
+    for (let seed = 1; seed <= 30; seed++) {
+      const [first, second] = crackerKickoffCells(arena, board.units, board.payload, new Rng(seed));
+      expect(distance(first, crackerPost(arena, 0)), `seed ${seed}`).toBe(1);
+      expect(distance(second, crackerPost(arena, 1)), `seed ${seed}`).toBe(1);
+      expect(arena.isOccupiable(first)).toBe(true);
+      expect(arena.isOccupiable(second)).toBe(true);
+      expect(first).not.toEqual(second);
+      expect(first).not.toEqual(KILL_SILO.ordnanceStart);
+      expect(second).not.toEqual(KILL_SILO.ordnanceStart);
+    }
   });
 
-  it('returns a spent Cracker to the centre itself when the centre is free', () => {
-    const board = cleared(fresh());
-    const state: MatchState = {
-      ...board,
-      payload: { carriedBy: null, x: 3, y: 10 },
-      crackers: board.crackers.map((c) => ({ ...c, state: 'destroyed' as const, respawnOnRound: 2 })),
-    };
-    expect(crackerRespawnCell(arena, state, new Rng(1))).toEqual(KILL_SILO.ordnanceStart);
+  it('does so on the real kick-off board, as far from both Furnaces as the ball', () => {
+    const state = fresh();
+    state.crackers.forEach((cracker, i) => {
+      expect(distance(cracker, crackerPost(arena, i))).toBe(1);
+      expect(state.units.some((u) => u.x === cracker.x && u.y === cracker.y)).toBe(false);
+    });
   });
 
-  it('never returns a Cracker onto the loose ball', () => {
+  it('returns a spent Cracker beside its own post', () => {
     const board = cleared(fresh());
     const state: MatchState = {
       ...board,
       payload: { carriedBy: null, x: 7, y: 22 },
       crackers: board.crackers.map((c) => ({ ...c, state: 'destroyed' as const, respawnOnRound: 2 })),
     };
-    for (let seed = 1; seed <= 40; seed++) {
-      const at = crackerRespawnCell(arena, state, new Rng(seed));
-      expect(at).not.toEqual({ x: 7, y: 22 });
-      expect(distance(at, { x: 7, y: 22 })).toBe(1);
+    for (let seed = 1; seed <= 20; seed++) {
+      expect(distance(crackerRespawnCell(arena, state, 0, new Rng(seed)), { x: 0, y: 22 })).toBe(1);
+      expect(distance(crackerRespawnCell(arena, state, 1, new Rng(seed)), { x: 14, y: 22 })).toBe(1);
     }
   });
 
-  it('never returns a Cracker onto a player or onto its live twin', () => {
+  it('never returns a Cracker onto the loose ball, a player or its live twin', () => {
     const board = cleared(fresh());
-    const blockers = board.units.slice(0, 7);
+    // The five open cells round the west post: three players, the ball, the twin.
     const ring = [
-      { x: 6, y: 21 }, { x: 7, y: 21 }, { x: 8, y: 21 },
-      { x: 6, y: 22 }, { x: 8, y: 22 },
-      { x: 6, y: 23 }, { x: 7, y: 23 },
+      { x: 0, y: 21 },
+      { x: 1, y: 21 },
+      { x: 1, y: 22 },
     ];
     let state: MatchState = {
       ...board,
-      payload: { carriedBy: null, x: 7, y: 22 },
+      payload: { carriedBy: null, x: 1, y: 23 },
       crackers: board.crackers.map((c, i) =>
-        i === 0
-          ? { ...c, x: 8, y: 23, state: 'live' as const, respawnOnRound: null }
+        i === 1
+          ? { ...c, x: 0, y: 23, state: 'live' as const, respawnOnRound: null }
           : { ...c, state: 'destroyed' as const, respawnOnRound: 2 },
       ),
     };
-    blockers.forEach((u, i) => {
+    board.units.slice(0, ring.length).forEach((u, i) => {
       state = place(state, u.id, ring[i]!);
     });
-    // Centre is the ball, the ring is players and the live twin: distance 2 it is.
     for (let seed = 1; seed <= 20; seed++) {
-      const at = crackerRespawnCell(arena, state, new Rng(seed));
-      expect(distance(at, { x: 7, y: 22 })).toBe(2);
+      const at = crackerRespawnCell(arena, state, 0, new Rng(seed));
+      expect(distance(at, { x: 0, y: 22 })).toBe(2);
       expect(arena.isOccupiable(at)).toBe(true);
       expect(state.units.some((u) => u.x === at.x && u.y === at.y)).toBe(false);
+      expect(at).not.toEqual({ x: 1, y: 23 });
+      expect(at).not.toEqual({ x: 0, y: 23 });
     }
   });
 
-  it('splits equidistant cells by the dice rather than always the same way', () => {
+  it('splits the cells beside the post by the dice rather than always the same way', () => {
     const board = cleared(fresh());
     const state: MatchState = {
       ...board,
@@ -499,10 +610,233 @@ describe('where a Cracker stands (écart 43)', () => {
     };
     const seen = new Set<string>();
     for (let seed = 1; seed <= 60; seed++) {
-      const at = crackerRespawnCell(arena, state, new Rng(seed));
+      const at = crackerRespawnCell(arena, state, 0, new Rng(seed));
       seen.add(`${at.x},${at.y}`);
     }
-    expect(seen.size).toBeGreaterThan(4);
+    expect(seen.size).toBeGreaterThan(2);
+  });
+});
+
+// -- The Breaker's parry (écart 47) ------------------------------------------
+
+describe('the arc of the parry', () => {
+  it('reads the face a Cracker came in through as the way back', () => {
+    // Up column 11 from (11, 22) to (11, 26): it came from the south, so the
+    // Breaker bats it back south, face 5.
+    const run = {
+      path: [{ x: 11, y: 23 }, { x: 11, y: 24 }, { x: 11, y: 25 }, { x: 11, y: 26 }],
+      landing: { x: 11, y: 26 },
+      struck: null,
+    };
+    expect(arrivalFace({ x: 11, y: 22 }, run)).toBe(5);
+    // A single step reads off the cell it rested on.
+    expect(arrivalFace({ x: 11, y: 25 }, { path: [{ x: 11, y: 26 }], landing: { x: 11, y: 26 }, struck: null })).toBe(5);
+    // No travel, no arrival.
+    expect(arrivalFace({ x: 11, y: 26 }, { path: [], landing: { x: 11, y: 26 }, struck: null })).toBeNull();
+  });
+
+  it('is the arrival face and its two neighbours, 120 degrees on a d8, wrapping round', () => {
+    expect(parryFaces(5)).toEqual([5, 4, 6]);
+    expect(parryFaces(1)).toEqual([1, 8, 2]);
+    expect(parryFaces(8)).toEqual([8, 7, 1]);
+  });
+
+  it('picks the face that reaches an opponent soonest', () => {
+    const board = cleared(fresh());
+    const breaker = board.units.find((u) => u.team === 'B' && u.role === 'breaker')!;
+    const far = board.units.filter((u) => u.team === 'A')[0]!;
+    const near = board.units.filter((u) => u.team === 'A')[1]!;
+    // Breaker at (7, 22), came in from the south (arrival 5). Straight back
+    // south an opponent stands three cells away; south-west another stands two.
+    let state = place(board, breaker.id, { x: 7, y: 22 });
+    state = place(state, far.id, { x: 7, y: 19 });
+    state = place(state, near.id, { x: 5, y: 20 });
+    expect(parryDirection(arena, state, state.units.find((u) => u.id === breaker.id)!, 5)).toBe(6);
+  });
+
+  it('keeps the arrival face when no face reaches an opponent', () => {
+    // Column 11 is open from y = 22 to y = 37: twelve cells north without a
+    // bounce, so the straight line comes back on nobody.
+    const board = cleared(fresh());
+    const breaker = board.units.find((u) => u.team === 'B' && u.role === 'breaker')!;
+    const state = place(board, breaker.id, { x: 11, y: 22 });
+    expect(parryDirection(arena, state, state.units.find((u) => u.id === breaker.id)!, 1)).toBe(1);
+  });
+
+  it('counts a line that bounces back onto the Breaker as a line that strikes its own side', () => {
+    // South from (7, 22) the pillar at (7, 16) turns the Cracker round and it
+    // rolls back up the column onto the Breaker's own cell: not a quiet face.
+    const board = cleared(fresh());
+    const breaker = board.units.find((u) => u.team === 'B' && u.role === 'breaker')!;
+    const state = place(board, breaker.id, { x: 7, y: 22 });
+    const chosen = parryDirection(arena, state, state.units.find((u) => u.id === breaker.id)!, 5);
+    expect([4, 6]).toContain(chosen);
+  });
+
+  it('turns off the arrival face when it would go off on a team-mate and a quiet face exists', () => {
+    const board = cleared(fresh());
+    const breaker = board.units.find((u) => u.team === 'B' && u.role === 'breaker')!;
+    const mate = board.units.find((u) => u.team === 'B' && u.id !== breaker.id)!;
+    let state = place(board, breaker.id, { x: 11, y: 22 });
+    state = place(state, mate.id, { x: 11, y: 24 });
+    const chosen = parryDirection(arena, state, state.units.find((u) => u.id === breaker.id)!, 1);
+    expect(chosen).not.toBe(1);
+    expect([8, 2]).toContain(chosen);
+  });
+});
+
+describe('the Breaker meets a Cracker in drift', () => {
+  /**
+   * Cracker-1 at (12, 20), the ball loose at (12, 30), the house's Breaker on
+   * the way at (12, 24), in the open patch between the two pairs of covers.
+   * The Cracker comes up from the south, so the arc the Breaker bats it into
+   * is the three southern faces; a player of team A stands two cells down
+   * the south-west one, at (10, 22), off the drift line. The second Cracker
+   * is parked in the far corner, where it rolls at the ball and meets nobody.
+   */
+  function staged(seed = 5, patch: (s: MatchState) => MatchState = (s) => s) {
+    return opened((s) => {
+      const breaker = s.units.find((u) => u.team === 'B' && u.role === 'breaker')!;
+      const victim = s.units.find((u) => u.team === 'A')!;
+      let state = crackersAt(s, { x: 12, y: 20 }, { x: 0, y: 0 });
+      state = place(state, breaker.id, { x: 12, y: 24 });
+      state = place(state, victim.id, { x: 10, y: 22 });
+      return patch(ballAt(state, { x: 12, y: 30 }));
+    }, seed);
+  }
+
+  const ofOne = (e: MatchEvent): boolean => 'crackerId' in e && e.crackerId === 'cracker-1';
+
+  function breakerOf(state: MatchState): Unit {
+    return state.units.find((u) => u.team === 'B' && u.role === 'breaker')!;
+  }
+
+  it('offers the Breaker its Reaction before the blast, and spends it either way', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const { state, events } = staged(seed);
+      const parried = events.find((e) => e.kind === 'crackerParried');
+      expect(parried, `seed ${seed}`).toBeDefined();
+      expect(parried).toMatchObject({ unitId: breakerOf(state).id, crackerId: 'cracker-1' });
+      expect(breakerOf(state).reactionAvailable).toBe(false);
+
+      // The drift onto the Breaker is logged before the parry; the blast after.
+      const moved = events.findIndex((e) => e.kind === 'crackerMoved' && ofOne(e));
+      const parry = events.findIndex((e) => e.kind === 'crackerParried');
+      const blast = events.findIndex((e) => e.kind === 'crackerDetonated' && ofOne(e));
+      expect(moved).toBeLessThan(parry);
+      expect(parry).toBeLessThan(blast);
+    }
+  });
+
+  it('on a hit, sends it back down the arc onto the first player it meets, and the Breaker is unhurt', () => {
+    for (let seed = 1; seed < 200; seed++) {
+      const { state, events } = staged(seed);
+      const parried = events.find((e) => e.kind === 'crackerParried');
+      if (!parried || parried.kind !== 'crackerParried' || !parried.hit) continue;
+
+      // Came up from the south; the south-west face reaches an opponent in two
+      // cells, straight back south reaches nobody, so south-west it is.
+      expect(parried.direction).toBe(6);
+      const runs = events.filter((e) => e.kind === 'crackerMoved' && ofOne(e));
+      expect(runs).toHaveLength(2);
+      expect(runs[1]).toMatchObject({ from: { x: 12, y: 24 }, to: { x: 10, y: 22 } });
+
+      const victim = state.units.find((u) => u.team === 'A' && u.x === 10 && u.y === 22)!;
+      expect(events.find((e) => e.kind === 'crackerDetonated')).toMatchObject({
+        targetId: victim.id,
+        at: { x: 10, y: 22 },
+      });
+      expect(breakerOf(state).hp).toBe(breakerOf(state).maxHp);
+      return;
+    }
+    throw new Error('no seed in range landed the parry');
+  });
+
+  it('on a miss, goes off on the Breaker as it always did', () => {
+    for (let seed = 1; seed < 200; seed++) {
+      const { state, events } = staged(seed);
+      const parried = events.find((e) => e.kind === 'crackerParried');
+      if (!parried || parried.kind !== 'crackerParried' || parried.hit) continue;
+
+      expect(events.filter((e) => e.kind === 'crackerMoved' && ofOne(e))).toHaveLength(1);
+      expect(events.find((e) => e.kind === 'crackerDetonated')).toMatchObject({
+        targetId: breakerOf(state).id,
+        at: { x: 12, y: 24 },
+      });
+      return;
+    }
+    throw new Error('no seed in range missed the parry');
+  });
+
+  it('rolls the parry against the Cracker AC with the Breaker might', () => {
+    const { state, events } = staged();
+    const parried = events.find((e) => e.kind === 'crackerParried');
+    expect(parried).toMatchObject({
+      roll: { die: 20, against: CRACKER_AC, bonus: statsFor(breakerOf(state).role, breakerOf(state).tier).might },
+    });
+  });
+
+  it('is not offered to a Breaker that has already spent its Reaction', () => {
+    const { state, events } = staged(5, (s) => ({
+      ...s,
+      units: s.units.map((u) => (u.id === breakerOf(s).id ? { ...u, reactionAvailable: false } : u)),
+    }));
+    expect(events.some((e) => e.kind === 'crackerParried')).toBe(false);
+    expect(events.find((e) => e.kind === 'crackerDetonated')).toMatchObject({ targetId: breakerOf(state).id });
+  });
+
+  it('is not offered to a Breaker carrying the ball, whose hands are full', () => {
+    const { state, events } = staged(5, (s) => carrying(s, breakerOf(s).id));
+    expect(events.some((e) => e.kind === 'crackerParried')).toBe(false);
+    expect(events.find((e) => e.kind === 'crackerDetonated')).toMatchObject({ targetId: breakerOf(state).id });
+  });
+
+  it('is not offered to any other role', () => {
+    const { events } = staged(5, (s) => {
+      const breaker = breakerOf(s);
+      const striker = s.units.find((u) => u.team === 'B' && u.role === 'striker')!;
+      return place(place(s, breaker.id, { x: 0, y: 44 }), striker.id, { x: 12, y: 24 });
+    });
+    expect(events.some((e) => e.kind === 'crackerParried')).toBe(false);
+    expect(events.some((e) => e.kind === 'crackerDetonated')).toBe(true);
+  });
+
+  it('is not offered to a Breaker standing on the Cracker when count 20 comes', () => {
+    const { state, events } = staged(5, (s) => place(s, breakerOf(s).id, { x: 12, y: 20 }));
+    expect(events.some((e) => e.kind === 'crackerParried')).toBe(false);
+    expect(events.find((e) => e.kind === 'crackerDetonated')).toMatchObject({
+      targetId: breakerOf(state).id,
+      at: { x: 12, y: 20 },
+    });
+  });
+
+  it('cannot be parried a second time once it has been batted back', () => {
+    // The Cracker comes in on the diagonal, from (10, 22) to the Breaker at
+    // (12, 24), so the arc it is batted back into is south-west, south and
+    // west. Every face is lined with the Breaker's own side and the opponent
+    // is gone, so the fallback sends it straight back south-west, onto the
+    // team's second Breaker three cells down the line. That run is a batted
+    // one, not a drift: it goes off on him, no second parry.
+    for (let seed = 1; seed < 200; seed++) {
+      const { events } = opened((s) => {
+        const breakers = s.units.filter((u) => u.team === 'B' && u.role === 'breaker');
+        const mates = s.units.filter((u) => u.team === 'B' && u.role === 'striker');
+        let state = crackersAt(s, { x: 10, y: 22 }, { x: 0, y: 0 });
+        state = place(state, breakers[0]!.id, { x: 12, y: 24 });
+        state = place(state, breakers[1]!.id, { x: 9, y: 21 });
+        state = place(state, mates[0]!.id, { x: 12, y: 22 });
+        state = place(state, mates[1]!.id, { x: 11, y: 24 });
+        return ballAt(state, { x: 14, y: 26 });
+      }, seed);
+      const parried = events.filter((e) => e.kind === 'crackerParried');
+      if (parried.length === 0 || (parried[0]!.kind === 'crackerParried' && !parried[0]!.hit)) continue;
+
+      expect(parried).toHaveLength(1);
+      expect(parried[0]).toMatchObject({ direction: 6 });
+      expect(events.find((e) => e.kind === 'crackerDetonated' && ofOne(e))).toMatchObject({ at: { x: 9, y: 21 } });
+      return;
+    }
+    throw new Error('no seed in range landed the parry');
   });
 });
 

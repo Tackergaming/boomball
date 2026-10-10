@@ -190,12 +190,16 @@ describe('the Kill-Silo', () => {
     }
   });
 
-  it('lets a substitute enter on open floor in the third of its own Furnace', () => {
+  it('keeps a substitute entry beside each Furnace in the spec, unread since écart 37 bis', () => {
+    // The column stays in the arenas row and the field in the spec so no
+    // migration was needed; the engine now returns a substitute to the free
+    // cell nearest the centre, which has to be open floor.
     for (const team of ['A', 'B'] as const) {
       const entry = KILL_SILO.substituteEntry[team];
       expect(arena.isOccupiable(entry)).toBe(true);
       expect(thirdOf(entry)).toBe(thirdOf(arena.furnaceOf(team).cells[0]!));
     }
+    expect(arena.isOccupiable(KILL_SILO.ordnanceStart)).toBe(true);
   });
 
   it('makes a team shoot at the Furnace it does not defend', () => {

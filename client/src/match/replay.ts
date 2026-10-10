@@ -409,6 +409,16 @@ function describe(
           outcome: forMe(event.hit, mine(event.unitId)),
         });
         break;
+      case 'crackerParried':
+        // The parry itself moves nothing: the batted run is its own crackerMoved.
+        lines.push({
+          text: `${name(event.unitId)} parries ${label(event.crackerId)} · ${
+            event.hit ? 'CLEAN' : 'MISSED'
+          }`,
+          roll: event.roll,
+          outcome: forMe(event.hit, mine(event.unitId)),
+        });
+        break;
       // The Crackers had no commentary at all, so a round where neither one
       // went off showed them rolling across the pitch with nothing said, and a
       // fresh one appearing in midfield looked like the same

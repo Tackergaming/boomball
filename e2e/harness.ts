@@ -19,6 +19,9 @@ import type { MatchState } from '../engine/types.js';
 declare global {
   interface Window {
     __boomball?: BoomballHook;
+    /** Filled by `startSendWatch`, read back and removed by `stopSendWatch`. */
+    __boomballSamples?: SendSample[];
+    __boomballSampler?: number;
   }
 }
 
@@ -289,4 +292,161 @@ export async function glideSeen(
     if (captured && Date.now() - started > 4_000) break;
   }
   return { moved, largestShift, smallestShift: Number.isFinite(smallestShift) ? smallestShift : 0 };
+}
+
+/** Where every unit stands, by id: the part of a board a replay is judged on. */
+export type Board = Record<string, { x: number; y: number }>;
+
+/** One look at the match screen, taken by the in-page sampler of `startSendWatch`. */
+export interface SendSample {
+  /** `performance.now()` in the page, milliseconds. */
+  t: number;
+  seq: number;
+  replaying: boolean;
+  busy: boolean;
+  positions: Board;
+}
+
+/** The unit positions on screen right now, read through the hook. */
+export function boardOf(page: Page): Promise<Board> {
+  return page.evaluate(() => {
+    const out: Record<string, { x: number; y: number }> = {};
+    for (const u of window.__boomball?.state?.units ?? []) out[u.id] = { x: u.x, y: u.y };
+    return out;
+  });
+}
+
+/** True when at least one unit stands on a different cell on the two boards. */
+export function boardsDiffer(a: Board, b: Board): boolean {
+  for (const id of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const p = a[id];
+    const q = b[id];
+    if (!p || !q || p.x !== q.x || p.y !== q.y) return true;
+  }
+  return false;
+}
+
+/**
+ * Starts recording what the match screen shows, every 25 ms, inside the page.
+ *
+ * A round trip through `page.evaluate` costs more than the transition this
+ * guards lasts, so the sampling lives in the browser and is read back once.
+ * Call it just before the click that sends the turn, and pair it with
+ * `stopSendWatch`.
+ */
+export async function startSendWatch(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    if (window.__boomballSampler !== undefined) window.clearInterval(window.__boomballSampler);
+    const samples: SendSample[] = [];
+    window.__boomballSamples = samples;
+    window.__boomballSampler = window.setInterval(() => {
+      const h = window.__boomball;
+      if (!h) return;
+      const positions: Board = {};
+      for (const u of h.state?.units ?? []) positions[u.id] = { x: u.x, y: u.y };
+      samples.push({ t: performance.now(), seq: h.seq, replaying: h.replaying, busy: h.busy, positions });
+    }, 25);
+  });
+}
+
+/**
+ * Resolves with the first sample whose unit positions differ from `before`,
+ * which is the first board a player sees after sending a turn. Take the capture
+ * the moment this returns.
+ */
+export async function firstChangedBoard(page: Page, before: Board, timeout = 30_000): Promise<SendSample> {
+  const handle = await page.waitForFunction(
+    (was) => {
+      const differs = (a: Board, b: Board) => {
+        for (const id of new Set([...Object.keys(a), ...Object.keys(b)])) {
+          const p = a[id];
+          const q = b[id];
+          if (!p || !q || p.x !== q.x || p.y !== q.y) return true;
+        }
+        return false;
+      };
+      return window.__boomballSamples?.find((s) => differs(s.positions, was)) ?? false;
+    },
+    before,
+    { timeout, polling: 25 },
+  );
+  return (await handle.jsonValue()) as SendSample;
+}
+
+/** Stops the sampler and returns everything it saw, oldest first. */
+export async function stopSendWatch(page: Page): Promise<SendSample[]> {
+  return page.evaluate(() => {
+    if (window.__boomballSampler !== undefined) window.clearInterval(window.__boomballSampler);
+    const samples = window.__boomballSamples ?? [];
+    delete window.__boomballSampler;
+    delete window.__boomballSamples;
+    return samples;
+  });
+}
+
+/** A few samples around one, relative times, for a failure message. */
+function sampleLog(samples: readonly SendSample[], around: number): string {
+  const t0 = samples[0]?.t ?? 0;
+  return samples
+    .slice(Math.max(0, around - 3), around + 4)
+    .map((s) => `  +${Math.round(s.t - t0)}ms seq=${s.seq} replaying=${s.replaying} busy=${s.busy}`)
+    .join('\n');
+}
+
+export interface SendVerdict {
+  /** Null when the snapshot was left alone until the replay began, else what was seen. */
+  seqJump: string | null;
+  /** Null when the first changed board was a beat of the replay, else what was seen. */
+  firstBoard: string | null;
+}
+
+/**
+ * Audit line "retour 1 de 2H.5": the replay must start from the board the
+ * player was looking at, not from the end of the round.
+ *
+ * `useMatch.send()` gets its batch in the HTTP reply, then `play()` walks the
+ * beats and ends with `load()`. The Realtime broadcast of the client's own
+ * batch can arrive before that reply, and its handler calls `load()` too, so
+ * the board jumps to the final positions and `seq` to the final value before
+ * the replay has begun; the player sees where everyone ends up, then watches
+ * the walk from the old board. Two things must hold, and this judges both:
+ * between the click and the first sample with `replaying` true, `seq` is still
+ * the one read before the click; and the first board that differs from the
+ * pre-click one is drawn during the replay and is not the final board of the
+ * batch. In a house round of thirteen AI turns the first beat never equals the
+ * final board, so the second check cannot fail on a correct client.
+ */
+export function judgeSend(
+  samples: readonly SendSample[],
+  seqBefore: number,
+  boardBefore: Board,
+  boardAfter: Board,
+): SendVerdict {
+  const started = samples.findIndex((s) => s.replaying);
+  const upToReplay = started < 0 ? samples.length : started;
+  const jumpAt = samples.slice(0, upToReplay).findIndex((s) => s.seq !== seqBefore);
+  const seqJump =
+    jumpAt < 0
+      ? null
+      : `seq went from ${seqBefore} to ${samples[jumpAt]!.seq} before the replay started ` +
+        `(the snapshot was re-read early, retour 1 de 2H.5):\n${sampleLog(samples, jumpAt)}`;
+
+  const firstAt = samples.findIndex((s) => boardsDiffer(s.positions, boardBefore));
+  let firstBoard: string | null = null;
+  if (firstAt < 0) {
+    firstBoard = 'no sample ever showed a board different from the one before the click';
+  } else {
+    const first = samples[firstAt]!;
+    if (!first.replaying) {
+      firstBoard =
+        `the first changed board was drawn with replaying=false, seq=${first.seq}` +
+        `${boardsDiffer(first.positions, boardAfter) ? '' : ', and it is the final board of the batch'}` +
+        ` (retour 1 de 2H.5):\n${sampleLog(samples, firstAt)}`;
+    } else if (!boardsDiffer(first.positions, boardAfter)) {
+      firstBoard =
+        `the first changed board is the final board of the batch, replaying=true ` +
+        `(retour 1 de 2H.5):\n${sampleLog(samples, firstAt)}`;
+    }
+  }
+  return { seqJump, firstBoard };
 }

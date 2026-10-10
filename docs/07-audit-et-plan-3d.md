@@ -1127,3 +1127,50 @@ Le tout forme **2H.6, « Crackers vers le ballon, parade du Breaker, écrans »*
 par rôle »**, écrites dans `08` §5 et dans `05-reprise-chat-suivant.md`. Le redéploiement de
 `resolve-action` avec l'écart 44 attend toujours son feu vert, et le dépôt porte ces notes non
 commitées en attendant son `/save` ou `/commit`.
+
+### Sous-phase 2H.6, « Crackers vers le ballon, parade du Breaker, écrans », construite le 2026-10-10, porte ouverte
+
+Par le fil principal (Fable 5.1), avec trois sous-agents Sonnet nommés ci-dessous, sur des fichiers
+disjoints comme `08` §9 le prévoit. Le fil principal a gardé `reduce.ts`, `rules/ordnance.ts`, le
+nouveau `rules/placement.ts`, `setup.ts`, `constants.ts`, `events.ts`, les tests du moteur, le
+sweep, `useMatch.ts`, le redéploiement et l'intégration. **Tout ce qui ne dépend pas de Jérôme est
+fait et vert** : `npm test` 408 tests sur 20 fichiers contre 382, `npm run typecheck` vert à la
+racine, dans `scripts/`, `e2e/` et `client/`, le build du client vert, `smoke.spec.ts` vert avec
+la nouvelle vérification de relecture. **La porte n'est pas franchie** : il reste le redéploiement
+des deux fonctions avec `ENGINE_VERSION` 3, sa lecture du tableau de `09` §11, et sa partie.
+
+Au départ, les cinq questions posées et tranchées par lui : redéployer `resolve-action` avec
+l'écart 44 **maintenant** (fait, v10, `ENGINE_VERSION` 2, avant toute ligne de 2H.6) ; `ENGINE_VERSION`
+3 et les matchs ouverts archivés, **oui** ; direction de la parade **automatique** avec la règle
+proposée ; Crackers à **8** cases (40 bis) ; remplaçant **au centre** (37 bis).
+
+| Tâche de `05` | État |
+|---|---|
+| a. Retour 1, le plateau montrait le futur | Fait, fil principal, cause confirmée au harnais avant correction : `seq` passait de 224 à 296 trois quarts de seconde après le clic, `replaying` encore faux. `useMatch.ts` tient un compteur de requêtes en vol ; tant qu'il est non nul, le gestionnaire de diffusion prend le fil et ne relit pas le snapshot, la réponse rejoue le lot puis relit. **Le smoke**, sous-agent Sonnet effort élevé : un échantillonneur dans la page toutes les 25 ms depuis le clic d'End turn en mode slow, `startSendWatch`, `firstChangedBoard`, `judgeSend` dans `e2e/harness.ts`, deux assertions (le `seq` ne bouge pas avant le premier beat ; le premier plateau différent de celui d'avant le clic est un beat, pas le plateau final) et deux captures, `first-board-after-send` et `final-board`. Le smoke a échoué sur l'assertion exacte avant le correctif et passe après ; sur la paire du 2026-10-10 le premier plateau après l'envoi est le beat 2 sur 16 de Corvo Ramrod au round 6, le final le round 7 avec Giff à la main |
+| b. Écart 45 | Fait, fil principal. `crackerRun` roule vers `ballCell` (porteur ou sol), s'arrête sur un ballon au sol sans rien faire, s'arrête avant le jumeau vivant, détonne sur la première unité traversée, plus de dé. **Un effet de bord trouvé par les tests** : le plus court chemin départageait les ex æquo par l'ordre fixe des huit directions, et trois cases vers l'ouest se roulaient en crochet sud-est puis nord-ouest ; les voisines sont désormais essayées de la plus proche du but à vol d'oiseau à la plus lointaine, ligne droite quand elle existe. 13 tests |
+| c. Écart 46 | Fait, fil principal. `crackerPost` dérive les deux piliers de bord de `ordnanceStart`, `crackerHomeCell` prend la case libre la plus proche du pilier à distance 1 ou plus, au coup d'envoi (`setup.ts`, après les noms, avant le nonce d'initiative) comme au retour ; `cracker-1` au pilier ouest `(0, 22)`, `cracker-2` à l'est `(14, 22)`. Rien ne change dans la ligne `arenas`. 6 tests, plus `setup.test.ts` |
+| d. Écart 48 | Fait, sous-agent Sonnet effort moyen : `passInterceptors` ignore la première cellule du vol ; 4 tests neufs, un test déplacé parce que son rôdeur n'était à une case que de la première cellule. 33 tests dans `reactions.test.ts` |
+| e. Écart 47 | Fait, fil principal, après les deux réponses de Jérôme. Événement `crackerParried` (unitId, crackerId, roll, hit, direction), `ENGINE_VERSION = 3`. Dans `reduce.ts`, `runCracker` distingue une course en dérive d'une course frappée : seule la dérive offre la parade, donc un Cracker renvoyé ne se pare pas deux fois. `arrivalFace` lit la face par laquelle il est entré, sens inverse de son dernier pas ; `parryFaces` donne la face et ses deux voisines ; `parryDirection` choisit la face qui atteint un adversaire le plus tôt, sinon la face d'arrivée, sauf si elle renverrait le Cracker sur un coéquipier alors qu'une voisine ne touche personne. **Trois cas limites décidés par le fil principal, écrits dans `00` C8, à relire par Jérôme** : pas de parade en portant le ballon, pas de parade debout sur le Cracker, pas de recul du Breaker. 12 tests. **Le client**, sous-agent Sonnet effort moyen : une ligne de carte dans `replay.ts` (« parries … CLEAN / MISSED » avec le dé), une ligne du fil dans `Feed.tsx`, une phrase dans `Briefing.tsx`, un test dans `replay.test.ts` |
+| f. 40 bis et 37 bis | Fait. `CRACKER_MOVE_CELLS = 8`. Le remplaçant entre sur la case libre la plus proche du centre par `nearestFreeCell` de `rules/placement.ts`, règle commune aux Crackers et au banc, dé pour les égalités ; `substituteEntry` et `substitute_entry` restent et ne sont plus lus. `combat.test.ts` et `foundations.test.ts` suivent |
+| g. Sweep de contrôle | Fait, 152 s, tableau et lecture dans `09` §11 : 1,18 / 1,69 / 2,21 but par match contre 1,12 / 1,40 / 2,00 ; **trois fois moins d'évacués** ; le star au-dessus de la cible à 2,21 avec 11 matchs sans but. **Jérôme tranche sur le tableau** |
+| h. Redéploiement | **Fait le 2026-10-10 avec son feu vert**, après qu'il a relu les cas limites de la parade (ok) et tranché le tableau de `09` §11 (rien ne bouge) : `resolve-action` v11 et `create-match` v9, `ENGINE_VERSION` 3. Vérifié au harnais dans la foulée : le hub du compte e2e affiche « 1 match from the old silo is archived » (A11), le smoke passe sur un match neuf du moteur 3 avec un Cracker beside each post et la vérification de relecture verte, et un playthrough de 16 s va au sifflet, 0 à 20 sur le Spark, 14 requêtes, 0 refus. Dans ce match la base porte **la première parade en ligne** : `B-breaker-6` pare `cracker-1`, 15 + 4 = 19 contre 10, renvoi face 8. Le match ouvert de Jérôme, round 7 du moteur 2, reste en base en `playing` et le client l'archive |
+
+**Comment le smoke a été vérifié avant le redéploiement.** Le client compile `ENGINE_VERSION` et
+archive tout match qui ne la porte pas ; avec le moteur 3 dans le dépôt et les fonctions v10 et v8
+en ligne, le harnais n'aurait trouvé aucun match jouable. Le fil principal a donc mis la constante à
+2 dans sa copie de travail le temps des trois runs (un playthrough de 18 s pour fermer le match du
+compte e2e, bloqué au round 9 avec un Striker encerclé sans case de destination, ce que `farthest`
+du smoke ne tolère pas ; le smoke avant correctif, échec attendu ; le smoke après, vert), puis l'a
+remise à 3 avant le typecheck et le build. Rien de tout cela n'a touché la base ni les fonctions.
+
+**Hors périmètre, laissé en vue.** `crackerPressure` dans `ai/evaluate.ts` lit toujours la distance
+de l'unité au Cracker, alors que le danger est désormais sur la ligne Cracker-ballon : c'est une
+ligne de 2H.7, les poids de l'IA n'ont pas bougé. Le choix de direction d'un Breaker humain reste
+automatique jusqu'à ce que le jeu sache poser une question en plein échelon des Crackers. La dette
+`arenas.art` et A20 (React 19) ne bougent pas.
+
+**Ce qui attend Jérôme** : `/update` pour `CONTEXT.md` et `/commit`, puis **une partie en 2D
+animée sur le moteur 3**, avec son verdict sur ce que ses coéquipiers et la maison cherchent, qui
+ouvre 2H.7, l'IA par rôle. L'équilibrage est **re-clos par lui sur `09` §11** le 2026-10-10,
+Crackers 8, portée 9/12, Spark 20, le star à 2,21 accepté. Sans son verdict sur l'IA, pas de
+phase 3.

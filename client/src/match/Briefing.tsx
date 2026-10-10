@@ -68,7 +68,7 @@ export function Briefing({ onClose }: { onClose: () => void }) {
           <Item
             mark={<span style={{ ...S.dot, background: '#d8a12a' }} />}
             title="The Crackers"
-            body="Two live charges. Every round they roll towards the nearest player, around obstacles, and go off. Swing at one to bat it away; it bounces off crates and edges."
+            body="Two live charges. Every round they roll towards the nearest player, around obstacles, and go off. Swing at one to bat it away; it bounces off crates and edges. A Breaker parries one that rolls onto it, a Reaction: bat against AC 10, and on a hit it is sent back into the arc it came from."
           />
           <Item
             mark={<span style={{ ...S.dot, background: '#fffce8' }} />}
