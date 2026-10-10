@@ -14,10 +14,11 @@
  * Trajector is the whole allowance, ever.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
+import { TEAM_SIZE } from '../../../engine/constants.js';
 import { TEAM_COMPOSITION, type Role } from '../../../engine/stats.js';
-import { createMatch } from '../lib/supabase.js';
+import { createMatch, supabase } from '../lib/supabase.js';
 import type { Team } from '../lib/useAccount.js';
 
 const ROLE_BLURB: Record<Role, string> = {
@@ -45,6 +46,25 @@ export function Lobby({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The name is kept between matches in `team_members.character_name`. A read
+  // that fails or finds nothing leaves the display name in place.
+  useEffect(() => {
+    let live = true;
+    void supabase
+      .from('team_members')
+      .select('character_name')
+      .eq('team_id', team.id)
+      .eq('profile_id', userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const saved = (data as { character_name: string | null } | null)?.character_name;
+        if (live && saved) setName(saved);
+      });
+    return () => {
+      live = false;
+    };
+  }, [team.id, userId]);
+
   const fielded = (r: Role) => TEAM_COMPOSITION.filter((x) => x === r).length;
 
   /**
@@ -57,6 +77,23 @@ export function Lobby({
     setBusy(true);
     setError(null);
     try {
+      // Remember the name for next time. Policy `team_members_write` lets a
+      // player write their own row; `preferred_role` is NOT NULL so it goes too.
+      // A failure here must not keep the player out of the match.
+      try {
+        const { error: saveFailure } = await supabase.from('team_members').upsert(
+          {
+            team_id: team.id,
+            profile_id: userId,
+            preferred_role: role,
+            character_name: name.trim() || null,
+          },
+          { onConflict: 'team_id,profile_id' },
+        );
+        if (saveFailure) console.warn('the character name was not saved', saveFailure);
+      } catch (saveFailure) {
+        console.warn('the character name was not saved', saveFailure);
+      }
       const reply = await createMatch(team.id, [
         { profileId: userId, role, characterName: name.trim() },
       ]);
@@ -97,7 +134,7 @@ export function Lobby({
             {team.name}
           </p>
           <p className="label" style={{ margin: '3px 0 0' }}>
-            {team.tier} · 1 named seat · 13 house Giff
+            {team.tier} · 1 named seat · {TEAM_SIZE * 2 - 1} house Giff
           </p>
         </div>
       </header>
@@ -161,7 +198,7 @@ export function Lobby({
             ))}
           </div>
           <p style={{ ...S.blurb, marginTop: 16 }}>
-            One Bulwark, one Trajector, ever. The other twelve Giff on the field are the house.
+            One Bulwark, one Trajector, ever. The other {TEAM_SIZE * 2 - 2} Giff on the field are the house.
           </p>
 
           <div style={S.notice}>

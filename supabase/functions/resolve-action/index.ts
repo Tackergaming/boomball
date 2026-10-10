@@ -43,8 +43,8 @@ import type { Action } from '../../../engine/actions.ts';
 import type { MatchState } from '../../../engine/types.ts';
 import { toArenaSpec } from '../../../server/arenaRow.ts';
 import {
-  expireIfDue,
-  submitAction,
+  engineVersionRefusal,
+  serveAction,
   type Session,
   type SessionStep,
 } from '../../../server/session.ts';
@@ -109,9 +109,18 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   const [{ data: snapshot, error: snapshotError }, { data: match }] = await Promise.all([
     db.from('match_state').select('seq, snapshot').eq('match_id', matchId).single(),
-    db.from('matches').select('arena_id, turn_deadline, team_id, orders').eq('id', matchId).single(),
+    db
+      .from('matches')
+      .select('arena_id, turn_deadline, team_id, orders, engine_version')
+      .eq('id', matchId)
+      .single(),
   ]);
   if (snapshotError || !snapshot || !match) return refuse('no such match', 404);
+
+  // Before anything is loaded into the engine: a snapshot written by another
+  // engine is not a board this one can read (audit line A11).
+  const archived = engineVersionRefusal(match.engine_version as number | null);
+  if (archived) return refuse(archived, 409);
 
   // The caller must be in this match. Read through `match_participants` rather
   // than trusting the unit id in the body.
@@ -162,46 +171,23 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   // A turn that ran out while nobody was looking is settled by whoever knocks
   // next, which is what stops a sleeping laptop freezing the other two players.
-  const overdue = expireIfDue(arena, session, now, orders);
-  const current = overdue ? overdue.session : session;
-  const carried = overdue ? [...overdue.events] : [];
-
-  const result = submitAction(
+  // **When it was overdue, the action is not played** (audit line A28): the
+  // expiry is what happened, and the player sees it marked `expired` rather
+  // than finding their late click applied to a turn they had never seen. An
+  // action that arrives after the clock is late, not illegal, so the reply is
+  // still `accepted`: answering a refusal here would put "it is not your turn"
+  // on screen for a turn the server itself just took away. This is also the
+  // reply to a client knocking on purpose to have its own expiry settled.
+  const served = serveAction(
     arena,
-    current,
+    session,
     { humanId, unitId, action: action as Action },
     now,
     orders,
   );
-  if (!result.ok) {
-    // The expiry still happened and still has to be persisted, or the match
-    // would replay it on the next request and drift from its own event log.
-    if (overdue) {
-      await persist(db, matchId, snapshot.seq, overdue, carried, orders);
-      await recordResult(db, match.team_id as string, session.state, overdue.session.state);
-      const fromSeq = snapshot.seq + 1;
-      await db.channel(`match:${matchId}`).send({
-        type: 'broadcast',
-        event: 'events',
-        payload: { fromSeq, events: carried },
-      });
-      // **An action that arrives after the clock ran out is late, not illegal.**
-      // The turn was spent in Dodge and ended, which is a thing that happened
-      // and which the player has to see; answering `accepted: false` here would
-      // put "it is not your turn" on screen for a turn the server itself just
-      // took away. This is also the reply to a client knocking on purpose to
-      // have its own expiry settled, which is how the timer reaches zero and
-      // does something instead of sitting there.
-      return reply({ accepted: true, fromSeq, events: carried, expired: true, serverNow: now });
-    }
-    return refuse(result.reason);
-  }
+  if (!served.ok) return refuse(served.reason);
 
-  const step: SessionStep = {
-    session: result.step.session,
-    events: [...carried, ...result.step.events],
-  };
-
+  const step: SessionStep = served.step;
   const fromSeq = snapshot.seq + 1;
   await persist(db, matchId, snapshot.seq, step, step.events, orders);
   await recordResult(db, match.team_id as string, state, step.session.state);
@@ -214,7 +200,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
     payload: { fromSeq, events: step.events },
   });
 
-  return reply({ accepted: true, fromSeq, events: step.events, serverNow: now });
+  return reply({
+    accepted: true,
+    fromSeq,
+    events: step.events,
+    ...(served.expired ? { expired: true } : {}),
+    serverNow: now,
+  });
 });
 
 /**

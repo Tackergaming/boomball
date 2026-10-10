@@ -1,20 +1,20 @@
 /**
- * The playing surface: an SVG grid laid over the art of one zone.
+ * The playing surface: the whole pitch at once, seen from above.
  *
- * **The picture is scenery and the layout is the ground.** A column that looks
- * solid in the JPEG and reads `.` in `KILL_SILO.rows` is walkable, and this
- * component draws solid cells from the layout, never from the image. That is
- * why the arena has an ASCII form at all, and it is also why the terrain can be
- * re-surveyed against the art later without touching a line of this file.
+ * **The layout is the ground.** There is no picture under the grid any more
+ * (D11). Solid cells are drawn from `KILL_SILO.rows` through `arena.cellAt`, on
+ * a dark floor, so what a player sees is exactly what the engine walks on.
  *
- * One zone at a time, fifteen cells square, because the silo is fifteen wide
- * and forty-five tall and a whole-shaft view would make every Giff four pixels
- * across. The neighbouring zones are strips above and below: a Giff standing in
- * one is drawn on its strip, so a fall or a shot from the level above is visible
- * before it lands rather than after.
+ * The pitch lies along the width of the screen: forty-five cells long, fifteen
+ * across. The engine's `y` is the screen column, 0 at the left where the
+ * player's own Furnace sits and 44 at the right where the house's does, and the
+ * engine's `x` is the screen row, 0 at the top. A cell (x, y) is therefore the
+ * SVG rect at `x={y} y={x}`, and that swap is made here, at the point of
+ * drawing, and nowhere else. `testHook.cellToScreen` applies the same rule to
+ * the stage element, so a script clicks where this file drew.
  *
- * `y` counts up from the floor in the engine and down the screen in SVG, so
- * every row here is flipped exactly once, in `rowOf`. Nowhere else.
+ * The three thirds are marked by two faint lines and carry no rule: they are
+ * there for the eye, not for the game.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -23,17 +23,18 @@ import type { Point } from '../../../engine/geometry.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
 import { pathTo } from '../../../engine/rules/movement.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
-import { ARENA_WIDTH, arena, spec, ZONE_ART, ZONE_COUNT, zoneOf } from '../lib/arena.js';
+import { ARENA_HEIGHT, ARENA_WIDTH, THIRD_LENGTH, arena, spec } from '../lib/arena.js';
 
-const ZONE_ROWS = 15;
+/** Columns on screen, which is the pitch's length. */
+const COLS = ARENA_HEIGHT;
+/** Rows on screen, which is the pitch's width. */
+const ROWS = ARENA_WIDTH;
 
 export interface BoardProps {
   state: MatchState;
   legal: LegalActions | null;
   /** The team the human plays for. Everything else is the house. */
   own: 'A' | 'B';
-  zone: number;
-  onZone: (zone: number) => void;
   /** Null when it is not this client's turn to act. */
   onMove: ((path: readonly Point[]) => void) | null;
   onSelectUnit: (unitId: string | null) => void;
@@ -50,8 +51,6 @@ export function Board({
   state,
   legal,
   own,
-  zone,
-  onZone,
   onMove,
   onSelectUnit,
   selected,
@@ -59,11 +58,6 @@ export function Board({
   spotlight = null,
   trail = null,
 }: BoardProps) {
-  const bottomY = (zone - 1) * ZONE_ROWS;
-  const rowOf = (y: number) => ZONE_ROWS - 1 - (y - bottomY);
-
-  const inZone = (p: { x: number; y: number }) => zoneOf(p.y) === zone;
-
   const reachable = legal && onMove ? legal.destinations : null;
   const units = activeUnits(state);
 
@@ -72,18 +66,17 @@ export function Board({
    * sized in pixels rather than in cells.
    *
    * A cell is one SVG unit, so `font-size: 0.21` is 0.21 of a cell, and a cell
-   * is whatever the window left over: about 47 px on a big screen and about
-   * 30 px on the 1280 x 800 this game is specified down to. The same label is
-   * legible on the first and 6 px tall on the second. So the stage is measured
-   * and the type is asked for in pixels, which is the unit legibility is
-   * actually in.
+   * is whatever the window left over. With the whole pitch on screen that is
+   * about 23 px on a 1440-wide window and about 19 px on the 1280 x 800 this
+   * game is specified down to. So the stage is measured and the type is asked
+   * for in pixels, which is the unit legibility is actually in.
    */
   const stageRef = useRef<HTMLDivElement>(null);
-  const [cellPx, setCellPx] = useState(40);
+  const [cellPx, setCellPx] = useState(23);
   useEffect(() => {
     const node = stageRef.current;
     if (!node) return;
-    const measure = () => setCellPx(Math.max(1, node.getBoundingClientRect().width / ARENA_WIDTH));
+    const measure = () => setCellPx(Math.max(1, node.getBoundingClientRect().width / COLS));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -92,53 +85,84 @@ export function Board({
   /** A size in screen pixels, expressed in the SVG units the viewBox counts in. */
   const px = (size: number) => size / cellPx;
 
+  const loose = !state.payload.carriedBy;
+
   return (
     <div style={S.frame}>
-      <Strip
-        zone={zone + 1}
-        state={state}
-        own={own}
-        onClick={() => zone < ZONE_COUNT && onZone(zone + 1)}
-        side="above"
-      />
+      {/* Exactly three to one, as wide as the frame allows and no taller than
+          it. `width: 100%` plus `max-height` would squash the ratio when the
+          height is the scarce side, so the width is the smaller of the frame's
+          width and three times its height, which the frame's size container
+          lets us say. The stage carries no border: the hook divides its width
+          by forty-five, and a border would make the SVG a different size. */}
+      <div style={S.stage} ref={stageRef} data-board-stage>
+        <svg viewBox={`0 0 ${COLS} ${ROWS}`} style={S.svg} shapeRendering="crispEdges">
+          {/* 1. The floor. */}
+          <rect x={0} y={0} width={COLS} height={ROWS} fill="#0a0e11" />
 
-      <div style={S.viewport}>
-        {/* A zone is fifteen by fifteen, so the stage is square. It used to be
-            whatever shape the layout left it, with the art filling that shape
-            in `cover` and the SVG letterboxed inside it by `meet`: the grid
-            then covered less ground than the picture, which is exactly the
-            mismatch Jérôme saw. One square, both layers, no discrepancy. */}
-        <div style={S.stage} ref={stageRef} data-board-stage>
-        <img src={ZONE_ART[zone]} alt="" style={S.art} />
-        <div style={S.wash} />
+          {/* 2. The grid, faint. */}
+          {range(COLS + 1).map((col) => (
+            <line
+              key={`v${col}`}
+              x1={col}
+              y1={0}
+              x2={col}
+              y2={ROWS}
+              stroke="rgba(142,161,169,.12)"
+              strokeWidth={0.02}
+            />
+          ))}
+          {range(ROWS + 1).map((row) => (
+            <line
+              key={`h${row}`}
+              x1={0}
+              y1={row}
+              x2={COLS}
+              y2={row}
+              stroke="rgba(142,161,169,.12)"
+              strokeWidth={0.02}
+            />
+          ))}
 
-        <svg viewBox={`0 0 ${ARENA_WIDTH} ${ZONE_ROWS}`} style={S.svg} shapeRendering="crispEdges">
-          {/* Terrain, read from the layout. */}
-          {range(ZONE_ROWS).map((row) =>
-            range(ARENA_WIDTH).map((x) => {
-              const y = bottomY + (ZONE_ROWS - 1 - row);
-              const cell = arena.cellAt({ x, y });
-              if (cell === 'open') return null;
+          {/* 3. Obstacles, read from the layout. A plate with a lighter edge and
+              a lighter inner frame: a block reads as a block at twenty pixels
+              without any of it being a thing the rules know about. */}
+          {range(ROWS).map((x) =>
+            range(COLS).map((y) => {
+              if (arena.cellAt({ x, y }) === 'open') return null;
               return (
-                <rect
-                  key={`t${x}-${y}`}
-                  x={x}
-                  y={row}
-                  width={1}
-                  height={1}
-                  fill={'rgba(9,12,14,.82)'}
-                />
+                <g key={`o${x}-${y}`}>
+                  <rect
+                    x={y + 0.03}
+                    y={x + 0.03}
+                    width={0.94}
+                    height={0.94}
+                    fill="#1c252b"
+                    stroke="#3d4e58"
+                    strokeWidth={0.06}
+                  />
+                  <rect
+                    x={y + 0.24}
+                    y={x + 0.24}
+                    width={0.52}
+                    height={0.52}
+                    fill="none"
+                    stroke="rgba(142,161,169,.22)"
+                    strokeWidth={0.04}
+                  />
+                </g>
               );
             }),
           )}
 
-          {/* The Furnaces, which are the goals. */}
+          {/* 4. The Furnaces, which are the goals. Drawn over the obstacle
+              cells they sit in, because the hatch is an obstacle in the layout. */}
           {spec.furnaces.map((furnace) =>
-            furnace.cells.filter(inZone).map((cell) => (
+            furnace.cells.map((cell) => (
               <rect
                 key={`f${furnace.defendedBy}-${cell.x}-${cell.y}`}
-                x={cell.x}
-                y={rowOf(cell.y)}
+                x={cell.y}
+                y={cell.x}
                 width={1}
                 height={1}
                 fill={furnace.defendedBy === own ? 'rgba(60,224,240,.16)' : 'rgba(255,86,220,.18)'}
@@ -148,38 +172,26 @@ export function Board({
             )),
           )}
 
-          {/* The grid itself, faint enough to read the art through. */}
-          {range(ARENA_WIDTH + 1).map((x) => (
+          {/* 5. The thirds: two faint lines between columns, nothing more.
+              They carry no rule. */}
+          {range(ARENA_HEIGHT / THIRD_LENGTH - 1).map((i) => (
             <line
-              key={`v${x}`}
-              x1={x}
+              key={`t${i}`}
+              x1={(i + 1) * THIRD_LENGTH}
               y1={0}
-              x2={x}
-              y2={ZONE_ROWS}
-              stroke="rgba(142,161,169,.14)"
-              strokeWidth={0.02}
-            />
-          ))}
-          {range(ZONE_ROWS + 1).map((row) => (
-            <line
-              key={`h${row}`}
-              x1={0}
-              y1={row}
-              x2={ARENA_WIDTH}
-              y2={row}
-              stroke="rgba(142,161,169,.14)"
-              strokeWidth={0.02}
+              x2={(i + 1) * THIRD_LENGTH}
+              y2={ROWS}
+              stroke="rgba(201,180,137,.28)"
+              strokeWidth={0.04}
+              strokeDasharray="0.3 0.3"
             />
           ))}
 
-          {/* The walk being replayed, so a Giff that crossed the zone reads as
-              having crossed it rather than as having appeared. */}
-          {trail && trail.path.some(inZone) && (
+          {/* 6. The walk being replayed, so a Giff that crossed the pitch reads
+              as having crossed it rather than as having appeared. */}
+          {trail && trail.path.length > 0 && (
             <polyline
-              points={trail.path
-                .filter(inZone)
-                .map((step) => `${step.x + 0.5},${rowOf(step.y) + 0.5}`)
-                .join(' ')}
+              points={trail.path.map((step) => `${step.y + 0.5},${step.x + 0.5}`).join(' ')}
               fill="none"
               stroke="rgba(201,180,137,.75)"
               strokeWidth={0.09}
@@ -189,93 +201,43 @@ export function Board({
             />
           )}
 
-          {/* Where this unit could stand. */}
+          {/* 7. Where this unit could stand. */}
           {reachable &&
-            [...reachable.values()]
-              .filter((step) => inZone(step.cell))
-              .map((step) => (
-                <rect
-                  key={`r${step.cell.x}-${step.cell.y}`}
-                  data-cell={`${step.cell.x},${step.cell.y}`}
-                  x={step.cell.x + 0.12}
-                  y={rowOf(step.cell.y) + 0.12}
-                  width={0.76}
-                  height={0.76}
-                  fill="rgba(60,224,240,.14)"
-                  stroke="rgba(60,224,240,.5)"
-                  strokeWidth={0.04}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => {
-                    const route = pathTo(reachable, step.cell);
-                    if (route && onMove) onMove(route);
-                  }}
-                />
-              ))}
-
-          {/* The loose Payload. Carried, it rides on its carrier instead.
-              It used to be a plain dot the same size as everything else on the
-              field, which is how a player ends up asking what the yellow
-              circle in the middle is. It is the whole point of the sport, so
-              it now pulses, wears a ring, and says its own name. */}
-          {!state.payload.carriedBy && inZone(state.payload) && (
-            <g>
-              <circle
-                cx={state.payload.x + 0.5}
-                cy={rowOf(state.payload.y) + 0.5}
-                r={0.44}
-                fill="none"
-                stroke="#c9b489"
-                strokeWidth={0.05}
-                opacity={0.75}
-              >
-                <animate
-                  attributeName="r"
-                  values="0.34;0.5;0.34"
-                  dur="1.8s"
-                  repeatCount="indefinite"
-                />
-                <animate
-                  attributeName="opacity"
-                  values="0.8;0.2;0.8"
-                  dur="1.8s"
-                  repeatCount="indefinite"
-                />
-              </circle>
-              <circle
-                cx={state.payload.x + 0.5}
-                cy={rowOf(state.payload.y) + 0.5}
-                r={0.24}
-                fill="#c9b489"
-                stroke="#05070a"
-                strokeWidth={0.05}
+            [...reachable.values()].map((step) => (
+              <rect
+                key={`r${step.cell.x}-${step.cell.y}`}
+                data-cell={`${step.cell.x},${step.cell.y}`}
+                x={step.cell.y + 0.12}
+                y={step.cell.x + 0.12}
+                width={0.76}
+                height={0.76}
+                fill="rgba(60,224,240,.14)"
+                stroke="rgba(60,224,240,.5)"
+                strokeWidth={0.04}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  const route = pathTo(reachable, step.cell);
+                  if (route && onMove) onMove(route);
+                }}
               />
-              <text
-                x={state.payload.x + 0.5}
-                y={rowOf(state.payload.y) - 0.16}
-                textAnchor="middle"
-                fill="#c9b489"
-                style={{ font: `700 0.3px 'IBM Plex Mono', monospace`, letterSpacing: '0.02px' }}
-              >
-                PAYLOAD
-              </text>
-            </g>
-          )}
+            ))}
 
+          {/* 8. Crackers. */}
           {state.crackers
-            .filter((cracker) => cracker.state === 'live' && inZone(cracker))
+            .filter((cracker) => cracker.state === 'live')
             .map((cracker) => (
               <g key={cracker.id}>
                 <circle
-                  cx={cracker.x + 0.5}
-                  cy={rowOf(cracker.y) + 0.5}
+                  cx={cracker.y + 0.5}
+                  cy={cracker.x + 0.5}
                   r={0.2}
                   fill="#d8a12a"
                   stroke="#05070a"
                   strokeWidth={0.05}
                 />
                 <circle
-                  cx={cracker.x + 0.5}
-                  cy={rowOf(cracker.y) + 0.5}
+                  cx={cracker.y + 0.5}
+                  cy={cracker.x + 0.5}
                   r={0.34}
                   fill="none"
                   stroke="rgba(216,161,42,.45)"
@@ -284,10 +246,11 @@ export function Board({
               </g>
             ))}
 
-          {sparkIsLive(state.spark) && inZone(state.spark) && (
+          {/* 9. The Spark. */}
+          {sparkIsLive(state.spark) && (
             <circle
-              cx={state.spark.x + 0.5}
-              cy={rowOf(state.spark.y) + 0.5}
+              cx={state.spark.y + 0.5}
+              cy={state.spark.x + 0.5}
               r={0.24}
               fill="#fffce8"
               stroke="#05070a"
@@ -295,31 +258,34 @@ export function Board({
             />
           )}
 
-          {/* Names first, tokens second, and the order is the whole reason a
-              plate may be wider than the cell it belongs to. Six characters at
-              a readable size do not fit in a thirty pixel box, so the plate
-              hangs under the token and takes its chances with the neighbours;
-              painting it before the tokens means the one thing it can ever be
-              hidden by is another Giff, which is the right way round. */}
-          {units.filter(inZone).map((unit) => (
+          {/* 10. Names first, tokens second, and the order is the whole reason a
+              plate may be wider than the cell it belongs to. Four characters at
+              a readable size are still wider than a twenty-three pixel box, so
+              the plate hangs under the token and takes its chances with the
+              neighbours; painting it before the tokens means the one thing it
+              can ever be hidden by is another Giff, which is the right way
+              round. */}
+          {units.map((unit) => (
             <NamePlate
               key={`n${unit.id}`}
               unit={unit}
               own={own}
-              x={unit.x}
-              row={rowOf(unit.y)}
+              col={unit.y}
+              row={unit.x}
               isYou={yoursId === unit.id}
+              full={selected === unit.id}
               px={px}
             />
           ))}
 
-          {units.filter(inZone).map((unit) => (
+          {/* 11. Tokens. */}
+          {units.map((unit) => (
             <UnitMark
               key={unit.id}
               unit={unit}
               own={own}
-              x={unit.x}
-              row={rowOf(unit.y)}
+              col={unit.y}
+              row={unit.x}
               onTheClock={state.turn?.unitId === unit.id}
               spotlit={spotlight === unit.id}
               isYou={yoursId === unit.id}
@@ -329,19 +295,51 @@ export function Board({
               onClick={() => onSelectUnit(selected === unit.id ? null : unit.id)}
             />
           ))}
+
+          {/* 12. The loose Payload, above the tokens and the plates (audit line
+              A15). Carried, it rides on its carrier instead. It is the whole
+              point of the sport, so it pulses, wears a ring, and says its own
+              name, and it is the last thing painted so that nothing can hide it.
+              It takes no clicks: the Giff under it is still the one you pick. */}
+          {loose && (
+            <g style={{ pointerEvents: 'none' }}>
+              <circle
+                cx={state.payload.y + 0.5}
+                cy={state.payload.x + 0.5}
+                r={0.44}
+                fill="none"
+                stroke="#c9b489"
+                strokeWidth={0.05}
+                opacity={0.75}
+              >
+                <animate attributeName="r" values="0.34;0.5;0.34" dur="1.8s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1.8s" repeatCount="indefinite" />
+              </circle>
+              <circle
+                cx={state.payload.y + 0.5}
+                cy={state.payload.x + 0.5}
+                r={0.24}
+                fill="#c9b489"
+                stroke="#05070a"
+                strokeWidth={0.05}
+              />
+              <text
+                x={state.payload.y + 0.5}
+                // Above the disc, except on the top row where the stage would clip it.
+                y={state.payload.x === 0 ? state.payload.x + 1.3 : state.payload.x - 0.16}
+                textAnchor="middle"
+                fill="#c9b489"
+                stroke="#05070a"
+                strokeWidth={px(2.5)}
+                paintOrder="stroke"
+                style={{ font: `700 ${px(8)}px 'IBM Plex Mono', monospace`, letterSpacing: `${px(0.5)}px` }}
+              >
+                PAYLOAD
+              </text>
+            </g>
+          )}
         </svg>
-
-          <ZoneTab zone={zone} />
-        </div>
       </div>
-
-      <Strip
-        zone={zone - 1}
-        state={state}
-        own={own}
-        onClick={() => zone > 1 && onZone(zone - 1)}
-        side="below"
-      />
     </div>
   );
 }
@@ -349,60 +347,60 @@ export function Board({
 /**
  * The name plate, hung under the token.
  *
- * Its own component and its own layer because of one constraint: a Giff's given
- * name is up to six characters, and six characters at a size a person can read
- * is wider than a cell on the smallest window this game supports. So it cannot
- * live inside the box, and if it were drawn with its token it would sit on top
- * of whoever stands below. Drawn ahead of every token instead, the worst it can
- * do is be covered by one.
+ * Its own component and its own layer because of one constraint: a name at a
+ * size a person can read is wider than a cell now that the whole pitch is on
+ * screen. So it cannot live inside the box, and if it were drawn with its
+ * token it would sit on top of whoever stands below. Drawn ahead of every token
+ * instead, the worst it can do is be covered by one.
  *
- * The given name alone. "Voss Ardent" is two cells wide and the surname is the
- * half nobody shouts.
+ * The given name alone, cut to four characters: "Voss Ardent" is two cells wide
+ * and the surname is the half nobody shouts. The full name is the token's
+ * hover title, and is written out in full here for the selected unit.
  */
 function NamePlate({
   unit,
   own,
-  x,
+  col,
   row,
   isYou,
+  full,
   px,
 }: {
   unit: Unit;
   own: 'A' | 'B';
-  x: number;
+  col: number;
   row: number;
   isYou: boolean;
+  /** The selected unit, whose whole name is shown. */
+  full: boolean;
   px: (size: number) => number;
 }) {
   const colour = isYou ? '#ffc14d' : unit.team === own ? '#3ce0f0' : '#ff56dc';
-  const name = unit.name.split(' ')[0] ?? unit.name;
+  const given = unit.name.split(' ')[0] ?? unit.name;
+  const label = full ? unit.name : given.slice(0, 4);
 
-  const size = px(10);
-  const height = px(13);
-  // Under the token, except on the bottom row of the zone where the stage
-  // would clip it, and clear of the chevron that marks the player's own Giff.
-  const below = row < ZONE_ROWS - 1;
+  const size = px(9);
+  const height = px(12);
+  // Under the token, except on the bottom row where the stage would clip it,
+  // and clear of the chevron that marks the player's own Giff.
+  const below = row < ROWS - 1;
   const top = below ? row + 0.98 : row - height - (isYou ? 0.3 : 0.06);
   // Monospace advance is about 0.6 em, plus a little air either side.
-  const width = Math.max(0.7, name.length * size * 0.6 + px(6));
+  const width = Math.max(0.7, label.length * size * 0.6 + px(5));
+  // A long name beside a wall would run off the stage; slide it back inside.
+  const left = Math.min(Math.max(col + 0.5 - width / 2, 0), COLS - width);
 
   return (
     <g style={{ pointerEvents: 'none' }}>
-      <rect
-        x={x + 0.5 - width / 2}
-        y={top}
-        width={width}
-        height={height}
-        fill="rgba(5,7,10,.86)"
-      />
+      <rect x={left} y={top} width={width} height={height} fill="rgba(5,7,10,.86)" />
       <text
-        x={x + 0.5}
-        y={top + height - px(3.5)}
+        x={left + width / 2}
+        y={top + height - px(3)}
         textAnchor="middle"
         fill={colour}
         style={{ font: `600 ${size}px 'IBM Plex Mono', monospace` }}
       >
-        {name}
+        {label}
       </text>
     </g>
   );
@@ -411,7 +409,7 @@ function NamePlate({
 function UnitMark({
   unit,
   own,
-  x,
+  col,
   row,
   onTheClock,
   spotlit,
@@ -423,7 +421,9 @@ function UnitMark({
 }: {
   unit: Unit;
   own: 'A' | 'B';
-  x: number;
+  /** Screen column, the engine's `y`. */
+  col: number;
+  /** Screen row, the engine's `x`. */
   row: number;
   onTheClock: boolean;
   /** The unit the replay is currently showing. */
@@ -441,9 +441,12 @@ function UnitMark({
   // filled rather than outlined, and wears a chevron.
   const colour = isYou ? '#ffc14d' : unit.team === own ? '#3ce0f0' : '#ff56dc';
   const hurt = unit.hp / unit.maxHp;
+  const x = col;
 
   return (
     <g style={{ cursor: 'pointer' }} onClick={onClick} data-unit={unit.id}>
+      {/* The whole name, on hover, because the plate only has room for four letters. */}
+      <title>{unit.name}</title>
       {spotlit && (
         <rect
           x={x - 0.18}
@@ -486,25 +489,24 @@ function UnitMark({
       {/* Hit points in figures, top right of the box.
           Two digits at most: the deepest pool in the game is a Star Breaker's
           85. Red under a third, so a Giff about to be carried off says so
-          before it happens rather than after. Reading this used to mean
-          clicking the Giff to open its sheet, which is a click for a fact that
-          should never have been a click away. */}
+          before it happens rather than after. */}
       <text
-        x={x + 0.88}
-        y={row + 0.1 + px(10)}
+        x={x + 0.9}
+        y={row + 0.1 + px(8)}
         textAnchor="end"
         fill={hurt <= 0.34 ? '#ff8fa0' : colour}
-        style={{ font: `700 ${px(11)}px 'IBM Plex Mono', monospace` }}
+        style={{ font: `700 ${px(9)}px 'IBM Plex Mono', monospace` }}
       >
         {unit.hp}
       </text>
 
+      {/* The role letter sits left of centre and low, clear of the figure. */}
       <text
-        x={x + 0.5}
-        y={row + 0.72}
+        x={x + 0.3}
+        y={row + 0.62}
         textAnchor="middle"
         fill={colour}
-        style={{ font: `600 ${px(15)}px 'IBM Plex Mono', monospace`, letterSpacing: '0.02px' }}
+        style={{ font: `600 ${px(11)}px 'IBM Plex Mono', monospace` }}
       >
         {unit.role[0]!.toUpperCase()}
       </text>
@@ -513,206 +515,40 @@ function UnitMark({
           a glance on a board too small for the figure to be comfortable. */}
       <rect x={x + 0.08} y={row + 0.86} width={0.84 * hurt} height={0.06} fill={colour} />
 
-      {/* The ball sits bottom left. The whole top of the box is spoken for:
-          the anchoring warning on the left, the hit points on the right. */}
+      {/* The ball sits bottom right: the top is spoken for by the hit points
+          and the left by the role letter. */}
       {carrying && (
-        <circle cx={x + 0.21} cy={row + 0.66} r={0.13} fill="#c9b489" stroke="#05070a" strokeWidth={0.04} />
+        <circle cx={x + 0.76} cy={row + 0.68} r={0.12} fill="#c9b489" stroke="#05070a" strokeWidth={0.04} />
       )}
     </g>
   );
 }
-
-/**
- * A neighbouring zone, as a band that shows who is up there or down there.
- *
- * **It is a button and now looks like one.** It always was clickable, and
- * nothing said so: no cursor cue beyond the pointer, no label, no border that
- * changed. A player who cannot see the rest of the shaft cannot plan a shot
- * from the level above, so the affordance is spelled out rather than left to
- * be discovered.
- */
-function Strip({
-  zone,
-  state,
-  own,
-  onClick,
-  side,
-}: {
-  zone: number;
-  state: MatchState;
-  own: 'A' | 'B';
-  onClick: () => void;
-  side: 'above' | 'below';
-}) {
-  const [hover, setHover] = useState(false);
-
-  if (zone < 1 || zone > ZONE_COUNT) {
-    return (
-      <div style={{ ...S.strip, background: 'var(--void)', cursor: 'default' }}>
-        <span className="label" style={{ ...S.stripLabel, color: 'var(--text-faint)' }}>
-          {side === 'above' ? 'Top of the silo' : 'Silo floor'}
-        </span>
-      </div>
-    );
-  }
-
-  const here = activeUnits(state).filter((unit) => zoneOf(unit.y) === zone);
-
-  return (
-    <button
-      type="button"
-      style={{ ...S.strip, ...S.stripButton, ...(hover ? S.stripHover : null) }}
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      title={`Look at zone ${zone}, ${ZONE_NAME[zone]}`}
-    >
-      <img src={ZONE_ART[zone]} alt="" style={{ ...S.stripArt, objectPosition: side === 'above' ? 'bottom' : 'top' }} />
-      <div style={S.stripWash} />
-      <span className="label" style={S.stripLabel}>
-        <span style={{ color: 'var(--brass)', marginRight: 7 }}>{side === 'above' ? '▲' : '▼'}</span>
-        Zone {zone} · {ZONE_NAME[zone]}
-        <span style={S.stripHint}>{hover ? 'click to look' : `${here.length} on this level`}</span>
-      </span>
-      <span style={S.stripUnits}>
-        {here.map((unit) => (
-          <span
-            key={unit.id}
-            style={{
-              ...S.pip,
-              borderColor: unit.team === own ? '#3ce0f0' : '#ff56dc',
-              color: unit.team === own ? '#3ce0f0' : '#ff56dc',
-            }}
-          >
-            {unit.role[0]!.toUpperCase()}
-          </span>
-        ))}
-      </span>
-    </button>
-  );
-}
-
-function ZoneTab({ zone }: { zone: number }) {
-  return (
-    <div style={S.zoneTab}>
-      <span className="label" style={{ color: 'var(--brass)' }}>
-        Zone {zone}
-      </span>
-      <span className="display" style={{ fontSize: 17 }}>
-        {ZONE_NAME[zone]}
-      </span>
-    </div>
-  );
-}
-
-const ZONE_NAME: Record<number, string> = {
-  1: 'The Trench',
-  2: 'The Scramble',
-  3: 'The Summit',
-};
 
 function range(n: number): number[] {
   return Array.from({ length: n }, (_, i) => i);
 }
 
 const S: Record<string, React.CSSProperties> = {
-  frame: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 4 },
-  viewport: {
-    position: 'relative',
+  // A size container, so the stage can be sized against the room it has.
+  frame: {
     flex: 1,
     minHeight: 0,
+    minWidth: 0,
+    width: '100%',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    background: 'var(--void)',
+    containerType: 'size',
   },
   stage: {
     position: 'relative',
-    aspectRatio: '1 / 1',
-    height: '100%',
+    aspectRatio: '3 / 1',
+    width: 'min(100cqw, 300cqh)',
     maxWidth: '100%',
     maxHeight: '100%',
-    border: '1px solid var(--line)',
+    boxShadow: '0 0 0 1px var(--line)',
+    background: '#0a0e11',
     overflow: 'hidden',
   },
-  art: {
-    position: 'absolute',
-    inset: 0,
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    filter: 'brightness(.5) saturate(.72)',
-  },
-  wash: { position: 'absolute', inset: 0, background: 'rgba(7,8,10,.28)' },
   svg: { position: 'absolute', inset: 0, width: '100%', height: '100%' },
-  zoneTab: {
-    position: 'absolute',
-    left: 10,
-    top: 8,
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '5px 9px',
-    background: 'rgba(7,8,10,.72)',
-    border: '1px solid var(--line)',
-    pointerEvents: 'none',
-  },
-  strip: {
-    position: 'relative',
-    height: 46,
-    flex: 'none',
-    borderWidth: 1,
-    borderStyle: 'solid',
-    borderColor: 'var(--line)',
-    overflow: 'hidden',
-    cursor: 'pointer',
-  },
-  stripButton: {
-    display: 'block',
-    width: '100%',
-    padding: 0,
-    background: 'var(--void)',
-    textAlign: 'left',
-    font: 'inherit',
-    letterSpacing: 'normal',
-    textTransform: 'none',
-    color: 'inherit',
-    transition: 'border-color .12s',
-  },
-  stripHover: { borderColor: 'var(--brass)' },
-  stripHint: {
-    marginLeft: 10,
-    fontFamily: 'var(--mono)',
-    fontSize: 9,
-    letterSpacing: '.1em',
-    color: 'var(--text-faint)',
-  },
-  stripArt: {
-    position: 'absolute',
-    inset: 0,
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    filter: 'brightness(.3) saturate(.5)',
-  },
-  stripWash: { position: 'absolute', inset: 0, background: 'rgba(7,8,10,.5)' },
-  stripLabel: {
-    position: 'absolute',
-    left: 10,
-    top: 6,
-    display: 'flex',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  stripUnits: { position: 'absolute', right: 10, top: 8, display: 'flex', gap: 5, zIndex: 1 },
-  pip: {
-    display: 'grid',
-    placeItems: 'center',
-    width: 20,
-    height: 20,
-    fontFamily: 'var(--mono)',
-    fontSize: 10,
-    borderWidth: 1,
-    borderStyle: 'solid',
-    background: 'rgba(5,7,10,.8)',
-  },
 };

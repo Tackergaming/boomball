@@ -31,6 +31,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
+import { ENGINE_VERSION } from '../../../engine/constants.ts';
 import { toArenaSpec } from '../../../server/arenaRow.ts';
 import { openLobbyMatch, type SeatRequest } from '../../../server/lobby.ts';
 
@@ -117,12 +118,15 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   // One live match per team. Without this a double-clicked lobby button opens
   // two matches, and the second silently becomes the one the client watches
-  // while the first sits unfinished forever.
+  // while the first sits unfinished forever. A match left open by an earlier
+  // engine does not count: it is archived, nobody can play it, and it must not
+  // lock the team out of the game (audit line A11).
   const { data: running } = await db
     .from('matches')
     .select('id')
     .eq('team_id', teamId)
     .neq('phase', 'finished')
+    .eq('engine_version', ENGINE_VERSION)
     .limit(1);
   if (running && running.length > 0) {
     return refuse('this team already has a match running', 409);
@@ -154,6 +158,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
       round: state.round,
       rng_seed: seed,
       turn_deadline: session.turnDeadline ? new Date(session.turnDeadline).toISOString() : null,
+      // Stamped at birth, so `resolve-action` can refuse this match the day the
+      // engine moves on, instead of replaying a snapshot it cannot read.
+      engine_version: ENGINE_VERSION,
     })
     .select('id')
     .single();

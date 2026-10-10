@@ -22,8 +22,7 @@
  * sentence: who acted, what they tried, what the dice said.
  */
 
-import { THIRD_COUNT, THIRD_LENGTH } from '../../../engine/constants.js';
-import type { Point } from '../../../engine/geometry.js';
+import { thirdOf, type Point } from '../../../engine/geometry.js';
 import type { DiceRoll, MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId, Unit, UnitId } from '../../../engine/types.js';
 
@@ -395,19 +394,19 @@ function describe(
         });
         break;
       // The Crackers had no commentary at all, so a round where neither one
-      // went off showed them jumping across the shaft with nothing said, and a
-      // fresh one appearing at the centre of The Scramble looked like the same
+      // went off showed them rolling across the pitch with nothing said, and a
+      // fresh one appearing in midfield looked like the same
       // Cracker refusing to leave. Both are minor: a detonation in the same
       // beat outranks them.
       case 'crackerMoved':
         lines.push({
-          text: `${label(event.crackerId)} drifts ${event.path.length} cells into ${zoneName(event.to.y)}`,
+          text: `${label(event.crackerId)} rolls ${event.path.length} cells towards ${thirdName(event.to, own)}`,
           minor: true,
         });
         break;
       case 'crackerRespawned':
         lines.push({
-          text: `A fresh ${label(event.crackerId)} drops into ${zoneName(event.at.y)}`,
+          text: `A fresh ${label(event.crackerId)} appears in ${thirdName(event.at, own)}`,
           outcome: 'neutral',
           minor: true,
         });
@@ -422,7 +421,7 @@ function describe(
         });
         break;
       case 'sparkEntered':
-        lines.push({ text: 'The Spark drops into the silo', outcome: 'neutral' });
+        lines.push({ text: 'The Spark rolls onto the pitch', outcome: 'neutral' });
         break;
       case 'sparkCaught':
         lines.push({
@@ -462,19 +461,17 @@ function label(crackerId: string): string {
 }
 
 /**
- * The zone a height falls in, named. Display numbering, 1 at the floor, which
- * is the numbering every other surface of this client uses.
+ * Which third of the pitch a cell is in, from the point of view of `own`.
+ *
+ * The thirds are only names, with no rule behind them. Team A's Furnace is at
+ * y = 0 and team B's at y = 44, so "own end" is the low third for A and the
+ * high one for B. SeatPanel uses the same words.
  */
-function zoneName(y: number): string {
-  const zone = Math.min(THIRD_COUNT, Math.max(1, Math.floor(y / THIRD_LENGTH) + 1));
-  return ZONE_NAMES[zone] ?? `Zone ${zone}`;
+export function thirdName(at: Point, own: TeamId): string {
+  const third = Math.min(2, Math.max(0, thirdOf(at)));
+  const fromOwn = own === 'A' ? third : 2 - third;
+  return ['own end', 'midfield', 'their end'][fromOwn]!;
 }
-
-const ZONE_NAMES: Record<number, string> = {
-  1: 'The Trench',
-  2: 'The Scramble',
-  3: 'The Summit',
-};
 
 /** Where a unit walked during a beat, for the trail drawn on the board. */
 export function trailOf(beat: Beat): { unitId: UnitId; path: readonly Point[] } | null {

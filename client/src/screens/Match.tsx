@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { legalActions, onlyEndTurnLeft } from '../../../engine/legalActions.js';
-import { TURN_TIMER_SECONDS } from '../../../engine/constants.js';
+import { BENCH_SIZE, MATCH_ROUNDS, TURN_TIMER_SECONDS } from '../../../engine/constants.js';
 import { pathTo } from '../../../engine/rules/movement.js';
 import { isHuman } from '../../../engine/types.js';
 import { arena } from '../lib/arena.js';
@@ -34,7 +34,6 @@ import { SeatPanel } from '../match/SeatPanel.js';
 import { trailOf } from '../match/replay.js';
 import { cellToScreen, publishHook, summarise, withdrawHook } from '../match/testHook.js';
 import { beatHoldMs, useMatch, type Speed } from '../match/useMatch.js';
-import { zoneOf } from '../lib/arena.js';
 
 export function Match({
   matchId,
@@ -52,7 +51,6 @@ export function Match({
 
   const match = useMatch(matchId, own);
   const [selected, setSelected] = useState<string | null>(null);
-  const [zone, setZone] = useState(2);
   const [now, setNow] = useState(() => Date.now());
   const [briefing, setBriefing] = useState(() => !hasBeenBriefed());
 
@@ -90,13 +88,6 @@ export function Match({
     () => (state && yours && !replaying ? legalActions(arena, state) : null),
     [state, yours, replaying],
   );
-
-  /** Follow the action: the zone the unit on the clock is standing in. */
-  const followed = replaying ? match.beat?.unitId ?? null : onClock?.id ?? null;
-  const followedUnit = followed ? state?.units.find((u) => u.id === followed) ?? null : null;
-  useEffect(() => {
-    if (followedUnit) setZone(zoneOf(followedUnit.y));
-  }, [followedUnit?.id, followedUnit?.y]);
 
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 500);
@@ -185,8 +176,6 @@ export function Match({
     void send({ kind: 'endTurn' });
   }, [yours, replaying, match.busy, match.deadline, match.skew, now, onClock?.id, send]);
 
-  const onZone = useCallback((next: number) => setZone(next), []);
-
   /**
    * The test hook, development only and compiled away otherwise.
    *
@@ -205,12 +194,10 @@ export function Match({
       replaying,
       busy: match.busy,
       deadline: match.deadline,
-      zone,
       refusal: match.refusal,
       legalSummary: () => summarise(legal),
-      setZone,
       setSpeed: match.setSpeed,
-      cellToScreen: (x, y) => cellToScreen(zone, x, y),
+      cellToScreen,
       clickCell: (x, y) => {
         if (!canAct || !legal) return false;
         const route = pathTo(legal.destinations, { x, y });
@@ -277,10 +264,15 @@ export function Match({
   // Counted from when control came back, which is what the knock above waits
   // for. A number that ran out while the player could not act would be a lie
   // twice over: they would watch it fall during the replay and nothing would
-  // happen when it hit zero.
+  // happen when it hit zero. Clamped at the top as well as at zero: `now` is
+  // sampled by the half-second tick and can predate the instant control came
+  // back, which read as a hundred and twenty-one on the first render (A14).
   const left =
     yours && !replaying && tookControl.current !== null
-      ? Math.max(0, TURN_TIMER_SECONDS - Math.floor((now - tookControl.current) / 1000))
+      ? Math.min(
+          TURN_TIMER_SECONDS,
+          Math.max(0, TURN_TIMER_SECONDS - Math.floor((now - tookControl.current) / 1000)),
+        )
       : null;
   const beatActor = match.beat?.unitId
     ? state.units.find((u) => u.id === match.beat!.unitId)?.name ?? null
@@ -298,7 +290,7 @@ export function Match({
               {teamName}
             </p>
             <p className="label" style={{ margin: '2px 0 0' }}>
-              Bench {state.bench.A} of 3
+              Bench {state.bench.A} of {BENCH_SIZE}
             </p>
           </div>
         </div>
@@ -314,7 +306,7 @@ export function Match({
             </span>
           </p>
           <p className="label" style={{ margin: 0, textAlign: 'center' }}>
-            Round {state.round} of 10
+            Round {state.round} of {MATCH_ROUNDS}
             {state.phase === 'suddenDeath' ? ' · sudden death' : ''}
           </p>
         </div>
@@ -325,7 +317,7 @@ export function Match({
               The House
             </p>
             <p className="label" style={{ margin: '2px 0 0' }}>
-              Bench {state.bench.B} of 3
+              Bench {state.bench.B} of {BENCH_SIZE}
             </p>
           </div>
           <div className="plate" style={{ ...S.crest, border: '2px solid var(--team-foe)' }}>
@@ -341,8 +333,6 @@ export function Match({
               state={state}
               legal={legal}
               own={own}
-              zone={zone}
-              onZone={onZone}
               onMove={canAct ? (path) => void send({ kind: 'move', path }) : null}
               onSelectUnit={setSelected}
               selected={selected}
@@ -520,6 +510,11 @@ const S: Record<string, React.CSSProperties> = {
     gridTemplateRows: 'minmax(140px, 1fr) auto minmax(140px, 1.2fr)',
     gap: 10,
     minHeight: 0,
+    // The column is a fixed track, and a panel whose content cannot shrink
+    // (a ladder rung that refuses to wrap, say) would otherwise push the whole
+    // column past the window's edge instead of scrolling inside its panel.
+    minWidth: 0,
+    overflow: 'hidden',
   },
   clockRow: { flex: 'none', display: 'flex', alignItems: 'center', gap: 10 },
   speed: { fontSize: 10, padding: '4px 9px' },

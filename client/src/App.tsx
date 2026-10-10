@@ -50,6 +50,9 @@ export function App() {
 
   if (account.loading) return <Waiting />;
   if (!account.userId) return <SignIn onDone={() => void account.refresh()} />;
+  if (account.failure) {
+    return <Unreachable reason={account.failure} onRetry={() => void account.refresh()} />;
+  }
 
   const name = account.profile?.display_name ?? '';
 
@@ -100,10 +103,49 @@ export function App() {
       team={account.team}
       displayName={name}
       live={account.live}
+      archived={account.archived}
       onResume={() => setAtTheBoard(true)}
       onCreated={() => void account.refresh()}
       onEnterLobby={() => setWhere('lobby')}
     />
+  );
+}
+
+/**
+ * The screen a player gets when the project does not answer (audit line A12).
+ *
+ * It replaces the one they used to get, which was "Raise a battery" for an
+ * account that had one, followed by a button that failed without a word. The
+ * reason is the server's own, verbatim, because it is what a friend will paste
+ * into a message to Jérôme, and a free project in pause and a network that is
+ * down read differently in it.
+ */
+function Unreachable({ reason, onRetry }: { reason: string; onRetry: () => void }) {
+  return (
+    <div style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
+      <div style={{ maxWidth: 560, padding: 26, background: 'var(--panel)', border: '1px solid var(--line)' }}>
+        <p className="label" style={{ margin: 0, color: 'var(--brass)' }}>
+          The silo is not answering
+        </p>
+        <h2 className="display" style={{ margin: '6px 0 14px', fontSize: 28 }}>
+          Could not read your battery
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
+          Your sign-in is fine. The server behind the game did not answer when the page asked for
+          your profile, your battery or your matches. Check your connection and try again; if it
+          keeps happening, send Jérôme the line below.
+        </p>
+        <p
+          className="error"
+          style={{ margin: '14px 0 0', fontFamily: 'var(--mono)', fontSize: 11, wordBreak: 'break-word' }}
+        >
+          {reason}
+        </p>
+        <button onClick={onRetry} style={{ marginTop: 18 }}>
+          Try again
+        </button>
+      </div>
+    </div>
   );
 }
 

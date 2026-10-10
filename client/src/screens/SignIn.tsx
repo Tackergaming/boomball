@@ -15,7 +15,7 @@
 
 import { useState, type FormEvent } from 'react';
 
-import trench from '../../../assets/arena/zone-1-trench.jpeg';
+import trench from '../../../assets/arena/sign-in.webp';
 import { supabase } from '../lib/supabase.js';
 
 type Mode = 'in' | 'up';

@@ -14,7 +14,7 @@
 
 import { statsFor } from '../../../engine/stats.js';
 import { unitById, type MatchState } from '../../../engine/types.js';
-import { zoneOf } from '../lib/arena.js';
+import { thirdName } from './replay.js';
 
 export function SeatPanel({
   state,
@@ -93,10 +93,15 @@ export function SeatPanel({
       </div>
 
       <p className="label" style={{ marginTop: 12, color: 'var(--text-faint)' }}>
-        Zone {zoneOf(unit.y)} · {unit.x},{unit.y}
+        {thirdLabel(thirdName(unit, own))} · {unit.x},{unit.y}
       </p>
     </div>
   );
+}
+
+/** The third in words, capitalised for a label: "Own end", "Midfield", "Their end". */
+function thirdLabel(name: string): string {
+  return name[0]!.toUpperCase() + name.slice(1);
 }
 
 function Stat({ term, value }: { term: string; value: string | number }) {

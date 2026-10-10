@@ -14,10 +14,52 @@
  * decides.
  */
 
+import { useEffect, useState } from 'react';
+
+import { TIER_WINS_STAR, TIER_WINS_VETERAN } from '../../../engine/constants.js';
+import { supabase } from '../lib/supabase.js';
 import type { LiveMatch } from '../lib/useAccount.js';
 import type { Team } from '../lib/useAccount.js';
 
-const NEXT_AT: Record<string, number | null> = { rookie: 3, veteran: 6, star: null };
+const NEXT_AT: Record<string, number | null> = {
+  rookie: TIER_WINS_VETERAN,
+  veteran: TIER_WINS_STAR,
+  star: null,
+};
+
+/**
+ * True when the Spark decided the match: the result on Payload goals alone
+ * differs from the actual one. Until the events are read it is false, so the
+ * verdict shows the Payload wording rather than a blank.
+ */
+function useSparkDecided(match: LiveMatch): boolean {
+  const [spark, setSpark] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void supabase
+      .from('match_events')
+      .select('payload')
+      .eq('match_id', match.id)
+      .eq('kind', 'scored')
+      .then(({ data, error }) => {
+        if (!live || error || !data) return;
+        let a = 0;
+        let b = 0;
+        for (const row of data as { payload: { team: 'A' | 'B'; points: number; source: string } }[]) {
+          const e = row.payload;
+          if (e.source !== 'payload') continue;
+          if (e.team === 'A') a += e.points;
+          else b += e.points;
+        }
+        const goalsWinner = a === b ? null : a > b ? 'A' : 'B';
+        setSpark(!match.is_draw && goalsWinner !== match.winner);
+      });
+    return () => {
+      live = false;
+    };
+  }, [match.id, match.winner, match.is_draw]);
+  return spark;
+}
 
 export function Results({
   match,
@@ -33,6 +75,7 @@ export function Results({
   const won = match.winner === 'A';
   const drawn = match.is_draw;
   const target = NEXT_AT[team.tier] ?? null;
+  const how = useSparkDecided(match) ? 'Spark' : 'Payload';
 
   return (
     <div style={S.screen}>
@@ -43,7 +86,7 @@ export function Results({
           {match.round} rounds played · full time
         </p>
         <h1 className="display" style={S.verdict}>
-          {drawn ? 'Drawn on the whistle' : won ? 'Won on the Payload' : 'Lost on the Payload'}
+          {drawn ? 'Drawn on the whistle' : won ? `Won on the ${how}` : `Lost on the ${how}`}
         </h1>
 
         <div style={S.scoreboard}>

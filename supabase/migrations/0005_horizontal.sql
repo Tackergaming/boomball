@@ -7,13 +7,25 @@
 -- of it, so a database still holding the vertical silo would serve the client a
 -- grid the engine no longer agrees with.
 --
--- This migration does that and nothing else: it rewrites the arena row. The
--- `matches.engine_version` column and the archiving of the matches still open
--- (audit line A11) come in a later migration, in sub-phase 2H.4.
+-- Two things, both idempotent, safe to run twice:
 --
--- The block below is the one `supabase/seed.sql` carries, and it stays held
--- equal to the engine by `server/arenaRow.test.ts` and by
--- `server/migration0005.test.ts`. Idempotent: safe to run twice.
+-- 1. The arena row, rewritten. The block below is the one `supabase/seed.sql`
+--    carries, and it stays held equal to the engine by `server/arenaRow.test.ts`
+--    and by `server/migration0005.test.ts`.
+-- 2. `matches.engine_version` (audit line A11, sub-phase 2H.4). Every match
+--    written so far was written by engine 1, the vertical silo, and defaults
+--    to 1 here; `create-match` stamps `ENGINE_VERSION` on every new row and
+--    `resolve-action` refuses a row whose version is not its own. The matches
+--    still open on version 1, Jérôme's and the e2e account's, are therefore
+--    **archived, not deleted**: their rows and events stay, nothing resumes
+--    them, and the client says so. Nothing in this file touches them.
+
+alter table matches
+  add column if not exists engine_version integer not null default 1
+  check (engine_version >= 1);
+
+comment on column matches.engine_version is
+  'Which engine wrote this match (engine/constants.ts ENGINE_VERSION). A match is only ever played by the engine that wrote it; an older one is archived.';
 
 insert into arenas (
   id, name, width, height, layout, furnaces, ordnance_start, starts, substitute_entry, art

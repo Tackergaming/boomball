@@ -188,7 +188,7 @@ navigateur en veille ne peut donc pas geler la partie.
 | `teams` | id, propriétaire, nom, tier, victoires | Le Tier se déduit des victoires, il n'est pas saisi |
 | `team_members` | équipe, profil, rôle préféré, **nom du personnage** | Le nom saisi au lobby est conservé ici |
 | `arenas` | id, nom, largeur, hauteur, `layout` (les 45 lignes ASCII), art | Le chargeur d'arènes est prévu, une seule ligne au MVP |
-| `matches` | id, équipe, arène, tier, statut, round, scores, `rng_seed`, échéance du tour | |
+| `matches` | id, équipe, arène, tier, statut, round, scores, `rng_seed`, échéance du tour, `engine_version` (A11 : la version du moteur qui a écrit le match ; `create-match` l'estampille, `resolve-action` refuse une autre version, le client marque le match archivé) | |
 | `match_participants` | match, profil, unité, rôle, nom | Qui contrôle quoi |
 | `match_events` | match, `seq`, acteur, type, payload, dés | Source de vérité. `(match_id, seq)` unique |
 | `match_state` | match, instantané jsonb, `seq` de l'instantané | Cache, reconstructible depuis les événements |

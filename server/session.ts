@@ -22,7 +22,7 @@
 
 import type { Action } from '../engine/actions.js';
 import type { Arena } from '../engine/arena.js';
-import { TURN_TIMER_SECONDS } from '../engine/constants.js';
+import { ENGINE_VERSION, TURN_TIMER_SECONDS } from '../engine/constants.js';
 import type { MatchEvent } from '../engine/events.js';
 import { openMatch, reduce } from '../engine/reduce.js';
 import { isHuman, unitById, type HumanId, type MatchState, type UnitId } from '../engine/types.js';
@@ -130,6 +130,66 @@ export function submitAction(
     ok: true,
     step: advance(arena, { ...session, state: result.state }, events, now, orders),
   };
+}
+
+/**
+ * What a request that carries an action gets, once the clock has been read.
+ *
+ * `expired` is the one bit a client has to know: when it is set, the events
+ * are the expiry the server settled and **the action was not played**.
+ */
+export type ServedAction =
+  | { readonly ok: true; readonly step: SessionStep; readonly expired: boolean }
+  | Refusal;
+
+/**
+ * The whole of a request: settle an overdue clock, or play the action.
+ *
+ * **Never both** (audit line A28). `resolve-action` used to settle the expiry
+ * and then submit the action it had been sent to the turn that came next, and
+ * since a `move` or an `endTurn` is legal on most turns, the late action was
+ * applied to a turn the player had not seen yet: an `endTurn` sent after the
+ * clock, including the client's own knock, cost two turns, and the reply did
+ * not even say `expired`. So an overdue clock is the only thing a late request
+ * achieves. The player gets the expiry back, marked as such, and acts again on
+ * the board that results.
+ */
+export function serveAction(
+  arena: Arena,
+  session: Session,
+  request: ActionRequest,
+  now: number,
+  orders: readonly AllyOrder[] = [],
+): ServedAction {
+  const overdue = expireIfDue(arena, session, now, orders);
+  if (overdue) return { ok: true, step: overdue, expired: true };
+
+  const result = submitAction(arena, session, request, now, orders);
+  if (!result.ok) return result;
+  return { ok: true, step: result.step, expired: false };
+}
+
+/**
+ * Why a match written by another engine cannot be played, or null when it can
+ * (audit line A11).
+ *
+ * A `MatchState` and its events change shape between engine versions: the
+ * version 1 silo had anchoring and falls, version 2 has neither and a different
+ * pitch. Replaying a version 1 snapshot through this engine would not fail
+ * loudly, it would play a corrupt match. So the `matches` row carries the
+ * version that wrote it, and the doors refuse a mismatch with a reason the
+ * client can show. The match is archived, not lost: its events stay.
+ *
+ * A row from before the column existed reads as version 1, which is what it
+ * was.
+ */
+export function engineVersionRefusal(written: number | null | undefined): string | null {
+  const version = written ?? 1;
+  if (version === ENGINE_VERSION) return null;
+  return (
+    `this match was played on engine version ${version} and the game now runs version ` +
+    `${ENGINE_VERSION}: it is archived and cannot be resumed`
+  );
 }
 
 // -- The clock --------------------------------------------------------------

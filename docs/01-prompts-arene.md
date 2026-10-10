@@ -1,5 +1,11 @@
 # Prompts de l'arène, Kill-Silo
 
+> **Document d'histoire depuis le 2026-10-10.** Les trois images ont été générées puis abandonnées :
+> la décision D8 a abandonné le relevé au pixel, et la décision D11 a couché le terrain, qui se
+> construit depuis le layout ASCII et ne porte plus aucune image. La dernière ligne de ce document,
+> « l'image gagne sur le plan », est donc périmée : c'est le layout qui fait foi. Une seule image
+> survit, convertie en WebP pour l'écran de connexion (`assets/arena/sign-in.webp`).
+
 > Trois images, une par zone, à générer dans Nanobanana. Chaque prompt est complet et se colle
 > d'un seul geste. Les consignes qui te sont adressées sont hors des blocs.
 

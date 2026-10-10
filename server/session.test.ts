@@ -11,10 +11,18 @@ import { describe, expect, it } from 'vitest';
 
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import { TURN_TIMER_SECONDS } from '../engine/constants.js';
+import { ENGINE_VERSION, TURN_TIMER_SECONDS } from '../engine/constants.js';
 import { createMatch, type HumanSeat } from '../engine/setup.js';
 import { isHuman, unitById, type MatchState } from '../engine/types.js';
-import { expireIfDue, isExpired, openSession, submitAction, type Session } from './session.js';
+import {
+  engineVersionRefusal,
+  expireIfDue,
+  isExpired,
+  openSession,
+  serveAction,
+  submitAction,
+  type Session,
+} from './session.js';
 
 const arena = new Arena(KILL_SILO);
 const T0 = 1_700_000_000_000;
@@ -306,6 +314,66 @@ describe('a player who goes quiet', () => {
     }
 
     expect(session.state.phase).toBe('finished');
+  });
+});
+
+describe('a request that arrives late', () => {
+  it('settles the clock and does not play the action it carried (A28)', () => {
+    const { session } = open(SOLO);
+    const unitId = session.state.turn!.unitId;
+    const late = session.turnDeadline! + 1;
+
+    // A dodge is legal on this turn, and would be legal on the next one too:
+    // that is exactly how a late action used to be played on a turn the player
+    // had never seen.
+    const served = serveAction(arena, session, { humanId: 'jerome', unitId, action: { kind: 'dodge' } }, late);
+    expect(served.ok).toBe(true);
+    if (!served.ok) return;
+
+    expect(served.expired).toBe(true);
+    // Byte for byte the expiry alone, nothing played after it.
+    expect(served.step).toEqual(expireIfDue(arena, session, late));
+  });
+
+  it('plays the action when the clock is still running', () => {
+    const { session } = open(SOLO);
+    const unitId = session.state.turn!.unitId;
+    const inTime = session.turnDeadline! - 1;
+
+    const served = serveAction(arena, session, { humanId: 'jerome', unitId, action: { kind: 'dodge' } }, inTime);
+    expect(served.ok).toBe(true);
+    if (!served.ok) return;
+
+    expect(served.expired).toBe(false);
+    const direct = submitAction(arena, session, { humanId: 'jerome', unitId, action: { kind: 'dodge' } }, inTime);
+    expect(direct.ok).toBe(true);
+    if (direct.ok) expect(served.step).toEqual(direct.step);
+  });
+
+  it('still refuses an illegal action in time, with the engine\'s reason', () => {
+    const { session } = open(SOLO);
+    const served = serveAction(
+      arena,
+      session,
+      { humanId: 'jerome', unitId: 'B-bulwark-1', action: { kind: 'dodge' } },
+      session.turnDeadline! - 1,
+    );
+    expect(served.ok).toBe(false);
+  });
+});
+
+describe('a match written by another engine', () => {
+  it('is refused with a reason that says it is archived (A11)', () => {
+    const reason = engineVersionRefusal(1);
+    expect(reason).not.toBeNull();
+    expect(reason).toContain('archived');
+    expect(reason).toContain(`version ${ENGINE_VERSION}`);
+  });
+
+  it('is accepted on the engine that wrote it, and a row without a version reads as the first', () => {
+    expect(engineVersionRefusal(ENGINE_VERSION)).toBeNull();
+    expect(engineVersionRefusal(null)).not.toBeNull();
+    expect(engineVersionRefusal(undefined)).not.toBeNull();
   });
 });
 

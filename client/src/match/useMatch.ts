@@ -162,6 +162,15 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   const [skew, setSkew] = useState(0);
   const [speed, setSpeedState] = useState<Speed>(storedSpeed);
   const seqRef = useRef(-1);
+  /**
+   * Every `fromSeq` this client has already put in the feed, from either
+   * direction. A batch reaches the browser twice, in the HTTP reply and on the
+   * match channel, and **the broadcast can land first**: the function sends it
+   * before it returns. So neither "is it ahead of what I hold" nor "did my
+   * request claim it" is enough on its own; the sequence number is the one
+   * thing both copies share (audit line A9).
+   */
+  const seenRef = useRef(new Set<number>());
   const speedRef = useRef(speed);
   const skipRef = useRef(false);
   const liveRef = useRef(true);
@@ -228,9 +237,10 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
       .on('broadcast', { event: 'events' }, (message) => {
         const payload = message.payload as { fromSeq?: number; events?: MatchEvent[] };
         const from = payload.fromSeq ?? 0;
-        // Our own batch comes back in the HTTP reply as well; only a batch that
-        // is ahead of what we already hold is worth a re-read.
-        if (from <= seqRef.current) return;
+        // Our own batch comes back in the HTTP reply as well, possibly after
+        // this. A batch already in the feed, or behind what we hold, is nothing.
+        if (seenRef.current.has(from) || from <= seqRef.current) return;
+        seenRef.current.add(from);
         if (payload.events) {
           setFeed((old) => [...old, ...payload.events!].slice(-FEED_LIMIT));
         }
@@ -321,7 +331,20 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
           return;
         }
 
-        setFeed((old) => [...old, ...reply.events].slice(-FEED_LIMIT));
+        // **Our own batch comes back twice**: in this reply, and as the
+        // broadcast the function sends on the match channel, which lands
+        // either just before this line or while the replay below is walking
+        // the beats. Unclaimed, the echo appended every line to the feed a
+        // second time and re-read the snapshot in the middle of the replay,
+        // which snapped the board to the final position (audit line A9). The
+        // feed takes the batch once, whichever copy came first, and `seqRef`
+        // is moved here rather than at the end of the replay so a late echo
+        // reads as behind.
+        if (!seenRef.current.has(reply.fromSeq)) {
+          seenRef.current.add(reply.fromSeq);
+          setFeed((old) => [...old, ...reply.events].slice(-FEED_LIMIT));
+        }
+        seqRef.current = Math.max(seqRef.current, reply.fromSeq + reply.events.length - 1);
         // The server answers `expired` when the clock, not the player, spent
         // the turn. It is news, not an error, and the screen says so.
         if ('expired' in reply && reply.expired) setExpired(true);

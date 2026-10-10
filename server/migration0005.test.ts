@@ -41,4 +41,9 @@ describe('migration 0005, the horizontal arena row', () => {
   it('is about the kill-silo arena', () => {
     expect(migration).toContain('kill-silo');
   });
+
+  it('adds the engine version to matches, earlier rows reading as version 1 (A11)', () => {
+    expect(migration).toContain('add column if not exists engine_version');
+    expect(migration).toContain('default 1');
+  });
 });

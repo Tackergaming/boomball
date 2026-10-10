@@ -16,7 +16,7 @@
  */
 
 import type { Action } from '../../../engine/actions.js';
-import { ARENA_WIDTH, THIRD_LENGTH } from '../../../engine/constants.js';
+import { ARENA_HEIGHT, ARENA_WIDTH } from '../../../engine/constants.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
 import type { MatchState } from '../../../engine/types.js';
 
@@ -52,14 +52,11 @@ export interface BoomballHook {
   busy: boolean;
   /** The server's turn deadline, epoch milliseconds, or null. */
   deadline: number | null;
-  /** The zone the board is showing, 1 at the floor. */
-  zone: number;
   /** The last refusal the server sent, until dismissed. */
   refusal: string | null;
   legalSummary(): LegalSummary | null;
-  setZone(zone: number): void;
   setSpeed(speed: ReplaySpeed): void;
-  /** The centre of a cell in window pixels, or null when it is not in the shown zone. */
+  /** The centre of a cell in window pixels, or null when the board is not mounted. */
   cellToScreen(x: number, y: number): { x: number; y: number } | null;
   /** What a click on that cell would do. False when the cell is not a destination. */
   clickCell(x: number, y: number): boolean;
@@ -94,19 +91,20 @@ export function summarise(legal: LegalActions | null): LegalSummary | null {
 /**
  * Where a cell is on the screen, read from the board's own stage element.
  *
- * The stage is square and `ARENA_WIDTH` cells wide, so one cell is its width
- * over fifteen; the row is flipped the way `Board.tsx` flips it, once. A cell
- * in another zone is not on screen and answers null rather than a guess.
+ * Since D11 the whole pitch is on screen, seen from above and laid along the
+ * width of the stage: the engine's `y` runs left to right, 0 at the mouth of
+ * Furnace A on the left, and the engine's `x` runs top to bottom. The stage is
+ * `ARENA_HEIGHT` cells wide, so one cell is its width over forty-five, and the
+ * same rule is the one `Board.tsx` draws by. A cell off the pitch answers null
+ * rather than a guess.
  */
-export function cellToScreen(zone: number, x: number, y: number): { x: number; y: number } | null {
+export function cellToScreen(x: number, y: number): { x: number; y: number } | null {
   const stage = document.querySelector<HTMLElement>('[data-board-stage]');
   if (!stage) return null;
-  const bottomY = (zone - 1) * THIRD_LENGTH;
-  if (y < bottomY || y >= bottomY + THIRD_LENGTH) return null;
+  if (x < 0 || x >= ARENA_WIDTH || y < 0 || y >= ARENA_HEIGHT) return null;
   const rect = stage.getBoundingClientRect();
-  const cell = rect.width / ARENA_WIDTH;
-  const row = THIRD_LENGTH - 1 - (y - bottomY);
-  return { x: rect.left + (x + 0.5) * cell, y: rect.top + (row + 0.5) * cell };
+  const cell = rect.width / ARENA_HEIGHT;
+  return { x: rect.left + (y + 0.5) * cell, y: rect.top + (x + 0.5) * cell };
 }
 
 export function publishHook(hook: BoomballHook): void {

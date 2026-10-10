@@ -110,7 +110,6 @@ export interface View {
   replaying: boolean;
   busy: boolean;
   deadline: number | null;
-  zone: number;
   phase: MatchState['phase'] | null;
   round: number;
   score: { A: number; B: number } | null;
@@ -131,7 +130,6 @@ export function view(page: Page): Promise<View> {
       replaying: h.replaying,
       busy: h.busy,
       deadline: h.deadline,
-      zone: h.zone,
       phase: h.state?.phase ?? null,
       round: h.state?.round ?? 0,
       score: h.state ? { A: h.state.score.A, B: h.state.score.B } : null,
@@ -208,14 +206,27 @@ export function waitForArrival(page: Page, unitId: string, cell: { x: number; y:
   );
 }
 
-/** The destination that costs the most to reach, inside the zone on screen. */
-export function farthest(
-  destinations: LegalSummary['destinations'],
-  zone: number,
-): { x: number; y: number; costFeet: number } {
-  const bottomY = (zone - 1) * 15;
-  const inZone = destinations.filter((d) => d.y >= bottomY && d.y < bottomY + 15);
-  const pool = inZone.length ? inZone : destinations;
-  const best = pool.reduce((a, b) => (b.costFeet > a.costFeet ? b : a));
-  return best;
+/** The destination that costs the most to reach: the whole pitch is on screen, so no zone narrows it. */
+export function farthest(destinations: LegalSummary['destinations']): { x: number; y: number; costFeet: number } {
+  return destinations.reduce((a, b) => (b.costFeet > a.costFeet ? b : a));
+}
+
+/**
+ * Audit line A9: the feed ("The call") must not show a round marker twice.
+ * Reads every visible line under the panel's head, counts `— Round N —` per N,
+ * and returns the counts so a spec can expect each to be 1.
+ */
+export async function roundMarkers(page: Page): Promise<Record<number, number>> {
+  const lines = await page
+    .locator('div:has(> .label:text-is("The call"))')
+    .first()
+    .locator('xpath=..')
+    .locator('p')
+    .allInnerTexts();
+  const counts: Record<number, number> = {};
+  for (const line of lines) {
+    const m = /^\s*— Round (\d+) —\s*$/.exec(line);
+    if (m) counts[Number(m[1])] = (counts[Number(m[1])] ?? 0) + 1;
+  }
+  return counts;
 }

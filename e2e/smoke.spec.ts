@@ -19,6 +19,7 @@ import {
   act,
   farthest,
   report,
+  roundMarkers,
   stamp,
   summary,
   unitAt,
@@ -94,7 +95,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   const legal1 = await summary(page);
   expect(legal1.destinations.length).toBeGreaterThan(0);
   const from1 = await unitAt(page, legal1.unitId);
-  const to1 = farthest(legal1.destinations, at.zone);
+  const to1 = farthest(legal1.destinations);
   expect(
     await page.evaluate(([x, y]) => window.__boomball!.clickCell(x, y), [to1.x, to1.y] as const),
   ).toBe(true);
@@ -129,7 +130,17 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
 
   await page.evaluate(() => window.__boomball!.dismissBeat());
   const legal3 = await summary(page);
-  const to3 = farthest(legal3.destinations, afterTwo.zone);
+  const to3 = farthest(legal3.destinations);
+  // The hook and the board must agree on the geometry: a reachable cell's
+  // screen point lies inside the stage's bounding box.
+  const point = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to3.x, to3.y] as const);
+  const box = await page.locator('[data-board-stage]').boundingBox();
+  expect(point, 'cellToScreen on a reachable cell').not.toBeNull();
+  expect(box, 'the board stage is on screen').not.toBeNull();
+  expect(point!.x).toBeGreaterThanOrEqual(box!.x);
+  expect(point!.x).toBeLessThanOrEqual(box!.x + box!.width);
+  expect(point!.y).toBeGreaterThanOrEqual(box!.y);
+  expect(point!.y).toBeLessThanOrEqual(box!.y + box!.height);
   await page.locator(`[data-cell="${to3.x},${to3.y}"]`).click();
   await waitForArrival(page, legal3.unitId, to3);
   await shots.take('turn-3-moved');
@@ -139,6 +150,14 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   const afterThree = await view(page);
   expect(afterThree.seq).toBeGreaterThan(afterTwo.seq);
   await shots.take('turn-3-house-played');
+
+  // -- A9: no round marker twice in the feed --------------------------------
+
+  const markers = await roundMarkers(page);
+  expect(Object.keys(markers).length, 'the feed shows at least one round marker').toBeGreaterThan(0);
+  for (const [round, count] of Object.entries(markers)) {
+    expect(count, `the marker "— Round ${round} —" appears once in the feed`).toBe(1);
+  }
 
   // -- What the console and the network said --------------------------------
 

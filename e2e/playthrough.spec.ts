@@ -16,7 +16,7 @@ import { expect, test } from '@playwright/test';
 import { chooseAction } from '../ai/chooseAction.js';
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import { Shots, act, report, stamp, state, view, waitForHook, waitForMyTurn, watch } from './harness.js';
+import { Shots, act, report, roundMarkers, stamp, state, view, waitForHook, waitForMyTurn, watch } from './harness.js';
 
 const arena = new Arena(KILL_SILO);
 
@@ -83,6 +83,13 @@ test('@playthrough plays the open match to the final whistle', async ({ page }, 
   await expect(page.getByText('full time')).toBeVisible({ timeout: 60_000 });
   await shots.take('results');
   console.log(`played ${turns} human requests, ${refusals} refused`);
+
+  // Audit line A9: no round marker twice in the feed (the results sheet may have taken the screen).
+  if (await page.getByText('The call', { exact: true }).count()) {
+    for (const [round, count] of Object.entries(await roundMarkers(page))) {
+      expect(count, `round ${round} marker appears once in the feed`).toBe(1);
+    }
+  }
 
   await info.attach('console-and-network', { body: report(seen), contentType: 'text/plain' });
   expect(seen.errors, 'page errors and console errors').toEqual([]);

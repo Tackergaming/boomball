@@ -3,7 +3,7 @@
  *
  * A solo round resolves thirteen AI turns behind one click and comes back as
  * one batch of sixty-odd events. Without a feed the board simply changes and
- * the player has no idea why their Bulwark is on the floor. This is the only
+ * the player has no idea why their Bulwark is off the field. This is the only
  * place in the client that reads events at all, and it reads them to narrate,
  * never to work out what the board looks like: that is the snapshot's job.
  *
@@ -101,7 +101,7 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'crackerMoved':
       return null;
     case 'sparkEntered':
-      return 'The Spark drops into the shaft.';
+      return 'The Spark rolls onto the pitch.';
     case 'sparkMoved':
       return null;
     case 'sparkCaught':
@@ -123,7 +123,7 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'payloadReset':
       return event.carriedBy
         ? `A fresh Payload goes to ${name(event.carriedBy)}.`
-        : 'A fresh Payload drops in front of the Furnace.';
+        : 'A fresh Payload lands in front of the Furnace.';
     case 'shotAtFurnace':
       if (event.scored) return `${name(event.unitId)} puts it in the Furnace.`;
       return event.blockedBy

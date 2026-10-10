@@ -19,6 +19,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 
+import { MATCH_ROUNDS, TIER_WINS_STAR, TIER_WINS_VETERAN } from '../../../engine/constants.js';
 import { ROLES, TEAM_COMPOSITION, type Role, type Tier } from '../../../engine/stats.js';
 import { supabase } from '../lib/supabase.js';
 import type { LiveMatch, Team } from '../lib/useAccount.js';
@@ -36,8 +37,8 @@ interface StatRow {
 /** Where each Tier starts, mirroring the generated column on `teams`. */
 const LADDER: { tier: Tier; at: number }[] = [
   { tier: 'rookie', at: 0 },
-  { tier: 'veteran', at: 3 },
-  { tier: 'star', at: 6 },
+  { tier: 'veteran', at: TIER_WINS_VETERAN },
+  { tier: 'star', at: TIER_WINS_STAR },
 ];
 
 export function TeamHub({
@@ -45,6 +46,7 @@ export function TeamHub({
   team,
   displayName,
   live,
+  archived,
   onResume,
   onCreated,
   onEnterLobby,
@@ -54,6 +56,8 @@ export function TeamHub({
   displayName: string;
   /** An unfinished match, which there is at most one of. */
   live: LiveMatch | null;
+  /** Matches from an earlier engine version: kept as a record, never resumable. */
+  archived: number;
   onResume: () => void;
   onCreated: () => void;
   onEnterLobby: () => void;
@@ -106,7 +110,7 @@ export function TeamHub({
               A match is running
             </p>
             <p style={S.resumeLine}>
-              Round {live.round} of 10 · {live.score_a} to {live.score_b}. A battery plays one match
+              Round {live.round} of {MATCH_ROUNDS} · {live.score_a} to {live.score_b}. A battery plays one match
               at a time, so this one has to finish before the next kicks off.
             </p>
           </div>
@@ -114,6 +118,14 @@ export function TeamHub({
             Back to the silo
           </button>
         </div>
+      )}
+
+      {archived > 0 && (
+        <p style={S.archivedNote}>
+          {archived} {archived === 1 ? 'match' : 'matches'} from the old silo{' '}
+          {archived === 1 ? 'is' : 'are'} archived: they were played on an earlier version of the
+          game and cannot be resumed, their record is kept.
+        </p>
       )}
 
       <section style={S.ladderBlock}>
@@ -221,7 +233,7 @@ function FoundTeam({ userId, onCreated }: { userId: string; onCreated: () => voi
           Raise a battery
         </h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 13, lineHeight: 1.6, marginTop: 10 }}>
-          A battery starts at Rookie and climbs by winning. Three wins make Veteran, six make Star,
+          A battery starts at Rookie and climbs by winning. {TIER_WINS_VETERAN} wins make Veteran, {TIER_WINS_STAR} make Star,
           and the house always fields your own Tier against you.
         </p>
 
@@ -288,6 +300,13 @@ const S: Record<string, React.CSSProperties> = {
     lineHeight: 1.6,
     color: 'var(--text-dim)',
     maxWidth: 620,
+  },
+  archivedNote: {
+    margin: '0 32px 22px',
+    fontSize: 12,
+    lineHeight: 1.6,
+    color: 'var(--text-faint)',
+    maxWidth: 720,
   },
   ladder: { display: 'flex', gap: 10 },
   rung: { padding: '8px 14px', borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--line)', background: 'var(--panel-deep)' },

@@ -25,6 +25,7 @@ export function Ladder({
 }) {
   const rungs = ladderRungs(state.turnOrder);
   const current = state.turn?.unitId ?? null;
+  const when = whenIPlay(state, own, rungs, current);
 
   return (
     <div style={S.panel}>
@@ -34,6 +35,11 @@ export function Ladder({
           Round {state.round}
           {state.phase === 'suddenDeath' ? ' · sudden death' : ''}
         </span>
+        {when && (
+          <span className="label" style={{ color: 'var(--team-own)', width: '100%' }}>
+            {when}
+          </span>
+        )}
       </div>
 
       <div style={S.list}>
@@ -90,6 +96,28 @@ export function Ladder({
   );
 }
 
+/**
+ * Where the player's own Giff sits relative to the clock. In solo the first
+ * human unit of the own side is the player. Wrapping to the next round counts
+ * the rungs left in this one plus the rungs before the player's, which is the
+ * same as the modular distance along the ladder.
+ */
+function whenIPlay(
+  state: MatchState,
+  own: 'A' | 'B',
+  rungs: ReturnType<typeof ladderRungs>,
+  current: string | null,
+): string | null {
+  const me = state.units.find((u) => u.team === own && u.controller.kind === 'human');
+  if (!me) return null;
+  if (current === me.id) return 'You are up';
+  const mineAt = rungs.findIndex((r) => r.unitIds.includes(me.id));
+  if (mineAt < 0) return null;
+  const nowAt = Math.max(0, rungs.findIndex((r) => r.unitIds.includes(current ?? '')));
+  const gap = (mineAt - nowAt + rungs.length) % rungs.length;
+  return gap === 0 ? 'You play in this block' : `You play in ${gap}`;
+}
+
 /** A rung can name a unit that has left the field; the ladder outlives them. */
 function safeUnit(state: MatchState, id: string) {
   try {
@@ -107,32 +135,39 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--panel)',
     border: '1px solid var(--line)',
   },
+  // Compact on purpose: up to 14 unit rungs plus 2 hazard rungs have to fit in
+  // about 260 px at 1440 x 900, so a rung is one short line.
   head: {
     display: 'flex',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    padding: '10px 12px',
+    gap: 2,
+    padding: '6px 8px',
     borderBottom: '1px solid var(--line)',
   },
-  list: { overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 },
+  list: { overflowY: 'auto', padding: 4, display: 'flex', flexDirection: 'column', gap: 1 },
   rung: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 6,
-    padding: '5px 6px',
+    gap: 4,
+    padding: '1px 4px',
+    minHeight: 16,
     borderLeftWidth: 2,
     borderLeftStyle: 'solid',
     borderLeftColor: 'transparent',
   },
   liveRung: { borderLeftColor: 'var(--team-own)', background: 'rgba(60,224,240,.06)' },
   hazardRung: { borderLeftColor: 'var(--danger)', background: 'rgba(216,161,42,.07)' },
-  rungUnits: { display: 'flex', flexWrap: 'wrap', gap: 4 },
+  rungUnits: { display: 'flex', flexWrap: 'wrap', gap: 3, minWidth: 0 },
   chip: {
     fontFamily: 'var(--mono)',
-    fontSize: 10,
-    letterSpacing: '.06em',
+    fontSize: 9,
+    lineHeight: 1.2,
+    letterSpacing: '.04em',
     textTransform: 'none',
-    padding: '4px 7px',
+    padding: '1px 5px',
+    whiteSpace: 'nowrap',
   },
-  count: { fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-faint)' },
+  count: { fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--text-faint)' },
 };
