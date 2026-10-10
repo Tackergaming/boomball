@@ -120,7 +120,15 @@ export const BULWARK_BLOCK_BONUS: Readonly<Record<Tier, number>> = {
 
 export const CRACKER_COUNT = 2;
 export const CRACKER_INITIATIVE = 20;
-export const CRACKER_MOVE_CELLS = 6;
+/**
+ * Ten, since 2026-10-10 (écart 40, decision D4). Six was the fiche's number and
+ * on the horizontal pitch the Crackers barely reached anyone: Jérôme's first
+ * game read them as balls that hardly moved. Measured at ten on the 2H.3 sweep,
+ * 200 matches per Tier: one more player evacuated every three or four matches,
+ * the goal rate holds at 1.10 to 1.80 per match across the Tiers, nothing else
+ * moves. The table is in docs/09-equilibrage-2H3-2026-10-10.md.
+ */
+export const CRACKER_MOVE_CELLS = 10;
 export const CRACKER_BAT_RANGE_CELLS = 12;
 export const CRACKER_AC = 10;
 export const CRACKER_SAVE_DC = 15;
@@ -178,6 +186,19 @@ export const SPARK_CATCH_DC = 20;
  * Spark stops deciding matches when the Payload starts deciding them, not when
  * this number comes down. That is why the price is set against the goal rate
  * and gets revisited whenever the goal rate moves.
+ *
+ * Revisited on 2026-10-10 for the horizontal pitch (2H.3). The Spark is never
+ * caught twice in a match, so the price only fixes which goal lead one catch
+ * overturns. Replayed on the same seeds with the Crackers at ten:
+ *
+ *     price   Rookie decided   Veteran decided   Star decided
+ *         5      74 (37%)         60 (30%)         53 (26%)
+ *        10     100 (50%)         95 (48%)         94 (47%)
+ *        20     107 (54%)        110 (55%)        108 (54%)
+ *        30     111 (56%)        119 (60%)        133 (66%)
+ *
+ * Jérôme kept twenty, knowing it settles about one match in two: the Spark
+ * stays worth two goals. The table is in docs/09-equilibrage-2H3-2026-10-10.md.
  */
 export const SPARK_POINTS = 20;
 

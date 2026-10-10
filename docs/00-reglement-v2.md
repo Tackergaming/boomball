@@ -344,13 +344,13 @@ entre des caisses et des piliers.
 |---|---|---|---|
 | 32 | Bousculade réussie contre un non-porteur : chute de 3 cases (B7) | **Poussée d'une case** dans la direction opposée au bousculeur. Si cette case est un obstacle, une unité ou le bord, la cible ne bouge pas. Contre un porteur : le ballon tombe sur sa case et la cible ne bouge pas, arbitrage du 2026-09-01 conservé | La bousculade de D&D 2024, 5 pieds |
 | 33 | Recul explosif de 2 cases, peut décrocher l'ancrage ; attaque d'opportunité retenue si le recul coûterait la prise (B3, B5) | Recul de 2 cases, arrêté par un obstacle, une unité ou le bord. **L'attaque d'opportunité est toujours prise** | Plus de prise à perdre |
-| 34 | Tir, passe, interception : portée en cases, rien ne les bloque (B7) | **Ligne de vue obligatoire** : un obstacle entre les deux cases interdit le tir, la passe et l'interception. Les unités ne coupent pas la ligne de vue. La portée reste 9 cases, 12 à désavantage, jusqu'au sweep de 2H.3 (écart 39) | J1 : le couvert existe |
+| 34 | Tir, passe, interception : portée en cases, rien ne les bloque (B7) | **Ligne de vue obligatoire** : un obstacle entre les deux cases interdit le tir, la passe et l'interception. Les unités ne coupent pas la ligne de vue. La portée reste 9 cases, 12 à désavantage, confirmée par le sweep de 2H.3 (écart 39) | J1 : le couvert existe |
 
 ## C4. Ordnance
 
 | # | Règle v2 | Règle après D11 | Raison |
 |---|---|---|---|
-| 35 | Les Crackers ignorent le terrain (B8) | **En dérive**, au compte 20, un Cracker roule vers l'unité la plus proche par le **chemin le plus court qui contourne les obstacles**, 6 cases de chemin, 10 si le sweep de 2H.3 le dit (écart 40). **Frappé**, il part en ligne droite sur la direction d8, **rebondit** sur un obstacle ou un bord selon l'écart 36b et continue avec les cases qui lui restent ; il détonne sur la première unité rencontrée, écart 4, sinon s'immobilise au bout de sa course. **Son mouvement ne tombe jamais à zéro à cause d'un obstacle** | J6, précisé par Jérôme |
+| 35 | Les Crackers ignorent le terrain (B8) | **En dérive**, au compte 20, un Cracker roule vers l'unité la plus proche par le **chemin le plus court qui contourne les obstacles**, **10 cases de chemin** depuis le 2026-10-10 (écart 40). **Frappé**, il part en ligne droite sur la direction d8, **rebondit** sur un obstacle ou un bord selon l'écart 36b et continue avec les cases qui lui restent ; il détonne sur la première unité rencontrée, écart 4, sinon s'immobilise au bout de sa course. **Son mouvement ne tombe jamais à zéro à cause d'un obstacle** | J6, précisé par Jérôme |
 | 36 | Le Spark entre en Zone 2 et dérive de 6 cases sur un cap d8 tiré une fois, dans le plan vertical (écart 3, B9) | Entre au round 6 dans le **tiers central**, à 4 cases ou plus de toute unité, dérive de 6 cases par round sur un cap d8 tiré une fois **dans le plan du terrain**, et **rebondit** sur les obstacles et les bords en gardant toutes ses cases | Le plan change, pas la règle |
 | 36b | | **Règle de rebond**, commune aux écarts 35 et 36. Une case orthogonale bloquée renvoie la direction en arrière. En diagonale, si une seule des deux cases orthogonales voisines est libre, seule la composante bloquée s'inverse ; si les deux sont bloquées, les deux s'inversent. Un rebond ne consomme pas de case. **Repli, confirmé par Jérôme le 2026-10-10** : si la règle ci-dessus ne trouve aucune case libre en quatre tentatives, le mobile tourne d'une face de d8 dans le sens horaire à partir de son cap d'arrivée, prend la première case libre et continue sur ce cap. Sur le layout accepté cela concerne 24 couples case et cap, mesurés en 2H.1 | Une règle, un fichier, un test. Le repli existe parce que J6 dit « jamais zéro » et que la règle seule coinçait |
 
@@ -360,19 +360,25 @@ entre des caisses et des piliers.
 |---|---|---|---|
 | 37 | À 0 HP, l'unité tombe au sol de la Zone 1 et est évacuée (B10) | **Évacuée sur place.** Le remplaçant entre à côté de la bouche de sa Furnace après 2 rounds, `(5, 1)` pour A et `(5, 43)` pour B, comme avant | Plus de sol où tomber |
 
-## C6. Ce qui se mesure avant de s'écrire
+## C6. Ce qui a été mesuré avant de s'écrire, tranché le 2026-10-10
 
-| # | Règle v2 | À mesurer en 2H.3 | Arbitre |
-|---|---|---|---|
-| 39 | Portée de tir 9 cases, 12 à désavantage | 9/12 contre 7/10 et 6/9, sur les trois Tiers | Jérôme, sur tableau. Retour 6 de sa première partie : la portée lui a paru trop longue |
-| 40 | Crackers à 6 cases par round | 6 contre 10 | Jérôme, sur tableau. D4 |
+Campagne de 2H.3, 200 matchs par Tier par variante, tableaux archivés dans
+`09-equilibrage-2H3-2026-10-10.md`. Jérôme a tranché sur le tableau le 2026-10-10.
+
+| # | Règle v2 | Mesuré en 2H.3 | Règle après arbitrage | Raison |
+|---|---|---|---|---|
+| 39 | Portée de tir 9 cases, 12 à désavantage | 9/12 contre 7/10 et 6/9 | **Inchangée, 9 cases, 12 à désavantage** | À 7/10 le rookie passe sous un but par match et les matchs sans but montent partout ; à 6/9 deux Tiers sur trois sont hors cible. Les obstacles coupent déjà un tir propre sur cinq. Le retour 6 de la première partie venait du terrain vertical sans obstacles |
+| 40 | Crackers à 6 cases par round | 6 contre 10 | **10 cases de chemin par round** | D4 confirmé. Les trois Tiers tiennent 1,10, 1,48 et 1,80 but par match, un évacué de plus tous les trois ou quatre matchs, rien d'autre ne bouge. C'est le retour 2 de la première partie, « les autres balles bougent à peine » |
+| 41 | Spark à 20 points | 5, 10, 15, 20 et 30, rejoués sur les mêmes graines | **Inchangé, 20 points**, deux buts | Le Spark n'est jamais pris deux fois dans un match, donc le prix ne fixe que l'avance aux buts qu'une prise renverse. À 20 il décide 54 à 55 % des rencontres avec les Crackers à 10 ; seul 5 atteignait les 30 % visés. **Jérôme garde 20 en connaissance de cause** : le Spark vaut deux buts, et la cible des 30 % est remplacée par cet arbitrage |
 
 **Tout le reste tient** : initiative, échelle et blocs, dix rounds et mort subite, banc de trois et
 retour après deux rounds, Spark à 20 points et son prix fixé contre le nombre de buts, Tiers et
 statistiques, Dodge, Dash, Disengage, interception, blocage du Bulwark à 2 cases de sa bouche, le
 but qui remet un ballon neuf au gardien.
 
-**L'équilibrage**, clos le 2026-09-02, est **rouvert par cette partie** et se referme à la fin de
-2H.3, quand les trois Tiers tiennent la cible de 1 à 2 buts par match avec un Spark qui décide
-environ 30 % des rencontres.
+**L'équilibrage**, clos le 2026-09-02, rouvert par cette partie, est **re-clos le 2026-10-10** à la
+fin de 2H.3 : avec les écarts 39 à 41, les trois Tiers tiennent 1,10, 1,48 et 1,80 but par match,
+33 à 69 matchs sans but sur 200, et le Spark décide 54 à 55 % des rencontres, part acceptée par
+Jérôme à la place de la cible des 30 %. Hors d'une nouvelle sous-phase ouverte par lui, on n'y
+touche plus.
 

@@ -43,7 +43,7 @@ script.
 | D1 | **Option 2, 2.5D stylisée**, Three.js via react-three-fiber, dans le client React actuel | Jérôme, sur ma recommandation | Caméra fixe face à la paroi, géométrie construite depuis le layout, pions stylisés, événements animés. L'option 1 reste atteignable plus tard, l'option 3 est exclue |
 | D2 | **Playwright MCP + scripts Playwright** comme dispositif de contrôle d'écran | Jérôme, sur ma recommandation | Profil Chrome séparé, compte de test dédié, crochet de test en développement seulement |
 | D3 | **Le 3D d'abord, le déploiement à la fin** | Jérôme, **contre ma recommandation** de livrer la 2D à ses amis d'abord | Le plan garde un jeu jouable en local à la fin de chaque phase. Conséquence assumée : les amis ne jouent pas avant la fin, et le projet Supabase doit être maintenu en vie pendant le développement |
-| D4 | `CRACKER_MOVE_CELLS` : **re-mesurer sur le terrain vertical, puis 10 si confirmé** | Jérôme | Un sweep à 10 en phase 2, arbitrage ensuite, écart à verser au règlement si appliqué |
+| D4 | `CRACKER_MOVE_CELLS` : **re-mesurer sur le terrain vertical, puis 10 si confirmé** | Jérôme | Un sweep à 10 en phase 2, arbitrage ensuite, écart à verser au règlement si appliqué. **Confirmé le 2026-10-10 en 2H.3, sur le terrain horizontal : 10, écart 40 de `00` partie C** |
 | D5 | **Done = solo en 2.5D, en ligne, stable sans Jérôme, plus la coop à 2 ou 3** | Jérôme | Le son et les temps forts de l'écran de résultats sont hors done, en phase optionnelle |
 | D6 | **Compte de test e2e créé par l'API admin**, identifiants dans `.env` sous `BOOMBALL_E2E_EMAIL` et `BOOMBALL_E2E_PASSWORD`, jamais imprimés | Jérôme, feu vert | Fait. Batterie « E2E Battery » et un match de test ouvert avec ce compte |
 | D7 | **Maintien en vie de Supabase par un workflow GitHub Actions planifié** | Jérôme | Un ping quotidien de l'API REST avec la clé anon en secret du dépôt. Le dépôt est déjà sur GitHub, aucun lien Vercel |
@@ -73,7 +73,7 @@ Les lignes vues à l'écran dans ce chat sont marquées « vu ».
 | A2 | **Déploiement Vercel par l'API**, projet à créer, fichiers construits à envoyer, `site_url` à changer | `scripts/` à écrire, Supabase auth config | Rien n'est déployé. Décision D3 : en dernière phase | Majeur | 1 |
 | A3 | `/security-review` | Jérôme la lance | Avant la mise en ligne | Majeur | 0,5 |
 | A4 | **Compteur de victoires** : 1 victoire pour 3 matchs gagnés | `teams.wins`, lu en base | L'ordre des quatre matchs en base colle à l'hypothèse de `04` : seul le dernier, 50-30, a été compté après la migration 0003. Se tranche à la prochaine victoire, humaine ou par script | Majeur | 0,25 |
-| A5 | **Re-mesure des Crackers à 10 cases** sur le terrain vertical, puis arbitrage, puis écart 26 au règlement v2 | `engine/constants.ts`, `00-reglement-v2.md` B8 | Décision D4 | Mineur | 0,5 |
+| A5 | **Fait le 2026-10-10 en 2H.3.** Crackers mesurés à 6 et à 10 sur le terrain horizontal, tableau dans `09-equilibrage-2H3-2026-10-10.md`, Jérôme a tranché 10 : écart 40 de `00` partie C, `CRACKER_MOVE_CELLS = 10` | `engine/constants.ts`, `00-reglement-v2.md` C4 et C6 | Décision D4 | Clos | 0 |
 | A6 | **La coop à 2 ou 3** : rejoindre une batterie, sièges 2 et 3 du lobby, les tours des autres humains rejoués à l'écran, `useAccount` qui ne trouve une équipe que par `owner` | `client/src/screens/Lobby.tsx`, `TeamHub.tsx`, `lib/useAccount.ts`, `match/useMatch.ts`, une migration | Décision produit verrouillée de `04`, jamais construite, et dans le done (D5) | Majeur | 3 à 4 |
 | A7 | **Échelle d'initiative coupée** (vu) : à 1440 x 900 seules quatre rangées sont visibles, le bloc des six alliés de Jérôme est hors de vue sous « Probe », et il faut faire défiler pour savoir quand on rejoue | `client/src/match/Ladder.tsx`, `screens/Match.tsx` grille de droite | Le brief de design demandait que l'échelle dise d'un coup d'œil quand le joueur rejoue | Majeur | 0,5 |
 | A8 | **Cases sans ancrage jamais montrées** (vu) : le plateau éclaire les cases atteignables mais rien ne distingue celles où finir le tour fait chuter | `client/src/match/Board.tsx` | Le brief de design le demandait, et c'est la règle la plus punitive du sport. L'avertissement `!` n'apparaît qu'après coup | Majeur | 0,5 en 2D, repris dans le 2.5D |
@@ -100,7 +100,7 @@ Les lignes vues à l'écran dans ce chat sont marquées « vu ».
 | A29 | **Les fonctions déployées sont en retard sur le moteur.** Trouvé en lisant les événements des deux matchs joués au harnais le 2026-10-10 : `scored(B, 50)` sur une prise du Spark, alors que `engine/constants.ts` dit `SPARK_POINTS = 20` depuis le commit c9be92c du 2026-09-02, « Ramène le Spark à deux buts », et que `04`, `CONTEXT.md` et `check_drift.py` disent 20. `resolve-action` v7 a donc été bundlée avant ce commit. Le jeu en ligne joue un Spark à cinq buts, et le tableau d'équilibrage de `04` ne décrit pas ce qui est déployé. Le commentaire de `scripts/live-match.ts` dit encore « 50 for the Spark » | `npm run deploy:function` pour les deux fonctions, `scripts/live-match.ts` | C'est exactement ce que A11 existe pour attraper : sans version sur les matchs, personne ne voit qu'un moteur déployé diverge. À redéployer avec le feu vert de Jérôme, parce que ça change le jeu en ligne, et A11 juste derrière | Majeur | 0,25, plus le feu vert |
 | A30 | **Le terrain ne se lit plus sous le noircissement** (retour 1 de la première partie de Jérôme, 2026-10-10). L'art est filtré à 50 % de luminosité, lavé d'un voile sombre, et chaque case de structure est peinte à 82 % d'opacité par-dessus : sur les captures, les passerelles de l'image disparaissent derrière le quadrillage | `client/src/match/Board.tsx`, `S.art`, `S.wash`, remplissage des cases | La 2D reste le repli derrière l'interrupteur jusqu'au bout, et c'est l'écran de la phase 2. Alléger le voile et l'opacité des cases, juger sur capture | Mineur | 0,25 |
 | A31 | **L'IA n'est ni lisible ni tactique pour un humain** (retours 3 et 4) : après un but marqué par Jérôme, tous ses alliés se sont massés autour de son Bulwark et n'en sont jamais repartis ; dans l'ensemble il n'a pas compris ce que la maison et ses coéquipiers cherchaient. L'équilibrage est mesuré IA contre IA, il ne dit rien de ce qu'un humain comprend. Le `payloadReset` après un but et la valeur de position « défendre » sont les premiers suspects, et la leçon de `positionValue` s'applique : une heuristique doit valoriser la case qui rend une action possible | `ai/`, à reproduire d'abord au harnais avec une capture après un but | **Reproduit et corrigé en 2H.2 le 2026-10-10**, voir §10 : la cause était un coéquipier sans aucune raison de s'écarter de son gardien dans sa propre moitié, corrigée par la valeur de relais `outlet`. Le sweep de contrôle a bougé, signalé en §10. La partie « lisible pour un humain » se juge à la porte de 2H.4 | Corrigé, à juger en 2H.4 | 0 |
-| A32 | **La portée de tir a paru trop longue** (retour 6) : `PAYLOAD_RANGE_CELLS` 9 et `PAYLOAD_LONG_RANGE_CELLS` 12, soit 45 et 60 pieds. C'est une règle de `00-reglement-v2.md`, donc un arbitrage de Jérôme, mesuré avant : une ligne de plus dans le sweep de la phase 2, à côté des Crackers | `engine/constants.ts`, `docs/00` | Même méthode que D4 : sweep, tableau, arbitrage, écart au règlement si appliqué | Mineur | fondu dans A5 |
+| A32 | **Clos le 2026-10-10 en 2H.3.** La portée de tir a paru trop longue (retour 6). Mesurée à 9/12, 7/10 et 6/9 sur le terrain horizontal : les deux portées courtes font passer le rookie sous un but par match et montent les matchs sans but. **Jérôme garde 9/12**, écart 39 de `00` partie C, rien ne change dans le code | `docs/00` C6, `09-equilibrage-2H3-2026-10-10.md` | L'impression venait du terrain vertical sans obstacles | Clos | 0 |
 
 ### 2.B Ce qui n'est pas optimisé
 
@@ -887,3 +887,43 @@ est défendable mais non décidé.
 **Ce qui attend 2H.3** : la campagne de `08` §4.3 sur ce nouveau régime, les Crackers à 6 et 10,
 la portée de tir à 9/12, 7/10 et 6/9, et le prix du Spark à discuter sur le tableau, puisque la
 part décidée par le Spark est la seule colonne encore hors cible.
+
+
+### Sous-phase 2H.3, « équilibrage », construite le 2026-10-10
+
+Par le fil principal (Fable 5.1), sans sous-agent, comme `08` §9 le prévoit. **La sous-phase est
+close** : la campagne de `08` §4.3 mesurée en entier, Jérôme a tranché sur le tableau, les écarts
+39 à 41 sont écrits dans `00` partie C6, `engine/constants.ts` est aligné, `npm test` vert à 342
+tests, `npm run typecheck` vert, et le sweep de confirmation sur les constantes commitées
+reproduit la variante retenue colonne par colonne. `CONTEXT.md` attend `/update`.
+
+| Tâche de `08` §4.3 | État |
+|---|---|
+| La référence | Relancée telle quelle : reproduit le sweep de contrôle de 2H.2 colonne par colonne, le harnais est déterministe et rien n'a dérivé entre les deux chats |
+| Les Crackers à 6 et à 10 | Mesurés. À 10, les trois Tiers tiennent 1,10, 1,48 et 1,80 but par match, un évacué de plus tous les trois ou quatre matchs, rien d'autre ne bouge |
+| La portée de tir à 9/12, 7/10 et 6/9 | Mesurée. À 7/10 le rookie passe à 0,94 et les matchs sans but montent partout, 74, 64 et 55 ; à 6/9 deux Tiers sur trois sont hors cible, 93 matchs sans but sur 200 |
+| Le prix du Spark | Rejoué à 5, 10, 15, 20 et 30 sur les mêmes graines, sans nouveau sweep, parce que rien dans `ai/` ne lit le score : les mêmes graines jouent le même match à tout prix, et le rejeu retombe exactement sur les colonnes du sweep à 20. **Le Spark n'est jamais pris deux fois dans un match** sur 2 400 matchs, donc le prix ne fixe que l'avance aux buts qu'une prise renverse. Entre 10 et 30 la part décidée ne bouge que de 44 à 63 % ; seul 5 atteint les 30 % visés |
+| Les tableaux | Un par variante, plus celui du prix, dans `09-equilibrage-2H3-2026-10-10.md` |
+| Le rapport de sweep | Imprime désormais les constantes sous lesquelles il a été mesuré, pour qu'un tableau archivé ne puisse pas être pris pour un autre |
+| Les deux tests d'ordnance pinnés sur six cases | Libérés de la géométrie : ils lisent `CRACKER_MOVE_CELLS` pour placer leur cible et leur point d'arrêt |
+
+**Les arbitrages de Jérôme, le 2026-10-10.** Crackers à 10, écart 40, ma recommandation suivie.
+Portée de tir gardée à 9/12, écart 39, ma recommandation suivie. **Spark gardé à 20 points, écart
+41, contre ma recommandation de 5** : je lui ai présenté que 20 fait décider le Spark dans un
+match sur deux et que seul 5 atteignait sa cible des 30 % ; il garde 20 en connaissance de cause,
+le Spark vaut deux buts, et la cible des 30 % est remplacée par cet arbitrage. La définition de
+« re-clos » dans le skill et dans `00` suit cette décision.
+
+**État mesuré après arbitrage**, constantes commitées, 200 matchs par Tier : buts par match 1,10,
+1,48 et 1,80 ; matchs sans but 69, 46 et 33 ; Spark décidant 107, 110 et 108 matchs sur 200 ;
+évacués 2,21, 1,53 et 1,12 ; dispersion 9,4, 9,3 et 9,3 ; collés 1,39, 1,49 et 1,53.
+
+**Deux observations pour 2H.4, non corrigées ici**, en plus des deux de 2H.2 qui restent dues : une
+portée de tir plus courte resserre l'équipe, parce que `outlet` et `passReach` sont graduées sur la
+portée de tir et non sur celle de la passe, à savoir si la portée descend un jour ; et le Spark est
+un enjeu unique par match, pris dans deux matchs sur trois en rookie et neuf sur dix en star, ce
+qui est ce que la règle produit et se lit avec le prix.
+
+**Ce qui attend 2H.4** : A11, A28, A29 et la migration 0005 avec le feu vert de Jérôme, le plateau
+2D vu de dessus, le briefing, le harnais sur le terrain horizontal, puis sa partie en 2D.
+

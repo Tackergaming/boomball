@@ -143,14 +143,17 @@ describe('a Cracker on count 20', () => {
     expect(xy(outcome.landing)).toEqual({ x: 7, y: 24 });
   });
 
-  it('covers six cells and no more, and hurts nobody when it falls short', () => {
-    // Column 11 is open from y = 22 to y = 37, so the route is a straight line.
+  it('covers its whole move and no more, and hurts nobody when it falls short', () => {
+    // Column 11 is open from y = 22 to y = 37, so the route is a straight line
+    // and the target at y = 40 is out of reach whatever the move is, as long as
+    // it stays under the eighteen rows to the target.
+    expect(CRACKER_MOVE_CELLS).toBeLessThan(15);
     const { state } = loneTarget({ x: 11, y: 40 });
     const outcome = crackerRun(arena, state, { x: 11, y: 22 }, new Rng(1));
 
     expect(outcome.struck).toBeNull();
     expect(outcome.path).toHaveLength(CRACKER_MOVE_CELLS);
-    expect(outcome.landing).toEqual({ x: 11, y: 28 });
+    expect(outcome.landing).toEqual({ x: 11, y: 22 + CRACKER_MOVE_CELLS });
   });
 
   it('goes off where it lies when a player is standing on it', () => {
@@ -183,10 +186,13 @@ describe('a Cracker on count 20', () => {
     expect(xy(outcome.landing)).toEqual({ x: 7, y: 18 });
   });
 
-  it('stops six cells short of a target the route to which is longer than six', () => {
-    // From (7, 12) to (7, 20) is eight rows: the pillar costs nothing, but the
-    // Cracker still only has six cells of move.
-    const { state } = loneTarget({ x: 7, y: 20 });
+  it('stops short of a target the route to which is longer than its move', () => {
+    // From (7, 12) past the pillar at (7, 16): the pillar costs nothing on a
+    // diagonal grid, but the target sits four rows beyond the Cracker's move,
+    // so it still falls short. Column 7 is open there apart from that pillar.
+    const targetY = 12 + CRACKER_MOVE_CELLS + 4;
+    expect(arena.isSolid({ x: 7, y: targetY })).toBe(false);
+    const { state } = loneTarget({ x: 7, y: targetY });
     const outcome = crackerRun(arena, state, { x: 7, y: 12 }, new Rng(1));
 
     expect(outcome.struck).toBeNull();

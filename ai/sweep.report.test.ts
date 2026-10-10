@@ -26,6 +26,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
+import {
+  CRACKER_MOVE_CELLS,
+  PAYLOAD_LONG_RANGE_CELLS,
+  PAYLOAD_RANGE_CELLS,
+  SPARK_POINTS,
+} from '../engine/constants.js';
 import { sweepAllTiers } from './selfPlay.js';
 
 declare const console: { log: (...args: unknown[]) => void };
@@ -35,6 +41,12 @@ const MATCHES_PER_TIER = 200;
 
 describe('balance', () => {
   it('reports the three Tiers', () => {
+    // The report names the constants it was measured under, so that a table
+    // archived from this output can never be mistaken for another variant's.
+    console.log(
+      `constants crackers ${CRACKER_MOVE_CELLS} range ${PAYLOAD_RANGE_CELLS}/${PAYLOAD_LONG_RANGE_CELLS} spark ${SPARK_POINTS}`,
+    );
+
     const reports = sweepAllTiers(KILL_SILO, MATCHES_PER_TIER);
 
     for (const report of reports) {

@@ -4,9 +4,9 @@
 > 2026-10-10 le point d'entrée est `08-plan-terrain-horizontal.md`, et `07-audit-et-plan-3d.md`
 > porte l'audit et le journal des phases. **Bandeau tenu à jour pour `check_drift.py` : au
 > 2026-10-10, après les sous-phases 2H.1 et 2H.2, le moteur 2 joue le terrain horizontal, l'IA voit
-> les obstacles, **342 tests**, et le sweep de contrôle donne 1,05 à 1,59 buts par match, équilibrage
-> rouvert jusqu'à la fin de 2H.3. Tout ce qui suit décrit le terrain vertical, dépassé par la
-> décision D11.
+> les obstacles, **342 tests**, et après la campagne 2H.3 et les arbitrages de Jérôme, Crackers à 10,
+> portée 9/12, Spark 20, le sweep donne 1,10 à 1,80 buts par match, équilibrage re-clos le
+> 2026-10-10. Tout ce qui suit décrit le terrain vertical, dépassé par la décision D11.
 > Dernière mise à jour du corps : 2026-09-02, après cinq tests en local de Jérôme et les deux
 > arbitrages qui suivaient le passage au terrain vertical.
 > **La phase 4 est écrite de bout en bout.** Projet Supabase en ligne, quatre migrations appliquées,
