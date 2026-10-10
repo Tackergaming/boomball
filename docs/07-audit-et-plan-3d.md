@@ -50,6 +50,7 @@ script.
 | D8 | **Relevé au pixel de l'arène 2D abandonné** | Jérôme | En 2.5D le décor est construit depuis le layout, l'écart disparaît par construction |
 | D9 | **Projet Supabase restauré par l'API** | Jérôme, feu vert | `POST /v1/projects/{ref}/restore`, quatre minutes |
 | D10 | Budget : **zéro euro**. Matériel des amis : **portables bureautiques à GPU intégré** | Jérôme | Contraintes du plan d'assets et du budget de performance |
+| D11 | **Terrain horizontal**, vu de dessus en trois quarts plongeant ; plus de chute, de vol, de grappin ni d'ancrage ; plus de coût de zone ; des obstacles avec collision et contournement | Jérôme, **le 2026-10-10**, après sa première partie, avec autorisation explicite de passer outre toute règle écrite qui le contredit | Le plan est `08-plan-terrain-horizontal.md`, **go donné le soir même**, arbitrages J1 à J7 tranchés, partie C du règlement écrite. Il remplace les phases 2 à 6 de §7 et rouvre l'équilibrage par nécessité. D1 à D10 tiennent |
 
 ### 1.3 Référence perdue
 
@@ -83,18 +84,23 @@ Les lignes vues à l'écran dans ce chat sont marquées « vu ».
 | A13 | **Maintien en vie du projet Supabase** (D7) | `.github/workflows/supabase-keepalive.yml`, secrets du dépôt par Jérôme | Sans lui, pause après sept jours sans trafic, et fenêtre de restauration limitée (90 jours selon les docs, un an selon d'autres pages) | Bloquant | 0,5 |
 | A14 | **Chrono affiché à 121 s** (vu) : le compte à rebours dépasse `TURN_TIMER_SECONDS` d'une seconde au premier rendu, parce que `now` peut être antérieur à l'instant de reprise de la main | `client/src/screens/Match.tsx`, calcul de `left` | Cosmétique | Mineur | 0,1 |
 | A15 | **Payload libre masqué** (vu) : l'anneau et le mot PAYLOAD sont dessinés sous les tokens et leurs plaques de nom, donc un ballon posé à côté d'un joueur disparaît | `client/src/match/Board.tsx`, ordre des couches | Le ballon est tout le sport | Mineur | 0,25 |
-| A16 | **Un 401 au chargement** et **deux avertissements React** sur des propriétés de style mélangées (`border` et `borderColor`, `margin` et `marginTop`) (vu, console) | `client/src/lib/useAccount.ts` ou `supabase.ts` pour le 401, `Ladder.tsx`, `Match.tsx` ou `Results.tsx` pour les styles | Propreté, et un 401 qu'on ne comprend pas est un 401 qu'on finira par ne plus lire | Mineur | 0,25 |
+| A16 | **Fait le 2026-10-10.** Le 401 ne s'est pas reproduit ; le harnais a trouvé à sa place un **409 sur `POST /rest/v1/profiles` à chaque connexion** : `App` insérait un profil qui existait, parce que `useAccount` gardait le profil `null` de l'état déconnecté à côté du nouvel id le temps d'une lecture. Corrigé par un état `undefined`, « pas encore lu », seul `null` déclenchant l'insertion. Les avertissements React venaient de sept objets de style mêlant un raccourci et une propriété longue (`Ladder`, `Board`, `Feed`, `Announce`, `Results`, `TeamHub`, `SeatPanel`), tous passés en propriétés longues. `smoke.spec.ts` et `global-setup.ts` échouent désormais sur tout avertissement et toute réponse 400 ou plus | `client/src/lib/useAccount.ts`, `App.tsx`, les sept composants | Un défaut qu'on ne lit plus est un défaut qui reste | Clos | 0,25 |
 | A17 | **Écran de résultats** : « Won on the Payload » même quand le Spark a décidé, temps forts non dérivés des événements, promotion non signalée | `client/src/screens/Results.tsx` | Hors done pour les temps forts, mais le verdict faux est un défaut | Mineur | 1 |
 | A18 | **Nom de personnage non conservé** entre deux matchs : `02` dit que `team_members.character_name` le garde, le lobby ne l'écrit jamais et préremplit avec le nom de profil | `client/src/screens/Lobby.tsx` | Petit écart doc / code | Mineur | 0,25 |
 | A19 | **Images** : trois JPEG 2048², 5,9 Mo. À convertir en WebP, et à décider si elles servent de texture de paroi en 2.5D | `assets/arena/`, `client/src/lib/arena.ts` | 95 % du téléchargement | Mineur | 0,5 |
 | A20 | **Montées de version** : React 19 (requis par react-three-fiber 9), vitest 5, `npm audit fix` pour source-map-js | `package.json` des deux paquets | Préalable au 2.5D | Mineur | 0,5 à 1 |
-| A21 | **Les deux contrôles Python chargent leurs variables à la bash** sur une machine PowerShell, contrairement à `apply-migration.mjs` qui lit le `.env` lui-même | `supabase/checks/*.py` | Une étape qu'on ratera | Mineur | 0,25 |
-| A22 | **Docs en dérive** : `02` dit un chrono de 60 s (120 depuis le 2 septembre) ; `01` finit sur « l'image gagne sur le plan », contredit par D8 ; le skill `boomball` et `05` disent qu'il n'y a pas de navigateur pilotable | `02-architecture.md`, `01-prompts-arene.md`, `.claude/skills/boomball/SKILL.md` | Un chat neuf les croit | Mineur | 0,25 |
+| A21 | **Fait le 2026-10-10**, les deux contrôles chargent le `.env` du workspace eux-mêmes, comme `apply-migration.mjs`. `live-match.ts` (via `run-ts.mjs`) et `deploy-edge-function.mjs` veulent encore leurs variables à la bash | `supabase/checks/*.py` | Une étape qu'on ratait | Clos pour les contrôles | 0 |
+| A22 | **Docs en dérive** : `02` dit un chrono de 60 s (120 depuis le 2 septembre) ; `01` finit sur « l'image gagne sur le plan », contredit par D8. Le skill `boomball` et `05` sont à jour depuis le 2026-10-10 | `02-architecture.md`, `01-prompts-arene.md` | Un chat neuf les croit | Mineur | 0,1 |
 | A23 | **Sauvegardes** : aucune sur le plan gratuit. Un script d'export JSON hebdomadaire des tables de référence et des équipes suffit à un cercle d'amis | `scripts/export-db.mjs` à écrire | Les seules données qui comptent sont les victoires des équipes | Mineur | 0,5 |
 | A24 | **CI** : aucune. Un workflow qui lance test, typecheck et build du client sur chaque push touchant `boomball/` | `.github/workflows/ci.yml` | Un dépôt qui ne se vérifie pas tout seul finit par casser sans bruit | Mineur | 0,5 |
 | A25 | **Audio** : inexistant. Six sons CC0 suffiraient | client | Hors done (D5) | Mineur | 1 |
 | A26 | `projet test` occupe le second des deux projets gratuits de l'org Supabase | Dashboard, Jérôme | À supprimer le jour où un troisième projet est voulu | Mineur | 0 |
 | A27 | **Secret JWT du projet** apparu dans un résultat d'outil de ce chat, en lisant la configuration PostgREST par l'API de gestion. Jamais recopié | Dashboard, Jérôme | Risque faible tant que les transcripts restent sur sa machine. Le faire tourner régénère aussi les clés anon et service, donc `.env` et `client/.env.local` | Mineur | Jérôme décide |
+| A28 | **Une action en retard est appliquée au tour suivant.** Trouvé au harnais le 2026-10-10. `resolve-action` règle l'expiration par `expireIfDue`, qui fait jouer la maison jusqu'au tour humain suivant, puis **soumet l'action reçue à ce nouveau tour** ; si elle y est légale elle est appliquée, et la réponse ne porte même pas `expired`. Seule une action illégale sur le nouveau plateau prend le chemin `expired`. Mesuré : match ouvert au round 2 avec un chrono passé, un `endTurn` envoyé, tour suivant au round 4. Un `endTurn` après le chrono, **dont le coup à la porte du client**, coûte donc deux tours | `supabase/functions/resolve-action/index.ts`, après `expireIfDue` | C'est une partie de ce que Jérôme décrivait quand « dix rounds avaient passé ». Correctif : quand `overdue` est non nul, ne pas soumettre l'action et répondre `expired` ; un test dans `session.test.ts` ; redéploiement de la fonction | Majeur | 0,5 |
+| A29 | **Les fonctions déployées sont en retard sur le moteur.** Trouvé en lisant les événements des deux matchs joués au harnais le 2026-10-10 : `scored(B, 50)` sur une prise du Spark, alors que `engine/constants.ts` dit `SPARK_POINTS = 20` depuis le commit c9be92c du 2026-09-02, « Ramène le Spark à deux buts », et que `04`, `CONTEXT.md` et `check_drift.py` disent 20. `resolve-action` v7 a donc été bundlée avant ce commit. Le jeu en ligne joue un Spark à cinq buts, et le tableau d'équilibrage de `04` ne décrit pas ce qui est déployé. Le commentaire de `scripts/live-match.ts` dit encore « 50 for the Spark » | `npm run deploy:function` pour les deux fonctions, `scripts/live-match.ts` | C'est exactement ce que A11 existe pour attraper : sans version sur les matchs, personne ne voit qu'un moteur déployé diverge. À redéployer avec le feu vert de Jérôme, parce que ça change le jeu en ligne, et A11 juste derrière | Majeur | 0,25, plus le feu vert |
+| A30 | **Le terrain ne se lit plus sous le noircissement** (retour 1 de la première partie de Jérôme, 2026-10-10). L'art est filtré à 50 % de luminosité, lavé d'un voile sombre, et chaque case de structure est peinte à 82 % d'opacité par-dessus : sur les captures, les passerelles de l'image disparaissent derrière le quadrillage | `client/src/match/Board.tsx`, `S.art`, `S.wash`, remplissage des cases | La 2D reste le repli derrière l'interrupteur jusqu'au bout, et c'est l'écran de la phase 2. Alléger le voile et l'opacité des cases, juger sur capture | Mineur | 0,25 |
+| A31 | **L'IA n'est ni lisible ni tactique pour un humain** (retours 3 et 4) : après un but marqué par Jérôme, tous ses alliés se sont massés autour de son Bulwark et n'en sont jamais repartis ; dans l'ensemble il n'a pas compris ce que la maison et ses coéquipiers cherchaient. L'équilibrage est mesuré IA contre IA, il ne dit rien de ce qu'un humain comprend. Le `payloadReset` après un but et la valeur de position « défendre » sont les premiers suspects, et la leçon de `positionValue` s'applique : une heuristique doit valoriser la case qui rend une action possible | `ai/`, à reproduire d'abord au harnais avec une capture après un but | **L'équilibrage reste clos** : il s'agit d'une reproduction mesurée puis d'un correctif ciblé, suivi d'un sweep pour vérifier que les moyennes n'ont pas bougé. Un correctif qui bouge les moyennes est un arbitrage de Jérôme | Majeur | 1 à 2 |
+| A32 | **La portée de tir a paru trop longue** (retour 6) : `PAYLOAD_RANGE_CELLS` 9 et `PAYLOAD_LONG_RANGE_CELLS` 12, soit 45 et 60 pieds. C'est une règle de `00-reglement-v2.md`, donc un arbitrage de Jérôme, mesuré avant : une ligne de plus dans le sweep de la phase 2, à côté des Crackers | `engine/constants.ts`, `docs/00` | Même méthode que D4 : sweep, tableau, arbitrage, écart au règlement si appliqué | Mineur | fondu dans A5 |
 
 ### 2.B Ce qui n'est pas optimisé
 
@@ -463,6 +469,10 @@ Jérôme, le mode fenêtré utilise le vrai GPU et c'est lui qui fait foi.
 
 ## 7. La feuille de route
 
+> **Depuis le 2026-10-10, D11 remplace les phases 2 à 6 ci-dessous par celles de
+> `08-plan-terrain-horizontal.md`, dès que Jérôme donne le go.** La phase 1 est faite, les phases 7
+> et 8 tiennent telles quelles. Le texte reste pour la trace.
+
 Les phases sont ordonnées selon D3 : le 2.5D avant le déploiement, mais la robustesse minimale et
 le harnais d'écran avant le 2.5D, parce qu'on ne construit pas une scène qu'on ne peut pas regarder
 sur un projet qui se met en pause tout seul. **Chaque phase laisse un jeu jouable en local, tests
@@ -502,7 +512,11 @@ fenêtre pilotée, jouer la partie, relancer `rls-check.py` et `browser-path.py`
 | A12 `useAccount` lit `error` et `App` affiche « le serveur ne répond pas » avec un bouton réessayer et le diagnostic à copier (C11) | `lib/useAccount.ts`, `App.tsx` |
 | A11 `ENGINE_VERSION`, migration `0005_engine_version.sql`, écriture par `create-match`, refus par `resolve-action`, affichage client | `engine/constants.ts`, `supabase/migrations/`, les deux fonctions, `lib/useAccount.ts` |
 | A10 migration `0006_append_step.sql` : une fonction SQL `append_match_step(match_id, expected_seq, events, snapshot, columns)` qui fait les trois écritures en une transaction et échoue si `seq` a bougé ; `persist` l'appelle et traite l'erreur | `supabase/migrations/`, `resolve-action/index.ts` |
-| A5 sweep à `CRACKER_MOVE_CELLS = 10` sur le terrain vertical, tableau pour Jérôme, application et écart 26 s'il tranche oui | `engine/constants.ts`, `docs/00` |
+| A5 et A32 : un seul sweep avec `CRACKER_MOVE_CELLS = 10` et une portée de tir réduite, tableau pour Jérôme, application et écarts au règlement s'il tranche oui | `engine/constants.ts`, `docs/00` |
+| A28 : quand `expireIfDue` a réglé un tour, ne pas soumettre l'action reçue, répondre `expired` ; test dans `session.test.ts` | `supabase/functions/resolve-action/index.ts`, `server/session.test.ts` |
+| A29 : redéployer les deux fonctions avec le feu vert de Jérôme, puis vérifier au harnais que le Spark vaut 20 ; corriger le commentaire de `live-match.ts` | `npm run deploy:function`, `scripts/live-match.ts` |
+| A30 : alléger le voile et l'opacité des cases sur la 2D, juger sur capture | `match/Board.tsx` |
+| A31 : reproduire au harnais le massage des alliés après un but, corriger la cause dans `ai/`, sweep de contrôle pour prouver que les moyennes tiennent | `ai/`, `e2e/` |
 | A13 `.github/workflows/supabase-keepalive.yml` : cron quotidien, `curl` sur `$SUPABASE_URL/rest/v1/role_stats?select=role&limit=1` avec `apikey` en secret, échec si le code n'est pas 200 | `.github/workflows/` |
 | A24 `ci.yml` : test, typecheck, build client sur push touchant `boomball/` | `.github/workflows/` |
 | A14, A15, A16 restants, A18 nom de personnage conservé dans `team_members` | `screens/Match.tsx`, `match/Board.tsx`, `screens/Lobby.tsx` |
@@ -651,7 +665,8 @@ carrière. À décider après la phase 8.
 | Le rendu headless SwiftShader diffère du GPU | Claude | Les captures de CI se comparent avec tolérance, le regard de Jérôme fait foi |
 | Le `.mcp.json` du projet n'est pas chargé par l'extension VS Code | Jérôme vérifie avec `/mcp` au redémarrage | Repli : `claude mcp add playwright -- npx -y @playwright/mcp@0.0.83 --browser chrome --caps vision` à portée utilisateur |
 | `projet test` occupe le second projet gratuit | Jérôme | Sans conséquence tant qu'un troisième projet n'est pas voulu |
-| Le match e2e ouvert dans ce chat reste en cours sur « E2E Battery » | Claude le finit en phase 1 par script | Supprimer le compte e2e cascade sur tout, le jour où on n'en veut plus |
+| Le match e2e ouvert dans ce chat reste en cours sur « E2E Battery » | Fini en phase 1 par script | Supprimer le compte e2e cascade sur tout, le jour où on n'en veut plus |
+| **Q1, orientation du terrain.** Posée et **tranchée par Jérôme le 2026-10-10 : horizontal, décision D11**, plan dans `08` | Tranchée | **Garder le silo** : rien ne change au plan ; la verticalité ne tient qu'à la règle d'ancrage (B6), au coût de zone et au plan vertical du d8 du Spark, parce que tout le monde vole. À rendre lisible par A8, A30, C16 et les phases 3 à 5. **Passer à l'horizontal** : retirer B6 (ancrage, chute libre, chute de bousculade, chute à 0 HP), le coût de zone et le plan du Spark ; les solides du layout deviennent des obstacles vus de dessus, les deux Furnaces restent à chaque bout, le miroir autour de la ligne 22 tient. Le moteur, c'est `rules/falling.ts` qui disparaît, les termes d'ancrage de `reduce.ts` et de `positionValue`, et le règlement v2 : environ une séance, plus une demi-séance d'IA, plus un sweep complet, parce que **l'équilibrage clos a été mesuré avec les chutes et les coûts de zone**, et la cible de 1 à 2 buts par match est à re-prouver. Le 2.5D s'en trouve simplifié : caméra de dessus ou de trois quarts, pas de défilement vertical. C'est aussi un retour vers la vue de dessus du règlement de table, écart 5 de `00`. Le repli que Jérôme avait nommé le 2026-09-02, « comme un terrain de foot », est exactement cette option |
 
 ---
 
@@ -673,3 +688,88 @@ Le jeu est fini quand, sur l'URL Vercel, sans Jérôme dans la pièce :
    été touché que pour la version et les Crackers si Jérôme les tranche.
 7. `/security-review` a été lancée par Jérôme et ses conclusions traitées.
 8. Le plateau 2D reste disponible sous l'interrupteur et prend le relais si WebGL échoue.
+
+---
+
+## 10. Journal des phases
+
+### Phase 1, « voir le jeu », construite le 2026-10-10
+
+Par le fil principal (Fable 5.1), avec deux sous-agents Sonnet à effort moyen : l'un a fait lire le
+`.env` aux deux contrôles Python, l'autre a passé en propriétés longues les sept objets de style
+qui déclenchaient les avertissements React. Tout le reste est du fil principal. **La phase n'est pas
+close** : son critère d'acceptation inclut la partie entière de Jérôme, qui n'a pas eu lieu.
+
+| Tâche de §7 | État |
+|---|---|
+| `@playwright/test` et le harnais | Fait. **Dans le `package.json` racine de `boomball/`, pas dans `client/`** comme le plan le disait : `e2e/` est à côté de `client/`, et `npx playwright` doit se résoudre depuis `boomball/`. Scripts `npm run e2e`, `npm run e2e:playthrough` ; `npm run typecheck` couvre `e2e/` ; vitest exclut `e2e/**` |
+| `global-setup.ts` | Fait. Connexion à chaque run, état de session dans `e2e/.auth/`, échec sur toute réponse 400 ou plus du chemin de connexion |
+| `smoke.spec.ts` | Fait, vert en 9 s : hub, briefing, match repris, vitesse instant, un tour expiré réglé, un déplacement par le crochet, Dodge et fin de tour par les vrais boutons, un déplacement par clic sur la case du plateau. Dix captures datées dans `e2e/out/<run>/`, lues et décrites par Claude. Échoue sur toute erreur, tout avertissement et toute réponse 400+ |
+| Crochet `window.__boomball` | Fait. `client/src/match/testHook.ts` (contrat, `cellToScreen`, `summarise`), `client/src/lib/flags.ts` (les deux drapeaux sous `import.meta.env.DEV`), publication dans `Match.tsx` après chaque rendu. Ancres DOM `data-board-stage`, `data-cell="x,y"`, `data-unit`. Le bundle de production fait 434,66 Ko, identique à l'audit : le crochet est compilé hors du build |
+| `VITE_BOOMBALL_PATIENT` | Fait, coupe l'effet du coup à la porte |
+| Contrôles Python et le `.env` | Fait, sous-agent. `live-match.ts` et `deploy-edge-function.mjs` restent à la bash |
+| 401 et avertissements | Fait, voir A16 : c'était un 409, et sept objets de style |
+| Skill `boomball` et `05` | Faits, récrits |
+| Match e2e ouvert depuis le 09/10 | **Fini par `npm run e2e:playthrough`** : dix rounds, 10 à 50, la maison gagne. Deux runs de plus ont chacun joué un match neuf en moins de 35 s, le troisième vert de bout en bout jusqu'à la feuille de résultats, 27 requêtes humaines, aucun refus. Les deux premiers ont buté sur la fin de match : `innerText` rend « full time » en majuscules, et le crochet disparaît avec l'écran de match ; les deux sont corrigés |
+
+**Mesuré en lisant les captures.** A7 confirmé, l'échelle montre quatre rangées. A14 confirmé,
+121 s au premier rendu. A28 trouvé : une action en retard est appliquée au tour suivant. A29 trouvé
+dans les événements : la fonction déployée compte le Spark 50 quand le moteur dit 20. Les deux en
+§2.A.
+
+**Écarts au plan.** `localhost` et jamais `127.0.0.1`, parce que Vite n'écoute que `[::1]:5173` sur
+cette machine et que le démarrage du serveur expirait. Le paquet Playwright à la racine, voir
+ci-dessus. Le mode « finir le match » est un test marqué `@playthrough`, exclu de `npm run e2e`,
+plutôt qu'un script Node : il passe par le crochet et donc par le client, et sa cervelle est
+`chooseAction`, la même que `live-match.ts`.
+
+**La première partie humaine du terrain vertical, 2026-10-10.** Jérôme a approuvé le serveur MCP,
+joué une partie entière et relancé les deux contrôles Python. Ses retours, numérotés par le fil
+principal dans l'ordre où il les a donnés, et où chacun va :
+
+1. Le terrain ne se lit plus sous le noircissement. Nouveau, **A30**, phase 2.
+2. Les autres balles bougent à peine et restent en zone 2. Les Crackers, selon toute
+   vraisemblance : c'est la mesure que **D4 et A5** attendaient, le sweep à 10 cases en phase 2.
+3. Le comportement des IA est incompréhensible et pas vraiment tactique. Nouveau, **A31**.
+4. Après son but, tous ses alliés se sont massés autour du gardien et n'en sont jamais repartis.
+   La reproduction concrète de **A31**, à faire au harnais d'abord.
+5. La maison a marqué 10 points sans qu'il comprenne pourquoi ni comment. C'est la raison d'être de
+   la **phase 5** : un tir traverse les zones sans changer d'écran. En attendant, la carte d'annonce
+   tient un but deux fois plus longtemps que le reste, et le verdict des résultats reste faux
+   (**A17**).
+6. La distance de tir qui a permis son but lui a paru trop longue. Nouveau, **A32**, mesuré dans
+   le sweep de la phase 2 puis arbitré par lui, parce que c'est le règlement v2.
+7. Il est tombé sans savoir pourquoi. **A8 et C16**, déjà en phase 2 : les cases sans ancrage ne
+   sont pas dessinées et le briefing ne dit pas ce qu'est l'ancrage.
+
+Quatre remarques de plus, données après coup, numérotées à la suite :
+
+8. Les animations de déplacement, la caméra et la séparation en zones statiques le gênent
+   fortement ; il veut une caméra qui suit le ballon ou le joueur et fait défiler le terrain en
+   continu, comme un jeu de football vidéo. C'est mot pour mot la cible des **phases 3 à 5**,
+   déjà écrite en §3 : défilement continu, suivi de l'unité qui agit, un tir qui traverse les
+   zones sans changer d'écran.
+9. Retirer le coût de déplacement pour passer d'une zone à l'autre, soit `ZONE_CROSSING_FEET`,
+   10 pieds par franchissement. Règle du règlement v2, donc son arbitrage ; mesuré dans le sweep
+   de la phase 2 avec A5 et A32, ou rendu sans objet par Q1.
+10. L'impression qu'il n'y a aucune gestion de collision ni d'obstacle. **Faux dans les règles,
+    vrai à l'écran** : les cases `#` du layout sont infranchissables, une case occupée bloque, quitter
+    l'allonge d'un adversaire déclenche l'attaque d'opportunité, le Shove pousse. Ce qu'il n'a pas vu,
+    c'est A30 : le terrain ne se lit pas sous le noircissement, et le dessin de la zone 2 ne colle pas
+    au layout. Le 2.5D construit le décor depuis le layout, donc ce qui se voit est ce qui bloque.
+11. **La question la plus grosse, Q1 en §8 : silo vertical ou terrain horizontal.** Son argument
+    est l'équité sous gravité. Les faits du moteur : toute unité **vole** à 40 pieds, monter coûte
+    exactement ce que descendre coûte ; une chute n'est jamais un déplacement choisi, c'est la
+    pénalité d'un tour fini sans ancrage, 10 cases au plus avant le grappin et 1d6 par 2 cases en cas
+    d'impact ; la portée d'un tir ou d'une passe est une distance de Chebyshev, la même vers le haut
+    que vers le bas ; le ballon ne tombe jamais. **L'iniquité qu'il craint n'existe pas dans les
+    règles.** Ce qui existe, c'est que la verticalité ne lui a rien apporté de lisible et lui a
+    coûté une chute incomprise (7), un coût de zone (9) et trois écrans (8).
+
+Les deux contrôles Python sont verts : `rls-check.py` 24/24, `browser-path.py` ALL GREEN.
+
+**La phase 1 est close sur ces retours.** Q1 a été tranchée le soir même : D11, le terrain passe à
+l'horizontal, et le plan qui en découle est `08-plan-terrain-horizontal.md`. Go donné le soir même,
+les sept arbitrages tranchés, la partie C de `00` écrite, le layout accepté. Le développement
+démarre dans un chat neuf par 2H.1.
+

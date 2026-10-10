@@ -113,7 +113,8 @@ const S: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: 22,
     background: 'var(--panel)',
-    border: '1px solid',
+    borderWidth: 1,
+    borderStyle: 'solid',
     borderLeftWidth: 3,
   },
   season: {

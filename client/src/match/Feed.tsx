@@ -157,5 +157,5 @@ const S: Record<string, React.CSSProperties> = {
   },
   head: { padding: '10px 12px', borderBottom: '1px solid var(--line)' },
   list: { overflowY: 'auto', padding: '8px 12px' },
-  line: { margin: '3px 0', fontSize: 12, lineHeight: 1.5 },
+  line: { marginTop: 3, marginBottom: 3, marginLeft: 0, marginRight: 0, fontSize: 12, lineHeight: 1.5 },
 };

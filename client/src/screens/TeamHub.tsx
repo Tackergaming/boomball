@@ -290,7 +290,7 @@ const S: Record<string, React.CSSProperties> = {
     maxWidth: 620,
   },
   ladder: { display: 'flex', gap: 10 },
-  rung: { padding: '8px 14px', border: '1px solid var(--line)', background: 'var(--panel-deep)' },
+  rung: { padding: '8px 14px', borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--line)', background: 'var(--panel-deep)' },
   sectionHead: {
     display: 'flex',
     alignItems: 'baseline',

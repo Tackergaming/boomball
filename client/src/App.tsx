@@ -39,7 +39,9 @@ export function App() {
   // existed, or one whose insert failed, would otherwise be stuck on a screen
   // that cannot explain itself.
   useEffect(() => {
-    if (!account.userId || account.loading || account.profile) return;
+    // `undefined` is a profile not read yet, and only `null` is a profile that
+    // the database has no row for.
+    if (!account.userId || account.loading || account.profile !== null) return;
     void supabase
       .from('profiles')
       .insert({ id: account.userId, display_name: 'Giff' })

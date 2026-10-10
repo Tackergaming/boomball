@@ -38,7 +38,12 @@ export interface LiveMatch {
 export interface Account {
   loading: boolean;
   userId: string | null;
-  profile: Profile | null;
+  /**
+   * `undefined` until the row has been read for the current user, `null` once
+   * the read came back empty. The two used to be one value, and `App` inserted
+   * a profile for every player who signed in: the row was simply not read yet.
+   */
+  profile: Profile | null | undefined;
   team: Team | null;
   live: LiveMatch | null;
   /** The last finished match, so the results screen has something to show. */
@@ -49,7 +54,7 @@ export interface Account {
 export function useAccount(): Account {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [team, setTeam] = useState<Team | null>(null);
   const [live, setLive] = useState<LiveMatch | null>(null);
   const [lastFinished, setLastFinished] = useState<LiveMatch | null>(null);
@@ -63,6 +68,12 @@ export function useAccount(): Account {
       setLoading(false);
       return;
     }
+
+    // Forgotten before the first await, so the render that learns the user id
+    // never sees it beside a `null` profile left over from the signed-out
+    // state. That pairing is what sent `App` to insert a profile that existed,
+    // and the 409 it got back was the unexplained failure on every sign-in.
+    setProfile(undefined);
 
     const { data: profileRow } = await supabase
       .from('profiles')

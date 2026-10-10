@@ -20,8 +20,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { legalActions, onlyEndTurnLeft } from '../../../engine/legalActions.js';
 import { TURN_TIMER_SECONDS } from '../../../engine/constants.js';
+import { pathTo } from '../../../engine/rules/movement.js';
 import { isHuman } from '../../../engine/types.js';
 import { arena } from '../lib/arena.js';
+import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
 import { ActionBar } from '../match/ActionBar.js';
 import { Announce } from '../match/Announce.js';
 import { Board } from '../match/Board.js';
@@ -30,6 +32,7 @@ import { Feed } from '../match/Feed.js';
 import { Ladder } from '../match/Ladder.js';
 import { SeatPanel } from '../match/SeatPanel.js';
 import { trailOf } from '../match/replay.js';
+import { cellToScreen, publishHook, summarise, withdrawHook } from '../match/testHook.js';
 import { beatHoldMs, useMatch, type Speed } from '../match/useMatch.js';
 import { zoneOf } from '../lib/arena.js';
 
@@ -170,6 +173,9 @@ export function Match({
    */
   const knocked = useRef<string | null>(null);
   useEffect(() => {
+    // Development only: a script between two actions is not a player gone
+    // quiet, and the server still rules on the deadline when the action lands.
+    if (PATIENT) return;
     if (!yours || replaying || match.busy || !match.deadline || !tookControl.current) return;
     if (now + match.skew < match.deadline) return;
     if (Date.now() - tookControl.current < TURN_TIMER_SECONDS * 1000) return;
@@ -180,6 +186,47 @@ export function Match({
   }, [yours, replaying, match.busy, match.deadline, match.skew, now, onClock?.id, send]);
 
   const onZone = useCallback((next: number) => setZone(next), []);
+
+  /**
+   * The test hook, development only and compiled away otherwise.
+   *
+   * Republished after every render so a script always reads the board that is
+   * on screen. Everything it can do goes through `send` and `pathTo` exactly
+   * as a click would: see `match/testHook.ts`.
+   */
+  useEffect(() => {
+    if (!HOOK_ENABLED) return;
+    publishHook({
+      state,
+      legal,
+      seq: match.seq,
+      view: '2d',
+      yours: canAct,
+      replaying,
+      busy: match.busy,
+      deadline: match.deadline,
+      zone,
+      refusal: match.refusal,
+      legalSummary: () => summarise(legal),
+      setZone,
+      setSpeed: match.setSpeed,
+      cellToScreen: (x, y) => cellToScreen(zone, x, y),
+      clickCell: (x, y) => {
+        if (!canAct || !legal) return false;
+        const route = pathTo(legal.destinations, { x, y });
+        if (!route) return false;
+        void send({ kind: 'move', path: route });
+        return true;
+      },
+      act: (action) => (canAct ? send(action) : Promise.resolve()),
+      skipReplay: match.skip,
+      dismissBeat: match.dismissBeat,
+    });
+  });
+  useEffect(() => {
+    if (!HOOK_ENABLED) return;
+    return () => withdrawHook();
+  }, []);
 
   /**
    * Ask every AI team-mate to look for you.

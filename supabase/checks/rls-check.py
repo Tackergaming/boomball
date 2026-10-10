@@ -10,11 +10,12 @@ round trip; the suite under `npm test` runs in milliseconds and must stay that
 way. Python with nothing but the standard library, so there is no dependency to
 install to run it.
 
-    set -a && . ./.env && set +a          # from the workspace root
-    python boomball/supabase/checks/rls-check.py
+    python boomball/supabase/checks/rls-check.py          # from the workspace root
 
 Reads SUPABASE_BOOMBALL_URL, SUPABASE_BOOMBALL_ANON_KEY and
-SUPABASE_BOOMBALL_SERVICE_ROLE_KEY. It creates two throwaway users and deletes
+SUPABASE_BOOMBALL_SERVICE_ROLE_KEY. When they are not already in the
+environment it loads the workspace `.env` on its own, so it runs the same way
+from PowerShell and from bash. It creates two throwaway users and deletes
 everything it made, including on the paths where a check fails.
 
 **A refused write does not answer 403.** With no write policy at all, an UPDATE
@@ -29,6 +30,38 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
+
+
+def load_workspace_env():
+    """Fill in missing SUPABASE_BOOMBALL_* variables from the workspace .env.
+
+    Anything already exported wins. No file, nothing to do.
+    """
+    wanted = (
+        "SUPABASE_BOOMBALL_URL",
+        "SUPABASE_BOOMBALL_ANON_KEY",
+        "SUPABASE_BOOMBALL_SERVICE_ROLE_KEY",
+    )
+    if all(name in os.environ for name in wanted):
+        return
+    path = Path(__file__).resolve().parents[3] / ".env"
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if name:
+            os.environ.setdefault(name, value)
+
+
+load_workspace_env()
 
 URL = os.environ["SUPABASE_BOOMBALL_URL"]
 ANON = os.environ["SUPABASE_BOOMBALL_ANON_KEY"]

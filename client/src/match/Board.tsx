@@ -108,7 +108,7 @@ export function Board({
             in `cover` and the SVG letterboxed inside it by `meet`: the grid
             then covered less ground than the picture, which is exactly the
             mismatch Jérôme saw. One square, both layers, no discrepancy. */}
-        <div style={S.stage} ref={stageRef}>
+        <div style={S.stage} ref={stageRef} data-board-stage>
         <img src={ZONE_ART[zone]} alt="" style={S.art} />
         <div style={S.wash} />
 
@@ -196,6 +196,7 @@ export function Board({
               .map((step) => (
                 <rect
                   key={`r${step.cell.x}-${step.cell.y}`}
+                  data-cell={`${step.cell.x},${step.cell.y}`}
                   x={step.cell.x + 0.12}
                   y={rowOf(step.cell.y) + 0.12}
                   width={0.76}
@@ -442,7 +443,7 @@ function UnitMark({
   const hurt = unit.hp / unit.maxHp;
 
   return (
-    <g style={{ cursor: 'pointer' }} onClick={onClick}>
+    <g style={{ cursor: 'pointer' }} onClick={onClick} data-unit={unit.id}>
       {spotlit && (
         <rect
           x={x - 0.18}
@@ -669,7 +670,9 @@ const S: Record<string, React.CSSProperties> = {
     position: 'relative',
     height: 46,
     flex: 'none',
-    border: '1px solid var(--line)',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'var(--line)',
     overflow: 'hidden',
     cursor: 'pointer',
   },
@@ -718,7 +721,8 @@ const S: Record<string, React.CSSProperties> = {
     height: 20,
     fontFamily: 'var(--mono)',
     fontSize: 10,
-    border: '1px solid',
+    borderWidth: 1,
+    borderStyle: 'solid',
     background: 'rgba(5,7,10,.8)',
   },
 };

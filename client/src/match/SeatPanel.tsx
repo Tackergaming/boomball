@@ -148,5 +148,5 @@ const S: Record<string, React.CSSProperties> = {
     color: 'var(--text)',
   },
   flags: { display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 12 },
-  flag: { padding: '3px 6px', border: '1px solid' },
+  flag: { padding: '3px 6px', borderWidth: 1, borderStyle: 'solid' },
 };

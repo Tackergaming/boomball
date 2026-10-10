@@ -1,0 +1,12 @@
+{
+  // The e2e scripts run in Node and reach into the page, so they need both
+  // Node and DOM types, which the root config deliberately gives neither the
+  // engine nor the AI. Playwright transpiles these files itself; this config is
+  // for `npm run typecheck` and the editor.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": ["."]
+}

@@ -305,3 +305,74 @@ L'**arène gridée**, seul livrable manquant avant le code :
 
 L'ancrage étant dérivé de la structure, ce fichier est la seule donnée de terrain dont le moteur a
 besoin.
+
+---
+
+# Partie C : écarts du 2026-10-10, décision D11, le terrain horizontal
+
+> Écrite le 2026-10-10 par le fil principal (Fable 5.1) sur la décision D11 de Jérôme, prise après
+> sa première partie entière du terrain vertical, avec son autorisation de passer outre toute règle
+> écrite qui la contredit. **Cette partie prime sur les parties A et B partout où elles se
+> contredisent.** Elle entre en vigueur dans le code à la sous-phase 2H.1 de
+> `08-plan-terrain-horizontal.md` ; jusqu'au redéploiement du moteur 2, le jeu en ligne joue encore
+> la partie B. Les écarts sont numérotés à la suite des précédents.
+
+**La fiction.** Le Kill-Silo reste un silo à missile nucléaire, un tube, mais **couché à
+l'horizontale**, par nostalgie de Bombara, le monde d'origine des Giff. Les deux Furnaces sont les
+deux bouches du tube. Il n'y a plus de haut ni de bas : on ne vole pas, on ne tombe pas, on court
+entre des caisses et des piliers.
+
+## C1. Terrain
+
+| # | Règle v2 | Règle après D11 | Raison |
+|---|---|---|---|
+| 27 | Vue de profil, trois zones empilées, `y` monte (écart 5, B1) | **Vue de dessus.** 15 cases de large sur 45 de long. `y` reste l'axe long, 0 côté Furnace A, 44 côté Furnace B ; `x` la largeur. Le miroir autour de `y = 22` tient. Les trois « zones » ne sont plus que les **trois tiers** du terrain, nommés pour le fil et pour l'entrée du Spark, sans aucune règle attachée | Les coordonnées du moteur ne changent pas, leur lecture change. C'est aussi la vue de la table |
+| 28 | Structure, chaîne centrale, crochets, passerelles, carte d'ancrage (écart 11) | **Obstacles.** Une case `#` est infranchissable et **coupe la ligne de vue**. Rien d'autre : la chaîne disparaît. Le layout est celui de `08` §3, accepté par Jérôme le 2026-10-10 | Un obstacle qui ne coupe pas la vue n'est qu'un détour |
+| 38 | Départs au-dessus des passerelles (B2, écart 24) | Bulwark en `(7, 1)` pour A et `(7, 43)` pour B. Les six joueurs de champ sur `y4` pour A et `y40` pour B, aux `x` 2, 4, 6, 8, 10, 12. Ballon en `(7, 22)` | Chacun dans son tiers, le gardien dans sa bouche |
+
+## C2. Déplacement
+
+| # | Règle v2 | Règle après D11 | Raison |
+|---|---|---|---|
+| 29 | Vitesse de vol 40 pieds (B3) | **Vitesse de déplacement 40 pieds**, 8 cases, huit directions, 5 pieds la case, Dash ajoute 40. Une case occupée ou pleine bloque, le chemin complet est envoyé | Inchangé dans les faits, renommé |
+| 30 | Franchir une zone coûte 10 pieds de plus (B1) | **Supprimé** | D11 |
+| 31 | B6 en entier : ancrage, chute libre, grappin, chute de bousculade ; écart 1 | **Supprimé.** Aucune unité ne tombe jamais, aucune case n'est « ancrable » | D11 |
+
+## C3. Contact
+
+| # | Règle v2 | Règle après D11 | Raison |
+|---|---|---|---|
+| 32 | Bousculade réussie contre un non-porteur : chute de 3 cases (B7) | **Poussée d'une case** dans la direction opposée au bousculeur. Si cette case est un obstacle, une unité ou le bord, la cible ne bouge pas. Contre un porteur : le ballon tombe sur sa case et la cible ne bouge pas, arbitrage du 2026-09-01 conservé | La bousculade de D&D 2024, 5 pieds |
+| 33 | Recul explosif de 2 cases, peut décrocher l'ancrage ; attaque d'opportunité retenue si le recul coûterait la prise (B3, B5) | Recul de 2 cases, arrêté par un obstacle, une unité ou le bord. **L'attaque d'opportunité est toujours prise** | Plus de prise à perdre |
+| 34 | Tir, passe, interception : portée en cases, rien ne les bloque (B7) | **Ligne de vue obligatoire** : un obstacle entre les deux cases interdit le tir, la passe et l'interception. Les unités ne coupent pas la ligne de vue. La portée reste 9 cases, 12 à désavantage, jusqu'au sweep de 2H.3 (écart 39) | J1 : le couvert existe |
+
+## C4. Ordnance
+
+| # | Règle v2 | Règle après D11 | Raison |
+|---|---|---|---|
+| 35 | Les Crackers ignorent le terrain (B8) | **En dérive**, au compte 20, un Cracker roule vers l'unité la plus proche par le **chemin le plus court qui contourne les obstacles**, 6 cases de chemin, 10 si le sweep de 2H.3 le dit (écart 40). **Frappé**, il part en ligne droite sur la direction d8, **rebondit** sur un obstacle ou un bord selon l'écart 36b et continue avec les cases qui lui restent ; il détonne sur la première unité rencontrée, écart 4, sinon s'immobilise au bout de sa course. **Son mouvement ne tombe jamais à zéro à cause d'un obstacle** | J6, précisé par Jérôme |
+| 36 | Le Spark entre en Zone 2 et dérive de 6 cases sur un cap d8 tiré une fois, dans le plan vertical (écart 3, B9) | Entre au round 6 dans le **tiers central**, à 4 cases ou plus de toute unité, dérive de 6 cases par round sur un cap d8 tiré une fois **dans le plan du terrain**, et **rebondit** sur les obstacles et les bords en gardant toutes ses cases | Le plan change, pas la règle |
+| 36b | | **Règle de rebond**, commune aux écarts 35 et 36. Une case orthogonale bloquée renvoie la direction en arrière. En diagonale, si une seule des deux cases orthogonales voisines est libre, seule la composante bloquée s'inverse ; si les deux sont bloquées, les deux s'inversent. Un rebond ne consomme pas de case | Une règle, un fichier, un test |
+
+## C5. Élimination
+
+| # | Règle v2 | Règle après D11 | Raison |
+|---|---|---|---|
+| 37 | À 0 HP, l'unité tombe au sol de la Zone 1 et est évacuée (B10) | **Évacuée sur place.** Le remplaçant entre à côté de la bouche de sa Furnace après 2 rounds, `(5, 1)` pour A et `(5, 43)` pour B, comme avant | Plus de sol où tomber |
+
+## C6. Ce qui se mesure avant de s'écrire
+
+| # | Règle v2 | À mesurer en 2H.3 | Arbitre |
+|---|---|---|---|
+| 39 | Portée de tir 9 cases, 12 à désavantage | 9/12 contre 7/10 et 6/9, sur les trois Tiers | Jérôme, sur tableau. Retour 6 de sa première partie : la portée lui a paru trop longue |
+| 40 | Crackers à 6 cases par round | 6 contre 10 | Jérôme, sur tableau. D4 |
+
+**Tout le reste tient** : initiative, échelle et blocs, dix rounds et mort subite, banc de trois et
+retour après deux rounds, Spark à 20 points et son prix fixé contre le nombre de buts, Tiers et
+statistiques, Dodge, Dash, Disengage, interception, blocage du Bulwark à 2 cases de sa bouche, le
+but qui remet un ballon neuf au gardien.
+
+**L'équilibrage**, clos le 2026-09-02, est **rouvert par cette partie** et se referme à la fin de
+2H.3, quand les trois Tiers tiennent la cible de 1 à 2 buts par match avec un Spark qui décide
+environ 30 % des rencontres.
+
