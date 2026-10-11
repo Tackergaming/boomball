@@ -3,14 +3,16 @@
 > Historique du projet Boomball : ce qui a été construit et pourquoi, jusqu'au 2026-09-02. Depuis le
 > 2026-10-10 le point d'entrée est `08-plan-terrain-horizontal.md`, et `07-audit-et-plan-3d.md`
 > porte l'audit et le journal des phases. **Bandeau tenu à jour pour `check_drift.py` : au
-> 2026-10-10, après les sous-phases 2H.1 à 2H.7, le moteur 4 joue le terrain horizontal, les
+> 2026-10-11, après les sous-phases 2H.1 à 2H.9, le moteur 5 joue le terrain horizontal, les
 > Crackers roulent vers le ballon et le Breaker les pare, l'initiative est un ordre sans comptes,
-> le Spark s'échappe et revient, l'IA des quatre rôles suit les mots de Jérôme, **429 tests**,
-> et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et 2H.7, Crackers à 8,
-> portée 9/12, Spark 20, le sweep donne 1,46 à 1,80 buts par match (`09` §12), équilibrage
-> re-clos par Jérôme sur ce tableau le 2026-10-10. **Le moteur 4 est le jeu en ligne** :
-> `resolve-action` v12 et `create-match` v10 déployées le 2026-10-10 avec son feu vert, les
-> matchs du moteur 3 archivés par le client, l'ouverture rejouée depuis le coup d'envoi.
+> le Spark s'échappe et revient, la surface de réparation protège la relance du gardien, l'IA
+> des quatre rôles suit les listes de Jérôme et note des tours entiers (le plan de tour),
+> **475 tests**, et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et
+> 2H.7, Crackers à 8, portée 9/12, Spark 20, le sweep donne 1,46 à 1,80 buts par match (`09` §12),
+> équilibrage re-clos par Jérôme sur ce tableau le 2026-10-10, pas de sweep depuis. **Le moteur 5
+> est le jeu en ligne** : `resolve-action` v15 et `create-match` v13 déployées le 2026-10-11 avec
+> son feu vert, les matchs du moteur 4 archivés par le client ; sa partie du 2026-10-11 est
+> consignée et rejouée dans `docs/matches/` par `scripts/dump-match.ts`.
 > Tout ce qui suit décrit le terrain vertical, dépassé par la décision D11.
 > Dernière mise à jour du corps : 2026-09-02, après cinq tests en local de Jérôme et les deux
 > arbitrages qui suivaient le passage au terrain vertical.

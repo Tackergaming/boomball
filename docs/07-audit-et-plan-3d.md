@@ -1343,6 +1343,20 @@ commit `922368f` poussé sur son `/commit et push` et son feu vert :
 | Ce que les captures montrent | **Le plan de tour est en ligne chez la maison** : « Derro Tarrow dashes. Derro Tarrow moves 16 cells. » en tête de round, le Dash joué en premier puis une seule marche ; au round 7 Giff bouscule Nib Flintlock qui lâche le ballon |
 | Un trait à connaître | Dans 6 tours sur 401 d'auto-jeu (trois matchs vétéran), le Dash vient **après** une première marche : « moves 8, dashes, moves 7 ». Ce n'est pas un défaut du plan mais de la relecture après chaque pas : des termes de `positionValue` lisent la position courante de l'unité (`rejoin` hors de portée de passe, `looseBallReach`, `keenerMateNear`), donc le paysage change une fois l'unité déplacée et un Dash devient rentable là où il ne l'était pas. La case finale est la même, l'ordre des lignes du fil diffère. À laisser tel quel sauf si Jérôme le voit et s'en plaint |
 
-**Ce qui attend Jérôme** : `/commit` pour le correctif du smoke et les documents de mise en ligne ;
-sa partie sur le moteur 5 avec le plan de tour, et son verdict sur ce que chaque rôle cherche ;
-**un sweep s'il le demande**, un seul, contre `09` §12, en comptant onze minutes.
+**La partie de Jérôme, le 2026-10-11**, star, **50 à 0**, match `0291a651`, Tacker en
+`A-striker-2`. Deux retours en chat, écrits en `00` C12 sans discussion : **un humain joue en
+dernier de son rôle** (écart 55, qui renverse la phrase de l'écart 51), et **le Trajector ne
+recule jamais à son premier tour**. Et une demande de méthode : la partie est **consignée tour par
+tour** et le chat suivant commence par l'analyser, décision par décision, contre la réflexion d'un
+agent Opus 5.5 effort élevé, pour en tirer des leçons et des ajustements de l'IA avant de coder.
+
+| Quoi | État |
+|---|---|
+| `scripts/dump-match.ts` | Neuf, fil principal, permanent. Lit un match en base avec la clé de service (lecture seule, `--list` ou `--match <id>`), écrit `match.json`, `kickoff.json`, `events.json` et `match.md` dans `docs/matches/<date>-<id8>/`, puis **rejoue le match en local** depuis `matches.kickoff` : chaque action est reconstruite depuis les événements qu'elle a produits, `reduce` la rejoue, les événements sont comparés aux événements stockés, et avant chaque décision `rankPlans` dit ce que l'IA de ce dépôt aurait choisi et pourquoi, pour une IA sa raison, pour l'humain ce que l'IA aurait fait à sa place |
+| Le match `0291a651` | 869 événements, **418 décisions rejouées, 0 écart d'événement**, score final reproduit, et **0 décision d'IA sur 382 dont l'action stockée ne soit pas le premier plan de ce dépôt** : le dépôt et les fonctions en ligne jouent la même IA, et `match.md` dit vraiment pourquoi chaque coup a été joué. Un seul cas a demandé une règle de lecture : une marche coupée par les attaques d'opportunité, le marcheur évacué en route, est stockée comme les cases parcourues et non comme la route envoyée, et le script la reconnaît comme le même plan quand elle en est un préfixe. 133 tours, **3 Actions inutilisées** contre 32 dans la partie précédente, 39 Dash |
+| Ce que le fichier montre déjà | Au round 1 le Trajector allié a dashé de `(12, 14)` à `(5, 1)`, treize cases vers son propre but : avec `chaseKickoff` à zéro et personne à portée de passe, la seule pente était `guardFurnace`. C'est le retour 1 de Jérôme, cause lue dans les plans |
+
+**Ce qui attend Jérôme** : `/update` et `/commit et push` demandés dans le même message, faits
+par le fil principal ; puis au chat suivant l'analyse de `docs/matches/2026-10-11-0291a651/match.md`
+avec un agent Opus 5.5 effort élevé, les leçons, puis le code de 2H.10, écarts dans `00` avant la
+première ligne ; **un sweep s'il le demande**, un seul, contre `09` §12, en comptant onze minutes.

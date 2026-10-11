@@ -718,3 +718,17 @@ le code contre les mots. **Codé en 2H.9.**
   moins d'une milliseconde avant ; un match d'auto-jeu dure 1,1 s au lieu de 0,5 s, donc le sweep
   prend environ 11 minutes au lieu de 5. `reachableCells` a perdu son tri par itération pour une
   file à seaux (sous-agent Sonnet), ce qui profite aussi au client.
+
+## C12. Décisions du 2026-10-11 après la partie à la porte de 2H.9, **sous-phase 2H.10, pas encore dans le code**
+
+> Écrites par le fil principal (Fable 5.1) sur les deux retours de Jérôme en chat après sa partie
+> sur le moteur 5 avec le plan de tour (star, 50 à 0, match `0291a651`, consigné tour par tour
+> dans `docs/matches/2026-10-11-0291a651/`). Dictées par lui, **à coder au chat suivant, après
+> l'analyse de la partie** décrite dans `05`. Le second change l'échelle d'initiative sans changer
+> la forme de l'état ni d'un événement : `ENGINE_VERSION` resterait 5, l'échelle d'un match ouvert
+> étant reconstruite à chaque round, et les fonctions seraient à redéployer.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 55 | Écart 51 : « Un humain joue en premier dans son rôle » | **Un humain joue en dernier dans son rôle.** Quand un humain tient un rôle, il passe après toutes les IA de ce rôle dans son équipe : un Striker humain joue le troisième des trois Strikers. Le reste de l'échelle ne bouge pas : Trajector, Strikers, Breakers, Bulwark, et l'ordre des IA d'un même rôle par la situation. Plusieurs humains du même rôle restent ordonnés entre eux par le d20 du coup d'envoi | Jérôme, le 2026-10-11, retour 2 : jouer en premier de son rôle le prive de la lecture de ce que ses coéquipiers du même rôle font avant lui | **À faire en 2H.10**, fil principal, `buildTurnOrder` dans `engine/initiative.ts` |
+| IA | Le Trajector ne prend pas la balle au coup d'envoi (C10, `chaseKickoff` 0) et rien ne dit où il va | **Au premier tour, le Trajector ne recule jamais : toujours vers l'avant.** Son plan de tour au round du coup d'envoi finit au moins aussi avancé vers la bouche adverse qu'il a commencé, jamais plus près de sa propre bouche | Jérôme, le 2026-10-11, retour 1. Lu dans le match : au round 1 son Trajector a dashé de `(12, 14)` à `(5, 1)`, treize cases vers son propre but, parce qu'avec `chaseKickoff` à zéro et tout le monde à huit cases du ballon la seule pente restante était `guardFurnace` | **À faire en 2H.10**, fil principal, règle d'IA dans `ai/` |

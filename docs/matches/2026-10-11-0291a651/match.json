@@ -1,0 +1,65 @@
+{
+  "match": {
+    "id": "0291a651-72f8-4b34-9e39-5c8fee29d771",
+    "team_id": "0e00cc43-e150-4186-8911-80dd9c329ca7",
+    "arena_id": "kill-silo",
+    "tier": "star",
+    "phase": "finished",
+    "round": 10,
+    "score_a": 50,
+    "score_b": 0,
+    "rng_seed": 2468605758,
+    "turn_deadline": null,
+    "winner": "A",
+    "is_draw": false,
+    "created_at": "2026-10-11T16:20:18.72417+00:00",
+    "finished_at": "2026-10-11T16:30:11.649+00:00",
+    "orders": [
+      {
+        "to": "A-bulwark-1",
+        "kind": "callForPass",
+        "receiverId": "A-striker-2"
+      },
+      {
+        "to": "A-striker-3",
+        "kind": "callForPass",
+        "receiverId": "A-striker-2"
+      },
+      {
+        "to": "A-striker-4",
+        "kind": "callForPass",
+        "receiverId": "A-striker-2"
+      },
+      {
+        "to": "A-breaker-5",
+        "kind": "callForPass",
+        "receiverId": "A-striker-2"
+      },
+      {
+        "to": "A-breaker-6",
+        "kind": "callForPass",
+        "receiverId": "A-striker-2"
+      },
+      {
+        "to": "A-trajector-7",
+        "kind": "callForPass",
+        "receiverId": "A-striker-2"
+      }
+    ],
+    "engine_version": 5
+  },
+  "team": {
+    "id": "0e00cc43-e150-4186-8911-80dd9c329ca7",
+    "name": "Shrapnel oath",
+    "owner": "6eb5302a-ba82-4f2e-9ae6-a8acbfe469df"
+  },
+  "participants": [
+    {
+      "match_id": "0291a651-72f8-4b34-9e39-5c8fee29d771",
+      "unit_id": "A-striker-2",
+      "profile_id": "6eb5302a-ba82-4f2e-9ae6-a8acbfe469df",
+      "role": "striker",
+      "character_name": "Tacker"
+    }
+  ]
+}
