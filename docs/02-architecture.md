@@ -119,8 +119,15 @@ chooseAction(state: MatchState, unitId: UnitId, orders: AllyOrder[]): Action
 Une table de priorités par rôle dans `ai/roles/`, lisible et modifiable sans toucher au moteur. Les
 ordres alliés biaisent la table, ils ne la remplacent pas.
 
+**Elle note des tours, pas des actions** (2H.9, `00` C11). Un candidat est un plan : Dash ou
+non, case d'arrivée, action depuis cette case, repli avec le mouvement restant. `chooseAction`
+renvoie la première action du meilleur plan et l'appelant rappelle après chaque action, donc le
+plan est reconstruit sur le plateau que les dés ont laissé. Ce qu'une case débloquerait est
+demandé au moteur, `actionOptionsAt` dans `legalActions.ts`, jamais recalculé côté IA.
+
 **Le cas dimensionnant est le solo : 13 unités IA pour un humain.** Un tour IA doit coûter
-quelques millisecondes, sinon le bloc allié devient une attente.
+quelques millisecondes, sinon le bloc allié devient une attente. Mesuré en 2H.9 : 2,7 ms par
+décision en moyenne, 18 ms au pire.
 
 ---
 

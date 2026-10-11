@@ -42,6 +42,7 @@ export const BULWARK: RoleWeights = {
   leash: 4,
   looseBallReach: 3,
   brace: 40,
+  rest: 1,
 
   pressCarrier: 60,
 

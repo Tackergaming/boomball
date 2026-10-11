@@ -279,3 +279,81 @@ describe('the keeper’s relaunch, écart 54', () => {
     throw new Error('no seed put A before B');
   });
 });
+
+describe('the box opens on the keeper’s throw, écart 53 bis', () => {
+  type Outcome = 'caught' | 'missed' | 'intercepted';
+
+  /** The keeper, ball in hands and clock in hand, throws from the mouth to (7, 7). */
+  function keeperThrow(outcome: Outcome) {
+    const { after } = goalByB();
+    expect(boxClosed(after, 'A')).toBe(true);
+    expect(after.penaltyBox.A).not.toBeNull();
+    expect(unit(after, 'A-bulwark-1').holdingPayload).toBe(true);
+
+    let base = put(after, 'A-striker-3', { x: 7, y: 7 });
+    if (outcome === 'intercepted') {
+      base = put(base, 'B-striker-3', { x: 8, y: 4 }, { reactionAvailable: true });
+    }
+    base = clockOn(base, 'A-bulwark-1');
+
+    for (let seed = 1; seed < 2000; seed++) {
+      const staged = { ...base, rngSeed: seed };
+      const result = reduce(arena, staged, {
+        unitId: 'A-bulwark-1',
+        action: { kind: 'pass', targetId: 'A-striker-3' },
+      });
+      if (!result.ok) throw new Error(result.reason);
+      const passed = result.events.find((e) => e.kind === 'passed');
+      const stolen = result.events.some((e) => e.kind === 'passIntercepted' && e.success);
+      if (outcome === 'intercepted' ? stolen : !stolen && passed && passed.caught === (outcome === 'caught')) {
+        return { staged, result, events: result.events };
+      }
+    }
+    throw new Error(`no seed gave a ${outcome} pass`);
+  }
+
+  function expectOpen(state: MatchState): void {
+    expect(state.penaltyBox.A).toBeNull();
+    expect(boxClosed(state, 'A')).toBe(false);
+    expect(barredCells(arena, state, 'B').size).toBe(0);
+  }
+
+  it('opens when the pass is caught', () => {
+    const { result } = keeperThrow('caught');
+    expectOpen(result.state);
+  });
+
+  it('opens when the pass is missed and the ball scatters', () => {
+    const { result, events } = keeperThrow('missed');
+    expect(events.some((e) => e.kind === 'payloadScattered')).toBe(true);
+    expectOpen(result.state);
+  });
+
+  it('opens when the pass is intercepted', () => {
+    const { result, events } = keeperThrow('intercepted');
+    const steal = events.find((e) => e.kind === 'passIntercepted' && e.success);
+    if (steal?.kind !== 'passIntercepted') throw new Error('no interception');
+    expect(unit(result.state, steal.interceptorId).holdingPayload).toBe(true);
+    expect(result.state.payload.carriedBy).toBe(steal.interceptorId);
+    expectOpen(result.state);
+  });
+
+  it('stays closed when a field player throws', () => {
+    const { after } = goalByB();
+    const round = after.penaltyBox.A;
+    expect(round).not.toBeNull();
+    let staged = put(after, 'A-bulwark-1', MOUTH_A, { holdingPayload: false });
+    staged = carrying(put(staged, 'A-striker-2', { x: 7, y: 5 }), 'A-striker-2');
+    staged = put(staged, 'A-striker-3', { x: 7, y: 8 });
+    staged = clockOn(staged, 'A-striker-2');
+
+    const result = reduce(arena, { ...staged, rngSeed: 3 }, {
+      unitId: 'A-striker-2',
+      action: { kind: 'pass', targetId: 'A-striker-3' },
+    });
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.events.some((e) => e.kind === 'passed')).toBe(true);
+    expect(result.state.penaltyBox.A).toBe(round);
+    expect(boxClosed(result.state, 'A')).toBe(true);
+  });
+});

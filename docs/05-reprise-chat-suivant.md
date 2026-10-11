@@ -1,59 +1,56 @@
 # Prompt de reprise pour le chat suivant
 
-> Récrit le 2026-10-11 par le fil principal (Fable 5.1) à la validation de C11, avant le codage
-> de 2H.9. À coller tel quel en ouverture du prochain chat, après `/prime`.
+> Récrit le 2026-10-11 par le fil principal (Fable 5.1) à la fin du codage de 2H.9, avant le
+> commit, le redéploiement et la partie de Jérôme. À coller tel quel en ouverture du prochain chat,
+> après `/prime`.
 
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.8
-est la dernière sous-phase construite et en ligne, 2H.9 est la prochaine, validée et pas codée,
-§9 la parallélisation. Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts
-27 à 54, plus 40 bis, 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle
-en deuxième version, listes triées par priorité dictées par moi, et le paragraphe « comment l'IA
-v2 est codée ». C11 est ce que tu vas coder : je l'ai VALIDÉ le 2026-10-11, mot pour mot, ne le
-rediscute pas. 07 §10 porte le journal, dont l'entrée 2H.8 et ce qui m'attend. 09 §12 est le
-dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8. 04 est l'histoire, à
-lire seulement quand une décision d'ingénierie te surprend.
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.9
+est la dernière sous-phase codée, §9 la parallélisation. Lis ensuite la partie C de
+boomball/docs/00-reglement-v2.md : les écarts 27 à 54, plus 40 bis, 37 bis et 53 bis, priment
+sur les parties A et B. C10 porte l'IA par rôle en deuxième version, listes triées par priorité
+dictées par moi. C11 porte le plan de tour, validé par moi le 2026-10-11 et codé le même jour,
+avec le paragraphe « comment le plan de tour est codé » qui dit poids par poids ce que fait le
+code : lis-le avant de toucher à ai/. 07 §10 porte le journal, dont l'entrée 2H.9 et ce qui
+m'attend. 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8
+ni de 2H.9. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.8 est CODÉE, COMMITÉE, POUSSÉE et EN LIGNE depuis le 2026-10-11. 462 tests
-verts sur 22 fichiers, typecheck racine, scripts, e2e et client verts, build du client vert.
-ENGINE_VERSION vaut 5 dans le dépôt comme en ligne : resolve-action v14 et create-match v12.
-J'ai joué ma partie sur le moteur 5 (star, 40 à 20) et donné mes retours ; le fil principal les
-a lus contre les événements du match en base : 32 tours sur 136 finis avec l'Action inutilisée,
-mon Bulwark resté planté en (9,1) au lieu de (7,1) des rounds 6 à 10. Tout est dans C11.
+Où on en est : 2H.9 est CODÉE le 2026-10-11, dans la copie de travail. 475 tests verts sur 22
+fichiers, typecheck racine, scripts, e2e et client verts, build du client vert, smoke vert en
+31 s, playthrough vert en 54 s. ENGINE_VERSION vaut 5 dans le dépôt comme en ligne, mais les
+fonctions en ligne (resolve-action v14, create-match v12) portent encore l'IA de 2H.8 : le plan
+de tour n'est pas en ligne. Selon ce que j'ai fait entre-temps, 2H.9 est soit encore à commiter,
+soit commitée et poussée, soit déjà redéployée : vérifie avec git log et git status avant de
+conclure, et demande-moi si ce n'est pas clair.
 
-LA TÂCHE : CODER 2H.9, telle que C11 la décrit, dans cet ordre.
+LA TÂCHE, dans cet ordre, chaque étape sur mon feu vert explicite.
 
-1. Le plan de tour dans ai/chooseAction.ts : l'IA note des tours complets (Dash ou non, case
-   d'arrivée, action depuis cette case, repli éventuel avec le mouvement restant) avec les mêmes
-   poids de rôle et la même positionValue, joue le meilleur plan action par action, et recalcule
-   après chaque action pour tenir compte des dés. Le Dash vaut le terrain qu'il achète (meilleur
-   plan à 16 cases moins meilleur plan à 8), reste interdit devant une cible à portée hors presse
-   et mur. Jamais l'Action en poche : le repli est le Dash, pas Dodge. Dodge reste le dernier
-   recours, abîmé de moitié et rien à faire. Garde les 462 tests comme filet, surtout
-   ai/ai.test.ts : les scènes de C10 doivent toujours passer, et le test des cinquante
-   millisecondes par décision fait foi sur la vitesse.
-2. L'écart 53 bis dans engine/reduce.ts, applyPass : la surface de réparation se lève à l'instant
-   où la passe du gardien quitte ses mains, attrapée, ratée ou interceptée. Test dans
-   engine/box.test.ts. ENGINE_VERSION reste 5, aucune forme ne change.
-3. La case de repos du gardien dans ai/evaluate.ts : guardFurnace mesure la distance à sa case de
-   départ, (7,1) pour A et (7,43) pour B, lue dans arena.spec.starts[team][0], plus la distance à
-   la bouche. Il rentre puis se plante : plus de pénalité de pas pour un Bulwark planté, c'est le
-   plan de tour qui arbitre.
-4. npm test, npm run typecheck, client typecheck et build, npm run e2e et e2e:playthrough, lecture
-   des captures, puis journal 07 §10, ligne 2H.9 dans 08 §5, et ce fichier. Pas de sweep sans ma
-   demande. Redéploiement seulement sur mon feu vert.
+1. Si 2H.9 n'est pas commitée : je tape /commit. Tu ne commites pas tout seul.
+2. Redéploiement sur mon feu vert, depuis boomball/ en bash : set -a && . ../.env && set +a puis
+   npm run deploy:function -- resolve-action create-match. Règle d'IA seule : aucune migration,
+   ENGINE_VERSION reste 5, les matchs ouverts continuent. Puis npm run e2e et
+   npm run e2e:playthrough contre les fonctions redéployées, et lecture des captures : la maison
+   doit montrer des Dash joués en premier puis une marche, et un gardien qui rentre en (7,1) ou
+   (7,43) avant de se planter.
+3. Ma partie, puis mes retours en chat. Tu les lis contre les événements du match en base
+   (match_events et matches.kickoff, un script Node de lecture avec la clé de service dans le
+   scratchpad, comme pour 2H.8) avant de proposer quoi que ce soit. Les questions sur ce que
+   fait l'IA se répondent par les événements, pas par une capture.
+4. Un sweep seulement si je le demande, un seul, contre 09 §12 : compte onze minutes maintenant
+   qu'un match d'auto-jeu dure 1,1 s, et le rapport imprime ses constantes.
+5. Journal 07 §10, 08 §5, ce fichier, puis /update et /save quand je les tape.
 
 Ce qu'il faut savoir tout de suite.
 
 1. Sous-agents comme en 08 §9 : Sonnet, effort précisé, fichiers disjoints, brief fermé, auteur
    nommé quand c'est présenté. Le fil principal garde reduce.ts, initiative.ts, evaluate.ts,
-   chooseAction.ts, rules/box.ts, les écarts, le sweep, les fonctions et l'intégration. Le plan
-   de tour est du fil principal, pas d'un sous-agent. Toute matière que tu me présentes nomme son
-   auteur. Dès que tu as une liste d'actions pour moi, donne-la numérotée, une action exacte par
-   ligne, et dis ce qui se passe ensuite.
+   chooseAction.ts, legalActions.ts, rules/box.ts, les écarts, le sweep, les fonctions et
+   l'intégration. Toute matière que tu me présentes nomme son auteur. Dès que tu as une liste
+   d'actions pour moi, donne-la numérotée, une action exacte par ligne, et dis ce qui se passe
+   ensuite.
 
 2. Quand j'explique un concept, pose tes questions en chat, une ou deux par message, et reformule
    avant de coder. L'outil de questions à choix sert aux arbitrages fermés. La méthode qui marche :
@@ -66,65 +63,65 @@ Ce qu'il faut savoir tout de suite.
    touches à aucune constante de 00 sans mon arbitrage. Les poids de l'IA sont dans ai/roles/, et
    ils viennent de mes mots dans 00 C10 et C11.
 
-4. Toute migration passe par moi via /supabase-migrate, tout redéploiement par mon feu vert
-   explicite, avec depuis boomball/ en bash : set -a && . ../.env && set +a puis
-   npm run deploy:function -- resolve-action create-match. Chaque match porte engine_version ; une
-   fonction qui lit une autre version refuse en 409, le client archive. Si le dépôt porte une
-   ENGINE_VERSION que les fonctions en ligne n'ont pas, épingle la constante à la version en ligne
-   le temps d'un run e2e et remets-la avant de commiter ; boxClosed lit un état sans penaltyBox
-   sans planter pour ça.
+4. Le plan de tour, en deux phrases pour ne pas le réapprendre : chooseAction renvoie la première
+   action du meilleur plan et l'appelant rappelle après chaque action, donc l'IA se juge sur
+   rankPlans (le plan entier et sa phrase, « walk to (7, 1), then dig in ») et jamais sur une
+   seule action. Ce qu'une case débloque se demande au moteur par actionOptionsAt dans
+   legalActions.ts. Un Dash qui n'achète aucune case n'est pas joué, et un lancer se note sur le
+   lancer seul, le terrain gagné lu depuis la case de départ du tour.
 
-5. Le harnais d'écran : npm run e2e en 30 s, npm run e2e:playthrough en 20 à 50 s, le crochet
-   window.__boomball. Une capture lue vaut plus qu'un typecheck pour tout ce qui touche à l'écran.
-   Le smoke suppose une case de destination au tour 1 et au tour 3, un clic simple sur une case qui
-   envoie la route la plus courte, et un pion cliquable au tour 2. Il échoue si le match e2e en
-   cours atteint le round 10 pendant ses trois tours : lancer npm run e2e:playthrough pour le finir,
-   le smoke suivant en ouvre un neuf. La zone violette (data-box="A"|"B" sur le plateau) et la
-   ligne « is moved out of the penalty box » n'ont pas encore été vues au harnais ni par moi : il
-   faut un but avec un adversaire dans la zone. Pour lire ce qui s'est passé dans un match en
-   ligne, les événements sont dans la table match_events (match_id, seq, kind, payload) et l'état
-   de coup d'envoi dans matches.kickoff : un script Node de lecture avec la clé de service, écrit
-   dans le scratchpad, a servi deux fois ce jour et vaut mieux qu'une capture pour les « pourquoi ».
+5. Toute migration passe par moi via /supabase-migrate, tout redéploiement par mon feu vert
+   explicite. Chaque match porte engine_version ; une fonction qui lit une autre version refuse
+   en 409, le client archive. Si le dépôt porte une ENGINE_VERSION que les fonctions en ligne
+   n'ont pas, épingle la constante à la version en ligne le temps d'un run e2e et remets-la avant
+   de commiter ; boxClosed lit un état sans penaltyBox sans planter pour ça.
 
-6. useMatch.load porte un compteur de génération : React StrictMode monte l'effet initial deux
+6. Le harnais d'écran : npm run e2e en 30 s, npm run e2e:playthrough en 50 à 60 s, le crochet
+   window.__boomball. Le siège humain du playthrough est piloté par chooseAction du dépôt depuis
+   Node, donc par le nouveau planificateur ; la maison est l'IA des fonctions en ligne. Le smoke
+   suppose une case de destination au tour 1 et au tour 3, un clic simple sur une case qui envoie
+   la route la plus courte, et un pion cliquable au tour 2. Il échoue si le match e2e en cours
+   atteint le round 10 pendant ses trois tours : lancer npm run e2e:playthrough pour le finir, le
+   smoke suivant en ouvre un neuf. La zone violette (data-box="A"|"B" sur le plateau) et la ligne
+   « is moved out of the penalty box » n'ont pas encore été vues au harnais ni par moi : il faut
+   un but avec un adversaire dans la zone.
+
+7. useMatch.load porte un compteur de génération : React StrictMode monte l'effet initial deux
    fois en dev et deux lectures en vol se dépassaient. Ne l'enlève pas.
 
-7. L'initiative (écart 51) est un ordre sans comptes : TurnSlot porte un rank, l'ordre dans un rôle
+8. L'initiative (écart 51) est un ordre sans comptes : TurnSlot porte un rank, l'ordre dans un rôle
    est calculé au début du round selon la situation, hasPlayedThisRound sert à la chaîne. Écart 54 :
    après un but, promoteBulwark réordonne l'échelle en cours si le bloc de l'équipe qui a encaissé
    est encore devant, sinon relaunch sur l'état met le Bulwark en tête de son équipe au round
    suivant. Écart 53 : penaltyBox est indexé par l'équipe qui DÉFEND la bouche, et vaut le dernier
-   round fermé ; barredCells(arena, state, team) donne les cases interdites à une équipe, et
-   movement.ts comme combat.ts la lisent. La relance sans receveur est relaunchCandidates dans
-   chooseAction.ts, et la laisse du gardien est levée dans positionValue tant qu'il porte le ballon
-   avec une relance à faire.
+   round fermé ; écart 53 bis : applyPass le remet à null quand le Bulwark lance. barredCells
+   donne les cases interdites à une équipe, movement.ts et combat.ts la lisent.
 
-8. Les interdits ne changent pas. Jamais le dépôt GitHub sur Vercel. Jamais le .env ni une clé dans
+9. Les interdits ne changent pas. Jamais le dépôt GitHub sur Vercel. Jamais le .env ni une clé dans
    un commit. Le règlement de table du vault est figé. Ne lis jamais design/Boomball Interface.html
    en entier.
 
-9. Les commandes. Depuis boomball/ : npm test (462), npm run typecheck, npm run sweep (320 s sur
-   une machine occupée), npm run e2e, npm run e2e:playthrough. Depuis boomball/client/ : npm run dev
-   sur http://localhost:5173, jamais 127.0.0.1, npm run build, npm run typecheck. Depuis la racine
-   du workspace : python boomball/supabase/checks/rls-check.py et browser-path.py, et python
-   .claude/scripts/check_drift.py, qui signale CONTEXT.md en retard tant que /update n'a pas tourné.
-   Le cwd de l'outil Bash se réinitialise entre deux appels parallèles : chemins absolus, ou
-   npm --prefix. Les heredocs bash avec des apostrophes françaises cassent par moments : écrire un
-   script Python dans le scratchpad et le lancer avec python -I est plus sûr ; un backtick dans un
-   python -c est mangé par bash.
+10. Les commandes. Depuis boomball/ : npm test (475), npm run typecheck, npm run sweep (environ
+    11 minutes maintenant), npm run e2e, npm run e2e:playthrough. Depuis boomball/client/ :
+    npm run dev sur http://localhost:5173, jamais 127.0.0.1, npm run build, npm run typecheck.
+    Depuis la racine du workspace : python boomball/supabase/checks/rls-check.py et
+    browser-path.py, et python .claude/scripts/check_drift.py, qui signale CONTEXT.md en retard
+    tant que /update n'a pas tourné. Le cwd de l'outil Bash se réinitialise entre deux appels
+    parallèles : chemins absolus, ou npm --prefix. Un script Python dans le scratchpad lancé avec
+    python -I est plus sûr qu'un heredoc bash pour tout texte français.
 
-10. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 54 de 00 partie
-    C, et C11 en entier. Dette connue : arenas.art et le champ art du spec nomment trois JPEG
-    retirés ; substituteEntry et substitute_entry restent et ne sont plus lus ; A20 (React 19)
-    reste le premier pas de la phase 3 ; le choix de direction d'un Breaker humain à la parade est
+11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 54 de 00 partie
+    C, et C11 en entier avec son paragraphe de codage. Dette connue : arenas.art et le champ art
+    du spec nomment trois JPEG retirés ; substituteEntry et substitute_entry restent et ne sont
+    plus lus ; w.dash dans les quatre fiches n'est plus lu depuis 2H.9 ; A20 (React 19) reste le
+    premier pas de la phase 3 ; le choix de direction d'un Breaker humain à la parade est
     automatique ; le marquage des cases sous allonge adverse lit « la route la plus courte
     provoque » et non « la case est sous allonge » ; le tray « Swing at / Shove / Pass to » au clic
-    sur un pion n'a pas encore été vu au harnais ; le fil garde 120 événements (FEED_LIMIT), soit
-    environ deux rounds maintenant que les marches s'affichent ; le Trajector sans ballon à chasser
-    au coup d'envoi n'a pas de position de relais tant que personne ne porte, il peut faire un pas
-    inutile ; trois fichiers du vault (Sapphire Hammer.md, la PREP de la scène 1.2 Ilthavax et sa
-    battlemap) sont modifiés hors de nos sessions Boomball et jamais commités par nous, à moi de
-    décider.
+    sur un pion n'a pas encore été vu au harnais ; le fil garde 120 événements (FEED_LIMIT) ; le
+    Trajector sans ballon à chasser au coup d'envoi n'a pas de position de relais tant que personne
+    ne porte ; trois fichiers du vault (Sapphire Hammer.md, la PREP de la scène 1.2 Ilthavax et sa
+    battlemap) plus la PREP des prompts de battlemap de la scène 1.3 sont modifiés hors de nos
+    sessions Boomball et jamais commités par nous, à moi de décider.
 
-11. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte, après
+12. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte, après
     avoir récrit ce fichier.

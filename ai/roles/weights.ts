@@ -213,6 +213,15 @@ export interface RoleWeights {
   readonly looseBallReach: number;
   /** Appetite for digging in (écart 52) when an opponent is two cells away. Bulwark only. */
   readonly brace: number;
+  /**
+   * Whether `guardFurnace` is measured against this role's **resting cell**,
+   * its starting cell in front of its own mouth, plus the hatch, rather than
+   * the hatch alone (2H.9, Jérôme after his engine 5 game: his keeper dug in
+   * two cells off-centre for five rounds because both cells were a cell from
+   * a hatch). One for the Bulwark, zero for everybody else. A number so the
+   * table stays data.
+   */
+  readonly rest: number;
 
   // -- Caution --------------------------------------------------------------
   /** Penalty per opponent a route would walk out of the reach of. */

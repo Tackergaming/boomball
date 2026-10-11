@@ -39,6 +39,7 @@ export const STRIKER: RoleWeights = {
   leash: 99,
   looseBallReach: 99,
   brace: 0,
+  rest: 0,
 
   pressCarrier: 55,
 

@@ -92,6 +92,97 @@ export interface LegalActions {
   readonly simple: readonly Action[];
 }
 
+/**
+ * What a unit could do with its Action, and with its free object interaction,
+ * **if it stood on `at`** with both still in hand. The position-dependent half
+ * of `legalActions`, split out so the AI's turn plan (2H.9) can ask what a
+ * cell would unlock before walking there, from the same code the door reads,
+ * rather than growing its own copy of the adjacency, range and sight rules.
+ * The economy of the turn, whether the Action or the interaction is still
+ * available, is `legalActions`' business and is not read here.
+ */
+export interface ActionOptions {
+  readonly attack: readonly TargetOption[];
+  readonly shove: readonly TargetOption[];
+  readonly pass: readonly TargetOption[];
+  readonly shoot: ShotOption | null;
+  readonly batCracker: readonly CrackerOption[];
+  readonly catchSpark: CatchOption | null;
+  readonly canGrabPayload: boolean;
+}
+
+export function actionOptionsAt(
+  arena: Arena,
+  state: MatchState,
+  unit: Unit,
+  at: Point,
+): ActionOptions {
+  const holding = unit.holdingPayload;
+
+  const adjacentEnemies = activeUnits(state).filter(
+    (u) => u.team !== unit.team && distance(at, u) === 1,
+  );
+
+  const attack: TargetOption[] = holding
+    ? []
+    : adjacentEnemies.map((target) => ({
+        unitId: target.id,
+        name: target.name,
+        against: statsFor(target.role, target.tier).ac,
+        mode: target.dodging ? ('disadvantage' as const) : ('normal' as const),
+      }));
+
+  // A player holding the ball can still shove: it is a grapple, not a swing.
+  const shove: TargetOption[] = adjacentEnemies.map((target) => {
+    const stats = statsFor(target.role, target.tier);
+    return {
+      unitId: target.id,
+      name: target.name,
+      against: Math.max(stats.might, stats.agility),
+      mode: 'normal' as const,
+    };
+  });
+
+  // A pass needs range and a line of sight (écart 34). The sight is filtered
+  // here so the interface and the AI both see only the throws the door takes.
+  const pass: TargetOption[] = holding
+    ? activeUnits(state)
+        .filter((u) => u.team === unit.team && u.id !== unit.id)
+        .flatMap((mate) => {
+          const range = throwRange(at, mate);
+          if (!range.ok || !hasLineOfSight(arena, at, mate)) return [];
+          return [
+            {
+              unitId: mate.id,
+              name: mate.name,
+              against: PAYLOAD_PASS_AC,
+              mode: range.mode,
+            },
+          ];
+        })
+    : [];
+
+  const shoot = holding ? shotOption(arena, state, unit, at) : null;
+
+  // Swinging at a Cracker is a bat swing, so the Payload bars it exactly as it
+  // bars an attack on a player.
+  const batCracker: CrackerOption[] = holding
+    ? []
+    : state.crackers
+        .filter((c) => c.state === 'live' && distance(at, c) === 1)
+        .map((c) => ({ crackerId: c.id, against: CRACKER_AC, directions: openLines(arena, c) }));
+
+  const catchSpark: CatchOption | null =
+    sparkIsLive(state.spark) && state.spark.x === at.x && state.spark.y === at.y
+      ? { against: SPARK_CATCH_DC, mode: 'normal' }
+      : null;
+
+  const canGrabPayload =
+    state.payload.carriedBy === null && state.payload.x === at.x && state.payload.y === at.y;
+
+  return { attack, shove, pass, shoot, batCracker, catchSpark, canGrabPayload };
+}
+
 export function legalActions(arena: Arena, state: MatchState): LegalActions | null {
   const turn = state.turn;
   if (!turn || state.phase === 'finished') return null;
@@ -100,76 +191,15 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
   if (!unit || unit.status !== 'active') return null;
 
   const hasAction = !turn.actionUsed;
-  const holding = unit.holdingPayload;
+  const options = actionOptionsAt(arena, state, unit, unit);
 
-  const adjacentEnemies = activeUnits(state).filter(
-    (u) => u.team !== unit.team && distance(unit, u) === 1,
-  );
-
-  const attack: TargetOption[] =
-    hasAction && !holding
-      ? adjacentEnemies.map((target) => ({
-          unitId: target.id,
-          name: target.name,
-          against: statsFor(target.role, target.tier).ac,
-          mode: target.dodging ? ('disadvantage' as const) : ('normal' as const),
-        }))
-      : [];
-
-  // A player holding the ball can still shove: it is a grapple, not a swing.
-  const shove: TargetOption[] = hasAction
-    ? adjacentEnemies.map((target) => {
-        const stats = statsFor(target.role, target.tier);
-        return {
-          unitId: target.id,
-          name: target.name,
-          against: Math.max(stats.might, stats.agility),
-          mode: 'normal' as const,
-        };
-      })
-    : [];
-
-  // A pass needs range and a line of sight (écart 34). The sight is filtered
-  // here so the interface and the AI both see only the throws the door takes.
-  const pass: TargetOption[] =
-    hasAction && holding
-      ? activeUnits(state)
-          .filter((u) => u.team === unit.team && u.id !== unit.id)
-          .flatMap((mate) => {
-            const range = throwRange(unit, mate);
-            if (!range.ok || !hasLineOfSight(arena, unit, mate)) return [];
-            return [
-              {
-                unitId: mate.id,
-                name: mate.name,
-                against: PAYLOAD_PASS_AC,
-                mode: range.mode,
-              },
-            ];
-          })
-      : [];
-
-  const shoot = hasAction && holding ? shotOption(arena, state, unit) : null;
-
-  // Swinging at a Cracker is a bat swing, so the Payload bars it exactly as it
-  // bars an attack on a player.
-  const batCracker: CrackerOption[] =
-    hasAction && !holding
-      ? state.crackers
-          .filter((c) => c.state === 'live' && distance(unit, c) === 1)
-          .map((c) => ({ crackerId: c.id, against: CRACKER_AC, directions: openLines(arena, c) }))
-      : [];
-
-  const catchSpark: CatchOption | null =
-    hasAction && sparkIsLive(state.spark) && state.spark.x === unit.x && state.spark.y === unit.y
-      ? { against: SPARK_CATCH_DC, mode: 'normal' }
-      : null;
-
-  const canGrabPayload =
-    !turn.objectInteractionUsed &&
-    state.payload.carriedBy === null &&
-    state.payload.x === unit.x &&
-    state.payload.y === unit.y;
+  const attack = hasAction ? options.attack : [];
+  const shove = hasAction ? options.shove : [];
+  const pass = hasAction ? options.pass : [];
+  const shoot = hasAction ? options.shoot : null;
+  const batCracker = hasAction ? options.batCracker : [];
+  const catchSpark = hasAction ? options.catchSpark : null;
+  const canGrabPayload = !turn.objectInteractionUsed && options.canGrabPayload;
 
   const canBrace = hasAction && unit.role === 'bulwark';
 
@@ -233,9 +263,9 @@ function openLines(arena: Arena, at: Point): number[] {
 }
 
 /** A shot needs a hatch cell in sight and in range (écart 34). */
-function shotOption(arena: Arena, state: MatchState, unit: Unit): ShotOption | null {
+function shotOption(arena: Arena, state: MatchState, unit: Unit, from: Point): ShotOption | null {
   const furnace = arena.targetFurnaceOf(unit.team);
-  const visible = visibleRangeToFurnace(arena, unit, furnace);
+  const visible = visibleRangeToFurnace(arena, from, furnace);
   if (visible === null) return null;
   const range = throwRangeOver(visible);
   if (!range.ok) return null;

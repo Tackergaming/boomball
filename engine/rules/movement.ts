@@ -13,6 +13,7 @@
  */
 
 import type { Arena } from '../arena.js';
+import { CELL_FEET } from '../constants.js';
 import { distance, inBounds, stepCostFeet, type Point } from '../geometry.js';
 import { activeUnits, type MatchState, type Unit } from '../types.js';
 import { barredCells } from './box.js';
@@ -107,35 +108,44 @@ export function reachableCells(
   state: MatchState,
   unit: Unit,
   budgetFeet: number,
+  from: Point = { x: unit.x, y: unit.y },
 ): Map<string, Reachable> {
+  // `from` stands in for the unit's cell: the real cell is already free,
+  // since occupiedCells leaves the unit itself out.
   const blocked = closedCells(arena, state, unit);
-  const start: Point = { x: unit.x, y: unit.y };
+  const start: Point = { x: from.x, y: from.y };
   const best = new Map<string, Reachable>();
   best.set(key(start), { cell: start, costFeet: 0, from: null });
 
-  // A frontier this small does not justify a heap: the arena is 675 cells and
-  // a forty foot budget reaches a few dozen of them.
-  const frontier: Reachable[] = [{ cell: start, costFeet: 0, from: null }];
+  // A bucket queue: a step costs a multiple of CELL_FEET, so the bucket at
+  // index costFeet / CELL_FEET is popped in increasing cost order with no
+  // sorting. A step never costs less than the one before it, so a bucket only
+  // ever receives entries while it is being drained or after.
+  const buckets: Reachable[][] = [[{ cell: start, costFeet: 0, from: null }]];
 
-  while (frontier.length > 0) {
-    frontier.sort((a, b) => a.costFeet - b.costFeet);
-    const current = frontier.shift()!;
+  for (let b = 0; b < buckets.length; b++) {
+    const bucket = buckets[b];
+    if (!bucket) continue;
+    for (let i = 0; i < bucket.length; i++) {
+      const current = bucket[i]!;
 
-    const known = best.get(key(current.cell));
-    if (known && known.costFeet < current.costFeet) continue;
+      const known = best.get(key(current.cell));
+      if (known && known.costFeet < current.costFeet) continue;
 
-    for (const next of neighbourCells(current.cell)) {
-      if (arena.isSolid(next) || blocked.has(key(next))) continue;
+      for (const next of neighbourCells(current.cell)) {
+        if (arena.isSolid(next) || blocked.has(key(next))) continue;
 
-      const costFeet = current.costFeet + stepCostFeet(current.cell, next);
-      if (costFeet > budgetFeet) continue;
+        const costFeet = current.costFeet + stepCostFeet(current.cell, next);
+        if (costFeet > budgetFeet) continue;
 
-      const seen = best.get(key(next));
-      if (seen && seen.costFeet <= costFeet) continue;
+        const seen = best.get(key(next));
+        if (seen && seen.costFeet <= costFeet) continue;
 
-      const entry: Reachable = { cell: next, costFeet, from: current.cell };
-      best.set(key(next), entry);
-      frontier.push(entry);
+        const entry: Reachable = { cell: next, costFeet, from: current.cell };
+        best.set(key(next), entry);
+        const index = Math.floor(costFeet / CELL_FEET);
+        (buckets[index] ??= []).push(entry);
+      }
     }
   }
 

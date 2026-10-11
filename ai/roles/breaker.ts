@@ -61,6 +61,7 @@ export const BREAKER: RoleWeights = {
   leash: 99,
   looseBallReach: 99,
   brace: 0,
+  rest: 0,
 
   // 2H.8, Jérôme's second pass.
   chaseKickoff: 1,

@@ -103,3 +103,56 @@ describe('proposed route', () => {
     for (const c of r) expect(arena.isSolid(c)).toBe(false);
   });
 });
+
+describe('reachable cells from a hypothetical origin', () => {
+  const arena = arenaWith([
+    { x: 5, y: 5 },
+    { x: 6, y: 5 },
+  ]);
+  const other: Unit = { ...base.units[0]!, id: 'other-unit', x: 7, y: 7 };
+
+  it('costs the same as the unit actually standing there', () => {
+    const real = unitAt(3, 3);
+    const hypothetical = reachableCells(
+      arena,
+      { ...base, units: [real, other] },
+      real,
+      MOVE_SPEED_FEET,
+      { x: 6, y: 6 },
+    );
+    const moved = unitAt(6, 6);
+    const placed = reachableCells(
+      arena,
+      { ...base, units: [moved, other] },
+      moved,
+      MOVE_SPEED_FEET,
+    );
+    // The real cell (3, 3) is free from the hypothetical origin, whereas the
+    // placed unit has left it too, so both sweeps see the same free cells.
+    for (const [k, r] of hypothetical) expect(placed.get(k)?.costFeet).toBe(r.costFeet);
+    for (const [k, r] of placed) expect(hypothetical.get(k)?.costFeet).toBe(r.costFeet);
+  });
+
+  it('frees the unit\'s real cell and keeps other units\' cells blocked', () => {
+    const real = unitAt(3, 3);
+    const reach = reachableCells(
+      arena,
+      { ...base, units: [real, other] },
+      real,
+      MOVE_SPEED_FEET,
+      { x: 4, y: 4 },
+    );
+    expect(reach.has(key({ x: 3, y: 3 }))).toBe(true);
+    expect(reach.has(key({ x: 7, y: 7 }))).toBe(false);
+    expect(reach.has(key({ x: 4, y: 4 }))).toBe(false);
+  });
+
+  it('gives the same cells and costs with or without `from` set to the unit cell', () => {
+    const real = unitAt(3, 3);
+    const state = { ...base, units: [real, other] };
+    const four = reachableCells(arena, state, real, MOVE_SPEED_FEET);
+    const five = reachableCells(arena, state, real, MOVE_SPEED_FEET, { x: 3, y: 3 });
+    expect([...five.keys()].sort()).toEqual([...four.keys()].sort());
+    for (const [k, r] of four) expect(five.get(k)?.costFeet).toBe(r.costFeet);
+  });
+});

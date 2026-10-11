@@ -613,17 +613,17 @@ positif et sans passe légale, chaque case atteignable d'où un coéquipier est 
 vaut `relaunch`, moins un demi-point par case de distance à sa bouche et la pénalité d'attaque
 d'opportunité de la route, hors de la laisse ; une fois sur place, la passe suit.
 
-## C11. Décisions du 2026-10-11 après la partie à la porte de 2H.8, **sous-phase 2H.9, pas encore dans le code**
+## C11. Décisions du 2026-10-11 après la partie à la porte de 2H.8, **sous-phase 2H.9, dans le code depuis le 2026-10-11, fonctions à redéployer**
 
 > Écrites par le fil principal (Fable 5.1) sur les cinq retours de Jérôme après sa partie sur le
 > moteur 5 (star, 40 à 20), lus contre les événements du match en base, puis deux questions
 > fermées. Un seul écart de règle, 53 bis ; le reste est l'IA. **Aucune forme d'état ni
 > d'événement ne change : `ENGINE_VERSION` reste 5**, les matchs ouverts jouent la règle au tour
-> suivant, les fonctions sont à redéployer.
+> suivant, les fonctions sont à redéployer. **Codé en 2H.9 le 2026-10-11**, journal en `07` §10.
 
 | # | Règle v2 | Règle décidée | Raison | État |
 |---|---|---|---|---|
-| 53 bis | La surface de réparation reste fermée le round du but et tout le round suivant (écart 53) | **Elle se lève à l'instant où la passe du gardien quitte ses mains**, attrapée, ratée ou interceptée, quel que soit le round. Exception à la durée de l'écart 53. Un gardien qui ne lance pas laisse la zone courir jusqu'à son terme normal | Jérôme, retour 3 : la zone n'a de sens que pour protéger la relance | **À faire en 2H.9**, fil principal, dans `applyPass` de `reduce.ts` |
+| 53 bis | La surface de réparation reste fermée le round du but et tout le round suivant (écart 53) | **Elle se lève à l'instant où la passe du gardien quitte ses mains**, attrapée, ratée ou interceptée, quel que soit le round. Exception à la durée de l'écart 53. Un gardien qui ne lance pas laisse la zone courir jusqu'à son terme normal | Jérôme, retour 3 : la zone n'a de sens que pour protéger la relance | **Fait en 2H.9**, fil principal, dans `applyPass` de `reduce.ts` : le lanceur est le Bulwark de l'équipe dont la zone est fermée, la zone passe à `null` avant le test d'interception. La passe d'un joueur de champ ne lève rien. 4 tests dans `engine/box.test.ts`, sous-agent Sonnet |
 | 48, confirmé | Interception par tout adversaire sur une case du vol ou à une case d'une case du vol, à partir de la deuxième | **Inchangé.** Jérôme a vu au round 4 une interception par un Trajector qui n'était pas sur la trajectoire : il était à une case de celle-ci, la règle est appliquée | Jérôme, le 2026-10-11, question fermée : « on garde » | Rien à faire |
 
 **Ce que les événements de la partie ont montré**, pour mémoire : 32 tours sur 136 finis avec
@@ -662,3 +662,59 @@ principal (« ok pour ta recommandation pour l'instant »).
 `ai/chooseAction.ts` en profondeur, `ai/evaluate.ts` pour la case de repos, les quatre fiches pour
 le Dash de repli ; **un seul sweep à la fin, si Jérôme le demande**, contre `09` §12, et la vitesse
 d'une décision est à mesurer, le test de cinquante millisecondes de `ai.test.ts` faisant foi.
+
+**Comment le plan de tour est codé**, par le fil principal (Fable 5.1) le 2026-10-11, pour relire
+le code contre les mots. **Codé en 2H.9.**
+
+- **Un plan est une suite d'actions** : au plus un Dash, une marche vers une case d'arrivée, une
+  action depuis cette case, un repli avec le mouvement restant. `Planner` dans `chooseAction.ts`
+  énumère les plans, les note, les trie ; `chooseAction` renvoie la **première action du meilleur
+  plan**, et l'appelant rappelle après chaque action, donc le plan est reconstruit de zéro à
+  chaque pas, sur le plateau que les dés ont laissé. `rankPlans` expose les plans entiers avec leur
+  phrase (« walk to (7, 1), then dig in »), `rankActions` les replie sur leur première action.
+- **La note d'un plan** est la valeur de l'action depuis la case d'arrivée, aux mêmes appétits
+  qu'avant, plus `positionValue` de la case où le plan finit moins celle de la case de départ,
+  moins les attaques d'opportunité des deux trajets (`avoidOpportunity`). `positionValue` est
+  calculée une fois par case et par décision. Les quatre fiches de `ai/roles/` ne changent pas de
+  rôle : ce sont toujours les données.
+- **Les actions depuis une case où l'unité n'est pas encore** sont demandées au moteur :
+  `actionOptionsAt(arena, state, unit, cell)` dans `legalActions.ts`, la moitié positionnelle de
+  `legalActions` sortie en fonction, qu'il appelle lui-même pour la case réelle. L'IA n'a donc pas
+  sa propre copie des règles d'adjacence, de portée et de ligne de vue. Une frappe ou une
+  bousculade n'est planifiée **après une marche** que sur une cible qui n'était pas déjà à portée :
+  marcher d'abord ne rend jamais la même frappe meilleure, et le plan « frapper puis marcher »
+  existe déjà.
+- **Un lancer (passe, tir) se note sur le lancer seul** : le terrain gagné par une passe est lu
+  depuis la case où le tour a commencé, pas depuis la case d'arrivée, sinon un pas en avant comptait
+  comme une passe plus longue ; chaque case marchée avant le lancer coûte 0,25 point, du mouvement
+  que le lanceur n'aura plus après ; le repli après un lancer n'est pas planifié, le plan reconstruit
+  après la passe s'en charge avec le plateau vrai. Le gardien qui a une passe légale depuis sa case
+  **lance sans bouger** (écart 54) ; sans ligne il va à la case la plus proche de sa bouche qui en
+  donne une, chaque case de distance à la bouche coûtant 0,5 point (`RELAUNCH_STEP`), jamais de
+  Dash pour ça : c'est l'ancien `relaunchCandidates`, devenu un plan ordinaire.
+- **Le Dash** est un plan « dash, puis marche de 16 cases », noté `positionValue` de l'arrivée
+  **avec l'Action dépensée** (le chasseur de Spark ne compte pas la prise sur la case du Spark
+  qu'il atteint en Dash) moins la case de départ moins les attaques d'opportunité. Il concourt à
+  valeur faciale contre les plans qui dépensent l'Action, et contre la marche simple, qu'il ne bat
+  que s'il achète du terrain : **un Dash qui n'achète rien n'est pas joué**, à égalité le plan le
+  plus court l'emporte. Interdit quand une frappe, une bousculade ou un Cracker est à portée, sauf
+  vers une case adjacente au porteur adverse (la presse, plancher `pressCarrier`) ou à deux cases
+  du porteur allié (le mur du Breaker, plancher `block`) quand une marche simple n'y arrive pas.
+  `w.dash` n'est plus lu.
+- **Jamais l'Action en poche** : comme le Dash vaut au moins la marche simple dès qu'une case de
+  plus rapporte quelque chose, et qu'une cible à portée produit toujours un plan qui la frappe,
+  l'Action ne reste en poche que lorsque rien d'utile n'est légal. Mesuré sur trois matchs
+  d'auto-jeu : 5, 0 et 2 tours sur 132 à 135 contre 32 sur 136 dans la partie de Jérôme, avec 32
+  à 40 Dash par match.
+- **Dodge** reste un plan de dernier recours : abîmé de moitié et aucun plan ne frappe, ne
+  bouscule, ne passe ni ne tire ; il concourt alors au score contre le Dash. **Disengage** est le
+  plan « disengage, puis marche vers la meilleure case sans pénalité » pour un porteur pressé.
+- **Le gardien** : `restNearness` dans `evaluate.ts`, distance à `arena.spec.starts[team][0]`
+  plus distance à la bouche, lue sur deux fois la longueur du terrain pour garder la pente de
+  `guardFurnace` ; la fiche porte `rest: 1` pour le Bulwark et 0 ailleurs. « Rentrer puis se
+  planter » est le plan `[move, brace]`, noté gain de la case plus `brace` ; un Bulwark déjà
+  planté qui bougerait rend `brace`, ce qui ne se lit qu'au deuxième pas du même tour.
+- **Vitesse** : 2,7 ms par décision en moyenne et 18 ms au pire sur un match vétéran, contre
+  moins d'une milliseconde avant ; un match d'auto-jeu dure 1,1 s au lieu de 0,5 s, donc le sweep
+  prend environ 11 minutes au lieu de 5. `reachableCells` a perdu son tri par itération pour une
+  file à seaux (sous-agent Sonnet), ce qui profite aussi au client.

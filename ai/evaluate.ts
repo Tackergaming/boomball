@@ -61,6 +61,13 @@ export interface Board {
   readonly orders: readonly AllyOrder[];
   readonly ownFurnace: Furnace;
   readonly targetFurnace: Furnace;
+  /**
+   * The keeper's resting cell (2H.9, `00` C11): its starting cell, the centre
+   * of the floor in front of its own mouth, `(7, 1)` for A and `(7, 43)` for
+   * B, read off the arena. Only a role with `rest` above zero measures its
+   * `guardFurnace` against it.
+   */
+  readonly restCell: Point;
   /** Whoever is holding the Payload right now, either team, or null if loose. */
   readonly carrier: Unit | null;
   readonly mates: readonly Unit[];
@@ -109,6 +116,7 @@ export function buildBoard(
     orders,
     ownFurnace: arena.furnaceOf(unit.team),
     targetFurnace: arena.targetFurnaceOf(unit.team),
+    restCell: arena.spec.starts[unit.team][0]!,
     carrier: carried ? (state.units.find((u) => u.id === carried) ?? null) : null,
     mates: others.filter((u) => u.team === unit.team),
     enemies: others.filter((u) => u.team !== unit.team),
@@ -149,6 +157,21 @@ export function nearness(a: Point, b: Point): number {
 
 export function furnaceNearness(from: Point, furnace: Furnace): number {
   return Math.max(0, 1 - rangeToFurnace(from, furnace) / ARENA_HEIGHT);
+}
+
+/**
+ * The keeper's reading of the same thing (2H.9, Jérôme after his engine 5
+ * game): the distance to its **resting cell**, the centre of the floor in
+ * front of its mouth, plus the distance to the nearest hatch. Measured on the
+ * hatch alone, `(9, 1)` was worth exactly as much as `(7, 1)`, both a cell
+ * from a hatch, and the keeper dug in off-centre for five rounds. The two
+ * distances are summed and read over twice the pitch so the gradient stays
+ * the one `guardFurnace` was tuned on, about two points a cell, and so that
+ * every cell on the pitch still reads above zero.
+ */
+export function restNearness(from: Point, rest: Point, furnace: Furnace): number {
+  const away = distance(from, rest) + rangeToFurnace(from, furnace);
+  return Math.max(0, 1 - away / (2 * ARENA_HEIGHT));
 }
 
 /**
@@ -498,8 +521,14 @@ function onCrackerLine(board: Board, cell: Point): boolean {
  * carrying, fetching, screening its own carrier or hunting the other side's.
  * Everything after that adds up, because guarding, chasing the Spark and
  * staying off a Cracker are all true at once.
+ *
+ * `actionLeft` says whether the unit will still have its Action when it
+ * stands there (2H.9). A cell is worth the action it unlocks only if that
+ * action can still be taken: the turn plan prices a Dash with it false, so
+ * dashing onto the Spark's cell is not worth the catch the Dash just spent.
+ * The pickup is free and the press is a stance, so those two stay.
  */
-export function positionValue(board: Board, cell: Point): number {
+export function positionValue(board: Board, cell: Point, actionLeft = true): number {
   const { state, unit, weights: w } = board;
   let value = 0;
 
@@ -509,7 +538,7 @@ export function positionValue(board: Board, cell: Point): number {
   // is the cell that makes the action legal. The Crackers are still a danger.
   if (board.hunter) {
     let hunt = w.chaseSpark * nearness(cell, state.spark);
-    if (cell.x === state.spark.x && cell.y === state.spark.y) {
+    if (actionLeft && cell.x === state.spark.x && cell.y === state.spark.y) {
       hunt += w.catchSpark * chance(statsFor(unit.role, unit.tier).agility, SPARK_CATCH_DC);
     }
     return hunt - w.avoidCrackers * crackerPressure(board, cell);
@@ -537,15 +566,15 @@ export function positionValue(board: Board, cell: Point): number {
   } else if (board.carrier && board.carrier.team === unit.team) {
     value += w.screenCarrier * nearness(cell, board.carrier);
     // The bodyguard's wall: between the threats and the carrier.
-    value += w.block * block(board, cell);
+    if (w.block > 0) value += w.block * block(board, cell);
     // Getting open: reachable, in the carrier's sight, ahead of it, and ideally
     // with a shot. See `outlet`. Without the sight and the ground gained, a
     // support player either walks to the far end and strands its carrier, or,
     // after a goal, stands on its goalkeeper's shoulder for the rest of the
     // match (A31).
-    value += w.supportAttack * outlet(board, cell);
+    if (w.supportAttack > 0) value += w.supportAttack * outlet(board, cell);
     // And unmarked: a lane nobody is standing beside. See `laneCover`.
-    value += w.cover * laneCover(board, cell);
+    if (w.cover > 0) value += w.cover * laneCover(board, cell);
     // Out of the carrier's reach altogether, every term above is zero and a
     // Striker up the pitch had nothing to come back for. See `rejoin`.
     if (passReach(unit, board.carrier) === 0) value += w.rejoin * nearness(cell, board.carrier);
@@ -558,21 +587,27 @@ export function positionValue(board: Board, cell: Point): number {
     if (distance(cell, board.carrier) === 1) value += w.pressCarrier;
     // The carrier out of reach, the Breaker swings at whoever is in reach,
     // Strikers first (`hunt`, `prey`).
-    value += w.hunt * preyAdjacency(board, cell);
+    if (w.hunt > 0) value += w.hunt * preyAdjacency(board, cell);
   }
 
   // The bodyguard's stance when the ball is not ours. See `screen`.
-  value += w.screen * screen(board, cell);
+  if (w.screen > 0) value += w.screen * screen(board, cell);
 
   // `chaseSpark` is the switch for the whole Spark hunt, and it is zero for
   // every role but the Trajector, which is handled as `hunter` at the top. A
   // Striker that finds itself in the Spark's cell still catches it, because
   // that is free; it just never walks there.
 
-  value += w.guardFurnace * furnaceNearness(cell, board.ownFurnace);
+  // Home: the mouth for a field player, the resting cell in front of it for
+  // the keeper (`rest`, 2H.9). See `restNearness`.
+  value +=
+    w.guardFurnace *
+    (w.rest > 0
+      ? restNearness(cell, board.restCell, board.ownFurnace)
+      : furnaceNearness(cell, board.ownFurnace));
 
   value -= w.avoidCrackers * crackerPressure(board, cell);
-  value += w.parryPost * parryPost(board, cell);
+  if (w.parryPost > 0) value += w.parryPost * parryPost(board, cell);
 
   // The keeper's tether (`leash`): a cell further from its own mouth than the
   // role allows is not a place it goes, whatever else is out there. Lifted

@@ -1310,3 +1310,29 @@ forme **2H.9**, à coder.
 **Ce qui attend Jérôme** : `/commit` ; puis au chat suivant le codage de 2H.9 par le fil
 principal, son feu vert de redéploiement, sa partie, et **un sweep s'il le demande**, un seul,
 contre `09` §12.
+
+### Sous-phase 2H.9, « le plan de tour, l'écart 53 bis, la case de repos du gardien », codée le 2026-10-11, porte ouverte
+
+Par le fil principal (Fable 5.1), avec deux sous-agents Sonnet nommés ci-dessous, sur des fichiers
+disjoints, à partir de `00` C11 validé par Jérôme mot pour mot. Rien n'a été rediscuté. **Pas de
+sweep**, à sa demande. Pas de commit ni de redéploiement : les deux lui appartiennent.
+
+| Quoi | État |
+|---|---|
+| Le plan de tour | Fait, fil principal. `ai/chooseAction.ts` récrit autour d'une classe `Planner` : un candidat est un plan, Dash ou non, marche vers une case d'arrivée, action depuis cette case, repli avec le mouvement restant ; la note est la valeur de l'action plus `positionValue` de la case finale moins celle du départ moins les attaques d'opportunité des trajets ; `chooseAction` renvoie la première action du meilleur plan et le plan est reconstruit après chaque action. `rankPlans` expose les plans entiers avec leur phrase, `rankActions` les replie sur leur première action, même contrat qu'avant pour `session.ts`, `selfPlay.ts`, le playthrough et `live-match.ts`. Le détail, poids par poids, est le paragraphe « comment le plan de tour est codé » en `00` C11 |
+| Ce qu'une case débloque | Fait, fil principal. `actionOptionsAt(arena, state, unit, cell)` dans `engine/legalActions.ts`, la moitié positionnelle de `legalActions` sortie en fonction et rappelée par lui pour la case réelle : l'IA demande au moteur ce qu'elle pourrait faire depuis une case avant d'y marcher, sans copie des règles d'adjacence, de portée et de ligne de vue. Sortie de `legalActions` inchangée |
+| Le Dash | Fait, fil principal. Un plan « dash, puis marche de 16 cases », noté sur la case d'arrivée avec l'Action dépensée (`positionValue(board, cell, false)`, qui ne compte pas la prise du Spark pour le chasseur), à valeur faciale contre les plans qui dépensent l'Action ; un Dash qui n'achète rien n'est pas joué, le plan le plus court gagne à égalité. Interdit devant une cible à portée, sauf la presse (plancher `pressCarrier`) et le mur (plancher `block`) quand la marche simple n'y arrive pas. `w.dash` n'est plus lu |
+| Jamais l'Action en poche | Mesuré sur trois matchs d'auto-jeu (vétéran graine 11, rookie et star graine 3) : 5, 0 et 2 tours sur 132 à 135 finis sans Action, contre 32 sur 136 dans la partie de Jérôme, avec 32 à 40 Dash et 2 à 4 Dodge par match |
+| Écart 53 bis | Fait, fil principal, `applyPass` dans `reduce.ts` : la zone de l'équipe du lanceur passe à `null` quand le lanceur est le Bulwark, avant le test d'interception. 4 tests dans `engine/box.test.ts`, **sous-agent Sonnet effort moyen** : attrapée, ratée, interceptée, et la passe d'un joueur de champ qui ne lève rien |
+| La case de repos du gardien | Fait, fil principal. `restNearness` dans `evaluate.ts` : distance à `arena.spec.starts[team][0]` plus distance à la bouche, sur deux fois la longueur du terrain ; `Board.restCell` ; poids `rest` dans les quatre fiches, 1 pour le Bulwark. Plus de pénalité de pas sur un Bulwark planté au début de sa décision : « rentrer puis se planter » est le plan `[move, brace]`, et un Bulwark déjà planté qui bougerait rend `brace` |
+| `reachableCells` | **Sous-agent Sonnet effort moyen** : paramètre `from` optionnel, le départ hypothétique du repli, et une file à seaux à la place du tri de la frontière à chaque pas, mêmes coûts, 3 tests dans `movement.test.ts` |
+| Tests | `ai/ai.test.ts` gagne un bloc « the turn plan, 2H.9 », 6 tests : le gardien en (9,1) rentre en (7,1) puis se plante sans Dash, le Striker à douze cases d'un ballon perdu Dash plutôt que de garder l'Action, pas de Dash vers nulle part, marcher puis frapper, frapper puis marcher avec le repli dans le plan, le plan reconstruit après chaque pas. **Deux scènes de C10 ont changé de mécanique sans changer de sens** : « carries towards the Furnace rather than shooting from nowhere » et « the Trajector drops everything for the Spark » attendaient une marche en première action et reçoivent un Dash, parce que rien n'utilisait l'Action ; elles affirment désormais le résultat du tour |
+| Vérification | `npm test` **475 sur 22 fichiers** contre 462, `npm run typecheck` vert (racine, scripts, e2e), client typecheck et build verts. **Le test des cinquante millisecondes passe** ; sonde jetée après lecture : 2,7 ms par décision en moyenne, 17,9 ms au pire (un Breaker au round 5), contre moins d'une milliseconde avant ; un match d'auto-jeu dure 1,1 s au lieu de 0,5 s, donc un sweep prendra environ 11 minutes au lieu de 5. Suite complète en 53 s contre 37 |
+| Harnais | `ENGINE_VERSION` 5 dans le dépôt comme en ligne, rien à épingler. Smoke vert en 31 s, playthrough vert en 54 s, 19 requêtes humaines, 0 refusée, gagné 40 à 20 par le compte e2e : **le siège humain du playthrough est piloté par le nouveau planificateur depuis Node contre les fonctions en ligne**, et la capture du round 10 montre « Giff dashes » avec 80 pieds à marcher, le Dash joué en premier puis la marche. La maison des captures est encore l'IA v14 en ligne |
+
+**Ce que ça change à l'écran** : rien. Aucun composant du client n'est touché.
+
+**Ce qui attend Jérôme** : `/commit` ; son feu vert pour redéployer `resolve-action` et
+`create-match` (règle d'IA seule, `ENGINE_VERSION` reste 5, aucune migration, les matchs ouverts
+continuent) ; sa partie sur le moteur 5 avec le plan de tour, et son verdict sur ce que chaque rôle
+cherche ; **un sweep s'il le demande**, un seul, contre `09` §12, en comptant onze minutes.

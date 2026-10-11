@@ -11,7 +11,7 @@ import { battedCrackerRun } from '../engine/rules/ordnance.js';
 import { rangeToFurnace } from '../engine/rules/payload.js';
 import { createMatch } from '../engine/setup.js';
 import type { MatchState, Unit, UnitId } from '../engine/types.js';
-import { chooseAction, rankActions } from './chooseAction.js';
+import { chooseAction, rankActions, rankPlans } from './chooseAction.js';
 import { hasLineOfSight } from '../engine/rules/sight.js';
 import {
   BLIND_DISCOUNT,
@@ -197,14 +197,14 @@ describe('the priority tables', () => {
 
   it('carries towards the Furnace it attacks rather than shooting from nowhere', () => {
     const state = carrying(put(board(), OPENER, { x: 7, y: 22 }), OPENER);
-    const chosen = chooseAction(arena, state, OPENER);
 
-    expect(chosen.kind).toBe('move');
-    if (chosen.kind !== 'move') throw new Error('unreachable');
-
-    const landing = chosen.path[chosen.path.length - 1]!;
+    // No shot from the halfway line and nobody to throw to, so the Action is
+    // not left in the pocket (2H.9): it dashes, and the ball goes up the pitch.
+    expect(chooseAction(arena, state, OPENER).kind).toBe('dash');
+    const after = playTurnOf(state, OPENER);
     const furnace = arena.targetFurnaceOf('A').cells[0]!;
-    expect(distance(landing, furnace)).toBeLessThan(distance({ x: 7, y: 22 }, furnace));
+    expect(after.payload.carriedBy).toBe(OPENER);
+    expect(distance(unit(after, OPENER), furnace)).toBeLessThan(distance({ x: 7, y: 22 }, furnace));
   });
 
   it('picks a loose Payload up off the cell it is standing on', () => {
@@ -775,10 +775,11 @@ describe("Jérôme's second pass on the roles, 2H.8", () => {
     expect(legalActions(arena, staged)!.shove).toHaveLength(1);
     expect(ranked.some((c) => c.action.kind === 'shove' || c.action.kind === 'attack')).toBe(false);
 
-    const first = ranked[0]!.action;
-    const to = endOf(first);
-    expect(to).not.toBeNull();
-    expect(distance(to!, spark)).toBeLessThan(distance({ x: 7, y: 20 }, spark));
+    // Nothing to spend the Action on, so it dashes (2H.9) and takes the
+    // swing on the way out: the turn ends nearer the Spark than it began.
+    expect(['dash', 'move']).toContain(ranked[0]!.action.kind);
+    const after = playTurnOf(staged, trajector);
+    expect(distance(unit(after, trajector), spark)).toBeLessThan(distance({ x: 7, y: 20 }, spark));
   });
 
   it('a Striker in defence dashes to finish on the carrier when a plain move falls short', () => {
@@ -986,6 +987,121 @@ describe('after a goal is scored', () => {
     const started = Date.now();
     for (let i = 0; i < 20; i++) chooseAction(arena, state, 'A-striker-2');
     expect((Date.now() - started) / 20).toBeLessThan(50);
+  });
+});
+
+// -- The turn plan, 2H.9 -------------------------------------------------------
+
+/**
+ * Jérôme's third pass (`00` C11, 2026-10-11, after his engine 5 game): the AI
+ * scores whole turns. Thirty-two turns in a hundred and thirty-six had ended
+ * with the Action in the pocket, and his keeper had dug in two cells off its
+ * centre for five rounds. One test per sentence of C11.
+ */
+describe('the turn plan, 2H.9', () => {
+  const keeper = 'A-bulwark-1';
+
+  function onClock(state: MatchState, id: UnitId): MatchState {
+    const at = state.turnOrder.findIndex((s) => s.actor.kind === 'unit' && s.actor.unitId === id);
+    return giveTurnTo({ ...state, turnIndex: at }, id);
+  }
+
+  it('the keeper off its centre walks home first, then digs in, and never dashes for it', () => {
+    // (9, 1) is a cell from a hatch exactly as (7, 1) is: measured on the
+    // hatch alone they were worth the same, and the keeper dug in where it
+    // stood. The resting cell is its starting cell, read off the arena.
+    const home = arena.spec.starts.A[0]!;
+    expect(home).toEqual({ x: 7, y: 1 });
+    const state = onClock(put(board(), keeper, { x: 9, y: 1 }), keeper);
+
+    const best = rankPlans(arena, state, keeper)[0]!;
+    expect(best.why).toBe('walk to (7, 1), then dig in');
+    expect(best.steps.map((s) => s.kind)).toEqual(['move', 'brace']);
+
+    const events = playOutTurn(state, keeper);
+    expect(events.some((e) => e.kind === 'dashed')).toBe(false);
+    expect(events.some((e) => e.kind === 'braced')).toBe(true);
+    const after = playTurnOf(state, keeper);
+    expect(unit(after, keeper)).toMatchObject({ ...home, braced: true });
+  });
+
+  it('never leaves the Action in the pocket: with nothing to do, it dashes for the ground a Dash buys', () => {
+    // Corvo, round 2: eight cells walked and the Action unused. A loose ball
+    // twelve cells away is out of a plain move and within a Dash.
+    const striker = OPENER;
+    const ball = { x: 7, y: 22 };
+    const state: MatchState = {
+      ...put(board(), striker, { x: 7, y: 10 }),
+      payload: { carriedBy: null, ...ball },
+      lastCarrierTeam: 'B',
+    };
+    expect([...legalActions(arena, state)!.destinations.values()].some((r) => distance(r.cell, ball) === 0)).toBe(false);
+
+    const best = rankPlans(arena, state, striker)[0]!;
+    expect(best.steps[0]).toEqual({ kind: 'dash' });
+    const events = playOutTurn(state, striker);
+    expect(events.some((e) => e.kind === 'dashed')).toBe(true);
+    expect(events.some((e) => e.kind === 'payloadGrabbed')).toBe(true);
+  });
+
+  it('the Dash is worth the ground it buys: already where it wants to be, it does not dash to nowhere', () => {
+    // A braced keeper at home has nothing to gain anywhere on the pitch.
+    const state = onClock(put(board(), keeper, { x: 7, y: 1 }, { braced: true }), keeper);
+    expect(rankPlans(arena, state, keeper).some((p) => p.steps[0]?.kind === 'dash')).toBe(false);
+    expect(chooseAction(arena, state, keeper)).toEqual({ kind: 'endTurn' });
+  });
+
+  it('walks up and swings in the one turn: the swing is read from the cell it walks to', () => {
+    const breaker = 'A-breaker-5';
+    let staged = put(board(), breaker, { x: 7, y: 20 });
+    staged = put(staged, 'B-striker-3', { x: 7, y: 24 });
+    staged = { ...staged, payload: { carriedBy: null, x: 0, y: 44 }, lastCarrierTeam: 'B' };
+    staged = giveTurnTo(staged, breaker);
+    expect(legalActions(arena, staged)!.attack).toHaveLength(0);
+
+    const best = rankPlans(arena, staged, breaker)[0]!;
+    expect(best.steps.map((s) => s.kind).slice(0, 2)).toEqual(['move', 'attack']);
+    expect(best.why).toMatch(/^walk to \(\d+, \d+\), then swing at /);
+    const events = playOutTurn(staged, breaker);
+    expect(events.some((e) => e.kind === 'attacked' && e.targetId === 'B-striker-3')).toBe(true);
+  });
+
+  it('swings first and walks after when the target is already in reach, and the fall-back is part of the plan', () => {
+    // An opponent on the Breaker, and its own carrier seven cells behind with
+    // that same opponent as the nearest threat: swing, then go and be the wall.
+    const breaker = 'A-breaker-5';
+    let staged = put(board(), breaker, { x: 7, y: 20 });
+    staged = put(staged, 'B-striker-3', { x: 7, y: 21 });
+    staged = carrying(put(staged, 'A-striker-2', { x: 7, y: 12 }), 'A-striker-2');
+    staged = giveTurnTo(staged, breaker);
+
+    const best = rankPlans(arena, staged, breaker)[0]!;
+    expect(best.steps.map((s) => s.kind)).toEqual(['attack', 'move']);
+    expect(best.why).toMatch(/^swing at .*, then walk to \(\d+, \d+\)$/);
+
+    const events = playOutTurn(staged, breaker);
+    const kinds = events.map((e) => e.kind);
+    expect(kinds.indexOf('attacked')).toBeGreaterThanOrEqual(0);
+    expect(kinds.indexOf('moved')).toBeGreaterThan(kinds.indexOf('attacked'));
+    const after = playTurnOf(staged, breaker);
+    expect(distance(unit(after, breaker), { x: 7, y: 12 })).toBeLessThanOrEqual(2);
+  });
+
+  it('rebuilds the plan after every step: the first action sent is the first step of the best plan', () => {
+    const striker = OPENER;
+    const carrier = { x: 7, y: 20 };
+    let staged = put(board(), striker, { x: 7, y: 14 });
+    staged = carrying(put(staged, 'B-striker-2', carrier), 'B-striker-2');
+    staged = giveTurnTo(staged, striker);
+
+    const plan = rankPlans(arena, staged, striker)[0]!;
+    expect(plan.steps.map((s) => s.kind)).toEqual(['move', 'shove']);
+    expect(chooseAction(arena, staged, striker)).toEqual(plan.steps[0]);
+
+    // Once beside the carrier, the plan built afresh starts with the shove.
+    const walked = reduce(arena, staged, { unitId: striker, action: plan.steps[0]! });
+    if (!walked.ok) throw new Error(walked.reason);
+    expect(chooseAction(arena, walked.state, striker)).toEqual({ kind: 'shove', targetId: 'B-striker-2' });
   });
 });
 

@@ -902,6 +902,15 @@ function applyPass(ctx: TurnCtx, targetId: UnitId): ReduceResult {
   const thrower: Unit = { ...unit, holdingPayload: false };
   let next: MatchState = { ...replaceUnit(state, thrower), turn: { ...turn, actionUsed: true } };
 
+  // Écart 53 bis (2H.9, Jérôme's retour 3 on the engine 5 game): the box in
+  // front of this keeper's own mouth opens the instant its throw leaves its
+  // hands, caught, dropped or stolen, whatever the round. The box only ever
+  // existed to protect the relaunch. A keeper that does not throw leaves it
+  // to lapse on its own (écart 53); a field player's throw opens nothing.
+  if (unit.role === 'bulwark' && next.penaltyBox[unit.team] !== null) {
+    next = { ...next, penaltyBox: { ...next.penaltyBox, [unit.team]: null } };
+  }
+
   // The ball is in the air before anyone catches it, so the lane is contested
   // first. A stolen pass never reaches its team-mate and is never rolled for.
   const stolen = resolveInterception(ctx, next, unit, lineTo(unit, mate));
