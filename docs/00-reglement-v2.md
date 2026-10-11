@@ -612,3 +612,53 @@ receveur** est `relaunchCandidates` dans `chooseAction.ts` : pour un porteur don
 positif et sans passe légale, chaque case atteignable d'où un coéquipier est à portée et en vue
 vaut `relaunch`, moins un demi-point par case de distance à sa bouche et la pénalité d'attaque
 d'opportunité de la route, hors de la laisse ; une fois sur place, la passe suit.
+
+## C11. Décisions du 2026-10-11 après la partie à la porte de 2H.8, **sous-phase 2H.9, pas encore dans le code**
+
+> Écrites par le fil principal (Fable 5.1) sur les cinq retours de Jérôme après sa partie sur le
+> moteur 5 (star, 40 à 20), lus contre les événements du match en base, puis deux questions
+> fermées. Un seul écart de règle, 53 bis ; le reste est l'IA. **Aucune forme d'état ni
+> d'événement ne change : `ENGINE_VERSION` reste 5**, les matchs ouverts jouent la règle au tour
+> suivant, les fonctions sont à redéployer.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 53 bis | La surface de réparation reste fermée le round du but et tout le round suivant (écart 53) | **Elle se lève à l'instant où la passe du gardien quitte ses mains**, attrapée, ratée ou interceptée, quel que soit le round. Exception à la durée de l'écart 53. Un gardien qui ne lance pas laisse la zone courir jusqu'à son terme normal | Jérôme, retour 3 : la zone n'a de sens que pour protéger la relance | **À faire en 2H.9**, fil principal, dans `applyPass` de `reduce.ts` |
+| 48, confirmé | Interception par tout adversaire sur une case du vol ou à une case d'une case du vol, à partir de la deuxième | **Inchangé.** Jérôme a vu au round 4 une interception par un Trajector qui n'était pas sur la trajectoire : il était à une case de celle-ci, la règle est appliquée | Jérôme, le 2026-10-11, question fermée : « on garde » | Rien à faire |
+
+**Ce que les événements de la partie ont montré**, pour mémoire : 32 tours sur 136 finis avec
+l'Action inutilisée (14 Breakers, 13 Strikers, 5 Trajectors), dont Corvo au round 2 ; le Bulwark
+allié resté planté en (9,0) puis (9,1) des rounds 6 à 10 au lieu de (7,1), but encaissé au round 6
+avec lui hors de sa case.
+
+**L'IA, troisième passe : le plan de tour.** Décidé par Jérôme sur la recommandation du fil
+principal (« ok pour ta recommandation pour l'instant »).
+
+- **Le moteur de décision change, pas les tableaux.** L'IA notait une action à la fois et
+  recommençait jusqu'à finir le tour, ce qui la rendait aveugle à toute séquence : le Dash noté sur
+  le mouvement restant valait zéro après la marche, « rentrer puis se planter » n'existait pas,
+  « marcher puis frapper » ne se comparait jamais à « frapper puis marcher ». **Elle note désormais
+  des plans de tour complets** : Dash ou non, case d'arrivée, action depuis cette case, repli
+  éventuel avec le mouvement restant ; le plateau à la fin de chaque plan est noté par les mêmes
+  poids de rôle, et le meilleur plan est joué action par action, le plan étant recalculé après
+  chaque action pour tenir compte des dés. Les quatre fiches de `ai/roles/` restent les données
+  que Jérôme dicte ; `positionValue` reste la note d'une case.
+- **Le Dash vaut le terrain qu'il achète** : la différence entre le meilleur plan avec 16 cases et
+  le meilleur plan avec 8, jamais le mouvement restant. Il reste interdit quand une frappe, une
+  bousculade ou un Cracker est à portée (C10), hors les cas de presse et de mur.
+- **Jamais l'Action en poche** : quand aucun plan n'utilise l'Action, **le plan de repli est le
+  Dash**, pas Dodge, même si les cases de plus rapportent peu. Jérôme, question fermée du
+  2026-10-11 : « je préfère un dash qu'un dodge ». Dodge reste le dernier recours de C10, abîmé de
+  moitié et rien à faire.
+- **Le gardien a une case de repos : sa case de départ**, le centre devant sa bouche, `(7, 1)`
+  pour A et `(7, 43)` pour B. `guardFurnace` mesure désormais la distance à cette case, plus la
+  distance à la case de bouche la plus proche, qui mettait `(9, 1)` à égalité avec `(7, 1)`. **Il
+  rentre d'abord, il se plante ensuite** : « rentrer puis se planter » est un plan ; un Bulwark
+  planté ne paie plus rien pour bouger, c'est le plan de tour qui arbitre.
+- Le reste de C10 tient : relance immédiate et sans receveur, presser coûte que coûte, le Breaker
+  garde du corps et chasseur, le Trajector chasseur de Spark, le Striker du coup d'envoi.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`. L'IA change dans
+`ai/chooseAction.ts` en profondeur, `ai/evaluate.ts` pour la case de repos, les quatre fiches pour
+le Dash de repli ; **un seul sweep à la fin, si Jérôme le demande**, contre `09` §12, et la vitesse
+d'une décision est à mesurer, le test de cinquante millisecondes de `ai.test.ts` faisant foi.

@@ -1295,7 +1295,18 @@ mais les deux fonctions portent l'IA et sont **à redéployer sur le feu vert de
 **Redéployée le 2026-10-11 sur le feu vert de Jérôme** : `resolve-action` v14 et `create-match`
 v12, moteur 5 inchangé.
 
-**Ce qui attend Jérôme** : `/commit` ;
-sa partie sur le moteur 5, avec en retours numérotés ce que chaque rôle cherche, la zone violette
-après un but, la relance du gardien, le Trajector qui laisse le ballon du coup d'envoi ; puis **un
-sweep s'il le demande**, un seul, contre `09` §12.
+**La partie de Jérôme, le 2026-10-11**, star, 40 à 20 : cinq retours en chat, lus par le fil
+principal contre les événements du match en base (table `match_events`, état de coup d'envoi dans
+`matches.kickoff`). Corvo, son Trajector, a marché 8 cases au round 2 sans rien d'autre, et 32
+tours sur 136 ont fini avec l'Action inutilisée : le Dash était noté sur le mouvement restant,
+zéro après la marche, défaut du moteur de décision à une action. L'interception du round 4 était
+l'écart 48 appliqué, à une case de la trajectoire, confirmé par lui. Son Bulwark est resté planté
+en (9,0) puis (9,1) des rounds 6 à 10, but encaissé au round 6 : la distance à la bouche la plus
+proche mettait (9,1) à égalité avec (7,1), et un Bulwark planté payait tout pas. Il a demandé
+comment l'IA décide et ce que font les jeux de ce type ; réponse en chat, recommandation acceptée :
+**noter des plans de tour et non des actions**. Tout est écrit en **`00` C11, validé par lui**, et
+forme **2H.9**, à coder.
+
+**Ce qui attend Jérôme** : `/commit` ; puis au chat suivant le codage de 2H.9 par le fil
+principal, son feu vert de redéploiement, sa partie, et **un sweep s'il le demande**, un seul,
+contre `09` §12.
