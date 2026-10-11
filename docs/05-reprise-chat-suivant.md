@@ -8,7 +8,7 @@
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
 c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.10
-est la dernière sous-phase codée, PAS ENCORE COMMITÉE NI EN LIGNE, §9 la parallélisation.
+est la dernière sous-phase codée et en ligne, §9 la parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 56, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 les décisions de 2H.10 : les écarts 55 et 56, les concepts dictés par
@@ -22,27 +22,22 @@ l'entrée 2H.10. 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il
 de 2H.8, 2H.9 ni 2H.10. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te
 surprend.
 
-Où on en est : 2H.10 est CODÉE le 2026-10-11, dans la copie de travail, ni commitée ni en ligne.
-503 tests verts sur 22 fichiers, typecheck racine, scripts, e2e et client verts, build du client
-vert, smoke et playthrough verts contre les fonctions en ligne du moteur 5 avec ENGINE_VERSION
-épinglée à 5 le temps du run et remise à 6. ENGINE_VERSION vaut 6 dans le dépôt (écart 56, la
-case de début de tour dans l'état du tour) et 5 en ligne : resolve-action v15 et create-match
-v13 portent encore le plan de tour de 2H.9 et l'IA de la troisième passe. L'analyse de ma partie
-précédente est dans boomball/docs/matches/2026-10-11-0291a651/analyse-2H10.md, par un agent Opus
-5.5 effort high, relue par le fil principal ; match.md à côté est la partie tour par tour.
+Où on en est : 2H.10 est CODÉE, COMMITÉE (0dfbaad) et EN LIGNE depuis le 2026-10-11. 503 tests
+verts sur 22 fichiers, typecheck racine, scripts, e2e et client verts, build du client vert,
+smoke et playthrough verts sans épingle sur les fonctions redéployées. ENGINE_VERSION vaut 6 dans
+le dépôt comme en ligne (écart 56, la case de début de tour) : resolve-action v16 et create-match
+v14 portent la quatrième passe de l'IA et l'écart 55. L'analyse de ma partie précédente est dans
+boomball/docs/matches/2026-10-11-0291a651/analyse-2H10.md, par un agent Opus 5.5 effort high,
+relue par le fil principal ; match.md à côté est la partie tour par tour.
 
 LA TÂCHE, dans cet ordre.
 
-1. Je tape /commit (le commit est à moi), puis je donne mon feu vert pour redéployer
-   resolve-action et create-match : depuis boomball/ en bash, set -a && . ../.env && set +a puis
-   npm run deploy:function -- resolve-action create-match. Le moteur 6 en ligne archive les matchs
-   ouverts du moteur 5, le mien et celui du compte e2e. Puis npm run e2e et npm run
-   e2e:playthrough SANS épingler, lecture des captures, et le journal 07 §10 complété d'une ligne
-   « mise en ligne ».
-2. Je joue ma partie sur le moteur 6. Tu la consignes avec scripts/dump-match.ts (--list puis
+1. Je joue ma partie sur le moteur 6. Tu la consignes avec scripts/dump-match.ts (--list puis
    --match <id>) dans docs/matches/, et tu vérifies zéro écart d'événement et zéro décision d'IA
    qui diffère du dépôt : si une IA diffère, c'est que le dépôt et les fonctions ne jouent pas la
    même IA, et ça se règle avant toute lecture.
+2. Si je le demande, l'analyse de cette partie par un agent Opus 5.5 effort high, relue par toi,
+   présentée en clair par rôle et par priorité, round par round, leçons, ajustements.
 3. Mes retours en chat, reformulés rôle par rôle, triés par priorité, corrigés point par point,
    puis écrits dans 00 en C13 AVANT la première ligne de code, puis le code. Un sweep seulement
    si je le demande, un seul, contre 09 §12, en comptant onze minutes.
@@ -88,10 +83,10 @@ Ce qu'il faut savoir tout de suite.
 
 6. Toute migration passe par moi via /supabase-migrate, tout redéploiement par mon feu vert
    explicite. Chaque match porte engine_version ; une fonction qui lit une autre version refuse
-   en 409, le client archive. Tant que les fonctions en ligne sont au moteur 5 et le dépôt au 6,
-   le harnais e2e ne trouve rien à jouer : épingler ENGINE_VERSION à 5 dans engine/constants.ts le
-   temps du run et la remettre à 6 avant de commiter. Après le redéploiement du moteur 6, plus
-   d'épingle.
+   en 409, le client archive. Si le dépôt porte une ENGINE_VERSION que les fonctions en ligne
+   n'ont pas, épingler la constante à la version en ligne dans engine/constants.ts le temps d'un
+   run e2e et la remettre avant de commiter. Redéploiement : depuis boomball/ en bash, set -a &&
+   . ../.env && set +a puis npm run deploy:function -- resolve-action create-match.
 
 7. Le harnais d'écran : npm run e2e en 25 à 55 s, npm run e2e:playthrough en 15 à 70 s, le
    crochet window.__boomball. Le siège humain du playthrough est piloté par chooseAction du dépôt

@@ -1396,7 +1396,15 @@ allonge adverse et cette route pour tout déplacement, la version 6), puis écri
 **Ce que ça change à l'écran** : rien. Aucun composant du client n'est touché ; la route proposée au
 clic reste la ligne droite de 2H.8, la route sûre est celle de l'IA.
 
-**Ce qui attend Jérôme** : `/commit` ; son feu vert pour redéployer `resolve-action` et
-`create-match` (moteur 6, les matchs ouverts du moteur 5 seront archivés par le client) ; sa partie
-sur le moteur 6, consignée par `dump-match.ts` ; **un sweep quand il le demandera**, contre `09`
-§12, en comptant onze minutes.
+**La mise en ligne, le 2026-10-11 dans le même chat**, par le fil principal (Fable 5.1), après le
+commit `0dfbaad` (`/commit`) et son feu vert :
+
+| Quoi | État |
+|---|---|
+| Redéploiement | `resolve-action` v16 et `create-match` v14, **moteur 6 en ligne**, aucune migration. Les matchs du moteur 5 sont archivés par le client |
+| Harnais sur le moteur 6, sans épingle | Smoke vert en 31 s, playthrough vert en 55 s, 19 requêtes humaines, 0 refusée, un match entier jusqu'au sifflet, gagné 40 à 20 sur le Spark par le compte e2e en onze rounds |
+| Ce que les captures montrent | **L'écart 55 à l'écran** : l'échelle lit Dolm Cannonade, Thessa Rivet, Tullin Ironmaw puis Giff, l'humain quatrième de son équipe, après les deux Strikers IA ; au coup d'envoi c'est Thessa Rivet, un Striker IA, qui prend le ballon et le passe ; au round 8 la maison joue la quatrième passe (marche, batte, recul, marche dans le fil) |
+
+**Ce qui attend Jérôme** : sa partie sur le moteur 6, consignée par `dump-match.ts` ; ses retours
+en C13 avant le code ; **un sweep quand il le demandera**, contre `09` §12, en comptant onze
+minutes.
