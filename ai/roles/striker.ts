@@ -2,9 +2,14 @@
  * The Striker scores.
  *
  * It wants the ball, it wants to be near the Furnace it attacks, and it takes
- * the shot. It hits people only when they are between it and the goal, and it
- * is the role most willing to pay an opportunity attack to get where it is
- * going, because a goal is worth ten and a d8 is not.
+ * the shot. It hits people only when they are between it and the goal. Since
+ * 2H.10 (Jérôme, 2026-10-11) it carries the ball without losing it: it ends
+ * its turn where the fewest opponents can come and shove it
+ * (`carrierSafety`), holds a clean shot for next turn rather than throw at
+ * disadvantage, presses the other side's carrier only by a route that crosses
+ * nobody's reach (`pressDash`), never shoves a bystander (`shoveBystander`),
+ * and stays off its team-mates (`spread`), taking a place beside its own
+ * carrier only when its relay does not suffer for it (`block`).
  */
 
 import type { RoleWeights } from './weights.js';
@@ -28,7 +33,9 @@ export const STRIKER: RoleWeights = {
   screenCarrier: 14,
   supportAttack: 45,
   cover: 20,
-  block: 0,
+  block: 15,
+  spread: 10,
+  carrierSafety: 60,
   wantsEscort: 1,
   guardStrike: 0,
   parryPost: 0,
@@ -49,9 +56,14 @@ export const STRIKER: RoleWeights = {
   hunt: 0,
   relaunch: 0,
 
-  avoidOpportunity: 4,
+  // 2H.10, Jérôme's fourth pass.
+  pressDash: 1,
+  shoveBystander: 0,
+  receiver: 1,
+  chainException: 0,
+
+  avoidOpportunity: 40,
   avoidCrackers: 10,
   dodgeWhenHurt: 6,
-  dash: 8,
   disengage: 16,
 };

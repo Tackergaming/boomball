@@ -7,6 +7,7 @@
  */
 
 import type { TeamId } from './arena.js';
+import type { Point } from './geometry.js';
 import type { Role, Tier } from './stats.js';
 
 export type { TeamId };
@@ -148,6 +149,13 @@ export interface TurnSlot {
  */
 export interface TurnState {
   readonly unitId: UnitId;
+  /**
+   * The cell the unit stood on when the turn opened (écart 56, 2H.10). No
+   * rule of play reads it: the AI prices a throw on the ground gained since
+   * the turn began, whatever step it is on, and the match dump says where a
+   * turn started. Engine version 6.
+   */
+  readonly startedAt: Point;
   readonly movementFeetRemaining: number;
   readonly actionUsed: boolean;
   readonly objectInteractionUsed: boolean;

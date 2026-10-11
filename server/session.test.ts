@@ -155,17 +155,19 @@ describe('who may move what', () => {
     const { session } = open(SOLO);
     const mine = session.state.turn!.unitId;
 
-    // Nobody is holding the Payload at kick-off, so this is refused by `reduce`
-    // and not by anything this layer re-decided.
+    // The Spark is not on the field at kick-off, so this is refused by `reduce`
+    // and not by anything this layer re-decided. (Until écart 55 the test shot
+    // with no ball in hand; since the human plays last in its role, an AI
+    // Striker may well have handed it the kick-off ball by now.)
     const result = submitAction(
       arena,
       session,
-      { humanId: 'jerome', unitId: mine, action: { kind: 'shoot' } },
+      { humanId: 'jerome', unitId: mine, action: { kind: 'catchSpark' } },
       T0,
     );
 
     expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toMatch(/not holding the Payload/);
+    expect(result.ok === false && result.reason).toMatch(/the Spark is not on the field/);
   });
 });
 

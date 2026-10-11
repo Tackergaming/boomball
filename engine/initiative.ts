@@ -15,8 +15,10 @@
  * built; a ball that changes hands mid-round does not move it.
  *
  * **Within a team** the roles go Trajector, Strikers, Breakers, Bulwark. A
- * human plays first in its role; two or three humans of the same role are
- * ordered once, at kick-off, by a d20 rerolled until it separates them. The AI
+ * human plays **last** in its role since écart 55 (2H.10, 2026-10-11; it
+ * played first under écart 51), so it sees what its AI team-mates of the same
+ * role do before it moves; two or three humans of the same role are ordered
+ * once, at kick-off, by a d20 rerolled until it separates them. The AI
  * units of a role are ordered **by the situation at the top of the round**, a
  * rule Jérôme accepted in those words: attacking, the carrier first if it is
  * one of them, then from the rearmost to the most advanced, so the ball can
@@ -157,7 +159,11 @@ function teamSlots(arena: Arena, state: MatchState, team: TeamId): Omit<TurnSlot
       .sort((a, b) => (b.initiative ?? 0) - (a.initiative ?? 0) || a.id.localeCompare(b.id));
     const ai = orderBySituation(arena, state, team, ofRole.filter((u) => !isHuman(u)));
 
-    for (const unit of [...humans, ...ai]) {
+    // Écart 55 (2H.10, Jérôme after his engine 5 game): a human plays **last**
+    // in its role, after every AI of that role on its side, so that it reads
+    // what its team-mates of the same role have done before it moves. Two or
+    // three humans of the same role keep their kick-off d20 between them.
+    for (const unit of [...ai, ...humans]) {
       out.push({ actor: { kind: 'unit', unitId: unit.id }, blockId: null, team });
     }
   }

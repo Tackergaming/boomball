@@ -16,6 +16,8 @@
 import type { Arena, Furnace } from '../engine/arena.js';
 import {
   ARENA_HEIGHT,
+  ARENA_WIDTH,
+  MOVE_SPEED_FEET,
   PAYLOAD_RANGE_CELLS,
   SPARK_CATCH_DC,
 } from '../engine/constants.js';
@@ -28,8 +30,9 @@ import {
   throwRangeOver,
   visibleRangeToFurnace,
 } from '../engine/rules/payload.js';
-import { hasPlayedThisRound } from '../engine/initiative.js';
-import { crackerRun } from '../engine/rules/ordnance.js';
+import { hasPlayedThisRound, sideOrder } from '../engine/initiative.js';
+import { key, reachableCells } from '../engine/rules/movement.js';
+import { crackerRun, sparkRun } from '../engine/rules/ordnance.js';
 import { passInterceptors } from '../engine/rules/reactions.js';
 import { hasLineOfSight } from '../engine/rules/sight.js';
 import { statsFor } from '../engine/stats.js';
@@ -89,6 +92,56 @@ export interface Board {
    * attack if it starts its turn in a melee.
    */
   readonly hunter: boolean;
+  /**
+   * Where the Spark will land at the top of the next round (2H.10): its drift
+   * is six cells on a known heading, bounces included, and rolls no die, so
+   * the hunter aims at the cell it is going to, not the cell it is leaving.
+   * Null when the Spark is not on the field.
+   */
+  readonly sparkNext: Point | null;
+  /**
+   * The threats to this unit as a carrier (2H.10, `carrierSafety`): every
+   * opponent who plays again before this unit's next turn, with the cells it
+   * can finish a plain move on and its odds of shoving the ball loose. Empty
+   * when this unit does not carry or its role reads no safety.
+   */
+  readonly threats: readonly CarrierThreat[];
+  /**
+   * Whether this unit can finish a plain move beside the other side's
+   * carrier this turn. The Breaker only hunts a Striker when it cannot
+   * (C10 Breaker 3 before 4, re-read in 2H.10).
+   */
+  readonly carrierReachable: boolean;
+  /**
+   * Whether our own carrier could still throw to this unit this round once it
+   * has moved (2H.10): yes when the carrier has already played, since the next
+   * throw is next round's anyway and everybody is fresh; yes when the carrier
+   * will be the last link; yes for a Striker ahead of a Breaker carrier (the
+   * Breaker's exception). Otherwise this unit will have played when the
+   * carrier's turn comes and the chain forbids the throw, so an outlet is
+   * worth a fraction: the Striker that ran twenty-two hit points into a cell
+   * nobody could serve was the lesson.
+   */
+  readonly carrierCanServe: boolean;
+  /**
+   * Where our own carrier will be when it matters for a place beside it: its
+   * cell alone once it has played this round, or, while it has not, its cell
+   * and every cell of the straight way from there to eight cells towards the
+   * mouth it attacks (2H.10: "le mur se pose là où sera le porteur, sur sa
+   * route vers la bouche"). Empty without an own carrier to stand by.
+   */
+  readonly wardLine: readonly Point[];
+  /** Whether an opponent can reach our own carrier at all this round or next, a Dash away. */
+  readonly wardThreatened: boolean;
+}
+
+/** One opponent that could come and shove this carrier before it plays again. */
+export interface CarrierThreat {
+  readonly unit: Unit;
+  /** Its odds of winning the shove contest against this carrier. */
+  readonly odds: number;
+  /** The cells it can end a plain move on, plus the one it stands on. */
+  readonly reach: ReadonlySet<string>;
 }
 
 export function buildBoard(
@@ -107,6 +160,62 @@ export function buildBoard(
     .filter((c) => c.state === 'live')
     .map((c) => crackerRun(arena, without, c).path);
 
+  const carrier = carried ? (state.units.find((u) => u.id === carried) ?? null) : null;
+  const mates = others.filter((u) => u.team === unit.team);
+  const enemies = others.filter((u) => u.team !== unit.team);
+  const targetFurnace = arena.targetFurnaceOf(unit.team);
+
+  const sparkNext =
+    sparkIsLive(state.spark) && state.spark.heading !== null
+      ? sparkRun(arena, { x: state.spark.x, y: state.spark.y }, state.spark.heading).landing
+      : null;
+
+  const threats =
+    unit.holdingPayload && weights.carrierSafety > 0 && weights.relaunch === 0
+      ? carrierThreats(arena, state, unit, enemies)
+      : [];
+
+  const foe = carrier && carrier.team !== unit.team ? carrier : null;
+  let carrierReachable = false;
+  if (foe) {
+    if (distance(unit, foe) <= 1) carrierReachable = true;
+    else {
+      for (const { cell } of legal.destinations.values()) {
+        if (distance(cell, foe) <= 1) {
+          carrierReachable = true;
+          break;
+        }
+      }
+    }
+  }
+
+  const ward = carrier && carrier.team === unit.team && carrier.id !== unit.id ? carrier : null;
+  let wardLine: Point[] = [];
+  let carrierCanServe = false;
+  let wardThreatened = false;
+  if (ward) {
+    const played = hasPlayedThisRound(state, ward.id);
+    const at = { x: ward.x, y: ward.y };
+    wardLine = played ? [at] : [at, ...lineTo(at, carriedForward(ward, targetFurnace))];
+    const afterUs = state.turnOrder.some(
+      (slot, i) =>
+        i > state.turnIndex &&
+        slot.actor.kind === 'unit' &&
+        slot.team === unit.team &&
+        slot.actor.unitId !== ward.id &&
+        slot.actor.unitId !== unit.id &&
+        state.units.some((u) => u.id === (slot.actor as { unitId: UnitId }).unitId && u.status === 'active'),
+    );
+    const lastLink = !played && !afterUs;
+    const exception =
+      weightsFor(ward.role).chainException > 0 &&
+      unit.role === 'striker' &&
+      rangeToFurnace(unit, targetFurnace) < rangeToFurnace(ward, targetFurnace);
+    carrierCanServe = played || lastLink || exception;
+    const dashReach = 2 * (MOVE_SPEED_FEET / 5) + 1;
+    wardThreatened = enemies.some((e) => wardLine.some((p) => distance(e, p) <= dashReach));
+  }
+
   return {
     arena,
     state,
@@ -115,14 +224,92 @@ export function buildBoard(
     weights,
     orders,
     ownFurnace: arena.furnaceOf(unit.team),
-    targetFurnace: arena.targetFurnaceOf(unit.team),
+    targetFurnace,
     restCell: arena.spec.starts[unit.team][0]!,
-    carrier: carried ? (state.units.find((u) => u.id === carried) ?? null) : null,
-    mates: others.filter((u) => u.team === unit.team),
-    enemies: others.filter((u) => u.team !== unit.team),
+    carrier,
+    mates,
+    enemies,
     crackerLines,
     hunter: sparkIsLive(state.spark) && weights.chaseSpark > 0,
+    sparkNext,
+    threats,
+    carrierReachable,
+    carrierCanServe,
+    wardLine,
+    wardThreatened,
   };
+}
+
+/** A carrier's cell carried a move's length towards the mouth it attacks, on the pitch. */
+function carriedForward(carrier: Unit, furnace: Furnace): Point {
+  const cells = MOVE_SPEED_FEET / 5;
+  const towards = furnace.cells[0]!.y > carrier.y ? 1 : -1;
+  const y = Math.max(0, Math.min(ARENA_HEIGHT - 1, carrier.y + towards * cells));
+  return { x: carrier.x, y };
+}
+
+/**
+ * The opponents who will play again before this carrier does, and where each
+ * can walk to. An opponent who has not played this round gets a whole turn
+ * first; one who has gets one too when its side opens the next round.
+ */
+function carrierThreats(arena: Arena, state: MatchState, carrier: Unit, enemies: readonly Unit[]): CarrierThreat[] {
+  const nextRound = sideOrder({ ...state, round: state.round + 1 });
+  const stats = statsFor(carrier.role, carrier.tier);
+  const defence = Math.max(stats.might, stats.agility);
+  const out: CarrierThreat[] = [];
+  for (const enemy of enemies) {
+    const playsFirst = !hasPlayedThisRound(state, enemy.id) || nextRound[0] === enemy.team;
+    if (!playsFirst) continue;
+    const reach = new Set<string>([key(enemy)]);
+    for (const k of reachableCells(arena, state, enemy, MOVE_SPEED_FEET).keys()) reach.add(k);
+    out.push({
+      unit: enemy,
+      odds: contestChance(statsFor(enemy.role, enemy.tier).might, defence),
+      reach,
+    });
+  }
+  return out.sort((a, b) => b.odds - a.odds);
+}
+
+/**
+ * How exposed a carrier is on a cell (2H.10, Jérôme's lesson of round 1): the
+ * threats that can finish a plain move beside it before it plays again, each
+ * worth its odds of shoving the ball loose, but no more of them than there are
+ * free cells around it, a team-mate standing beside it taking a place away.
+ * Zero to about the number of free cells.
+ */
+export function carrierExposure(board: Board, cell: Point): number {
+  if (board.threats.length === 0) return 0;
+  const { arena, state } = board;
+  let free = 0;
+  const around: string[] = [];
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      const p = { x: cell.x + dx, y: cell.y + dy };
+      if (p.x < 0 || p.y < 0 || p.x >= ARENA_WIDTH || p.y >= ARENA_HEIGHT || arena.isSolid(p)) continue;
+      const mateThere = board.mates.some((m) => m.x === p.x && m.y === p.y);
+      if (mateThere) continue;
+      // A cell our own unit stands on now but will have left is still a place:
+      // only the cells beside the *end* cell count, and the unit itself is not
+      // beside itself. The ball's cell is free like any other.
+      free++;
+      around.push(key(p));
+    }
+  }
+  if (free === 0) return 0;
+  let exposure = 0;
+  let counted = 0;
+  for (const threat of board.threats) {
+    if (counted >= free) break;
+    const canArrive = around.some((k) => threat.reach.has(k));
+    if (!canArrive) continue;
+    exposure += threat.odds;
+    counted++;
+  }
+  void state;
+  return exposure;
 }
 
 // -- Odds -------------------------------------------------------------------
@@ -191,6 +378,20 @@ export function restNearness(from: Point, rest: Point, furnace: Furnace): number
  * legal carries the action's worth.
  */
 export const BLIND_DISCOUNT = 0.8;
+
+/**
+ * What a shot held for next turn is worth against one taken now, as a share
+ * of its odds (2H.10): a carrier nobody can reach keeps the ball for a clean
+ * shot rather than throw at disadvantage, and a clean shot now still beats
+ * holding it.
+ */
+export const HOLD_FOR_CLEAN = 0.8;
+
+/** The fraction of an outlet's worth when the carrier has no right to throw to it this round. */
+export const UNSERVED_OUTLET = 0.3;
+
+/** What a carrier of any role fears the Cracker line at, at least (2H.10). */
+export const CARRIER_CRACKER_FEAR = 14;
 
 /**
  * The distance from a cell to the nearest hatch cell it can see, or null when
@@ -350,6 +551,56 @@ export function shotQuality(board: Board, unit: Unit, from: Point): number {
   return chance(statsFor(unit.role, unit.tier).aim, shotTarget(keeper), range.mode);
 }
 
+/**
+ * The best shot this carrier could take **next turn** from a cell: the best
+ * `shotQuality` over every cell within a plain move of it, obstacles and units
+ * ignored (2H.10). This is what a carrier that cannot be reached is holding
+ * when it keeps the ball instead of throwing at disadvantage now: "il garde la
+ * balle pour un tir propre au tour suivant". Read from a per-arena table of
+ * visible ranges so a carrier's decision stays cheap.
+ */
+export function bestShotNextTurn(board: Board, unit: Unit, from: Point): number {
+  const table = visibleRangeTable(board.arena, board.targetFurnace);
+  const keeper = blockingBulwark(board.state, board.targetFurnace, board.targetFurnace.defendedBy);
+  const target = shotTarget(keeper);
+  const aim = statsFor(unit.role, unit.tier).aim;
+  const reach = MOVE_SPEED_FEET / 5;
+  let best = 0;
+  for (let y = Math.max(0, from.y - reach); y <= Math.min(ARENA_HEIGHT - 1, from.y + reach); y++) {
+    for (let x = Math.max(0, from.x - reach); x <= Math.min(ARENA_WIDTH - 1, from.x + reach); x++) {
+      const seen = table[y * ARENA_WIDTH + x]!;
+      if (seen < 0) continue;
+      const range = throwRangeOver(seen);
+      if (!range.ok) continue;
+      const odds = chance(aim, target, range.mode);
+      if (odds > best) best = odds;
+    }
+  }
+  return best;
+}
+
+const visibleRangeTables2 = new WeakMap<Arena, Map<string, Int16Array>>();
+
+/** Every cell's visible range to a Furnace, -1 when the mouth is hidden, computed once per arena. */
+function visibleRangeTable(arena: Arena, furnace: Furnace): Int16Array {
+  let perFurnace = visibleRangeTables2.get(arena);
+  if (!perFurnace) {
+    perFurnace = new Map();
+    visibleRangeTables2.set(arena, perFurnace);
+  }
+  const known = perFurnace.get(furnace.defendedBy);
+  if (known) return known;
+  const table = new Int16Array(ARENA_WIDTH * ARENA_HEIGHT);
+  for (let y = 0; y < ARENA_HEIGHT; y++) {
+    for (let x = 0; x < ARENA_WIDTH; x++) {
+      const p = { x, y };
+      table[y * ARENA_WIDTH + x] = arena.isSolid(p) ? -1 : (visibleRange(arena, p, furnace) ?? -1);
+    }
+  }
+  perFurnace.set(furnace.defendedBy, table);
+  return table;
+}
+
 // -- The bodyguard ------------------------------------------------------------
 
 /**
@@ -377,16 +628,30 @@ export function block(board: Board, cell: Point): number {
   const wanted = weightsFor(carrier.role).wantsEscort;
   if (wanted === 0) return 0;
 
-  const threats = nearestN(board.enemies, carrier, 2);
-  if (threats.length === 0) return wanted * shoulder(cell, carrier, null);
-
+  // A place taken beside the carrier (2H.10, Jérôme): one a cell off where it
+  // will be, half two cells off, a thin gradient beyond so a Breaker across
+  // the pitch still walks over. No side, no lane. Worth little when no
+  // opponent can reach the carrier anyway. A carrier still to play will have
+  // moved: the place is on its way to the mouth, and worth more the further
+  // along that way it is (`wardLine`).
+  const urgency = board.wardThreatened ? 1 : 0.3;
+  const line = board.wardLine;
   let best = 0;
-  for (const threat of threats) {
-    const lane = lineTo(threat, carrier);
-    const onLane = lane.some((p) => distance(p, cell) <= 1) ? 1 : 0.5;
-    best = Math.max(best, shoulder(cell, carrier, threat) * onLane);
+  for (let i = 0; i < line.length; i++) {
+    const along = line.length === 1 ? 1 : 0.5 + (0.5 * i) / (line.length - 1);
+    best = Math.max(best, along * shoulder(cell, line[i]!, null));
   }
-  return wanted * best;
+  return wanted * urgency * best;
+}
+
+/** Adjacent team-mates who are not the carrier: the Striker's crowding (C10 Striker 5). */
+export function crowding(board: Board, cell: Point): number {
+  let n = 0;
+  for (const mate of board.mates) {
+    if (mate.holdingPayload) continue;
+    if (distance(mate, cell) === 1) n++;
+  }
+  return n;
 }
 
 /**
@@ -485,9 +750,12 @@ function nearestTo(units: readonly Unit[], to: Point): Unit | null {
 export function keenerMateNear(board: Board): boolean {
   const { state, unit, weights: w } = board;
   if (state.payload.carriedBy !== null) return false;
+  // A mate who has played this round will not pick the ball up before the
+  // other side plays (2H.10): a ball left to it is a ball left to them.
   return board.mates.some(
     (mate) =>
       distance(mate, state.payload) <= 2 &&
+      !hasPlayedThisRound(state, mate.id) &&
       weightsFor(mate.role).chaseLoosePayload > w.chaseLoosePayload,
   );
 }
@@ -505,6 +773,11 @@ function loosePayloadShare(board: Board): number {
  */
 export function parryPost(board: Board, cell: Point): number {
   if (board.unit.holdingPayload) return 0;
+  // Never a Cracker line before a loose ball within a move (2H.10): the
+  // Breaker that walked off to a line and left the ball three cells away
+  // handed it to the other side.
+  const { state, unit } = board;
+  if (state.payload.carriedBy === null && distance(unit, state.payload) <= MOVE_SPEED_FEET / 5) return 0;
   return onCrackerLine(board, cell) ? 1 : 0;
 }
 
@@ -537,15 +810,37 @@ export function positionValue(board: Board, cell: Point, actionLeft = true): num
   // cell the Spark is in carries the catch's worth, for the usual reason: it
   // is the cell that makes the action legal. The Crackers are still a danger.
   if (board.hunter) {
-    let hunt = w.chaseSpark * nearness(cell, state.spark);
-    if (actionLeft && cell.x === state.spark.x && cell.y === state.spark.y) {
-      hunt += w.catchSpark * chance(statsFor(unit.role, unit.tier).agility, SPARK_CATCH_DC);
+    const onSpark = cell.x === state.spark.x && cell.y === state.spark.y;
+    // The hunter aims at where the Spark is going (2H.10): the drift plays at
+    // the top of the next round before anybody moves, so a cell beside the
+    // Spark now is seven cells from it then. The cell it is in now is worth
+    // the catch while the Action is there, and a little less than nothing
+    // without it, since the Spark skips away from under a minder (écart 49).
+    const goal = board.sparkNext ?? { x: state.spark.x, y: state.spark.y };
+    let hunt = w.chaseSpark * nearness(cell, goal);
+    if (onSpark) {
+      hunt += actionLeft
+        ? w.catchSpark * chance(statsFor(unit.role, unit.tier).agility, SPARK_CATCH_DC)
+        : -w.chaseSpark * 0.2;
     }
     return hunt - w.avoidCrackers * crackerPressure(board, cell);
   }
 
   if (unit.holdingPayload) {
     value += w.carryToFurnace * scoringNearness(board.arena, cell, board.targetFurnace);
+    // The ball is lost between two turns (2H.10): what the end cell is worth
+    // is less by every opponent that can come and shove on it first, and
+    // more by the clean shot held for next turn when none can.
+    if (w.carrierSafety > 0) {
+      const exposure = carrierExposure(board, cell);
+      value -= w.carrierSafety * exposure;
+      if (exposure === 0 && w.shoot > 0) value += w.shoot * HOLD_FOR_CLEAN * bestShotNextTurn(board, unit, cell);
+    }
+    // A Breaker that carries does not parry (écart 47): it fears the Cracker
+    // line like everybody else.
+    if (w.avoidCrackers < CARRIER_CRACKER_FEAR) {
+      value -= (CARRIER_CRACKER_FEAR - w.avoidCrackers) * crackerPressure(board, cell);
+    }
   } else if (state.payload.carriedBy === null) {
     // A Breaker leaves the ball to a Striker standing beside it: see
     // `keenerMateNear`. Everybody else reads a share of one. A keeper only
@@ -565,16 +860,20 @@ export function positionValue(board: Board, cell: Point, actionLeft = true): num
     if (cell.x === state.payload.x && cell.y === state.payload.y) value += w.grabPayload * share;
   } else if (board.carrier && board.carrier.team === unit.team) {
     value += w.screenCarrier * nearness(cell, board.carrier);
-    // The bodyguard's wall: between the threats and the carrier.
+    // A place taken beside our carrier (2H.10). See `block`.
     if (w.block > 0) value += w.block * block(board, cell);
     // Getting open: reachable, in the carrier's sight, ahead of it, and ideally
     // with a shot. See `outlet`. Without the sight and the ground gained, a
     // support player either walks to the far end and strands its carrier, or,
     // after a goal, stands on its goalkeeper's shoulder for the rest of the
-    // match (A31).
-    if (w.supportAttack > 0) value += w.supportAttack * outlet(board, cell);
+    // match (A31). An outlet the carrier will have no right to throw to this
+    // round is worth a fraction (2H.10): see `carrierCanServe`.
+    const serve = board.carrierCanServe ? 1 : UNSERVED_OUTLET;
+    if (w.supportAttack > 0) value += w.supportAttack * serve * outlet(board, cell);
     // And unmarked: a lane nobody is standing beside. See `laneCover`.
-    if (w.cover > 0) value += w.cover * laneCover(board, cell);
+    if (w.cover > 0) value += w.cover * serve * laneCover(board, cell);
+    // Spread out, never on a team-mate (C10 Striker 5, coded in 2H.10).
+    if (w.spread > 0) value -= w.spread * crowding(board, cell);
     // Out of the carrier's reach altogether, every term above is zero and a
     // Striker up the pitch had nothing to come back for. See `rejoin`.
     if (passReach(unit, board.carrier) === 0) value += w.rejoin * nearness(cell, board.carrier);
@@ -585,9 +884,11 @@ export function positionValue(board: Board, cell: Point, actionLeft = true): num
     // press itself, not one more step of gradient. Jérôme, 2H.8: a Striker
     // presses the carrier "coûte que coûte", and finishes adjacent.
     if (distance(cell, board.carrier) === 1) value += w.pressCarrier;
-    // The carrier out of reach, the Breaker swings at whoever is in reach,
-    // Strikers first (`hunt`, `prey`).
-    if (w.hunt > 0) value += w.hunt * preyAdjacency(board, cell);
+    // The carrier out of reach of a plain move, the Breaker swings at whoever
+    // is in reach, Strikers first (`hunt`, `prey`); within reach, the carrier
+    // comes first (C10 Breaker 3 before 4). Beside a prey without an Action
+    // left is worth nothing (2H.10).
+    if (w.hunt > 0 && actionLeft && !board.carrierReachable) value += w.hunt * preyAdjacency(board, cell);
   }
 
   // The bodyguard's stance when the ball is not ours. See `screen`.

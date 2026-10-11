@@ -353,14 +353,26 @@ describe('the initiative ladder (écart 51)', () => {
     }
   });
 
-  it('plays a human first within its role', () => {
+  it('plays a human last within its role (écart 55, 2H.10)', () => {
     const state = fullMatch();
     const listed = ids(state);
     for (const human of state.units.filter(isHuman)) {
-      const first = listed.find((id) => id.startsWith('A-') && roleOf(state, id) === human.role);
-      expect(first).toBe(human.id);
+      const ofRole = listed.filter((id) => id.startsWith('A-') && roleOf(state, id) === human.role);
+      expect(ofRole[ofRole.length - 1]).toBe(human.id);
+      if (human.role !== 'trajector') expect(ofRole.length).toBeGreaterThan(1);
       expect(human.initiative).not.toBeNull();
     }
+  });
+
+  it('keeps the relaunching keeper at the head of its side even when it is the human (écart 54 over 55)', () => {
+    const state = createMatch({
+      ...base,
+      humans: [{ humanId: 'jerome', role: 'bulwark' }],
+    });
+    const conceded = { ...state, relaunch: 'A' as const };
+    const order = buildTurnOrder(arena, conceded);
+    const firstA = order.find((s) => s.team === 'A')!;
+    expect(firstA.actor.kind === 'unit' && roleOf(state, firstA.actor.unitId)).toBe('bulwark');
   });
 
   it('orders two humans of the same role by their kick-off d20, never tied', () => {

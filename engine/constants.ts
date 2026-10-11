@@ -38,11 +38,14 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * decided by Jérôme on 2026-10-11 after his engine 4 game: the penalty box
  * (écart 53, `penaltyBox` on the state and the `relocated` event) and the
  * keeper's relaunch at the head of its side's block after a goal (écart 54,
- * `relaunch` on the state). Nothing in the engine reads it: the server stamps
- * it on `matches` and refuses a mismatch, and the client archives what it
- * cannot play.
+ * `relaunch` on the state); version 6 is 2H.10, decided by Jérôme on
+ * 2026-10-11 after his engine 5 game: the turn state remembers the cell the
+ * turn started on (`startedAt`, écart 56), a memory for the AI and the match
+ * dump that no rule of play reads. Nothing in the engine reads the version:
+ * the server stamps it on `matches` and refuses a mismatch, and the client
+ * archives what it cannot play.
  */
-export const ENGINE_VERSION = 5;
+export const ENGINE_VERSION = 6;
 
 // -- The penalty box (écart 53) --------------------------------------------
 

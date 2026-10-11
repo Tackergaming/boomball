@@ -32,6 +32,8 @@ export const BULWARK: RoleWeights = {
   supportAttack: 0,
   cover: 0,
   block: 0,
+  spread: 0,
+  carrierSafety: 0,
   wantsEscort: 0,
   guardStrike: 0,
   parryPost: 0,
@@ -52,9 +54,14 @@ export const BULWARK: RoleWeights = {
   hunt: 0,
   relaunch: 150,
 
-  avoidOpportunity: 4,
+  // 2H.10, Jérôme's fourth pass.
+  pressDash: 0,
+  shoveBystander: 1,
+  receiver: 0.4,
+  chainException: 0,
+
+  avoidOpportunity: 30,
   avoidCrackers: 8,
   dodgeWhenHurt: 8,
-  dash: 4,
   disengage: 10,
 };

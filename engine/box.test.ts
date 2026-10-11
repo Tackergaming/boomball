@@ -44,6 +44,7 @@ function clockOn(state: MatchState, id: UnitId): MatchState {
     turnIndex: at,
     turn: {
       unitId: id,
+      startedAt: { x: state.units.find((u) => u.id === id)!.x, y: state.units.find((u) => u.id === id)!.y },
       movementFeetRemaining: MOVE_SPEED_FEET,
       actionUsed: false,
       objectInteractionUsed: false,

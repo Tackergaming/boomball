@@ -1293,6 +1293,7 @@ function beginTurn(state: MatchState, unit: Unit, log: MatchEvent[]): MatchState
     ...replaceUnit(state, acting),
     turn: {
       unitId: acting.id,
+      startedAt: { x: acting.x, y: acting.y },
       movementFeetRemaining: MOVE_SPEED_FEET,
       actionUsed: false,
       objectInteractionUsed: false,

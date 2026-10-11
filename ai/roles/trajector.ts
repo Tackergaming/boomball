@@ -31,7 +31,9 @@ export const TRAJECTOR: RoleWeights = {
   screenCarrier: 30,
   supportAttack: 30,
   cover: 25,
-  block: 0,
+  block: 10,
+  spread: 0,
+  carrierSafety: 60,
   wantsEscort: 1,
   guardStrike: 0,
   parryPost: 0,
@@ -52,9 +54,14 @@ export const TRAJECTOR: RoleWeights = {
   hunt: 0,
   relaunch: 0,
 
-  avoidOpportunity: 7,
+  // 2H.10, Jérôme's fourth pass.
+  pressDash: 0,
+  shoveBystander: 0,
+  receiver: 1,
+  chainException: 0,
+
+  avoidOpportunity: 50,
   avoidCrackers: 14,
   dodgeWhenHurt: 8,
-  dash: 9,
   disengage: 22,
 };

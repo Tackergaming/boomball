@@ -723,12 +723,211 @@ le code contre les mots. **Codé en 2H.9.**
 
 > Écrites par le fil principal (Fable 5.1) sur les deux retours de Jérôme en chat après sa partie
 > sur le moteur 5 avec le plan de tour (star, 50 à 0, match `0291a651`, consigné tour par tour
-> dans `docs/matches/2026-10-11-0291a651/`). Dictées par lui, **à coder au chat suivant, après
-> l'analyse de la partie** décrite dans `05`. Le second change l'échelle d'initiative sans changer
-> la forme de l'état ni d'un événement : `ENGINE_VERSION` resterait 5, l'échelle d'un match ouvert
-> étant reconstruite à chaque round, et les fonctions seraient à redéployer.
+> dans `docs/matches/2026-10-11-0291a651/`), puis sur ses réponses, le même jour dans le chat
+> suivant, à l'analyse de cette partie décision par décision (`analyse-2H10.md` dans le même
+> dossier, par un agent général Opus 5.5 effort high, relue par le fil principal). Tout ce qui
+> suit est **dicté par lui et validé mot pour mot avant la première ligne de code**. L'écart 55
+> change l'échelle sans changer la forme de l'état ; mais la case de début de tour, décidée en
+> fin de section, entre dans l'état du tour : **`ENGINE_VERSION` monte à 6**, les matchs ouverts
+> du moteur 5 sont archivés au redéploiement. C'est le seul changement de forme de 2H.10.
 
 | # | Règle v2 | Règle décidée | Raison | État |
 |---|---|---|---|---|
 | 55 | Écart 51 : « Un humain joue en premier dans son rôle » | **Un humain joue en dernier dans son rôle.** Quand un humain tient un rôle, il passe après toutes les IA de ce rôle dans son équipe : un Striker humain joue le troisième des trois Strikers. Le reste de l'échelle ne bouge pas : Trajector, Strikers, Breakers, Bulwark, et l'ordre des IA d'un même rôle par la situation. Plusieurs humains du même rôle restent ordonnés entre eux par le d20 du coup d'envoi | Jérôme, le 2026-10-11, retour 2 : jouer en premier de son rôle le prive de la lecture de ce que ses coéquipiers du même rôle font avant lui | **À faire en 2H.10**, fil principal, `buildTurnOrder` dans `engine/initiative.ts` |
 | IA | Le Trajector ne prend pas la balle au coup d'envoi (C10, `chaseKickoff` 0) et rien ne dit où il va | **Au premier tour, le Trajector ne recule jamais : toujours vers l'avant.** Son plan de tour au round du coup d'envoi finit au moins aussi avancé vers la bouche adverse qu'il a commencé, jamais plus près de sa propre bouche | Jérôme, le 2026-10-11, retour 1. Lu dans le match : au round 1 son Trajector a dashé de `(12, 14)` à `(5, 1)`, treize cases vers son propre but, parce qu'avec `chaseKickoff` à zéro et tout le monde à huit cases du ballon la seule pente restante était `guardFurnace` | **À faire en 2H.10**, fil principal, règle d'IA dans `ai/` |
+| 56 | Rien ne retient la case où un tour a commencé ; C11 note un lancer « depuis la case où le tour a commencé », ce que le plan reconstruit après chaque pas ne peut pas lire | **L'état du tour porte la case de départ du tour**, posée quand le tour s'ouvre. Aucune règle de jeu n'en dépend : c'est une mémoire pour l'IA et pour le fichier de match | Jérôme, le 2026-10-11, sur la recommandation du fil principal. Au round 2, Tobb a marché sept cases pour une passe de 5 cases vers l'avant, puis, le plan relu depuis la nouvelle case, a passé 5 cases en arrière. Sans cette case, toute note « depuis le début du tour » est impossible à écrire | **À faire en 2H.10**, fil principal, `TurnState` dans `engine/types.ts`, **`ENGINE_VERSION` 6** |
+
+**Ce que l'analyse de la partie a montré**, pour mémoire. Le Spark a fait 40 des 50 points : le
+chasseur de B est arrivé trois fois sur le Spark sans Action, deux fois après un Dodge et une
+fois après un Dash, et n'a jamais pu le tenter. Douze Dash n'ont rien acheté, dont celui du
+gardien A au round 4, parti « sur le porteur » contre sa laisse et resté sur place. Treize
+bousculades sur dix-sept visaient un non-porteur. Les Breakers ont frappé le porteur à la batte
+quand il fallait le bousculer. A n'a tiré qu'une fois en dix rounds et B deux fois, parce que la
+chaîne laisse mourir le ballon chez les Breakers, qui jouent après les Strikers. Les attaques
+d'opportunité se payaient 4 points quels que soient l'attaquant et les PV. Deux faits de règle,
+constatés sans décision : l'équipe qui a l'humain joue juste après le Spark à chaque round, donc
+A a eu la première main sur chaque dérive ; et le Spark a rebondi trois rounds de suite dans la
+poche de la ligne 19, entre le bord et la caisse `(4, 19)`, en revenant sur sa case, règle 36b
+appliquée.
+
+**Les concepts dictés par Jérôme le 2026-10-11, après l'analyse.** Ses mots.
+
+- **Les places libres autour du porteur.** Autour du porteur il y a huit cases. Chaque case
+  libre est une place pour un adversaire : une batte, une bousculade, et une attaque
+  d'opportunité dès que le porteur bouge au round suivant. **Chaque allié collé au porteur prend
+  une de ces places** : deux alliés collés, c'est six places au lieu de huit, deux attaques et
+  deux attaques d'opportunité de moins. La valeur d'un allié adjacent est celle-là, une place
+  prise, qu'il bloque une route ou non ; le côté et la ligne droite vers la menace ne comptent
+  pas. Le porteur lui-même **ne cherche pas** une case à peu de voisines libres.
+- **Le Breaker, en attaque, se colle au porteur d'abord**, avant le Cracker et avant toute
+  frappe sur un retardataire, dès que le porteur allié est à portée de Dash d'un adversaire. Il
+  ne quitte pas ce contact pour une action dont le recul l'en éloignerait. Au round 1, un Breaker
+  a préféré d'un demi-point un Cracker à huit cases, et son recul l'a rejeté à six cases de
+  Tacker, que quatre adversaires ont encerclé.
+- **Le Striker se colle au porteur seulement si ça ne coûte rien à son relais** : s'il peut
+  finir adjacent au porteur en restant une case que le porteur peut servir, à vue, à portée,
+  devant ou sur sa ligne, il le fait. Dès que le relais en souffre, le relais passe avant.
+- **Le Breaker porteur, exception à la chaîne.** D'abord l'autre Breaker, s'il n'a pas joué et
+  que sa marche porterait le ballon plus près de la bouche adverse que là où le porteur se tient.
+  Sinon **un Striker plus près de la bouche adverse que lui, même s'il a déjà joué ce round,
+  pourvu que la passe soit sans intercepteur.** Sans l'un ni l'autre, il avance et ne tire
+  quasiment jamais. La définition du dernier maillon ne change pas pour les autres rôles.
+- **Le Spark reste au Trajector seul.** Un Striker qui a le Spark à portée de marche, Action en
+  main, ne le tente pas, même quand son Trajector est hors jeu ou vient de le rater. Confirmé
+  contre cinq occasions à 45 % dans la partie.
+- **La presse en Dash du Striker ne se joue que par une route sans allonge adverse** : s'il
+  existe une route jusqu'au contact du porteur qui ne traverse aucune allonge adverse, il la
+  prend ; sinon pas de Dash de presse. Et **cette route optimisée vaut pour tout déplacement de
+  l'IA** : elle cherche d'abord la route qui ne provoque aucune attaque d'opportunité, quitte à
+  faire le tour tant que le mouvement le permet, et ne tombe sur la ligne droite que faute de
+  mieux. « Pas tout droit comme un con. »
+- **La case de début de tour**, écart 56, pour que la note d'un lancer tienne avant comme après
+  la marche. Choisie contre la demi-mesure qui n'aurait corrigé que l'égalité.
+
+**L'IA, quatrième passe : les ajustements retenus**, par rôle, triés par priorité, validés par
+Jérôme le 2026-10-11. Aucune constante de règle ne bouge. Les poids viennent de ces mots.
+
+*Commun.*
+
+1. **Une case ne vaut l'action qu'elle débloque que si l'Action reste.** Le repli après une
+   action et le Dodge ne comptent plus la prise du Spark ; « marcher puis attraper » devient un
+   plan ; la prise du Spark compte dans « rien d'autre à faire » avant un Dodge.
+2. **Ramasser puis lancer dans le même tour** : le ramassage est gratuit, le lancer depuis la
+   case du ballon se note comme les autres « marche puis lancer ».
+3. **Le porteur finit son tour là où le moins d'adversaires peuvent venir le bousculer avant
+   qu'il rejoue**, les alliés collés réduisant ce compte, et quand personne ne l'atteint il
+   garde la balle pour un tir propre au tour suivant plutôt qu'un tir à désavantage tout de
+   suite. C'est « sans perdre la balle » de C9 qui prime sur « le plus vite possible » de C10
+   Striker 3.
+4. **Contre le porteur, on bouscule.** La batte ou le Cracker ne valent une récupération que si
+   le coup peut l'évacuer.
+5. **Bousculer un non-porteur ne vaut rien pour un Striker ou un Trajector** : s'il n'y a que
+   ça, c'est une attaque. Seule une cible légitime pour son rôle interdit le Dash.
+6. **La balle au sol ne se laisse qu'à un coéquipier qui n'a pas encore joué** ; sinon on la
+   ramasse, et jamais une ligne de Cracker avant un ballon libre.
+7. **Un relais ne vaut que si le porteur aura le droit de le servir.**
+8. **Une attaque d'opportunité se paie à ses dégâts attendus rapportés aux PV** de l'unité qui
+   la prend, et une route qui donne une chance sérieuse d'évacuation s'écarte.
+9. **Le plan se tient d'une action à l'autre** : la frappe de Cracker depuis une case marchée se
+   calcule avec l'unité déjà sur cette case ; le dernier maillon ne passe jamais en arrière sur
+   une égalité, le terrain gagné tranche avant l'identifiant ; la passe après une marche se juge
+   depuis la case de début de tour, écart 56.
+10. **Une passe préfère un Striker ou le Trajector à un Breaker** à égalité, les mots de C9.
+11. **Tout déplacement prend la route qui évite les allonges adverses** quand le mouvement le
+    permet.
+
+*Trajector.*
+
+1. Debout sur le Spark avec son Action, il l'attrape, jamais un Dodge ni un Dash avant.
+2. **Il vise la case où le Spark sera après la prochaine dérive**, qui se joue au début du round
+   avant tout tour et sans dé, et ne finit jamais son tour sur le Spark sans l'avoir tenté.
+3. Pas de Dash pour finir au contact du porteur : en défense il bouscule s'il arrive en
+   marchant, sinon un Cracker ou rien.
+4. En attaque sans la balle, pas de bousculade d'un non-porteur.
+5. Au premier tour, il ne recule jamais (ci-dessus).
+
+*Striker.*
+
+1. Porteur, il avance sans perdre la balle, et garde pour un tir propre au tour suivant quand
+   personne ne l'atteint.
+2. En défense il bouscule le porteur ; la batte seulement si elle peut l'évacuer.
+3. Il ne bouscule pas un non-porteur.
+4. Il ne court pas en relais d'un porteur qui ne pourra pas le servir.
+5. Il ne paie pas une route à travers des Breakers pour quelques points de position, et sa
+   presse en Dash ne part que par une route sans allonge adverse.
+6. **Étalé, jamais collé à un coéquipier**, C10 Striker 5, qu'aucun terme n'écrivait : au round
+   3 les trois Strikers B ont fini alignés en `(3, 12)`, `(4, 12)` et `(5, 12)`.
+7. Il se colle au porteur seulement si son relais n'en souffre pas.
+
+*Breaker.*
+
+1. En attaque, collé au porteur d'abord, une place prise autour de lui, avant le Cracker et
+   avant tout retardataire ; il ne quitte pas ce contact pour une action dont le recul
+   l'éloignerait.
+2. En défense, le porteur se bouscule.
+3. Pas de Dash « sur le porteur » ; **frapper l'adversaire proche seulement quand le porteur est
+   hors de portée de marche** : finir à côté d'un Striker valait 70 et finir à côté du porteur
+   55, contre l'ordre de C10 Breaker 3 puis 4.
+4. Porteur : l'autre Breaker s'il porte plus loin, sinon un Striker devant lui même s'il a joué,
+   sans intercepteur.
+5. Il ne laisse la balle qu'à un Striker ou au Trajector qui n'a pas joué.
+6. Porteur, il fuit la ligne des Crackers : un Breaker qui porte ne pare pas (écart 47).
+7. Le mur se pose là où sera le porteur : s'il n'a pas encore joué, sur sa route vers la bouche.
+8. Loin du porteur en attaque, il Dash vers lui même sans arriver à deux cases.
+9. Strikers d'abord, puis Breakers, puis Trajector, aussi pour le Cracker envoyé.
+
+*Bulwark.*
+
+1. **La laisse tient pour tout plan, Dash compris** : jamais de Dash de presse hors de ses
+   quatre cases. Au round 4 le gardien A a dashé « sur Tobb », à neuf cases de sa bouche, et
+   n'a pas bougé, Action brûlée au lieu de se planter.
+2. Rien d'autre : relance, plantage et blocages ont été justes dans la partie.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`. `ENGINE_VERSION` 6 pour la
+seule case de début de tour. L'IA change dans `ai/chooseAction.ts`, `ai/evaluate.ts` et les
+quatre fiches ; l'échelle dans `engine/initiative.ts` ; la route dans `engine/rules/movement.ts`
+pour l'IA seule, le client gardant sa ligne droite au clic. **Un seul sweep à la fin, si Jérôme
+le demande**, contre `09` §12, en comptant onze minutes. Les 475 tests sont le filet, le test
+des cinquante millisecondes fait foi sur la vitesse.
+
+**Comment la quatrième passe est codée**, par le fil principal (Fable 5.1) le 2026-10-11, pour
+relire le code contre les mots. **Codé en 2H.10.**
+
+- **Un plan se lit à sa fin, Action dépensée.** Chaque case d'arrivée est notée par
+  `positionValue(board, cell, false)` : une case ne vaut l'action qu'elle débloque que par le plan
+  qui la prend. « Marcher sur le Spark puis l'attraper » est un plan (`catchSpark` depuis une case
+  marchée, par `actionOptionsAt`), « Dodge puis marcher sur le Spark » ne vaut plus la prise, et
+  la prise compte parmi les actions qui interdisent le Dodge. Finir à côté d'une proie sans
+  Action ne vaut rien (`hunt` lu seulement avec l'Action). Le chasseur vise `Board.sparkNext`, la
+  case où `sparkRun` posera le Spark à la prochaine dérive, et finir sur sa case sans l'avoir
+  tenté vaut moins que rien.
+- **La frappe recule.** Un plan de batte ou de Cracker finit sur la case de recul
+  (`recoilDestination`, écart 33), et le repli part de là. La frappe de Cracker depuis une case
+  marchée se calcule sur le plateau où l'unité est déjà sur cette case (`stateWithUnitAt`).
+- **Ramasser puis lancer** : `throwsAfterPickup` demande au moteur les lancers d'un porteur
+  hypothétique sur la case du ballon, et le plan `[move, grabPayload, pass]` vaut le ramassage
+  plus le lancer.
+- **La sécurité du porteur** : `carrierThreats` dans `evaluate.ts` liste les adversaires qui
+  rejouent avant le porteur (pas encore joué ce round, ou leur camp ouvre le round suivant par
+  `sideOrder`) avec les cases où leur marche les amène ; `carrierExposure(cell)` somme leurs
+  chances de bousculade (`contestChance`) sur les premiers d'entre eux, jamais plus que de cases
+  libres autour de la case, un allié adjacent en retirant une. Poids `carrierSafety` (Striker 60,
+  Trajector 60, Breaker 50, Bulwark 0). Quand l'exposition est nulle, la case vaut en plus
+  `shoot × HOLD_FOR_CLEAN (0,8) × bestShotNextTurn`, le meilleur tir à une marche de là. Un
+  lancer reçoit en retour `relief`, l'exposition de la case de départ, puisque le ballon parti
+  n'expose plus personne.
+- **Contre le porteur on bouscule** : la batte sur un porteur vaut `stripCarrier ×
+  batEvacuates(might, hp)`, le Cracker `stripCarrier × crackerEvacuates(target)` (3d6, jet de
+  sauvegarde compris), plus `prey[rôle]` aussi pour le Cracker. La bousculade d'un non-porteur
+  vaut `shove × shoveBystander` (Striker 0, Trajector 0, Breaker 1, Bulwark 1).
+- **La place prise** : `block` note la proximité à `Board.wardLine`, la case du porteur s'il a
+  joué, sinon sa case et les huit cases de sa route vers la bouche, chacune valant plus loin sur
+  la route ; plus de côté ni de ligne droite. Poids `block` 80 Breaker, 15 Striker, 10
+  Trajector ; `wardThreatened` le réduit à 0,3 quand aucun adversaire n'est à portée de Dash du
+  porteur. Le Breaker loin du porteur Dash vers lui dès que le Dash referme une marche de l'écart
+  (plancher `block`). `spread` (Striker 10) retire par coéquipier non-porteur adjacent.
+- **Le relais** : `outlet` et `laneCover` comptent `UNSERVED_OUTLET` (0,3) quand le porteur n'a
+  pas le droit de servir cette unité ce round (`Board.carrierCanServe` : porteur déjà joué,
+  dernier maillon, ou Breaker porteur devant un Striker). Une passe à un receveur qui n'a pas
+  joué est notée sur le tir qu'il aura après sa marche (`bestShotNextTurn` du receveur), et le
+  terrain gagné est pondéré par `receiver` du rôle receveur (Striker 1, Trajector 1, Breaker
+  0,8, Bulwark 0,4). `chainException` (Breaker 1) ouvre la passe à un Striker devant lui déjà
+  joué, sans intercepteur. Le dernier maillon perd `BACKWARD_STEP` (0,5) par case en arrière.
+- **Les attaques d'opportunité** : `Planner.exposure` somme, par attaquant provoqué, sa chance
+  de toucher fois ses dégâts moyens, rapportés aux PV de l'unité, fois `avoidOpportunity`
+  (Striker 40, Trajector 50, Breaker 20, Bulwark 30), plus `LETHAL_ROUTE` (100) quand la somme
+  atteint les PV. Un Breaker porteur craint la ligne des Crackers à `CARRIER_CRACKER_FEAR`
+  (14).
+- **Les routes** : `safeReachableCells` et `safePathTo` dans `engine/rules/movement.ts`
+  (sous-agent Sonnet effort élevé, récrits sur des indices numériques par le fil principal)
+  donnent, pour chaque case atteignable, la route qui provoque le moins d'attaques d'opportunité
+  puis coûte le moins de pieds, sur un balayage par (case, pieds dépensés) ; l'ensemble des cases
+  est celui de `reachableCells`. Le Planner ne lit plus que ces routes, pour la marche, le Dash et
+  le repli. Le Dash de presse (`pressDash`, Striker seul) n'est offert que pour une case au
+  contact dont la route provoque zéro attaque, et jamais hors de la laisse.
+- **La balle au sol** : `keenerMateNear` ignore un coéquipier qui a déjà joué ; `parryPost` vaut
+  zéro quand un ballon libre est à une marche.
+- **La chaîne lit la case de début de tour** (`turn.startedAt`, écart 56) pour le terrain gagné,
+  avant comme après la marche.
+- **Vitesse** : 2,7 ms par décision en moyenne et 25 ms au pire sur un match vétéran, comme en
+  2H.9 ; le test des cinquante millisecondes passe.

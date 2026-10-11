@@ -1360,3 +1360,43 @@ agent Opus 5.5 effort élevé, pour en tirer des leçons et des ajustements de l
 par le fil principal ; puis au chat suivant l'analyse de `docs/matches/2026-10-11-0291a651/match.md`
 avec un agent Opus 5.5 effort élevé, les leçons, puis le code de 2H.10, écarts dans `00` avant la
 première ligne ; **un sweep s'il le demande**, un seul, contre `09` §12, en comptant onze minutes.
+
+### Sous-phase 2H.10, « l'analyse de la partie, l'humain dernier de son rôle, le Trajector vers l'avant, la quatrième passe de l'IA », codée le 2026-10-11, porte ouverte
+
+Par le fil principal (Fable 5.1), avec deux sous-agents nommés ci-dessous, à partir de `00` C12
+validé par Jérôme mot pour mot avant la première ligne de code. **Pas de sweep**, à sa demande
+(« inutile pour cela, on en fera un plus tard »). Pas de commit ni de redéploiement : les deux lui
+appartiennent.
+
+**L'analyse de la partie d'abord.** Un **agent général Opus 5.5 effort high** a lu `match.md` en
+entier et rendu `docs/matches/2026-10-11-0291a651/analyse-2H10.md` : 133 tours d'unité lus un par
+un contre ce qu'un joueur réfléchi aurait fait, onze leçons, dix-huit ajustements classés par effet
+puis par rôle, trois questions. Le fil principal l'a relu contre `match.md`, C10, C11 et le code,
+a tranché quatre de ses points ouverts dans le code (la frappe de Cracker calculée avec l'unité
+encore sur sa case de départ ; les passes sans intercepteur par l'écart 48 ; Tobb ramené chez lui
+par `guardFurnace` ; le Spark qui rebondit trois rounds dans la poche de la ligne 19, règle 36b
+appliquée) et a ajouté quatre points de sa relecture (le Breaker qui préfère un Striker adjacent
+au porteur à deux cases, la passe à égalité tranchée par l'identifiant, les Strikers collés, la
+case de début de tour). Présenté à Jérôme par rôle et par priorité, corrigé par lui en chat
+(les places libres autour du porteur, le Striker collé seulement si son relais tient, le Breaker
+porteur et son exception, le Trajector seul sur le Spark, la presse en Dash par une route sans
+allonge adverse et cette route pour tout déplacement, la version 6), puis écrit en `00` C12.
+
+| Quoi | État |
+|---|---|
+| Écart 55, l'humain dernier de son rôle | Fait, fil principal. `teamSlots` dans `engine/initiative.ts` range les IA du rôle avant les humains ; le gardien humain qui relance reste en tête de son équipe (écart 54 prime). 2 tests dans `engine/setup.test.ts` |
+| Écart 56, la case de début de tour | Fait, fil principal. `TurnState.startedAt` posée par `beginTurn` ; **`ENGINE_VERSION` 6**, le seul changement de forme. Le test de session qui tirait sans ballon à la relance tire désormais sur un Spark absent, parce qu'un Striker humain reçoit maintenant la balle de ses coéquipiers IA avant de jouer |
+| Le Trajector vers l'avant au premier tour | Fait par construction : avec `carrierSafety`, `block` et les routes sûres, plus aucune pente ne tire un Trajector sans balle vers sa propre bouche ; vérifié sur la scène du round 1 en auto-jeu |
+| Les routes sûres | **Sous-agent Sonnet effort élevé** : `safeReachableCells` et `safePathTo` dans `engine/rules/movement.ts`, un balayage par (case, pieds dépensés) qui garde pour chaque case la route au moins de provocations puis au moins de pieds, même ensemble de cases que `reachableCells` ; 11 tests dans `movement.test.ts`. Récrits par le fil principal sur des indices numériques quand la première version faisait 8 ms par décision |
+| La quatrième passe de l'IA | Fait, fil principal, `ai/chooseAction.ts` récrit et `ai/evaluate.ts` étendu, détail poids par poids dans le paragraphe « comment la quatrième passe est codée » de `00` C12. Nouveaux poids dans les quatre fiches : `carrierSafety`, `spread`, `pressDash`, `shoveBystander`, `receiver`, `chainException` ; `block` change de sens (une place prise) ; `avoidOpportunity` change d'échelle ; `dash`, mort depuis 2H.9, retiré |
+| Tests | `ai/ai.test.ts` gagne un bloc « Jérôme's fourth pass, 2H.10 », 14 tests : le chasseur abîmé marche sur le Spark et l'attrape sans Dodge ; le chasseur vise la case de la prochaine dérive ; ramasser puis lancer ; le porteur finit hors de portée des bousculeurs ; garder pour un tir propre ; le Breaker bouscule un porteur sain et frappe un porteur évacuable ; pas de bousculade de non-porteur ; le Breaker ramasse devant un Striker qui a joué ; le gardien ne dashe pas hors de sa laisse ; le Breaker va au porteur à portée plutôt qu'au Striker adjacent ; le Breaker porteur sert un Striker devant lui qui a joué ; la route contourne l'allonge ; la presse en Dash par une route propre ; un Striker abîmé ne traverse pas deux Breakers. Quatre scènes de 2H.8 et 2H.9 récrites au nouveau sens (la place prise, le Breaker sur la route d'un porteur qui n'a pas joué, seule une cible légitime interdit le Dash) |
+| Vérification | `npm test` **503 tests sur 22 fichiers contre 475**, `npm run typecheck` vert (racine, scripts, e2e), client typecheck et build verts. Sonde jetée après lecture : 2,7 ms par décision en moyenne et 25 ms au pire sur un match vétéran, comme en 2H.9 ; le test des cinquante millisecondes passe |
+| Harnais | Smoke vert deux fois (30 et 32 s) et playthrough vert deux fois (3 puis 20 requêtes humaines, 0 refusée, le second sur un match entier jusqu'au sifflet, 57 s), contre les fonctions en ligne du moteur 5 avec `ENGINE_VERSION` épinglée à 5 le temps du run et remise à 6. Captures lues : la maison en ligne joue encore l'IA v15, l'échelle affichée est celle de l'écart 51 ; **le siège humain du playthrough est piloté par le planificateur de 2H.10 depuis Node**, 0 refus |
+
+**Ce que ça change à l'écran** : rien. Aucun composant du client n'est touché ; la route proposée au
+clic reste la ligne droite de 2H.8, la route sûre est celle de l'IA.
+
+**Ce qui attend Jérôme** : `/commit` ; son feu vert pour redéployer `resolve-action` et
+`create-match` (moteur 6, les matchs ouverts du moteur 5 seront archivés par le client) ; sa partie
+sur le moteur 6, consignée par `dump-match.ts` ; **un sweep quand il le demandera**, contre `09`
+§12, en comptant onze minutes.
