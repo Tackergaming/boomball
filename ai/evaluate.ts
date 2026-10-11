@@ -575,8 +575,12 @@ export function positionValue(board: Board, cell: Point): number {
   value += w.parryPost * parryPost(board, cell);
 
   // The keeper's tether (`leash`): a cell further from its own mouth than the
-  // role allows is not a place it goes, whatever else is out there.
-  if (rangeToFurnace(cell, board.ownFurnace) > w.leash) value -= 500;
+  // role allows is not a place it goes, whatever else is out there. Lifted
+  // while it holds the ball with a relaunch to make (Jérôme, 2026-10-11): it
+  // steps out as far as a line to a team-mate needs, throws, and only then
+  // is the tether read again and walks it home.
+  const relaunching = unit.holdingPayload && w.relaunch > 0;
+  if (!relaunching && rangeToFurnace(cell, board.ownFurnace) > w.leash) value -= 500;
 
   const hold = findOrder(board.orders, 'holdZone');
   if (hold) value += ORDER_PULL * nearness(cell, hold.at);

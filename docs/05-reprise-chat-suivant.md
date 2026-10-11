@@ -17,19 +17,27 @@ mes mots. 07 §10 porte le journal, dont l'entrée 2H.8 et ce qui m'attend. 09 �
 2H.7, tranché « rien ne bouge » ; il n'y a PAS de sweep de 2H.8. 04 est l'histoire, à lire
 seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.8 est CODÉE le 2026-10-11, PAS COMMITÉE si tu lis ceci avant mon /commit, et
-PAS EN LIGNE. 460 tests verts sur 22 fichiers, typecheck racine, scripts, e2e et client verts,
-build du client vert. ENGINE_VERSION vaut 5 dans le dépôt ; en ligne, resolve-action v12 et
-create-match v10 jouent encore le moteur 4. Aucune migration : l'état gagne penaltyBox et
-relaunch dans le JSON, les événements gagnent relocated. Le smoke a tourné vert contre le moteur 4
-en ligne avec ENGINE_VERSION épinglée à 4 le temps du run, puis remise à 5.
+Où on en est : 2H.8 est CODÉE, COMMITÉE, POUSSÉE et EN LIGNE depuis le 2026-10-11. 460 tests
+verts sur 22 fichiers, typecheck racine, scripts, e2e et client verts, build du client vert.
+ENGINE_VERSION vaut 5 dans le dépôt comme en ligne : resolve-action v14 et create-match v12.
+Aucune migration : l'état gagne penaltyBox et relaunch dans le JSON, les événements gagnent
+relocated. Smoke et playthrough verts sur le moteur 5 ; les captures montrent le Trajector qui
+laisse le ballon du coup d'envoi et qui chasse le Spark en prenant l'attaque d'opportunité ; la
+zone violette et le replacement n'ont pas encore été vus à l'écran. Lu en base sur le match e2e :
+le Striker prend le ballon du coup d'envoi, le gardien qui encaisse joue bien en premier au round
+suivant, mais il se plante au lieu de lancer parce qu'aucun coéquipier n'est à portée ni en vue ;
+une sonde d'auto-jeu dit qu'il lance à chaque fois qu'une passe est légale, et qu'une relance sur
+deux n'a pas de receveur. Tranché par moi et codé le même jour (00 C10, Bulwark, « sans
+receveur ») : il sort autant qu'il faut, laisse levée, pour trouver une ligne et passe dans le
+même tour, sinon il se plante, jamais de Dash. 462 tests. C'est de l'IA, donc ENGINE_VERSION reste
+5 ; fonctions redéployées sur mon feu vert : resolve-action v14 et create-match v12 en ligne.
 
-LA PORTE DE 2H.8 : (1) mon feu vert de redéploiement des deux fonctions, qui archive les matchs du
-moteur 4 ; (2) ma partie sur le moteur 5, avec en retours numérotés si je comprends ce que chaque
-rôle cherche, si la zone violette après un but et la relance du gardien se lisent, si le Trajector
-laisse bien le ballon du coup d'envoi ; (3) un sweep si je le demande, un seul, contre 09 §12.
-Ce verdict ouvre la phase 3 (scène 2.5D, A20 React 19 en premier pas) ou une sous-phase 2H.9.
-Sans ce verdict, pas de phase 3. Tu commences par me demander où j'en suis de ces trois points.
+LA PORTE DE 2H.8 : ma partie sur le moteur 5, avec en retours numérotés si je comprends ce que
+chaque rôle cherche, si la zone violette après un but et la relance du gardien se lisent, si le
+Trajector laisse bien le ballon du coup d'envoi ; puis un sweep si je le demande, un seul, contre
+09 §12. Ce verdict ouvre la phase 3 (scène 2.5D, A20 React 19 en premier pas) ou une sous-phase
+2H.9. Sans ce verdict, pas de phase 3. Tu commences par me demander mes retours si je ne les ai
+pas donnés.
 
 Ce qu'il faut savoir tout de suite.
 

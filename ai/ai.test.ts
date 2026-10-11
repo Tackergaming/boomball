@@ -8,6 +8,7 @@ import type { Action } from '../engine/actions.js';
 import type { MatchEvent } from '../engine/events.js';
 import { openMatch, reduce } from '../engine/reduce.js';
 import { battedCrackerRun } from '../engine/rules/ordnance.js';
+import { rangeToFurnace } from '../engine/rules/payload.js';
 import { createMatch } from '../engine/setup.js';
 import type { MatchState, Unit, UnitId } from '../engine/types.js';
 import { chooseAction, rankActions } from './chooseAction.js';
@@ -865,6 +866,37 @@ describe("Jérôme's second pass on the roles, 2H.8", () => {
     expect(legal.pass.map((o) => o.unitId)).toEqual(['A-striker-2']);
     const best = rankActions(arena, state, keeper)[0]!;
     expect(best.action).toEqual({ kind: 'pass', targetId: 'A-striker-2' });
+  });
+
+  it('the keeper with nobody in sight steps out, beyond its leash, to find a line and throws', () => {
+    const keeper = 'A-bulwark-1';
+    const outlet = { x: 0, y: 17 };
+    let state = carrying(put(board(), keeper, { x: 7, y: 1 }), keeper);
+    state = put(state, 'A-striker-2', outlet);
+    state = giveTurnTo(state, keeper);
+
+    expect(legalActions(arena, state)!.pass).toHaveLength(0);
+    const first = chooseAction(arena, state, keeper);
+    expect(first.kind).toBe('move');
+
+    const events = playOutTurn(state, keeper);
+    const thrown = events.find((e) => e.kind === 'passed');
+    expect(thrown).toBeDefined();
+    if (thrown?.kind !== 'passed') throw new Error('unreachable');
+    expect(thrown.toId).toBe('A-striker-2');
+    const from = events.find((e) => e.kind === 'moved');
+    if (from?.kind !== 'moved') throw new Error('no move');
+    expect(rangeToFurnace(from.to, arena.furnaceOf('A'))).toBeGreaterThan(weightsFor('bulwark').leash);
+    expect(events.some((e) => e.kind === 'dashed')).toBe(false);
+  });
+
+  it('the keeper with no line anywhere within a move digs in and keeps the ball', () => {
+    const keeper = 'A-bulwark-1';
+    const state = giveTurnTo(carrying(put(board(), keeper, { x: 7, y: 1 }), keeper), keeper);
+    expect(legalActions(arena, state)!.pass).toHaveLength(0);
+    expect(chooseAction(arena, state, keeper)).toEqual({ kind: 'brace' });
+    const after = playTurnOf(state, keeper);
+    expect(unit(after, keeper)).toMatchObject({ x: 7, y: 1, holdingPayload: true, braced: true });
   });
 
   it('never dashes past a target in reach', () => {

@@ -22,8 +22,9 @@ import { distance, lineTo, type Point } from '../engine/geometry.js';
 import { legalActions } from '../engine/legalActions.js';
 import { battedCrackerRun } from '../engine/rules/ordnance.js';
 import { pathTo } from '../engine/rules/movement.js';
-import { rangeToFurnace } from '../engine/rules/payload.js';
+import { rangeToFurnace, throwRange } from '../engine/rules/payload.js';
 import { passInterceptors, provokedAlong } from '../engine/rules/reactions.js';
+import { hasLineOfSight } from '../engine/rules/sight.js';
 import { statsFor } from '../engine/stats.js';
 import type { MatchState, Unit, UnitId } from '../engine/types.js';
 import {
@@ -92,6 +93,7 @@ function candidatesFor(board: Board): Candidate[] {
   ];
 
   out.push(...ballCandidates(board));
+  out.push(...relaunchCandidates(board));
   out.push(...violenceCandidates(board));
   out.push(...sparkCandidates(board));
 
@@ -203,6 +205,42 @@ function ballCandidates(board: Board): Candidate[] {
   }
 
   return out;
+}
+
+/**
+ * The relaunch with nobody to throw to (Jérôme, 2026-10-11, after reading the
+ * engine 5 match: the conceding keeper dug in on both goals because none of
+ * its six were within a throw and in sight). For a carrier whose role has
+ * `relaunch` and no legal pass: every reachable cell from which a team-mate
+ * would be in throwing range **and** in line of sight is worth the relaunch,
+ * the nearest to its own mouth first, whatever the leash says, less what the
+ * route would be swung at for. Once there, `ballCandidates` prices the throw
+ * and it goes the same turn. No such cell, nothing is offered, and the keeper
+ * digs in as it would anyway; next turn the same rule reads the board again.
+ * Never a Dash for this: that would spend the Action the throw needs.
+ */
+function relaunchCandidates(board: Board): Candidate[] {
+  const { arena, state, unit, legal, weights: w } = board;
+  if (w.relaunch <= 0 || !unit.holdingPayload || legal.pass.length > 0) return [];
+
+  const out: Candidate[] = [];
+  for (const reachable of legal.destinations.values()) {
+    const cell = reachable.cell;
+    const outlet = board.mates.find(
+      (mate) => throwRange(cell, mate).ok && hasLineOfSight(arena, cell, mate),
+    );
+    if (!outlet) continue;
+    const route = pathTo(legal.destinations, cell);
+    if (!route) continue;
+    const exposed = provokedAlong(state, unit, route).length;
+    out.push({
+      action: { kind: 'move', path: route },
+      score:
+        w.relaunch - rangeToFurnace(cell, board.ownFurnace) * 0.5 - exposed * w.avoidOpportunity,
+      why: `step out to (${cell.x}, ${cell.y}) for a line to ${outlet.name}`,
+    });
+  }
+  return rank(out).slice(0, 2);
 }
 
 /** Whether anybody is standing on this player, which is what makes a pass a way out. */

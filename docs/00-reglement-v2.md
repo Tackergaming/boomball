@@ -471,7 +471,7 @@ contre 1,12 / 1,40 / 2,00 en `09` §10, et surtout **trois fois moins d'évacué
 les Breakers, les Crackers touchent beaucoup moins de monde. L'équilibrage, clos le 2026-10-10,
 **est rouvert par 2H.6 le temps de ce tableau, que Jérôme lit et tranche.**
 
-## C10. Écarts décidés le 2026-10-11 après la partie à la porte de 2H.7, **dans le code depuis 2H.8 le 2026-10-11, pas encore en ligne**
+## C10. Écarts décidés le 2026-10-11 après la partie à la porte de 2H.7, **dans le code depuis 2H.8 et en ligne le 2026-10-11 (moteur 5)**
 
 > Écrits par le fil principal (Fable 5.1) sur les retours de Jérôme après sa partie sur le moteur 4,
 > donnés en chat le 2026-10-11 et reformulés en trois passes, rôle par rôle, avant la moindre ligne
@@ -566,6 +566,15 @@ par rapport à C9 est en gras.
 1. Spark sous ses pieds : l'attraper.
 2. **Après un but : premier de l'initiative de son équipe (écart 54), il lance la balle
    immédiatement, au plus loin, même avec un risque d'interception.** Il ne la garde jamais.
+   **Sans receveur, décidé par Jérôme le 2026-10-11 après la mise en ligne** (lu en base : le
+   gardien se plantait au lieu de lancer, personne à portée ni en vue dans une relance sur deux) :
+   **si une case atteignable avec son déplacement normal lui donne un coéquipier à portée de passe
+   et en ligne de mire, il y va, même au-delà de ses quatre cases, la plus proche de sa bouche, et
+   passe dans le même tour ; sinon il se plante et garde le ballon ; au tour suivant la même règle
+   s'applique, il passe dès qu'il le peut, et s'il n'a toujours aucune ligne même en marchant, il
+   se replante.** Jamais de Dash pour ça. Le ballon parti, sa laisse reprend et il rentre. C'est
+   une règle de l'IA, pas du moteur : `ENGINE_VERSION` ne bouge pas, les fonctions sont à
+   redéployer.
 3. Le blocage en Réaction à deux cases de sa bouche, inchangé.
 4. Il reste au centre de sa bouche.
 5. Balle au sol à trois cases ou moins : il va la chercher. Plus loin, non.
@@ -598,4 +607,8 @@ allié, sur leur ligne, et vaut aussi le Dash quand le porteur est à plus d'un 
 (150, Bulwark) s'ajoute à toute passe hors du facteur d'interception et lève les filtres de la
 chaîne ; le Dash ordinaire n'est plus offert quand une frappe, une bousculade ou un Cracker est à
 portée ; le Bulwark se plante sans condition de proximité, et un Bulwark planté paie `brace` pour
-tout pas. Le `shove` du Breaker passe de 65 à 50, son `shoot` de 45 à 15.
+tout pas. Le `shove` du Breaker passe de 65 à 50, son `shoot` de 45 à 15. **La relance sans
+receveur** est `relaunchCandidates` dans `chooseAction.ts` : pour un porteur dont `relaunch` est
+positif et sans passe légale, chaque case atteignable d'où un coéquipier est à portée et en vue
+vaut `relaunch`, moins un demi-point par case de distance à sa bouche et la pénalité d'attaque
+d'opportunité de la route, hors de la laisse ; une fois sur place, la passe suit.

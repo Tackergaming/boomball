@@ -1271,7 +1271,31 @@ la fin du bloc de l'équipe qui a marqué, puis passe en premier du bloc de son 
 | L'écran de la zone et de la relance | Fait, **un troisième sous-agent Sonnet effort moyen** : `Board.tsx` dessine la zone fermée en violet sous les cases atteignables (`data-box`), `Feed.tsx` et `replay.ts` disent « is moved out of the penalty box », le projecteur du rejeu saute le pion, `Briefing.tsx` gagne deux items. Non vu en navigateur par l'agent |
 | Vérification | `npm test` 460 sur 22 fichiers contre 429, `npm run typecheck` vert (racine, scripts, e2e), client typecheck et build verts. **Smoke vert en 32 s contre le moteur 4 en ligne**, `ENGINE_VERSION` épinglée à 4 le temps du run et remise à 5 ; `boxClosed` lit l'état d'un moteur antérieur sans planter pour ça. Captures lues : le fil énumère désormais les marches, les Dash et les bousculades tenues |
 
-**Ce qui attend Jérôme** : relire `00` C10 ; **le feu vert de redéploiement** des deux fonctions
-(moteur 5, les matchs du moteur 4 archivés, aucune migration) ; sa partie, avec la zone violette
-après un but, la relance du gardien, le Trajector qui laisse le ballon du coup d'envoi ; puis
-**un sweep s'il le demande**, un seul, contre `09` §12.
+**La mise en ligne, le 2026-10-11 dans le même chat**, par le fil principal (Fable 5.1), après le
+commit poussé par Jérôme (`/commit et push`) et son feu vert :
+
+| Quoi | État |
+|---|---|
+| Redéploiement | `resolve-action` v13 et `create-match` v11, **moteur 5 en ligne**, aucune migration. Les matchs du moteur 4 sont archivés par le client |
+| Harnais sur le moteur 5 | Smoke vert en 33 s, playthrough vert en 37 s, 15 requêtes humaines, 0 refusée, un match entier jusqu'au sifflet, perdu 0 à 20 par le compte e2e |
+| Ce que les captures montrent | **Le Trajector allié laisse le ballon du coup d'envoi** (le fil : « Voss Powderkin moves 8 cells », ballon encore au centre, et c'est le pas sans but noté en dette) ; au round 9, **le Trajector chasse le Spark et prend l'attaque d'opportunité pour y aller** (« Gullo Emberkell catches Voss Powderkin leaving », « grabs at the Spark and misses », « The Spark skips a cell away from under its minder ») ; le fil énumère marches, Dash et bousculades tenues |
+| Les événements du match en ligne, lus en base | Le ballon du coup d'envoi pris par `A-striker-3`, pas par le Trajector. Deux buts de la maison, les deux par un Breaker tirant de loin : **personne dans la zone, donc aucun `relocated`**, la zone violette n'a pas encore été vue. **Après chaque but, le premier tour du camp qui encaisse est bien `A-bulwark-1`**, au round suivant (écart 54 en ligne). Mais les deux fois le gardien **s'est planté au lieu de lancer** |
+| Pourquoi le gardien ne lance pas | Sonde sur 30 matchs d'auto-jeu en veteran, 36 relances : **le gardien lance à chaque fois qu'une passe est légale (13 sur 13)**, et se plante quand aucune ne l'est (22 sur 36), parce qu'après un but ses six coéquipiers sont à 15 à 30 cases de lui, hors des 12 cases ou derrière une caisse. `rejoin` (Striker 40, Trajector 30) les ramène à portée au round suivant, et il lance alors. La règle « il lance immédiatement » n'a donc pas de receveur une fois sur deux : **question posée à Jérôme**, voir ci-dessous. Sonde jetée après lecture |
+
+**La relance sans receveur, tranchée par Jérôme le 2026-10-11 et codée dans la foulée**, fil
+principal : si une case atteignable avec son déplacement normal donne au gardien un coéquipier à
+portée et en vue, il y va, même au-delà de sa laisse, la plus proche de sa bouche, et passe dans le
+même tour ; sinon il se plante ; au tour suivant même règle, et sans ligne même en marchant il se
+replante, jamais de Dash. Écrit dans `00` C10 sous le Bulwark. `relaunchCandidates` dans
+`chooseAction.ts`, et la laisse est levée dans `positionValue` tant qu'il porte le ballon avec une
+relance à faire, sinon il revenait à sa bouche à 500 points au lieu de lancer, vu en traçant la
+scène. 2 tests, **462 tests**, typecheck vert. **Règle d'IA seule** : `ENGINE_VERSION` reste 5,
+mais les deux fonctions portent l'IA et sont **à redéployer sur le feu vert de Jérôme**.
+
+**Redéployée le 2026-10-11 sur le feu vert de Jérôme** : `resolve-action` v14 et `create-match`
+v12, moteur 5 inchangé.
+
+**Ce qui attend Jérôme** : `/commit` ;
+sa partie sur le moteur 5, avec en retours numérotés ce que chaque rôle cherche, la zone violette
+après un but, la relance du gardien, le Trajector qui laisse le ballon du coup d'envoi ; puis **un
+sweep s'il le demande**, un seul, contre `09` §12.
