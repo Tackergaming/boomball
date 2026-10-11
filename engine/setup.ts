@@ -76,6 +76,8 @@ export function createMatch(setup: MatchSetup): MatchState {
     units: rollHumanInitiative(units, rng),
     payload,
     lastCarrierTeam: null,
+    penaltyBox: { A: null, B: null },
+    relaunch: null,
     crackers,
     // The Spark stays off the field until the start of round 6.
     spark: { state: 'pending', x: ordnance.x, y: ordnance.y, heading: null },

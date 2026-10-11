@@ -414,7 +414,7 @@ plateau (retour 7), et la passe d'animation 2D passe avant toute ligne de 2.5D (
 | 48 | Interception possible par tout adversaire à une case d'une cellule du vol, la première comprise (B7, écart 34) | **La première case du vol ne compte pas** : une passe qui quitte les mains ne se vole pas par un voisin du lanceur. Un adversaire doit être sur la trajectoire ou à une case d'une cellule du vol à partir de la deuxième. Conséquences : une passe à un coéquipier adjacent ne s'intercepte jamais ; un adversaire voisin du lanceur compte encore s'il est aussi à une case de la deuxième cellule | Jérôme, retour 6, sur la proposition du fil principal | **Fait en 2H.6**, sous-agent Sonnet, `passInterceptors` dans `rules/reactions.ts` |
 | 37 bis | Le remplaçant entre à côté de la bouche de sa Furnace (écart 37) | **La case libre la plus proche du centre**, le centre lui-même s'il est libre, jamais le ballon au sol, une unité ni un Cracker vivant, égalités au dé | Jérôme, tranché au départ de 2H.6 sur le retour 5 : revenir à côté de sa Furnace était trop pénalisant | **Fait en 2H.6.** Dérivé de `ordnanceStart` dans le moteur, règle `nearestFreeCell` de `rules/placement.ts` partagée avec les Crackers ; la colonne `substitute_entry` de la ligne `arenas` et le champ du spec restent et ne sont plus lus, pas de migration |
 
-## C9. Écarts décidés le 2026-10-10 après la partie à la porte de 2H.6, **dans le code depuis 2H.7, pas encore en ligne**
+## C9. Écarts décidés le 2026-10-10 après la partie à la porte de 2H.6, **dans le code depuis 2H.7, en ligne le 2026-10-10 (moteur 4)**
 
 > Écrits par le fil principal (Fable 5.1) sur les retours de Jérôme après sa partie sur le moteur 3
 > (`07` §10, sous 2H.6), tranchés par lui en une question chacun au départ de 2H.7, puis implémentés
@@ -470,3 +470,132 @@ contre 1,12 / 1,40 / 2,00 en `09` §10, et surtout **trois fois moins d'évacué
 0,61 contre 2,35 / 1,75 / 1,24) : nés aux piliers, à huit cases, lancés sur le ballon et parés par
 les Breakers, les Crackers touchent beaucoup moins de monde. L'équilibrage, clos le 2026-10-10,
 **est rouvert par 2H.6 le temps de ce tableau, que Jérôme lit et tranche.**
+
+## C10. Écarts décidés le 2026-10-11 après la partie à la porte de 2H.7, **dans le code depuis 2H.8 le 2026-10-11, pas encore en ligne**
+
+> Écrits par le fil principal (Fable 5.1) sur les retours de Jérôme après sa partie sur le moteur 4,
+> donnés en chat le 2026-10-11 et reformulés en trois passes, rôle par rôle, avant la moindre ligne
+> de code. Deux écarts de règle, 53 et 54 ; le reste est de l'IA et de l'écran. L'écart 53 ajoute un
+> champ à l'état et un événement, l'écart 54 change l'échelle : **`ENGINE_VERSION` monte à 5**, les
+> matchs ouverts du moteur 4 sont archivés au redéploiement.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 53 | Après un but, le ballon neuf est dans les mains du gardien qui vient d'encaisser, et rien n'empêche les adversaires de camper devant sa bouche | **La surface de réparation.** Au moment du but, la zone des cases à **trois cases ou moins, en portée de grille, diagonales comprises**, de l'une des trois cases de la bouche qui vient d'encaisser, est **interdite à l'équipe qui a marqué**, pendant le round du but et **tout le round suivant**, levée au début du round d'après. Sur le layout : `x` 3 à 11, `y` 0 à 3 devant la Furnace A, `y` 41 à 44 devant la B, soit 33 cases hors bouche, qui contiennent la case du gardien et sa portée de blocage. **Tout adversaire déjà dedans est replacé immédiatement** sur la case libre la plus proche hors de la zone, égalités au dé, la règle `nearestFreeCell` du remplaçant (écart 37 bis), sans perdre le ballon s'il le porte ; événement `relocated`. Ensuite **aucun déplacement n'y fait entrer un adversaire** : ni un pas volontaire, ni une poussée, ni un recul explosif, qui s'arrêtent devant la zone comme devant un obstacle. Le ballon, le Spark et les Crackers ne sont pas concernés. Un nouveau but sur la même bouche prolonge la zone ; un but sur l'autre bouche ouvre la sienne, les deux peuvent coexister. Humains et IA y sont soumis de la même façon | Jérôme, le 2026-10-11 : après un but il voyait l'équipe qui venait de marquer se poser autour du gardien, et la relance mourait sur place | **Fait en 2H.8**, fil principal. `rules/box.ts` (`penaltyBoxCells`, `boxClosed`, `barredCells`), état `penaltyBox` par Furnace, `movement.ts` ferme les cases à la route et au chemin envoyé, `combat.ts` arrête poussée et recul au bord, `reduce.ts` ferme la zone et replace au but (`closeBox`), rouvre au début du round d'après. 6 tests dans `engine/box.test.ts` |
+| 54 | Dans une équipe l'ordre est Trajector, Strikers, Breakers, Bulwark (écart 51) ; le Bulwark après un but est le dernier maillon et passe quand même | **Après un but, le Bulwark de l'équipe qui a encaissé passe exceptionnellement en premier de l'initiative de son équipe**, devant le Trajector, et **il lance la balle immédiatement à son tour**, au plus loin, même avec un risque d'interception. Il ne la garde jamais. Le moment précis de ce tour est tranché ci-dessous | Jérôme, le 2026-10-11 : la relance après un but doit partir tout de suite, et remonter la chaîne dans le même round | **Fait en 2H.8**, fil principal. `promoteBulwark` dans `initiative.ts` réordonne l'échelle du round en cours si le bloc de l'équipe qui a encaissé est encore devant ; sinon l'état porte `relaunch` et `buildTurnOrder` met le Bulwark en tête de son équipe au round suivant, puis l'efface. 2 tests |
+
+**Le moment du tour, tranché par Jérôme le 2026-10-11.** Un but se marque pendant le bloc de
+l'équipe qui marque. Le Bulwark **attend la fin de ce bloc**, Crackers compris s'ils suivent cette
+équipe, et **quand arrive le bloc de son équipe, il y passe en premier**, devant le Trajector : dans
+le même round si son équipe n'a pas encore joué, sinon au début du round suivant, où l'échelle est
+construite avec lui en tête de son équipe. Un seul tour, à la première occasion ; ensuite il reprend
+sa place habituelle. S'il est évacué entre-temps, rien ne se passe. Humain ou IA, même règle.
+
+**L'IA par rôle, deuxième version, dictée par Jérôme le 2026-10-11.** Elle remplace le bloc de C9.
+Les listes sont **triées par priorité**, la première ligne qui s'applique l'emporte. Ce qui change
+par rapport à C9 est en gras.
+
+*Règles communes aux quatre rôles.*
+
+1. Debout sur le Spark : l'attraper, toujours.
+2. Debout sur le ballon au sol : le ramasser. Seule exception, le Breaker, qui le laisse à un
+   Striker ou un Trajector à deux cases ou moins.
+3. **Une cible légitime pour son rôle à portée de frappe ou de bousculade se frappe ou se
+   bouscule**, jamais un déplacement de trois cases à la place.
+4. **Ne jamais finir un tour sans agir** quand une action utile est légale.
+5. La chaîne : le porteur ne passe jamais à quelqu'un qui a déjà joué ce round, sauf dernier maillon
+   de son équipe, qui passe au plus loin, sans intercepteur d'abord. Le receveur est devant ou sur la
+   même ligne, ou 1 à 3 cases derrière s'il est le tout prochain à jouer.
+6. **Au coup d'envoi, en IA, c'est un Striker qui prend la balle, jamais le Trajector.** Le moteur
+   range déjà les Strikers du plus proche de la balle au plus loin.
+7. Dodge est le dernier recours : abîmé de moitié et rien à frapper, bousculer, passer ni tirer.
+
+*Trajector.*
+
+1. **Spark sur le terrain : il le chasse et rien d'autre.** Il quitte l'attaque ou la défense, et
+   accepte l'attaque d'opportunité s'il commence son tour au contact.
+2. Spark sous ses pieds : l'attraper.
+3. **Coup d'envoi en IA : il ne prend pas la balle au premier tour.**
+4. Lanceur du round, balle en main : il passe au receveur devant ou sur la même ligne, ou 1 à 3
+   cases derrière si c'est le tout prochain à jouer.
+5. Il tire s'il voit la bouche à portée propre et que personne n'ira aussi loin que lui.
+6. Balle au sol à portée : il la ramasse, priorité partagée avec les Strikers.
+7. En défense : bousculade du porteur pour faire tomber la balle.
+8. En attaque sans la balle : il se place à vue du porteur, en relais, et revient à portée de passe
+   s'il est trop loin.
+9. Dodge en dernier recours.
+
+*Striker.*
+
+1. Spark sous ses pieds : l'attraper.
+2. Balle au sol à portée : il la ramasse, priorité partagée avec le Trajector.
+3. Porteur : il avance le plus vite possible vers la bouche adverse, et tire s'il la voit à portée
+   propre.
+4. Porteur sans tir : il passe à un maillon qui n'a pas encore joué, devant ou sur la même ligne, ou
+   1 à 3 cases derrière si c'est le tout prochain.
+5. En attaque sans la balle : il se place devant ou sur la ligne du porteur, étalé, jamais collé à
+   un coéquipier ; trop loin devant, il revient à portée de passe. **Un adversaire collé au porteur
+   allié ne le fait pas bouger : il garde sa position de relais.**
+6. **En défense, il presse le porteur coûte que coûte** : finir son tour sur une case adjacente au
+   porteur adverse. **Priorité au déplacement normal jusqu'à l'adjacence puis Shove** pour faire
+   tomber la balle ; **sinon Dash pour arriver adjacent**, même sans action restante, afin de tenir
+   l'attaque d'opportunité quand le porteur partira.
+7. Dodge en dernier recours.
+
+*Breaker.*
+
+1. Spark sous ses pieds : l'attraper.
+2. La parade, en Réaction, quand un Cracker en dérive arrive sur sa case. Automatique.
+3. **En défense, d'abord le porteur : y aller et le bousculer** pour faire tomber la balle.
+4. **Porteur hors de portée : taper l'adversaire proche, Strikers d'abord, puis Breakers, puis
+   Trajector.**
+5. En défense, personne à portée : sa position vise d'abord le chemin des adversaires vers ses
+   Strikers, pour qu'aucun ne finisse adjacent à eux, ensuite la ligne des Crackers, où il se poste
+   exprès pour parer.
+6. **En attaque, il est un obstacle entre les adversaires et le porteur allié** : il se place sur
+   le chemin qu'ils devraient emprunter, pour qu'ils dépensent plus de mouvement ou n'arrivent pas
+   en case adjacente au porteur. Plus de notion d'épaule. **Loin du porteur, il Dash pour être
+   proche au round suivant** plutôt que de frapper un retardataire adverse. Collé au porteur avec un
+   adversaire déjà adjacent, il le frappe. En seconde priorité, la ligne des Crackers.
+7. Balle perdue : il la laisse à un Striker ou un Trajector à deux cases ou moins ; s'il la prend
+   quand même, il passe à la première occasion. Il ne tire quasiment jamais.
+8. Dodge en dernier recours.
+
+*Bulwark.*
+
+1. Spark sous ses pieds : l'attraper.
+2. **Après un but : premier de l'initiative de son équipe (écart 54), il lance la balle
+   immédiatement, au plus loin, même avec un risque d'interception.** Il ne la garde jamais.
+3. Le blocage en Réaction à deux cases de sa bouche, inchangé.
+4. Il reste au centre de sa bouche.
+5. Balle au sol à trois cases ou moins : il va la chercher. Plus loin, non.
+6. Il sort bousculer jusqu'à quatre cases de son but, pas plus.
+7. **Il se plante par défaut**, dès qu'il n'a rien de mieux : pas de balle à lancer, pas de balle au
+   sol à trois cases ou moins, pas de porteur à bousculer à quatre cases ou moins. **Il n'attend pas
+   qu'un adversaire approche.**
+8. Dodge en dernier recours.
+
+**Deux retours d'écran sans règle**, 2H.8 : **la route proposée est une ligne droite par défaut**,
+la diagonale puis le droit, et ne contourne que ce qui bloque, jamais un arc (capture de Jérôme du
+2026-10-11 : une route qui montait de deux cases et redescendait sans obstacle) ; et **toutes les
+actions des IA s'affichent** dans le fil et dans le rejeu, aucune n'est tue.
+
+**Ce que ces écarts rouvrent.** Rien dans les constantes de `00`. L'IA change dans les quatre
+fiches de `ai/roles/`, `ai/evaluate.ts` et `ai/chooseAction.ts` ; **un seul sweep à la fin, si
+Jérôme le demande**, contre `09` §12. **Pas lancé au 2026-10-11.**
+
+**Comment l'IA v2 est codée**, par le fil principal, pour relire les poids contre les mots :
+`chaseKickoff` (0 pour le Trajector) retire le ballon du coup d'envoi, jamais porté, à ce rôle ;
+`Board.hunter` (Spark sur le terrain et `chaseSpark` > 0, le Trajector seul) fait de
+`positionValue` une fonction du Spark seul, retire les attaques et les bousculades des candidats,
+annule la pénalité d'attaque d'opportunité sur la route, et ajoute `chaseSpark` à toute passe pour
+qu'il se débarrasse du ballon ; la case adjacente au porteur adverse vaut `pressCarrier` en plus du
+gradient, et `dashCandidates` offre le Dash à `pressCarrier` quand l'adjacence n'est atteignable
+qu'avec lui ; `hunt` (70, Breaker) paie la case adjacente à un adversaire frappable, pondérée par
+`prey` (Strikers 1, Breakers 0,8, Trajector 0,6) qui pondère aussi la valeur du coup ; `block`
+(60, Breaker, remplace `escort`) paie la case entre les deux menaces les plus proches et le porteur
+allié, sur leur ligne, et vaut aussi le Dash quand le porteur est à plus d'un déplacement ; `relaunch`
+(150, Bulwark) s'ajoute à toute passe hors du facteur d'interception et lève les filtres de la
+chaîne ; le Dash ordinaire n'est plus offert quand une frappe, une bousculade ou un Cracker est à
+portée ; le Bulwark se plante sans condition de proximité, et un Bulwark planté paie `brace` pour
+tout pas. Le `shove` du Breaker passe de 65 à 50, son `shoot` de 45 à 15.

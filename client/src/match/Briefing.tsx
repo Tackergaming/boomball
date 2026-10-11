@@ -95,6 +95,16 @@ export function Briefing({ onClose }: { onClose: () => void }) {
             title="Your turn"
             body={`One move and one action, in any order, within ${TURN_TIMER_SECONDS} seconds. Run out and the clock takes cover for you and passes the turn on. A Bulwark can dig in for its Action: until its next turn, or until it moves, shoving it rolls at disadvantage and minus 3.`}
           />
+          <Item
+            mark={<span style={S.shove}>&times;</span>}
+            title="The penalty box"
+            body="After a goal, the cells within three of their Furnace are closed to the side that just scored, for that round and the next. Anyone of theirs already inside is moved out for them."
+          />
+          <Item
+            mark={<span style={S.shove}>&larr;</span>}
+            title="The keeper restarts"
+            body="After a goal, the Bulwark who let it in goes first in the initiative of his side at its next block, and restarts the play at once."
+          />
         </div>
 
         <p style={S.foot}>

@@ -156,6 +156,12 @@ export type MatchEvent =
     }
   /** The Bulwark digs in (écart 52). */
   | { readonly kind: 'braced'; readonly unitId: UnitId }
+  /**
+   * A player of the side that just scored was standing inside the penalty box
+   * of the mouth it scored in and is put out of it at once (écart 53, 2H.8),
+   * on the nearest free cell outside. New in engine version 5.
+   */
+  | { readonly kind: 'relocated'; readonly unitId: UnitId; readonly from: Point; readonly to: Point }
   | { readonly kind: 'payloadGrabbed'; readonly unitId: UnitId }
   | { readonly kind: 'payloadDropped'; readonly unitId: UnitId; readonly at: Point }
   | {

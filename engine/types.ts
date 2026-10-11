@@ -180,6 +180,23 @@ export interface MatchState {
    * (écart 51). Null until somebody picks it up.
    */
   readonly lastCarrierTeam: TeamId | null;
+  /**
+   * The penalty box (écart 53, 2H.8), keyed by the team that **defends** the
+   * mouth: the last round through which the other side is barred from the
+   * cells in front of it, or null when it is open. Set by a goal, read by
+   * every route and forced move, cleared at the top of the round after it
+   * lapses. See `rules/box.ts`.
+   */
+  readonly penaltyBox: Readonly<Record<TeamId, number | null>>;
+  /**
+   * The side whose Bulwark goes first in its next block (écart 54, 2H.8):
+   * set by a goal when the conceding side has already played this round, so
+   * the next ladder is built with the keeper at the head of that side, then
+   * cleared. Null otherwise. When that side has not played yet, the ladder
+   * of the current round is reordered on the spot instead and this stays
+   * null.
+   */
+  readonly relaunch: TeamId | null;
   readonly crackers: readonly Cracker[];
   readonly spark: Spark;
 

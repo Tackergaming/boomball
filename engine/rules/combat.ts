@@ -13,6 +13,7 @@ import { inBounds, type Point } from '../geometry.js';
 import type { Rng } from '../rng.js';
 import { statsFor } from '../stats.js';
 import { activeUnits, type MatchState, type Unit } from '../types.js';
+import { barredCells } from './box.js';
 
 export interface AttackOutcome {
   readonly roll: DiceRoll;
@@ -172,11 +173,14 @@ function forcedDestination(
       .filter((u) => u.id !== mover.id)
       .map((u) => `${u.x},${u.y}`),
   );
+  // The closed penalty box stops a push or a recoil like a crate (écart 53).
+  const barred = barredCells(arena, state, mover.team);
 
   let landing: Point = { x: mover.x, y: mover.y };
   for (let i = 0; i < cells; i++) {
     const next = { x: landing.x + step.x, y: landing.y + step.y };
-    if (!inBounds(next) || arena.isSolid(next) || occupied.has(`${next.x},${next.y}`)) break;
+    const k = `${next.x},${next.y}`;
+    if (!inBounds(next) || arena.isSolid(next) || occupied.has(k) || barred.has(k)) break;
     landing = next;
   }
   return landing;

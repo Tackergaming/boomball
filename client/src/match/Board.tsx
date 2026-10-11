@@ -30,6 +30,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
+import { boxClosed, penaltyBoxCells } from '../../../engine/rules/box.js';
 import { pathCostFeet, pathTo, reachableCells, type Reachable } from '../../../engine/rules/movement.js';
 import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
@@ -499,6 +500,29 @@ export function Board({
           {/* 1 to 5. The floor, the grid, the obstacles, the Furnaces and the
               thirds. Nothing here moves, so it is drawn once. */}
           <Backdrop own={own} />
+
+          {/* 5b. The closed penalty boxes (écart 53): violet wash and a dashed
+              edge, under the reachable cells and the tokens. Deaf to the mouse. */}
+          {(['A', 'B'] as const).map((defender) =>
+            boxClosed(state, defender) ? (
+              <g key={`box${defender}`} data-box={defender} style={{ pointerEvents: 'none' }}>
+                <title>{`Penalty box: closed to ${defender === 'A' ? 'B' : 'A'} until the end of round ${state.penaltyBox[defender]}`}</title>
+                {penaltyBoxCells(arena, arena.furnaceOf(defender)).map((cell) => (
+                  <rect
+                    key={`${cell.x}-${cell.y}`}
+                    x={cell.y + 0.04}
+                    y={cell.x + 0.04}
+                    width={0.92}
+                    height={0.92}
+                    fill="rgba(160,110,255,.16)"
+                    stroke="rgba(160,110,255,.45)"
+                    strokeWidth={0.03}
+                    strokeDasharray="0.12 0.1"
+                  />
+                ))}
+              </g>
+            ) : null,
+          )}
 
           {/* 6. Where this unit could stand. */}
           {reachable &&

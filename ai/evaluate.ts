@@ -74,6 +74,14 @@ export interface Board {
    * array per live Cracker, empty when it would not move.
    */
   readonly crackerLines: readonly (readonly Point[])[];
+  /**
+   * Whether this unit is hunting the Spark right now: the Spark is on the
+   * field and this role chases it (`chaseSpark` above zero, the Trajector).
+   * Jérôme, 2026-10-11: while it is on the field the hunter chases it and
+   * nothing else, drops out of attack and defence, and takes the opportunity
+   * attack if it starts its turn in a melee.
+   */
+  readonly hunter: boolean;
 }
 
 export function buildBoard(
@@ -105,6 +113,7 @@ export function buildBoard(
     mates: others.filter((u) => u.team === unit.team),
     enemies: others.filter((u) => u.team !== unit.team),
     crackerLines,
+    hunter: sparkIsLive(state.spark) && weights.chaseSpark > 0,
   };
 }
 
@@ -321,27 +330,60 @@ export function shotQuality(board: Board, unit: Unit, from: Point): number {
 // -- The bodyguard ------------------------------------------------------------
 
 /**
- * The shoulder that matters: how good a cell is for standing between our own
- * carrier and the nearest opponent, zero to one.
+ * The wall: how good a cell is for being an obstacle between our own carrier
+ * and the opponents coming at it, zero to one. Jérôme's wording of
+ * 2026-10-11, replacing the shoulder of 2H.7: the point is that they spend
+ * more movement, or cannot finish adjacent to the carrier at all.
  *
- * Two factors. Closeness to the carrier, one on its shoulder, a little less a
- * cell further out, and a thin gradient beyond so a Breaker across the pitch
- * still walks over. And the side: a cell nearer the threat than the carrier
- * is reads one, a cell on the far shoulder reads half. With no opponent on
- * the field any shoulder is as good as another.
+ * Read against the two nearest threats. For each, the cell is worth its
+ * closeness to the carrier (one a cell off, a little less two cells off, a
+ * thin gradient beyond so a Breaker across the pitch still walks over), on
+ * the threat's side of the carrier (half on the far side), and on or beside
+ * the straight line the threat would take (half off it). With no opponent on
+ * the field, beside the carrier is as good as anywhere.
  *
  * It is the carrier and never a Striker by name, by Jérôme's arbitration of
  * 2026-10-10: the thing to protect is whoever has the ball, and when the
- * ball is loose or on the other side there is nobody to escort and the
- * Breaker is a hunter (`pressCarrier`) or a parry post instead.
+ * ball is loose or on the other side there is nobody to wall off and the
+ * Breaker is a hunter (`pressCarrier`, `hunt`) or a parry post instead.
  */
-export function escort(board: Board, cell: Point): number {
+export function block(board: Board, cell: Point): number {
   const carrier = board.carrier;
   if (!carrier || carrier.team !== board.unit.team || carrier.id === board.unit.id) return 0;
-  // A goalkeeper at home wants outlets, not shoulders: see `wantsEscort`.
+  // A goalkeeper at home wants outlets, not a wall: see `wantsEscort`.
   const wanted = weightsFor(carrier.role).wantsEscort;
   if (wanted === 0) return 0;
-  return wanted * shoulder(cell, carrier, nearestTo(board.enemies, carrier));
+
+  const threats = nearestN(board.enemies, carrier, 2);
+  if (threats.length === 0) return wanted * shoulder(cell, carrier, null);
+
+  let best = 0;
+  for (const threat of threats) {
+    const lane = lineTo(threat, carrier);
+    const onLane = lane.some((p) => distance(p, cell) <= 1) ? 1 : 0.5;
+    best = Math.max(best, shoulder(cell, carrier, threat) * onLane);
+  }
+  return wanted * best;
+}
+
+/**
+ * The swing within reach when the carrier is not (2H.8): one on a cell beside
+ * an opponent, scaled by what this role makes of that opponent (`prey`), zero
+ * elsewhere and zero for the carrier, whose cell is priced by `pressCarrier`.
+ * Only read when the other side has the ball.
+ */
+export function preyAdjacency(board: Board, cell: Point): number {
+  let best = 0;
+  for (const enemy of board.enemies) {
+    if (enemy.holdingPayload || distance(enemy, cell) !== 1) continue;
+    best = Math.max(best, board.weights.prey[enemy.role]);
+  }
+  return best;
+}
+
+/** The `n` units nearest to a point, nearest first. */
+function nearestN(units: readonly Unit[], to: Point, n: number): Unit[] {
+  return [...units].sort((a, b) => distance(a, to) - distance(b, to)).slice(0, n);
 }
 
 /**
@@ -461,14 +503,29 @@ export function positionValue(board: Board, cell: Point): number {
   const { state, unit, weights: w } = board;
   let value = 0;
 
+  // The Spark hunter reads nothing but the Spark (2H.8, Jérôme): the whole
+  // ball game and the stances below are off while it is on the field. The
+  // cell the Spark is in carries the catch's worth, for the usual reason: it
+  // is the cell that makes the action legal. The Crackers are still a danger.
+  if (board.hunter) {
+    let hunt = w.chaseSpark * nearness(cell, state.spark);
+    if (cell.x === state.spark.x && cell.y === state.spark.y) {
+      hunt += w.catchSpark * chance(statsFor(unit.role, unit.tier).agility, SPARK_CATCH_DC);
+    }
+    return hunt - w.avoidCrackers * crackerPressure(board, cell);
+  }
+
   if (unit.holdingPayload) {
     value += w.carryToFurnace * scoringNearness(board.arena, cell, board.targetFurnace);
   } else if (state.payload.carriedBy === null) {
     // A Breaker leaves the ball to a Striker standing beside it: see
-    // `keenerMateNear`. Everybody else reads a share of one. And a keeper only
-    // goes for a ball lying within its reach (`looseBallReach`).
+    // `keenerMateNear`. Everybody else reads a share of one. A keeper only
+    // goes for a ball lying within its reach (`looseBallReach`). And the
+    // kick-off ball, which nobody has carried yet, is a Striker's to take:
+    // the Trajector reads `chaseKickoff` zero and keeps itself for the throw.
+    const kickoff = state.lastCarrierTeam === null ? w.chaseKickoff : 1;
     const share =
-      distance(unit, state.payload) > w.looseBallReach ? 0 : loosePayloadShare(board);
+      distance(unit, state.payload) > w.looseBallReach ? 0 : loosePayloadShare(board) * kickoff;
     value += w.chaseLoosePayload * share * nearness(cell, state.payload);
     // The cell the ball is actually lying in is worth the pickup, not one more
     // step of gradient. Without this the last cell gains `chaseLoosePayload/45`,
@@ -479,8 +536,8 @@ export function positionValue(board: Board, cell: Point): number {
     if (cell.x === state.payload.x && cell.y === state.payload.y) value += w.grabPayload * share;
   } else if (board.carrier && board.carrier.team === unit.team) {
     value += w.screenCarrier * nearness(cell, board.carrier);
-    // The bodyguard's shoulder: beside the carrier, facing the threat.
-    value += w.escort * escort(board, cell);
+    // The bodyguard's wall: between the threats and the carrier.
+    value += w.block * block(board, cell);
     // Getting open: reachable, in the carrier's sight, ahead of it, and ideally
     // with a shot. See `outlet`. Without the sight and the ground gained, a
     // support player either walks to the far end and strands its carrier, or,
@@ -494,23 +551,23 @@ export function positionValue(board: Board, cell: Point): number {
     if (passReach(unit, board.carrier) === 0) value += w.rejoin * nearness(cell, board.carrier);
   } else if (board.carrier) {
     value += w.pressCarrier * nearness(cell, board.carrier);
+    // The cell beside the carrier is the one that makes the Shove legal and
+    // holds the opportunity attack when the carrier leaves: it is worth the
+    // press itself, not one more step of gradient. Jérôme, 2H.8: a Striker
+    // presses the carrier "coûte que coûte", and finishes adjacent.
+    if (distance(cell, board.carrier) === 1) value += w.pressCarrier;
+    // The carrier out of reach, the Breaker swings at whoever is in reach,
+    // Strikers first (`hunt`, `prey`).
+    value += w.hunt * preyAdjacency(board, cell);
   }
 
   // The bodyguard's stance when the ball is not ours. See `screen`.
   value += w.screen * screen(board, cell);
 
   // `chaseSpark` is the switch for the whole Spark hunt, and it is zero for
-  // every role but the Trajector. A Striker that finds itself in the Spark's
-  // cell still catches it, because that is free; it just never walks there.
-  if (sparkIsLive(state.spark) && w.chaseSpark > 0) {
-    value += w.chaseSpark * nearness(cell, state.spark);
-    // Same defect as the loose Payload, same cure: standing in the Spark's cell
-    // is what makes the catch legal, so the cell has to carry the catch's worth
-    // rather than one more step of gradient.
-    if (cell.x === state.spark.x && cell.y === state.spark.y) {
-      value += w.catchSpark * chance(statsFor(unit.role, unit.tier).agility, SPARK_CATCH_DC);
-    }
-  }
+  // every role but the Trajector, which is handled as `hunter` at the top. A
+  // Striker that finds itself in the Spark's cell still catches it, because
+  // that is free; it just never walks there.
 
   value += w.guardFurnace * furnaceNearness(cell, board.ownFurnace);
 

@@ -25,6 +25,7 @@ import {
   MATCH_ROUNDS,
   MOVE_SPEED_FEET,
   PAYLOAD_PASS_AC,
+  PENALTY_BOX_ROUNDS,
   SPARK_CATCH_DC,
   SPARK_ENTRY_ROUND,
   SPARK_POINTS,
@@ -33,7 +34,7 @@ import {
 } from './constants.js';
 import type { MatchEvent } from './events.js';
 import { directionFromD8, distance, lineTo, stepCostFeet, type Point } from './geometry.js';
-import { buildTurnOrder } from './initiative.js';
+import { buildTurnOrder, promoteBulwark } from './initiative.js';
 import { Rng } from './rng.js';
 import {
   attackMode,
@@ -55,7 +56,8 @@ import {
   sparkRun,
   type HazardRun,
 } from './rules/ordnance.js';
-import { nearestFreeCell, takenOn } from './rules/placement.js';
+import { barredCells } from './rules/box.js';
+import { cellKey, nearestFreeCell, takenOn } from './rules/placement.js';
 import {
   blockingBulwark,
   dropCell,
@@ -69,11 +71,13 @@ import { hasLineOfSight } from './rules/sight.js';
 import { statsFor } from './stats.js';
 import {
   activeUnits,
+  activeUnitsOf,
   opposingTeam,
   sparkIsLive,
   type Cracker,
   type MatchResult,
   type MatchState,
+  type TeamId,
   type TurnSlot,
   type Unit,
   type UnitId,
@@ -1065,7 +1069,49 @@ function score(ctx: Ctx, state: MatchState, team: MatchState['units'][number]['t
 
   // In sudden death the first goal ends it, which is the whole point of it.
   if (next.phase === 'suddenDeath') return finish(next, ctx.log);
+
+  // The box closes and the keeper's relaunch is scheduled (écarts 53 and 54).
+  return scheduleRelaunch(ctx.arena, closeBox(ctx, next, defender), defender);
+}
+
+/**
+ * The penalty box (écart 53): the mouth that just conceded closes its box to
+ * the scoring side through the next round, and anybody of that side already
+ * inside is put out on the nearest free cell beyond the edge, the dice
+ * splitting ties as for a substitute. A relocated player loses nothing but
+ * its footing: a braced one is no longer braced, which only a keeper could be.
+ */
+function closeBox(ctx: Ctx, state: MatchState, defender: TeamId): MatchState {
+  let next: MatchState = {
+    ...state,
+    penaltyBox: { ...state.penaltyBox, [defender]: state.round + PENALTY_BOX_ROUNDS },
+  };
+  const intruders = opposingTeam(defender);
+  const barred = barredCells(ctx.arena, next, intruders);
+
+  for (const unit of activeUnitsOf(next, intruders)) {
+    if (!barred.has(cellKey(unit))) continue;
+    const taken = takenOn(next);
+    for (const k of barred) taken.add(k);
+    const to = nearestFreeCell(ctx.arena, taken, unit, ctx.rng);
+    ctx.log.push({ kind: 'relocated', unitId: unit.id, from: { x: unit.x, y: unit.y }, to });
+    next = replaceUnit(next, { ...unit, x: to.x, y: to.y, braced: false });
+  }
   return next;
+}
+
+/**
+ * The keeper's relaunch (écart 54): the conceding side's Bulwark opens its
+ * side's next block. If that block is still ahead this round, the ladder is
+ * reordered now; if the side has already played, the next round's ladder is
+ * built with the keeper first (`relaunch`). No keeper on the field, nothing.
+ */
+function scheduleRelaunch(arena: Arena, state: MatchState, defender: TeamId): MatchState {
+  const keeper = activeUnitsOf(state, defender).find((u) => u.role === 'bulwark');
+  if (!keeper) return state;
+  const promoted = promoteBulwark(state.turnOrder, state.turnIndex, defender, keeper.id);
+  if (promoted) return { ...state, turnOrder: promoted };
+  return { ...state, relaunch: defender };
 }
 
 // -- Damage and the bench ---------------------------------------------------
@@ -1297,8 +1343,19 @@ function rebuild(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState
     units: restocked.units.map((u) => ({ ...u, reactionAvailable: true })),
     turnIndex: 0,
     turn: null,
+    // A box whose ban has lapsed opens again (écart 53).
+    penaltyBox: {
+      A: lapsed(restocked, 'A') ? null : restocked.penaltyBox.A,
+      B: lapsed(restocked, 'B') ? null : restocked.penaltyBox.B,
+    },
   };
-  return { ...refreshed, turnOrder: buildTurnOrder(arena, refreshed) };
+  // The relaunch is spent by the ladder it reorders (écart 54).
+  return { ...refreshed, turnOrder: buildTurnOrder(arena, refreshed), relaunch: null };
+}
+
+function lapsed(state: MatchState, defender: TeamId): boolean {
+  const until = state.penaltyBox[defender];
+  return until !== null && state.round > until;
 }
 
 // -- Kick-off ---------------------------------------------------------------

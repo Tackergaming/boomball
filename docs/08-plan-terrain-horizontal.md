@@ -24,8 +24,13 @@
 > le même soir, 429 tests, et mise en ligne le 2026-10-10 dans le chat suivant** : migration 0007
 > appliquée par Jérôme, moteur 4 en ligne (`resolve-action` v12, `create-match` v10), harnais vert
 > après un défaut de relecture de l'ouverture corrigé dans `useMatch.ts`, le sweep unique en `09`
-> §12, journal en `07` §10. **Sa porte n'est pas franchie** : Jérôme tranche `09` §12 puis rejoue et
-> dit s'il comprend ce que chaque rôle cherche. Le prompt est `05-reprise-chat-suivant.md`.
+> §12, journal en `07` §10. **Sa partie est jouée le 2026-10-11** : rien ne bouge au sweep, et ses
+> retours en chat, reformulés en trois passes, forment **2H.8** : la surface de réparation (écart
+> 53), la relance du gardien en tête de son équipe (écart 54), l'IA par rôle en deuxième version
+> (`00` C10, listes triées par priorité), la route en ligne droite et le fil complet. **2H.8 est
+> codée le 2026-10-11**, 460 tests, `ENGINE_VERSION` 5, smoke vert contre le moteur 4 en ligne,
+> **pas encore en ligne**, pas de sweep. Sa porte : le feu vert de redéploiement, puis la partie de
+> Jérôme. Le prompt est `05-reprise-chat-suivant.md`.
 >
 > **Unité d'effort : la séance**, environ deux heures de Claude Code bornées à un commit.
 
@@ -328,6 +333,7 @@ ligne de vue ; `07` garde D11 en §1.2 ; le skill `boomball` et `05` suivent ; `
 | **2H.5 Coup d'envoi, ballon perdu, Crackers, animation 2D** | Écarts 38 révisé, 42, 43 et 44 ; traits de trajectoire retirés ; les pions glissent et le ballon vole, un temps par action ; sweep de contrôle ; migration 0006 et redéploiement | 1 | `smoke.spec.ts` vert avec deux captures d'un même temps à des instants différents, **Jérôme rejoue une partie en 2D animée et dit s'il comprend ce que ses coéquipiers et la maison cherchent** |
 | **2H.6 Crackers vers le ballon, parade du Breaker, écrans** | Le défaut de relecture pendant le rejeu (retour 1) ; écarts 45 (Crackers vers le ballon), 46 (un Cracker par pilier de bord), 47 (parade du Breaker, `ENGINE_VERSION` 3), 48 (la première case du vol ne compte pas) ; les deux points ouverts tranchés par Jérôme ; sweep, équilibrage rouvert le temps de le lire ; redéploiement. **Construite le 2026-10-10 et en ligne le soir**, journal en `07` §10, tableau en `09` §11 tranché par Jérôme | 1 à 1,5 | `npm test` vert, smoke vert, le plateau ne montre plus le futur, Jérôme lit le tableau |
 | **2H.7 L'IA par rôle, l'initiative, le Spark, l'écran** | Écarts 49 à 52 (`00` C9) ; l'IA des quatre rôles dictée par Jérôme (la chaîne qui lit l'échelle, presser par rôle, le Breaker garde du corps, le Bulwark tenu en laisse, Dodge en dernier recours) ; l'ouverture rejouée (migration 0007), agir au clic sur un pion, tracer sa trajectoire, la bande d'initiative ; `ENGINE_VERSION` 4 ; **un seul sweep à la fin** contre `09` §11. **Codée le 2026-10-10 soir**, 429 tests, **en ligne le 2026-10-10** (migration 0007, moteur 4, harnais vert, sweep en `09` §12), journal en `07` §10 | 1,5 à 2 | **Jérôme rejoue et dit qu'il comprend ce que chaque rôle cherche.** Sans ce verdict, pas de phase 3 |
+| **2H.8 La surface de réparation, la relance, l'IA v2, la route, le fil** | Écarts 53 et 54 (`00` C10) ; l'IA des quatre rôles en deuxième version, listes triées par priorité dictées par Jérôme le 2026-10-11 (le Trajector laisse le ballon du coup d'envoi et chasse le Spark sans rien d'autre, le Striker presse le porteur coûte que coûte, le Breaker bouscule le porteur puis tape Strikers, Breakers, Trajector, fait mur devant le porteur allié, le Bulwark relance aussitôt et se plante par défaut, jamais un Dash quand une cible est à portée) ; la route en ligne droite ; toutes les actions des IA dans le fil ; `ENGINE_VERSION` 5 ; **pas de sweep sauf demande**. **Codée le 2026-10-11**, 460 tests, journal en `07` §10 | 1 | Feu vert de redéploiement, puis **Jérôme rejoue et dit qu'il comprend ce que chaque rôle cherche** |
 | 3 Scène 2.5D statique | Sol, obstacles, deux bouches depuis le layout ; caméra trois quarts, deux zooms, pas de rotation ; textures CC0 | 1 à 2 | Comme `07` : bijection layout vers solides, Jérôme reconnaît le terrain |
 | 4 Jouer en 2.5D | Lancer de rayon sur le sol, survol, clic, tuiles atteignables, **aperçu de la ligne de vue** sur les cibles, mini-carte 45 x 15 | 1 à 2 | Jérôme joue une partie en 3D sans basculer |
 | 5 Timeline | Marche, poussée, recul, frappe, dérive du Spark, arc de passe et de tir, éclat de but ; la caméra suit le ballon ; plus aucune chute à animer | 2 | Jérôme suit un round de la maison sans lire le fil |

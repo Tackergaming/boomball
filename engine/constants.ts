@@ -34,11 +34,28 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * the Breaker's parry and its `crackerParried` event (écart 47, 2H.6, decided
  * by Jérôme on 2026-10-10 soir); version 4 is 2H.7: `sparkMoved` carries a
  * `cause`, the Spark skips away from a minder (écart 49) and comes back after a
- * catch (écart 50), so `Spark.state` loses `caught`. Nothing in the engine
- * reads it: the server stamps it on `matches` and refuses a mismatch, and the
- * client archives what it cannot play.
+ * catch (écart 50), so `Spark.state` loses `caught`; version 5 is 2H.8,
+ * decided by Jérôme on 2026-10-11 after his engine 4 game: the penalty box
+ * (écart 53, `penaltyBox` on the state and the `relocated` event) and the
+ * keeper's relaunch at the head of its side's block after a goal (écart 54,
+ * `relaunch` on the state). Nothing in the engine reads it: the server stamps
+ * it on `matches` and refuses a mismatch, and the client archives what it
+ * cannot play.
  */
-export const ENGINE_VERSION = 4;
+export const ENGINE_VERSION = 5;
+
+// -- The penalty box (écart 53) --------------------------------------------
+
+/**
+ * How far from a hatch cell the box in front of a mouth reaches, in grid
+ * range with diagonals: three, Jérôme's number. See `rules/box.ts`.
+ */
+export const PENALTY_BOX_CELLS = 3;
+/**
+ * How many rounds **after** the round of the goal the scoring side stays out
+ * of it: one, so the ban covers the goal's round and the whole next one.
+ */
+export const PENALTY_BOX_ROUNDS = 1;
 
 // -- Movement ---------------------------------------------------------------
 

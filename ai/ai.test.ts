@@ -392,7 +392,7 @@ describe('the Breaker, bodyguard', () => {
     return action.kind === 'move' ? action.path[action.path.length - 1]! : null;
   }
 
-  it('stands on the shoulder of its own carrier that faces the nearest opponent', () => {
+  it('stands between its own carrier and the nearest opponent, a cell off the carrier', () => {
     let staged = giveTurnTo(put(board(), breaker, { x: 7, y: 15 }), breaker);
     staged = carrying(put(staged, 'A-striker-2', { x: 7, y: 21 }), 'A-striker-2');
     staged = put(staged, 'B-striker-2', { x: 7, y: 26 }); // ahead of the carrier, up the pitch
@@ -569,12 +569,18 @@ describe('the Bulwark, tethered', () => {
     expect(positionValue(view, far)).toBeLessThan(positionValue(view, near) - 100);
   });
 
-  it('digs in when an opponent is two cells off and there is nobody to shove', () => {
+  it('digs in by default: nobody near, no ball to throw or fetch, it still braces (2H.8)', () => {
     const home = { x: mouth().x, y: mouth().y + 1 };
-    let state = onClock(put(board(), keeper, home));
-    state = put(state, 'B-breaker-5', { x: home.x, y: home.y + 2 });
+    const state = onClock(put(board(), keeper, home));
     const best = rankActions(arena, state, keeper)[0]!;
     expect(best.action).toEqual({ kind: 'brace' });
+  });
+
+  it('once braced, does not walk off its footing for a step worth less than the brace', () => {
+    const home = { x: mouth().x, y: mouth().y + 1 };
+    const state = onClock(put(board(), keeper, home, { braced: true }));
+    const after = playTurnOf(state, keeper);
+    expect(unit(after, keeper)).toMatchObject(home);
   });
 
   it('dodges only when badly hurt and with nothing else to do', () => {
@@ -730,6 +736,147 @@ function playTurnOf(start: MatchState, unitId: UnitId): MatchState {
   }
   return state;
 }
+
+describe("Jérôme's second pass on the roles, 2H.8", () => {
+  function endOf(action: Action): Point | null {
+    return action.kind === 'move' ? action.path[action.path.length - 1]! : null;
+  }
+
+  it('the Trajector leaves the kick-off ball to a Striker', () => {
+    const trajector = 'A-trajector-7';
+    const ball = { x: 7, y: 22 };
+    const fresh = board();
+    expect(fresh.lastCarrierTeam).toBeNull();
+    expect(fresh.payload).toMatchObject({ carriedBy: null, ...ball });
+
+    const after = playTurnOf(put(fresh, trajector, { x: 7, y: 14 }), trajector);
+    expect(after.payload.carriedBy).toBeNull();
+    expect(distance(unit(after, trajector), ball)).toBeGreaterThanOrEqual(4);
+
+    // The same cell, a Striker: it goes and takes it.
+    const striker = playTurnOf(put(fresh, OPENER, { x: 7, y: 14 }), OPENER);
+    expect(striker.payload.carriedBy).toBe(OPENER);
+
+    // And once somebody has carried, a loose ball is the Trajector's too.
+    const later = { ...put(fresh, trajector, { x: 7, y: 14 }), lastCarrierTeam: 'B' as const };
+    expect(playTurnOf(later, trajector).payload.carriedBy).toBe(trajector);
+  });
+
+  it('the Trajector drops everything for the Spark, opportunity attack included', () => {
+    const trajector = 'A-trajector-7';
+    const spark = { x: 7, y: 30 };
+    let staged = put(board(), trajector, { x: 7, y: 20 });
+    staged = carrying(put(staged, 'B-striker-2', { x: 7, y: 19 }), 'B-striker-2');
+    staged = { ...staged, spark: { state: 'live', ...spark, heading: 1 } };
+    staged = giveTurnTo(staged, trajector);
+
+    const ranked = rankActions(arena, staged, trajector);
+    expect(legalActions(arena, staged)!.shove).toHaveLength(1);
+    expect(ranked.some((c) => c.action.kind === 'shove' || c.action.kind === 'attack')).toBe(false);
+
+    const first = ranked[0]!.action;
+    const to = endOf(first);
+    expect(to).not.toBeNull();
+    expect(distance(to!, spark)).toBeLessThan(distance({ x: 7, y: 20 }, spark));
+  });
+
+  it('a Striker in defence dashes to finish on the carrier when a plain move falls short', () => {
+    const striker = OPENER;
+    const carrier = { x: 7, y: 20 };
+    let staged = put(board(), striker, { x: 7, y: 8 });
+    staged = carrying(put(staged, 'B-striker-2', carrier), 'B-striker-2');
+    staged = giveTurnTo(staged, striker);
+
+    const legal = legalActions(arena, staged)!;
+    expect([...legal.destinations.values()].some((r) => distance(r.cell, carrier) <= 1)).toBe(false);
+
+    const after = playTurnOf(staged, striker);
+    expect(distance(unit(after, striker), carrier)).toBe(1);
+  });
+
+  it('a Striker in defence walks up and shoves when the carrier is within a plain move', () => {
+    const striker = OPENER;
+    const carrier = { x: 7, y: 20 };
+    let staged = put(board(), striker, { x: 7, y: 14 });
+    staged = carrying(put(staged, 'B-striker-2', carrier), 'B-striker-2');
+    const events = playOutTurn(giveTurnTo(staged, striker), striker);
+    expect(events.some((e) => e.kind === 'dashed')).toBe(false);
+    expect(events.some((e) => e.kind === 'shoved' && e.targetId === 'B-striker-2')).toBe(true);
+  });
+
+  it('the Breaker in defence, carrier out of reach, swings at the Striker before the Trajector', () => {
+    const breaker = 'A-breaker-5';
+    let staged = put(board(), breaker, { x: 7, y: 20 });
+    staged = carrying(put(staged, 'B-striker-2', { x: 7, y: 40 }), 'B-striker-2');
+    staged = put(staged, 'B-trajector-7', { x: 6, y: 20 });
+    staged = put(staged, 'B-striker-3', { x: 8, y: 20 });
+    staged = giveTurnTo(staged, breaker);
+
+    const best = rankActions(arena, staged, breaker)[0]!;
+    expect(best.action).toEqual({ kind: 'attack', targetId: 'B-striker-3' });
+  });
+
+  it('the Breaker in defence walks over to a Striker it can reach rather than take a stance', () => {
+    const breaker = 'A-breaker-5';
+    let staged = put(board(), breaker, { x: 7, y: 20 });
+    staged = carrying(put(staged, 'B-striker-2', { x: 7, y: 40 }), 'B-striker-2');
+    staged = put(staged, 'B-striker-3', { x: 7, y: 26 });
+    staged = put(staged, 'A-striker-2', { x: 2, y: 12 });
+    const events = playOutTurn(giveTurnTo(staged, breaker), breaker);
+    expect(events.some((e) => e.kind === 'attacked' && e.targetId === 'B-striker-3')).toBe(true);
+  });
+
+  it('the Breaker far from its own carrier runs to it rather than swinging at a straggler', () => {
+    const breaker = 'A-breaker-5';
+    let staged = put(board(), breaker, { x: 7, y: 12 });
+    staged = carrying(put(staged, 'A-striker-2', { x: 7, y: 30 }), 'A-striker-2');
+    staged = put(staged, 'B-breaker-5', { x: 7, y: 11 });
+    staged = put(staged, 'B-striker-2', { x: 7, y: 34 });
+    staged = giveTurnTo(staged, breaker);
+
+    expect(legalActions(arena, staged)!.attack).toHaveLength(1);
+    expect(chooseAction(arena, staged, breaker).kind).toBe('dash');
+    const after = playTurnOf(staged, breaker);
+    expect(distance(unit(after, breaker), { x: 7, y: 30 })).toBeLessThanOrEqual(3);
+  });
+
+  it('the Breaker beside its carrier makes a wall on the way of the threats', () => {
+    const breaker = 'A-breaker-5';
+    const carrier = { x: 7, y: 21 };
+    let staged = put(board(), breaker, { x: 7, y: 16 });
+    staged = carrying(put(staged, 'A-striker-2', carrier), 'A-striker-2');
+    staged = put(staged, 'B-striker-2', { x: 7, y: 27 });
+    staged = put(staged, 'B-breaker-5', { x: 9, y: 27 });
+    const after = playTurnOf(giveTurnTo(staged, breaker), breaker);
+    const at = unit(after, breaker);
+    expect(distance(at, carrier)).toBeLessThanOrEqual(2);
+    expect(at.y).toBeGreaterThan(carrier.y);
+  });
+
+  it('the keeper throws the fresh ball out at once, interceptors or not, rather than dig in', () => {
+    const keeper = 'A-bulwark-1';
+    let state = carrying(put(board(), keeper, { x: 7, y: 1 }), keeper);
+    state = put(state, 'A-striker-2', { x: 7, y: 8 });
+    state = put(state, 'B-striker-2', { x: 6, y: 5 });
+    state = put(state, 'B-striker-3', { x: 8, y: 6 });
+    state = giveTurnTo(state, keeper);
+
+    const legal = legalActions(arena, state)!;
+    expect(legal.pass.map((o) => o.unitId)).toEqual(['A-striker-2']);
+    const best = rankActions(arena, state, keeper)[0]!;
+    expect(best.action).toEqual({ kind: 'pass', targetId: 'A-striker-2' });
+  });
+
+  it('never dashes past a target in reach', () => {
+    const striker = OPENER;
+    let staged = put(board(), striker, { x: 7, y: 30 });
+    staged = put(staged, 'B-breaker-5', { x: 7, y: 31 });
+    staged = { ...staged, payload: { carriedBy: null, x: 7, y: 44 }, lastCarrierTeam: 'A' };
+    staged = giveTurnTo(staged, striker);
+    expect(legalActions(arena, staged)!.attack).toHaveLength(1);
+    expect(rankActions(arena, staged, striker).some((c) => c.action.kind === 'dash')).toBe(false);
+  });
+});
 
 describe('after a goal is scored', () => {
   // Audit line A31, reproduced from Jérôme's first match on 2026-10-10: a goal

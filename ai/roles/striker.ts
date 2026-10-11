@@ -28,7 +28,7 @@ export const STRIKER: RoleWeights = {
   screenCarrier: 14,
   supportAttack: 45,
   cover: 20,
-  escort: 0,
+  block: 0,
   wantsEscort: 1,
   guardStrike: 0,
   parryPost: 0,
@@ -41,6 +41,12 @@ export const STRIKER: RoleWeights = {
   brace: 0,
 
   pressCarrier: 55,
+
+  // 2H.8, Jérôme's second pass.
+  chaseKickoff: 1,
+  prey: { striker: 1, breaker: 1, trajector: 1, bulwark: 1 },
+  hunt: 0,
+  relaunch: 0,
 
   avoidOpportunity: 4,
   avoidCrackers: 10,

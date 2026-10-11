@@ -21,6 +21,8 @@
  *     walking through three opponents to take a shot it will miss.
  */
 
+import type { Role } from '../../engine/stats.js';
+
 export interface RoleWeights {
   // -- The Payload ----------------------------------------------------------
   /** Putting it in the Furnace. */
@@ -101,15 +103,19 @@ export interface RoleWeights {
   /** Staying on the opponent who is carrying. */
   readonly pressCarrier: number;
 
-  // -- The bodyguard, 2H.7 ------------------------------------------------
+  // -- The bodyguard, 2H.7, reworded by Jérôme in 2H.8 ----------------------
   /**
-   * Standing beside the team-mate who carries, **on the side the nearest
-   * opponent is coming from**. `screenCarrier` prices closeness alone and put
-   * the Breaker on whatever shoulder was free; this prices the shoulder that
-   * matters. Decided by Jérôme on 2026-10-10: the Breaker's charge is always
-   * the carrier, never a Striker by name. Zero for every other role.
+   * Being an obstacle between the opponents and our own carrier: a cell on
+   * the way the nearest threats would take to it, a cell or two off the
+   * carrier, so that they spend more movement or cannot finish adjacent to it
+   * at all. Jérôme's words of 2026-10-11, replacing the "shoulder facing the
+   * threat" of 2H.7, which he did not like. Decided on 2026-10-10 and kept:
+   * the Breaker's charge is always the carrier, never a Striker by name. Zero
+   * for every other role. Also the price of a Dash when the carrier is too far
+   * to reach this turn: a Breaker far from its carrier runs rather than swing
+   * at a straggler.
    */
-  readonly escort: number;
+  readonly block: number;
   /**
    * Whether this role, when it carries, is worth escorting: one for a field
    * player, zero for the goalkeeper. A keeper handed a fresh ball after a goal
@@ -160,6 +166,37 @@ export interface RoleWeights {
    * every other role.
    */
   readonly screen: number;
+
+  // -- Jérôme's second pass on the roles, 2H.8, 2026-10-11 ------------------
+  /**
+   * The share of the kick-off ball this role wants: the ball nobody has
+   * carried yet (`lastCarrierTeam` null). Zero for the Trajector, which
+   * leaves the first pick-up to a Striker and keeps itself for the throw;
+   * one for everybody else.
+   */
+  readonly chaseKickoff: number;
+  /**
+   * What a swing at each opposing role is worth, as a share of `attack`. The
+   * Breaker's order in defence when the carrier is out of reach: Strikers
+   * first, then Breakers, then the Trajector. One across the board for the
+   * roles that have no preference.
+   */
+  readonly prey: Readonly<Record<Role, number>>;
+  /**
+   * Finishing adjacent to an opponent it can swing at, when the other side
+   * has the ball and their carrier is out of reach: "porteur hors de portée,
+   * taper l'adversaire proche". Scaled by `prey`. Breaker only. Above
+   * `screen` on purpose, since Jérôme ranks the swing before the stance.
+   */
+  readonly hunt: number;
+  /**
+   * A flat appetite for throwing the ball at once, whoever has played and
+   * wherever they stand, interceptors or not: the keeper's relaunch after a
+   * goal (écart 54), "il lance la balle immédiatement, même s'il y a risque
+   * d'interception". It also lifts the chain's filters for this role. Bulwark
+   * only.
+   */
+  readonly relaunch: number;
 
   // -- The goalkeeper's tether, 2H.7 ------------------------------------------
   /**

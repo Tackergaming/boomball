@@ -144,7 +144,13 @@ function teamSlots(arena: Arena, state: MatchState, team: TeamId): Omit<TurnSlot
   const units = activeUnitsOf(state, team);
   const out: Omit<TurnSlot, 'rank'>[] = [];
 
-  for (const role of ROLE_ORDER) {
+  // The relaunch (écart 54): the side that conceded after its block had gone
+  // opens its next round with the keeper, so the fresh ball leaves its hands
+  // before anybody else of its side has moved.
+  const roles: readonly Role[] =
+    state.relaunch === team ? ['bulwark', ...ROLE_ORDER.filter((r) => r !== 'bulwark')] : ROLE_ORDER;
+
+  for (const role of roles) {
     const ofRole = units.filter((u) => u.role === role);
     const humans = ofRole
       .filter(isHuman)
@@ -180,6 +186,39 @@ function orderBySituation(arena: Arena, state: MatchState, team: TeamId, units: 
 
   const focus = carrier ?? { x: state.payload.x, y: state.payload.y };
   return [...units].sort((a, b) => distance(a, focus) - distance(b, focus) || byId(a, b));
+}
+
+/**
+ * The relaunch inside the round of the goal (écart 54, 2H.8, Jérôme's
+ * reading): a goal is scored during the scoring side's block, the conceding
+ * keeper waits for that block to end, and when its own side's block comes it
+ * goes first. When that block is still ahead of the cursor, the ladder of
+ * this round is reordered here, the keeper's slot moved to the head of its
+ * side's slots and the ranks renumbered. Returns null when the side has
+ * already begun or finished its block, in which case the next round's ladder
+ * is built with `relaunch` instead, or when the keeper has no slot.
+ */
+export function promoteBulwark(
+  order: readonly TurnSlot[],
+  turnIndex: number,
+  team: TeamId,
+  keeperId: string,
+): TurnSlot[] | null {
+  const ours = order
+    .map((slot, i) => ({ slot, i }))
+    .filter(({ slot }) => slot.actor.kind === 'unit' && slot.team === team);
+  if (ours.length === 0 || ours[0]!.i <= turnIndex) return null;
+
+  const keeperAt = ours.find(
+    ({ slot }) => slot.actor.kind === 'unit' && slot.actor.unitId === keeperId,
+  );
+  if (!keeperAt) return null;
+  if (keeperAt.i === ours[0]!.i) return [...order];
+
+  const without = order.filter((_, i) => i !== keeperAt.i);
+  const head = ours[0]!.i;
+  const reordered = [...without.slice(0, head), keeperAt.slot, ...without.slice(head)];
+  return reordered.map((slot, i) => ({ ...slot, rank: i + 1 }));
 }
 
 /**

@@ -17,6 +17,7 @@
 import type { Action } from '../engine/actions.js';
 import type { Arena } from '../engine/arena.js';
 import { CRACKER_AC, MOVE_SPEED_FEET, PAYLOAD_PASS_AC } from '../engine/constants.js';
+import { reachableCells } from '../engine/rules/movement.js';
 import { distance, lineTo, type Point } from '../engine/geometry.js';
 import { legalActions } from '../engine/legalActions.js';
 import { battedCrackerRun } from '../engine/rules/ordnance.js';
@@ -142,16 +143,22 @@ function ballCandidates(board: Board): Candidate[] {
   const next = nextToPlay(board);
   const moveCells = MOVE_SPEED_FEET / 5;
 
+  // Two players throw no matter who has played or where they stand: the
+  // keeper relaunching after a goal (écart 54, `relaunch`), and the Spark
+  // hunter, which has to get rid of the ball to go and hunt (2H.8).
+  const unload = w.relaunch > 0 || board.hunter;
+  const unloadBonus = w.relaunch + (board.hunter ? w.chaseSpark : 0);
+
   for (const option of legal.pass) {
     const mate = unitOf(state, option.unitId);
     const odds = chance(aim, PAYLOAD_PASS_AC, option.mode);
 
     const played = hasPlayedThisRound(state, mate.id);
-    if (played && !lastLink) continue;
+    if (played && !lastLink && !unload) continue;
 
     const gained =
       rangeToFurnace(unit, board.targetFurnace) - rangeToFurnace(mate, board.targetFurnace);
-    if (gained < 0 && !lastLink && (next?.id !== mate.id || -gained > 3)) continue;
+    if (gained < 0 && !lastLink && !unload && (next?.id !== mate.id || -gained > 3)) continue;
 
     // Worth the ground the ball will have gained once the receiver has moved
     // too: a receiver still to play adds its whole run. Capped so a chain of
@@ -181,10 +188,14 @@ function ballCandidates(board: Board): Candidate[] {
 
     // `handOff` is the flat appetite of a role that should not be carrying at
     // all: for a Breaker a throw that gains nothing still beats walking.
+    // `unloadBonus` is flat and outside `safety` on purpose: the keeper
+    // throws into two interceptors rather than hold or dig in, and the safety
+    // term still ranks the receivers, safe first, far second.
     out.push({
       action: { kind: 'pass', targetId: mate.id },
       score:
         (w.pass * odds * (progress + opening * 3) + w.handOff * odds) * safety +
+        unloadBonus * odds +
         ordered -
         risk * w.avoidOpportunity,
       why: `pass to ${mate.name}, ${gained} cells on${played ? ', last link' : ''}, shot ${Math.round(mine * 100)} to ${Math.round(theirs * 100)}, ${risk} in the lane`,
@@ -207,6 +218,9 @@ function violenceCandidates(board: Board): Candidate[] {
   const stats = statsFor(unit.role, unit.tier);
   const marked = findOrder(board.orders, 'markTarget');
 
+  // The Spark hunter swings at nobody: its Action is for the catch (2H.8).
+  if (board.hunter) return out;
+
   // The bodyguard's target: an opponent standing on our own carrier. Zero for
   // every role but the Breaker, whose charge is the carrier (2H.7).
   const ownCarrier = board.carrier && board.carrier.team === unit.team ? board.carrier : null;
@@ -219,7 +233,11 @@ function violenceCandidates(board: Board): Candidate[] {
 
     // A swing does not make anyone drop the ball, so a carrier is only worth
     // half of the appetite for stripping one. The Shove below is the real tool.
-    let value = w.attack + (target.holdingPayload ? w.stripCarrier * 0.5 : 0);
+    // Everybody else is worth what this role makes of its shirt (`prey`):
+    // the Breaker's Strikers first, Breakers, then the Trajector.
+    let value =
+      w.attack * (target.holdingPayload ? 1 : w.prey[target.role]) +
+      (target.holdingPayload ? w.stripCarrier * 0.5 : 0);
     if (onOurCarrier(target)) value += w.guardStrike;
     if (marked?.targetId === target.id) value += ORDER_PULL;
     if (target.hp <= 4.5 + stats.might) value *= 1.4;
@@ -353,8 +371,10 @@ function moveCandidates(board: Board): Walking {
     const clean = positionValue(board, reachable.cell) - here;
     if (clean > bestClean) bestClean = clean;
 
-    const exposed = provokedAlong(state, unit, route).length;
-    const gain = clean - exposed * w.avoidOpportunity;
+    // The Spark hunter takes the opportunity attack and goes (2H.8); a braced
+    // keeper that walks loses its footing, which is worth what digging in was.
+    const exposed = board.hunter ? 0 : provokedAlong(state, unit, route).length;
+    const gain = clean - exposed * w.avoidOpportunity - (unit.braced ? w.brace : 0);
     if (gain <= 0) continue;
 
     out.push({
@@ -398,26 +418,16 @@ function stanceCandidates(board: Board, walking: Walking): Candidate[] {
     }
   }
 
-  // Dig in (écart 52): the keeper with an opponent two cells away and its
-  // Action still in hand. Not if already braced, and never a pass or a shove
-  // forgone: those score higher when they are on.
+  // Dig in (écart 52): the keeper's default, Jérôme's second pass (2H.8). It
+  // does not wait for anybody to come: with nothing better on, a throw, a
+  // ball within reach or a carrier to shove, it digs in. Not if already
+  // braced; those three score higher when they are on.
   if (legal.canBrace && !unit.braced) {
-    const close = board.enemies.some((e) => distance(e, unit) <= 2);
-    if (close) {
-      out.push({ action: { kind: 'brace' }, score: w.brace, why: 'dig in, somebody is coming' });
-    }
+    out.push({ action: { kind: 'brace' }, score: w.brace, why: 'dig in' });
   }
 
   if (legal.canDash) {
-    // Worth buying more movement in proportion to how much the movement it
-    // already has is buying. Nothing to gain by walking, nothing to gain by
-    // walking twice as far. It stays under a shot or a strip on purpose: the
-    // Action is worth more than the ground almost every time it is a choice.
-    out.push({
-      action: { kind: 'dash' },
-      score: w.dash * Math.min(1, bestMove / 12),
-      why: 'buy a second helping of movement',
-    });
+    out.push(...dashCandidates(board, bestMove));
   }
 
   // Pressed, carrying, and with ground to gain if the swings could be bought
@@ -432,6 +442,67 @@ function stanceCandidates(board: Board, walking: Walking): Candidate[] {
   }
 
   return out;
+}
+
+/**
+ * Dash (2H.8, Jérôme's second pass). Three reasons to spend the Action on
+ * movement, and one reason never to.
+ *
+ * Never: a target in reach. "Une cible à portée se frappe ou se bouscule,
+ * jamais un déplacement de trois cases à la place": with a swing, a shove or
+ * a Cracker on offer, the plain Dash is not, and the Action goes to one of
+ * them or to nothing. The hunter is exempt, since it swings at nobody.
+ *
+ * The plain Dash, otherwise, is worth a share of what the walk is already
+ * buying, and stays under a shot or a strip on purpose.
+ *
+ * The press: the other side's carrier is out of reach of a plain move but a
+ * Dash gets this unit adjacent to it. Worth the press itself, so a Striker
+ * twelve cells from the carrier dashes to finish on it and holds the
+ * opportunity attack when it leaves, rather than swinging at whoever is
+ * nearer.
+ *
+ * The wall: our own carrier is more than a move away from a Breaker. Worth
+ * `block`, so it runs to be beside the carrier next round rather than hit a
+ * straggler.
+ */
+function dashCandidates(board: Board, bestMove: number): Candidate[] {
+  const { arena, state, unit, legal, weights: w } = board;
+  const violence = legal.attack.length + legal.shove.length + legal.batCracker.length > 0;
+
+  let score = violence && !board.hunter ? 0 : w.dash * Math.min(1, bestMove / 12);
+  let why = 'buy a second helping of movement';
+
+  const carrier = board.carrier;
+  const withDash = (): ReadonlyMap<string, { cell: Point }> =>
+    reachableCells(arena, state, unit, state.turn!.movementFeetRemaining + MOVE_SPEED_FEET);
+  const within = (cells: Iterable<{ cell: Point }>, target: Point, gap: number): boolean => {
+    for (const { cell } of cells) {
+      if (distance(cell, target) <= gap && rangeToFurnace(cell, board.ownFurnace) <= w.leash) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  if (carrier && !board.hunter && !unit.holdingPayload) {
+    if (carrier.team !== unit.team && w.pressCarrier > 0) {
+      const now = distance(unit, carrier) <= 1 || within(legal.destinations.values(), carrier, 1);
+      if (!now && within(withDash().values(), carrier, 1) && w.pressCarrier > score) {
+        score = w.pressCarrier;
+        why = `dash to get on ${carrier.name}`;
+      }
+    } else if (carrier.team === unit.team && w.block > 0 && weightsFor(carrier.role).wantsEscort > 0) {
+      const now = distance(unit, carrier) <= 2 || within(legal.destinations.values(), carrier, 2);
+      if (!now && within(withDash().values(), carrier, 2) && w.block > score) {
+        score = w.block;
+        why = `dash to get beside ${carrier.name}`;
+      }
+    }
+  }
+
+  if (score <= 0) return [];
+  return [{ action: { kind: 'dash' }, score, why }];
 }
 
 // -- Ranking ----------------------------------------------------------------

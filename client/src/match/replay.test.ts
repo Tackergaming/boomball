@@ -21,6 +21,7 @@ import { createMatch } from '../../../engine/setup.js';
 import { isHuman, type MatchState } from '../../../engine/types.js';
 import { chooseAction } from '../../../ai/chooseAction.js';
 import { openSession, submitAction, type Session } from '../../../server/session.js';
+import { feedLines } from './Feed.js';
 import { toBeats } from './replay.js';
 
 const arena = new Arena(KILL_SILO);
@@ -194,6 +195,26 @@ describe('Dig in (écart 52)', () => {
   });
 });
 
+describe('the penalty box (écart 53)', () => {
+  it('says a replacement in the beat of the goal and moves the token', () => {
+    const state = open(7).session.state;
+    const unit = state.units[0]!;
+    const from = { x: unit.x, y: unit.y };
+    const to = { x: 1, y: 20 };
+    const events: MatchEvent[] = [
+      { kind: 'roundStarted', round: 3 },
+      { kind: 'relocated', unitId: unit.id, from, to },
+    ];
+    const beats = toBeats(state, events, 'A');
+    const texts = beats.flatMap((beat) => beat.lines.map((line) => line.text));
+    expect(texts).toContain(`${unit.name} is moved out of the penalty box`);
+    const last = beats[beats.length - 1]!.state.units.find((u) => u.id === unit.id)!;
+    expect({ x: last.x, y: last.y }).toEqual(to);
+    const feed = feedLines(events, (id) => (id === unit.id ? unit.name : id)).map((l) => l.line);
+    expect(feed).toContain(`${unit.name} is moved out of the penalty box.`);
+  });
+});
+
 describe('the Spark rules of écarts 49 and 50', () => {
   const state = createMatch({ arena: KILL_SILO, tier: 'rookie', humans: HUMAN, seed: 5 });
   const unitId = state.units[0]!.id;
@@ -220,5 +241,76 @@ describe('the Spark rules of écarts 49 and 50', () => {
     const caught: MatchEvent = { kind: 'sparkCaught', unitId, roll, caught: true };
     const beats = toBeats(state, [caught], 'A');
     expect(beats[beats.length - 1]!.state.spark.state).toBe('pending');
+  });
+});
+
+describe('every action leaves a line, the house included', () => {
+  const state = open(7).session.state;
+  const [a, b] = [state.units[0]!, state.units[1]!];
+  const roll = { die: 20, rolled: 3, bonus: 2, total: 5, against: 12, mode: 'normal' as const };
+  const textsOf = (events: MatchEvent[]) =>
+    toBeats(state, events, 'A').flatMap((beat) => beat.lines.map((line) => line.text));
+
+  it('says a failed interception, which used to be silent', () => {
+    const texts = textsOf([
+      { kind: 'passIntercepted', interceptorId: a.id, throwerId: b.id, interceptorRoll: roll, throwerRoll: roll, success: false },
+    ]);
+    expect(texts.some((t) => /MISSED/.test(t) && t.includes(a.name))).toBe(true);
+  });
+
+  it('says a recoil when nothing louder shares the beat', () => {
+    const texts = textsOf([{ kind: 'recoiled', unitId: a.id, from: { x: 1, y: 1 }, to: { x: 1, y: 2 } }]);
+    expect(texts.some((t) => /thrown back/.test(t))).toBe(true);
+  });
+
+  it('says a turn spent doing nothing', () => {
+    const texts = textsOf([
+      { kind: 'turnStarted', unitId: a.id, round: 1 },
+      { kind: 'turnEnded', unitId: a.id },
+    ]);
+    expect(texts).toContain(`${a.name} holds position`);
+  });
+
+  it('does not claim a turn that acted held position', () => {
+    const texts = textsOf([
+      { kind: 'turnStarted', unitId: a.id, round: 1 },
+      { kind: 'dodging', unitId: a.id },
+      { kind: 'turnEnded', unitId: a.id },
+    ]);
+    expect(texts.some((t) => /holds position/.test(t))).toBe(false);
+  });
+
+  it('keeps all of a long turn, not just its first four lines', () => {
+    const events: MatchEvent[] = [
+      { kind: 'turnStarted', unitId: a.id, round: 1 },
+      { kind: 'dashed', unitId: a.id, extraFeet: 40 },
+      { kind: 'attacked', attackerId: a.id, targetId: b.id, roll, hit: false },
+      { kind: 'shoved', shoverId: a.id, targetId: b.id, success: false, shoverRoll: roll, targetRoll: roll, pushedTo: null },
+      { kind: 'passed', fromId: a.id, toId: b.id, roll, caught: false },
+      { kind: 'shotAtFurnace', unitId: a.id, roll, scored: false, blockedBy: null },
+      { kind: 'turnEnded', unitId: a.id },
+    ];
+    const beats = toBeats(state, events, 'A');
+    expect(beats[0]!.lines.length).toBe(5);
+  });
+
+  it('feed: an idle turn and a missed interception get lines', () => {
+    const name = (id: string) => state.units.find((u) => u.id === id)?.name ?? id;
+    const lines = feedLines(
+      [
+        { kind: 'turnStarted', unitId: a.id, round: 1 },
+        { kind: 'turnEnded', unitId: a.id },
+        { kind: 'turnStarted', unitId: b.id, round: 1 },
+        { kind: 'moved', unitId: b.id, from: { x: 1, y: 1 }, to: { x: 1, y: 2 }, path: [{ x: 1, y: 2 }], costFeet: 5 },
+        { kind: 'turnEnded', unitId: b.id },
+        { kind: 'passIntercepted', interceptorId: a.id, throwerId: b.id, interceptorRoll: roll, throwerRoll: roll, success: false },
+      ],
+      name,
+    ).map((l) => l.line);
+    expect(lines).toEqual([
+      `${a.name} holds position.`,
+      `${b.name} moves 1 cell.`,
+      `${a.name} reaches for the pass from ${b.name} and misses.`,
+    ]);
   });
 });

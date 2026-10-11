@@ -1245,4 +1245,33 @@ l'ordre que Jérôme avait fixé :
 
 **Ce qui attend Jérôme** : trancher `09` §12, dont le prix du Spark maintenant qu'il revient après une
 prise ; `/update`, `/commit` ; puis **sa partie**, dont le verdict sur ce que chaque rôle cherche
-ouvre la phase 3.
+ouvre la phase 3. **Tranché et joué le 2026-10-11** : rien ne bouge au sweep, et la partie ouvre
+2H.8 ci-dessous.
+
+### Sous-phase 2H.8, « la surface de réparation, la relance, l'IA v2, la route, le fil », codée le 2026-10-11, porte ouverte
+
+Par le fil principal (Fable 5.1), avec trois sous-agents Sonnet nommés ci-dessous, sur des fichiers
+disjoints. La partie de Jérôme sur le moteur 4 a donné ses retours en chat, non numérotés, puis une
+liste complète par rôle demandée par lui, triée par priorité, corrigée en deux passes (le Striker
+presse coûte que coûte, le Breaker tape le porteur puis Strikers, Breakers, Trajector, fait mur et
+non épaule, le Bulwark se plante sans attendre), puis trois questions fermées (le Striker prend le
+ballon du coup d'envoi ; la surface en portée de grille ; le Breaker bouscule le porteur, le
+Striker garde sa position de relais) et un arbitrage sur le moment de la relance (le Bulwark attend
+la fin du bloc de l'équipe qui a marqué, puis passe en premier du bloc de son équipe). Tout est
+écrit dans `00` C10 **avant** la première ligne de code. **Pas de sweep**, à sa demande.
+
+| Quoi | État |
+|---|---|
+| Écart 53, la surface de réparation | Fait, fil principal. `engine/rules/box.ts`, état `penaltyBox` par Furnace, `relocated`, `movement.ts` et `combat.ts` ferment la zone à la route, au chemin envoyé, à la poussée et au recul, `closeBox` dans `reduce.ts` replace au but par `nearestFreeCell`, la zone rouvre au début du second round après le but. `engine/box.test.ts`, 6 tests |
+| Écart 54, la relance | Fait, fil principal. `promoteBulwark` dans `initiative.ts` réordonne l'échelle en cours quand le bloc de l'équipe qui a encaissé est devant, sinon `relaunch` sur l'état et `buildTurnOrder` au round suivant. 2 tests |
+| `ENGINE_VERSION` 5 | Fait. L'état gagne deux champs, les événements un kind |
+| L'IA v2 | Fait, fil principal. `chaseKickoff`, `Board.hunter`, l'adjacence au porteur adverse, `dashCandidates` (presser, faire mur, jamais devant une cible à portée), `hunt` et `prey`, `block` à la place de `escort`, `relaunch`, le Bulwark planté par défaut et qui paie son pas. Détail des poids en `00` C10. 10 tests neufs dans `ai.test.ts`, deux titres récrits |
+| La route en ligne droite | Fait, **sous-agent Sonnet effort moyen** : `pathTo` dans `rules/movement.ts` reconstruit le chemin depuis l'arrivée en prenant, à coût égal, le voisin le plus proche de la droite ; `reachableCells` inchangé ; le client passait déjà par `pathTo`. `engine/rules/movement.test.ts`, 5 tests |
+| Le fil complet | Fait, **sous-agent Sonnet effort moyen** : `moved`, `recoiled`, `crackerMoved`, `crackerRespawned`, `payloadScattered` et l'interception ratée étaient muets dans `Feed.tsx`, `turnEnded` sans cas, et `replay.ts` plafonnait un beat à 4 lignes. Désormais une ligne par action, « holds position » pour un tour vide, plafond à 8. 5 tests. Le fil garde 120 événements (`FEED_LIMIT`), soit environ deux rounds maintenant que les marches s'affichent |
+| L'écran de la zone et de la relance | Fait, **un troisième sous-agent Sonnet effort moyen** : `Board.tsx` dessine la zone fermée en violet sous les cases atteignables (`data-box`), `Feed.tsx` et `replay.ts` disent « is moved out of the penalty box », le projecteur du rejeu saute le pion, `Briefing.tsx` gagne deux items. Non vu en navigateur par l'agent |
+| Vérification | `npm test` 460 sur 22 fichiers contre 429, `npm run typecheck` vert (racine, scripts, e2e), client typecheck et build verts. **Smoke vert en 32 s contre le moteur 4 en ligne**, `ENGINE_VERSION` épinglée à 4 le temps du run et remise à 5 ; `boxClosed` lit l'état d'un moteur antérieur sans planter pour ça. Captures lues : le fil énumère désormais les marches, les Dash et les bousculades tenues |
+
+**Ce qui attend Jérôme** : relire `00` C10 ; **le feu vert de redéploiement** des deux fonctions
+(moteur 5, les matchs du moteur 4 archivés, aucune migration) ; sa partie, avec la zone violette
+après un but, la relance du gardien, le Trajector qui laisse le ballon du coup d'envoi ; puis
+**un sweep s'il le demande**, un seul, contre `09` §12.

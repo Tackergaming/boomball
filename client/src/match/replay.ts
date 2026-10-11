@@ -25,7 +25,7 @@
 import { thirdOf, type Point } from '../../../engine/geometry.js';
 import type { DiceRoll, MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId, Unit, UnitId } from '../../../engine/types.js';
-import { SUBSTITUTE_DELAY_ROUNDS } from '../../../engine/constants.js';
+import { MOVE_SPEED_FEET, SUBSTITUTE_DELAY_ROUNDS } from '../../../engine/constants.js';
 import { motionOf, type MotionStep } from './motion.js';
 
 /** One watchable moment: a unit's turn, a round's hazards, or the final whistle. */
@@ -81,13 +81,14 @@ export function toBeats(base: MatchState, events: readonly MatchEvent[], own: Te
     // Read against the board **before** the beat, which is where everything
     // that moves in it starts from.
     const motion = motionOf(board, current);
+    const before = board;
     board = project(board, current);
     beats.push({
       unitId: currentUnit,
       events: current,
       state: board,
       motion,
-      lines: describe(current, board, own),
+      lines: describe(current, board, own, before),
       weight: loudness(current),
     });
     current = [];
@@ -160,6 +161,7 @@ function project(base: MatchState, events: readonly MatchEvent[]): MatchState {
       // The board is told who is acting through the beat's own `unitId`.
       case 'moved':
       case 'recoiled':
+      case 'relocated':
         moveUnit(event.unitId, event.to);
         break;
       case 'shoved':
@@ -301,6 +303,7 @@ function describe(
   events: readonly MatchEvent[],
   after: MatchState,
   own: TeamId,
+  before: MatchState,
 ): BeatLine[] {
   const lines: BeatLine[] = [];
   const name = (id: UnitId) => after.units.find((unit) => unit.id === id)?.name ?? id;
@@ -332,6 +335,15 @@ function describe(
         break;
       case 'disengaged':
         lines.push({ text: `${name(event.unitId)} disengages` });
+        break;
+      case 'turnEnded':
+        if (spentNothing(events, before, event.unitId)) {
+          lines.push({ text: `${name(event.unitId)} holds position`, outcome: 'neutral' });
+        }
+        break;
+      case 'recoiled':
+        // A consequence of a swing, not a choice: background to the swing.
+        lines.push({ text: `${name(event.unitId)} is thrown back by the swing`, minor: true });
         break;
       case 'attacked':
       case 'opportunityAttacked':
@@ -389,13 +401,24 @@ function describe(
         });
         break;
       case 'passIntercepted':
-        if (event.success) {
-          lines.push({
-            text: `${name(event.interceptorId)} cuts the pass out of the air`,
-            roll: event.interceptorRoll,
-            outcome: mine(event.interceptorId) ? 'good' : 'bad',
-          });
-        }
+        lines.push(
+          event.success
+            ? {
+                text: `${name(event.interceptorId)} cuts the pass out of the air`,
+                roll: event.interceptorRoll,
+                outcome: mine(event.interceptorId) ? 'good' : 'bad',
+              }
+            : {
+                text: `${name(event.interceptorId)} reaches for the pass from ${name(event.throwerId)} · MISSED`,
+                roll: event.interceptorRoll,
+                outcome: forMe(false, mine(event.interceptorId)),
+              },
+        );
+        break;
+      // Part of the goal's story (écart 53), so not minor: it must show in the
+      // beat of the goal. The token just jumps; motion.ts has no step for it.
+      case 'relocated':
+        lines.push({ text: `${name(event.unitId)} is moved out of the penalty box`, outcome: 'neutral' });
         break;
       case 'shotAtFurnace':
         lines.push({
@@ -497,11 +520,54 @@ function describe(
   const eventful = lines.some((line) => !line.minor);
   const kept = eventful ? lines.filter((line) => !line.minor) : lines;
 
-  return kept.slice(0, 4);
+  // A cap is how an action goes missing: a turn can hold a walk, a dash, a swing,
+  // a recoil and a blast, and the old limit of four cut whatever came last,
+  // usually the result. Eight is more than any turn has produced.
+  return kept.slice(0, MAX_LINES);
+}
+
+const MAX_LINES = 8;
+
+/** The kinds that are a unit doing something with its turn. */
+const TURN_ACTIONS: ReadonlySet<MatchEvent['kind']> = new Set<MatchEvent['kind']>([
+  'moved',
+  'dashed',
+  'dodging',
+  'disengaged',
+  'braced',
+  'attacked',
+  'shoved',
+  'passed',
+  'shotAtFurnace',
+  'crackerBatted',
+  'sparkCaught',
+  'payloadGrabbed',
+]);
+
+/**
+ * Whether a turn that is ending did nothing at all.
+ *
+ * A beat that opens on `turnStarted` holds the whole turn, so no action in it is
+ * enough. A beat that does not (a human ending a turn they began in an earlier
+ * batch) is judged on the board it started from: the turn still at full
+ * movement with its action unspent.
+ */
+function spentNothing(events: readonly MatchEvent[], before: MatchState, unitId: UnitId): boolean {
+  if (events.some((event) => TURN_ACTIONS.has(event.kind))) return false;
+  if (events.some((event) => event.kind === 'turnStarted')) return true;
+  const turn = before.turn;
+  return (
+    turn !== null &&
+    turn.unitId === unitId &&
+    !turn.actionUsed &&
+    !turn.objectInteractionUsed &&
+    !turn.disengaged &&
+    turn.movementFeetRemaining >= MOVE_SPEED_FEET
+  );
 }
 
 /** `cracker-1` is not a thing to read on a card. */
-function label(crackerId: string): string {
+export function label(crackerId: string): string {
   const n = /(\d+)$/.exec(crackerId)?.[1];
   return n ? `Cracker ${n}` : 'A Cracker';
 }

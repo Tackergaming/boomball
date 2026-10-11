@@ -15,6 +15,7 @@
 import type { Arena } from '../arena.js';
 import { distance, inBounds, stepCostFeet, type Point } from '../geometry.js';
 import { activeUnits, type MatchState, type Unit } from '../types.js';
+import { barredCells } from './box.js';
 
 export interface PathAccepted {
   readonly ok: true;
@@ -53,7 +54,8 @@ export function validatePath(
 ): PathVerdict {
   if (path.length === 0) return { ok: false, reason: 'the path is empty' };
 
-  const blocked = occupiedCells(state, unit.id);
+  const occupied = occupiedCells(state, unit.id);
+  const barred = barredCells(arena, state, unit.team);
   let current: Point = { x: unit.x, y: unit.y };
   let cost = 0;
 
@@ -67,8 +69,11 @@ export function validatePath(
     if (arena.isSolid(step)) {
       return { ok: false, reason: `${cellName(step)} is an obstacle` };
     }
-    if (blocked.has(key(step))) {
+    if (occupied.has(key(step))) {
       return { ok: false, reason: `${cellName(step)} is already occupied` };
+    }
+    if (barred.has(key(step))) {
+      return { ok: false, reason: `${cellName(step)} is inside the closed penalty box` };
     }
 
     cost += stepCostFeet(current, step);
@@ -103,7 +108,7 @@ export function reachableCells(
   unit: Unit,
   budgetFeet: number,
 ): Map<string, Reachable> {
-  const blocked = occupiedCells(state, unit.id);
+  const blocked = closedCells(arena, state, unit);
   const start: Point = { x: unit.x, y: unit.y };
   const best = new Map<string, Reachable>();
   best.set(key(start), { cell: start, costFeet: 0, from: null });
@@ -142,18 +147,51 @@ export function reachableCells(
  * The cheapest route to a reachable cell, origin excluded, ready to be sent as
  * a `move` action. The client offers this as the default and lets the player
  * drag a different route; the AI takes it as is.
+ *
+ * Many cheapest routes usually exist, and the sweep's parent pointers pick one
+ * arbitrarily, which drew gratuitous arcs. So the route is rebuilt from the
+ * destination back, and at each step takes, among the neighbours that sit one
+ * step closer in cost, the one nearest the straight line from origin to
+ * destination. Ties fall to the fixed neighbour order, so it is deterministic.
  */
 export function pathTo(
   reachable: ReadonlyMap<string, Reachable>,
   destination: Point,
 ): Point[] | null {
-  const route: Point[] = [];
-  let step = reachable.get(key(destination));
-  if (!step) return null;
+  const end = reachable.get(key(destination));
+  if (!end) return null;
 
-  while (step) {
-    route.unshift(step.cell);
-    step = step.from ? reachable.get(key(step.from)) : undefined;
+  // The origin is not in the map; walk the stored parents once to find it.
+  let origin: Point = end.cell;
+  for (let e: Reachable | undefined = end; e; ) {
+    if (!e.from) break;
+    origin = e.from;
+    e = reachable.get(key(e.from));
+  }
+
+  const dx = destination.x - origin.x;
+  const dy = destination.y - origin.y;
+  const deviation = (p: Point): number =>
+    Math.abs((p.x - origin.x) * dy - (p.y - origin.y) * dx);
+
+  const route: Point[] = [end.cell];
+  let current = end;
+  while (current.from && !(current.from.x === origin.x && current.from.y === origin.y)) {
+    const wanted = current.costFeet - stepCostFeet(origin, current.cell);
+    let best: Reachable | null = null;
+    let bestDeviation = Infinity;
+    for (const n of neighbourCells(current.cell)) {
+      const candidate = reachable.get(key(n));
+      if (!candidate || candidate.costFeet !== wanted) continue;
+      const d = deviation(candidate.cell);
+      if (d < bestDeviation) {
+        best = candidate;
+        bestDeviation = d;
+      }
+    }
+    // The parent always qualifies, so this only guards the type.
+    current = best ?? reachable.get(key(current.from))!;
+    route.unshift(current.cell);
   }
 
   return route;
@@ -177,6 +215,18 @@ function occupiedCells(state: MatchState, exceptUnitId: string): Set<string> {
     if (unit.id === exceptUnitId) continue;
     cells.add(key(unit));
   }
+  return cells;
+}
+
+/**
+ * Every cell this unit may not step on: the ones other players stand on, and
+ * the penalty box in front of the opposing mouth while it is closed to its
+ * side (écart 53). The route search reads this one set; `validatePath` reads
+ * the two parts apart so its refusal can say which rule stopped the step.
+ */
+function closedCells(arena: Arena, state: MatchState, unit: Unit): Set<string> {
+  const cells = occupiedCells(state, unit.id);
+  for (const barred of barredCells(arena, state, unit.team)) cells.add(barred);
   return cells;
 }
 

@@ -31,7 +31,7 @@ export const BULWARK: RoleWeights = {
   screenCarrier: 8,
   supportAttack: 0,
   cover: 0,
-  escort: 0,
+  block: 0,
   wantsEscort: 0,
   guardStrike: 0,
   parryPost: 0,
@@ -44,6 +44,12 @@ export const BULWARK: RoleWeights = {
   brace: 40,
 
   pressCarrier: 60,
+
+  // 2H.8, Jérôme's second pass.
+  chaseKickoff: 1,
+  prey: { striker: 1, breaker: 1, trajector: 1, bulwark: 1 },
+  hunt: 0,
+  relaunch: 150,
 
   avoidOpportunity: 4,
   avoidCrackers: 8,

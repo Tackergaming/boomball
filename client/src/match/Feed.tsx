@@ -7,8 +7,12 @@
  * place in the client that reads events at all, and it reads them to narrate,
  * never to work out what the board looks like: that is the snapshot's job.
  *
- * Events with no line here are deliberately silent. `diceRolled` and
- * `turnStarted` fire constantly and would bury the two lines that matter.
+ * Every action a unit takes leaves a line, the house's included, a miss as much
+ * as a hit and a turn spent doing nothing as much as a turn spent swinging
+ * ("holds position"). Jérôme played a match and saw the AI act without the
+ * feed saying so: walks, a failed interception and an idle turn were all
+ * silent. Only bookkeeping stays quiet: `diceRolled`, `turnStarted`, a Spark
+ * drift and a Payload coordinate change carry no action of anybody's.
  */
 
 import { useEffect, useRef } from 'react';
@@ -16,6 +20,7 @@ import { useEffect, useRef } from 'react';
 import { SUBSTITUTE_DELAY_ROUNDS } from '../../../engine/constants.js';
 import type { MatchEvent } from '../../../engine/events.js';
 import type { MatchState } from '../../../engine/types.js';
+import { label } from './replay.js';
 
 export function Feed({ feed, state, own }: { feed: MatchEvent[]; state: MatchState; own: 'A' | 'B' }) {
   const box = useRef<HTMLDivElement>(null);
@@ -34,18 +39,57 @@ export function Feed({ feed, state, own }: { feed: MatchEvent[]; state: MatchSta
         <span className="label">The call</span>
       </div>
       <div ref={box} style={S.list}>
-        {feed.map((event, i) => {
-          const line = describe(event, name);
-          if (!line) return null;
-          return (
-            <p key={i} style={{ ...S.line, ...toneOf(event, side) }}>
-              {line}
-            </p>
-          );
-        })}
+        {feedLines(feed, name).map(({ event, line }, i) => (
+          <p key={i} style={{ ...S.line, ...toneOf(event, side) }}>
+            {line}
+          </p>
+        ))}
       </div>
     </div>
   );
+}
+
+/** What a unit does with its turn, as opposed to what merely happens to it. */
+const ACTIONS: ReadonlySet<MatchEvent['kind']> = new Set<MatchEvent['kind']>([
+  'moved',
+  'dashed',
+  'dodging',
+  'disengaged',
+  'braced',
+  'attacked',
+  'shoved',
+  'passed',
+  'shotAtFurnace',
+  'crackerBatted',
+  'sparkCaught',
+  'payloadGrabbed',
+]);
+
+/**
+ * The feed as lines. An event maps to a line on its own, except `turnEnded`,
+ * which says something only when the unit did nothing since its `turnStarted`.
+ * Until a `turnStarted` has been seen the window may have been cut mid-turn, so
+ * the unit is given the benefit of the doubt.
+ */
+export function feedLines(
+  feed: readonly MatchEvent[],
+  name: (id: string) => string,
+): { event: MatchEvent; line: string }[] {
+  const out: { event: MatchEvent; line: string }[] = [];
+  let acted = true;
+  for (const event of feed) {
+    if (event.kind === 'turnStarted') acted = false;
+    else if (ACTIONS.has(event.kind)) acted = true;
+    const line =
+      event.kind === 'turnEnded'
+        ? acted
+          ? null
+          : `${name(event.unitId)} holds position.`
+        : describe(event, name);
+    if (line) out.push({ event, line });
+    if (event.kind === 'turnEnded') acted = true;
+  }
+  return out;
 }
 
 function toneOf(
@@ -72,7 +116,7 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'roundStarted':
       return `— Round ${event.round} —`;
     case 'moved':
-      return null;
+      return `${name(event.unitId)} moves ${event.path.length} ${event.path.length === 1 ? 'cell' : 'cells'}.`;
     case 'dashed':
       return `${name(event.unitId)} dashes.`;
     case 'dodging':
@@ -90,23 +134,23 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'opportunityAttacked':
       return `${name(event.attackerId)} catches ${name(event.targetId)} leaving${event.hit ? '' : ', and misses'}.`;
     case 'recoiled':
-      return null;
+      return `${name(event.unitId)} is thrown back by the swing.`;
     case 'shoved':
       return event.success
         ? `${name(event.shoverId)} shoves ${name(event.targetId)}${event.pushedTo ? ' back a cell' : ' off the line'}.`
         : `${name(event.shoverId)} shoves at ${name(event.targetId)} and it holds.`;
     case 'crackerBatted':
-      return `${name(event.unitId)} bats ${event.crackerId} away.`;
+      return `${name(event.unitId)} bats ${label(event.crackerId)} away${event.hit ? '' : ' and misses'}.`;
     case 'crackerParried':
       return event.hit
-        ? `${name(event.unitId)} gets the bat on ${event.crackerId} as it comes in.`
-        : `${name(event.unitId)} swings at ${event.crackerId} as it comes in, and misses.`;
+        ? `${name(event.unitId)} gets the bat on ${label(event.crackerId)} as it comes in.`
+        : `${name(event.unitId)} swings at ${label(event.crackerId)} as it comes in, and misses.`;
     case 'crackerDetonated':
-      return `${event.crackerId} goes off on ${name(event.targetId)} for ${event.damage}${event.saved ? ', half caught' : ''}.`;
+      return `${label(event.crackerId)} goes off on ${name(event.targetId)} for ${event.damage}${event.saved ? ', half caught' : ''}.`;
     case 'crackerRespawned':
-      return null;
+      return `A fresh ${label(event.crackerId)} appears.`;
     case 'crackerMoved':
-      return null;
+      return `${label(event.crackerId)} rolls ${event.path.length} ${event.path.length === 1 ? 'cell' : 'cells'}.`;
     case 'sparkEntered':
       return 'The Spark rolls onto the pitch.';
     case 'sparkMoved':
@@ -124,9 +168,11 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'passIntercepted':
       return event.success
         ? `${name(event.interceptorId)} picks off the pass from ${name(event.throwerId)}.`
-        : null;
+        : `${name(event.interceptorId)} reaches for the pass from ${name(event.throwerId)} and misses.`;
     case 'payloadScattered':
-      return null;
+      return event.cells === 1
+        ? 'The Payload rolls to the next cell.'
+        : `The Payload bounces ${event.cells} cells away.`;
     case 'payloadReset':
       return event.carriedBy
         ? `A fresh Payload goes to ${name(event.carriedBy)}.`
@@ -136,6 +182,8 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
       return event.blockedBy
         ? `${name(event.blockedBy)} gets in the mouth and turns ${name(event.unitId)} away.`
         : `${name(event.unitId)} shoots and it comes back out.`;
+    case 'relocated':
+      return `${name(event.unitId)} is moved out of the penalty box.`;
     case 'substituteEntered':
       return `${name(event.unitId)} comes on.`;
     case 'scored':
