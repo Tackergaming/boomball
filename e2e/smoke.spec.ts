@@ -133,7 +133,10 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   await page.locator(`[data-unit="${pawnId}"]`).click();
   await expect(page.getByText(pawn.name, { exact: true }).first()).toBeVisible();
   if (targetId) {
-    await expect(page.getByRole('button', { name: /^(Swing at|Shove|Pass to) / })).toBeVisible();
+    // An adjacent opponent is both a Swing and a Shove, so the tray holds two
+    // buttons: first seen at the harness on 2026-10-11, once the house pressed
+    // Giff at round 2 (2H.9), and the bare locator tripped on the pair.
+    await expect(page.getByRole('button', { name: /^(Swing at|Shove|Pass to) / }).first()).toBeVisible();
   }
   await shots.take(targetId ? 'pawn-clicked-target' : 'pawn-clicked');
   await page.locator(`[data-unit="${me.id}"]`).click();

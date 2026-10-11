@@ -34,9 +34,10 @@
 > (star, 40 à 20), cinq retours lus contre les événements en base, et **C11 validé par lui** le
 > même jour : écart 53 bis, le plan de tour comme moteur de décision de l'IA, le Dash de repli, la
 > case de repos du gardien. **2H.9 est codée le 2026-10-11 dans le chat suivant**, 475 tests,
-> `ENGINE_VERSION` toujours 5, smoke et playthrough verts, **pas encore commitée ni redéployée** :
-> le commit, le feu vert de redéploiement et sa partie attendent Jérôme. Le prompt est
-> `05-reprise-chat-suivant.md`.
+> `ENGINE_VERSION` toujours 5, commitée et poussée (`922368f`), puis **mise en ligne le même jour
+> sur le feu vert de Jérôme** (`resolve-action` v15, `create-match` v13), smoke et playthrough
+> verts sur les fonctions redéployées. **Sa porte n'est pas franchie** : il rejoue et dit s'il
+> comprend ce que chaque rôle cherche. Le prompt est `05-reprise-chat-suivant.md`.
 >
 > **Unité d'effort : la séance**, environ deux heures de Claude Code bornées à un commit.
 

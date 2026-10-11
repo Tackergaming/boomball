@@ -1332,7 +1332,17 @@ sweep**, à sa demande. Pas de commit ni de redéploiement : les deux lui appart
 
 **Ce que ça change à l'écran** : rien. Aucun composant du client n'est touché.
 
-**Ce qui attend Jérôme** : `/commit` ; son feu vert pour redéployer `resolve-action` et
-`create-match` (règle d'IA seule, `ENGINE_VERSION` reste 5, aucune migration, les matchs ouverts
-continuent) ; sa partie sur le moteur 5 avec le plan de tour, et son verdict sur ce que chaque rôle
-cherche ; **un sweep s'il le demande**, un seul, contre `09` §12, en comptant onze minutes.
+**La mise en ligne, le 2026-10-11 dans le même chat**, par le fil principal (Fable 5.1), après le
+commit `922368f` poussé sur son `/commit et push` et son feu vert :
+
+| Quoi | État |
+|---|---|
+| Redéploiement | `resolve-action` v15 et `create-match` v13, moteur 5 inchangé, aucune migration, les matchs ouverts continuent |
+| Smoke | **Rouge une fois, pour une raison du harnais et pas du jeu** : au round 2 la maison avait fini un Striker adjacent à Giff, le smoke a cliqué ce pion et le tray « Swing at / Shove » s'est ouvert pour la première fois au harnais, avec deux boutons, et le localisateur du test en attendait un seul (violation du mode strict de Playwright). `.first()` ajouté dans `smoke.spec.ts`, c'est la dette « tray jamais vu au harnais » qui se solde. Puis smoke vert en 23 s |
+| Playthrough | Vert en 1,1 min, 26 requêtes humaines, 0 refusée, match nul 10 à 10 en douze rounds |
+| Ce que les captures montrent | **Le plan de tour est en ligne chez la maison** : « Derro Tarrow dashes. Derro Tarrow moves 16 cells. » en tête de round, le Dash joué en premier puis une seule marche ; au round 7 Giff bouscule Nib Flintlock qui lâche le ballon |
+| Un trait à connaître | Dans 6 tours sur 401 d'auto-jeu (trois matchs vétéran), le Dash vient **après** une première marche : « moves 8, dashes, moves 7 ». Ce n'est pas un défaut du plan mais de la relecture après chaque pas : des termes de `positionValue` lisent la position courante de l'unité (`rejoin` hors de portée de passe, `looseBallReach`, `keenerMateNear`), donc le paysage change une fois l'unité déplacée et un Dash devient rentable là où il ne l'était pas. La case finale est la même, l'ordre des lignes du fil diffère. À laisser tel quel sauf si Jérôme le voit et s'en plaint |
+
+**Ce qui attend Jérôme** : `/commit` pour le correctif du smoke et les documents de mise en ligne ;
+sa partie sur le moteur 5 avec le plan de tour, et son verdict sur ce que chaque rôle cherche ;
+**un sweep s'il le demande**, un seul, contre `09` §12, en comptant onze minutes.

@@ -1,8 +1,7 @@
 # Prompt de reprise pour le chat suivant
 
-> Récrit le 2026-10-11 par le fil principal (Fable 5.1) à la fin du codage de 2H.9, avant le
-> commit, le redéploiement et la partie de Jérôme. À coller tel quel en ouverture du prochain chat,
-> après `/prime`.
+> Récrit le 2026-10-11 par le fil principal (Fable 5.1) à la mise en ligne de 2H.9, avant la
+> partie de Jérôme. À coller tel quel en ouverture du prochain chat, après `/prime`.
 
 ---
 
@@ -18,30 +17,35 @@ code : lis-le avant de toucher à ai/. 07 §10 porte le journal, dont l'entrée 
 m'attend. 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8
 ni de 2H.9. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.9 est CODÉE le 2026-10-11, dans la copie de travail. 475 tests verts sur 22
-fichiers, typecheck racine, scripts, e2e et client verts, build du client vert, smoke vert en
-31 s, playthrough vert en 54 s. ENGINE_VERSION vaut 5 dans le dépôt comme en ligne, mais les
-fonctions en ligne (resolve-action v14, create-match v12) portent encore l'IA de 2H.8 : le plan
-de tour n'est pas en ligne. Selon ce que j'ai fait entre-temps, 2H.9 est soit encore à commiter,
-soit commitée et poussée, soit déjà redéployée : vérifie avec git log et git status avant de
-conclure, et demande-moi si ce n'est pas clair.
+Où on en est : 2H.9 est CODÉE, COMMITÉE (922368f), POUSSÉE et EN LIGNE depuis le 2026-10-11.
+475 tests verts sur 22 fichiers, typecheck racine, scripts, e2e et client verts, build du client
+vert. ENGINE_VERSION vaut 5 dans le dépôt comme en ligne : resolve-action v15 et create-match
+v13 portent le plan de tour. Smoke vert en 23 s et playthrough vert en 1,1 min sur les fonctions
+redéployées, 26 requêtes humaines, 0 refusée ; la capture de tête de round montre « Derro Tarrow
+dashes. Derro Tarrow moves 16 cells. », le Dash joué en premier puis une seule marche. Le smoke
+a soldé la dette du tray « Swing at / Shove » au clic sur un pion : vu pour la première fois,
+deux boutons, le localisateur du test en attendait un seul, corrigé par .first() dans
+smoke.spec.ts. Ce correctif et les documents de mise en ligne sont peut-être encore à commiter :
+vérifie git status avant de conclure. Je n'ai pas encore joué ma partie sur le plan de tour.
 
 LA TÂCHE, dans cet ordre, chaque étape sur mon feu vert explicite.
 
-1. Si 2H.9 n'est pas commitée : je tape /commit. Tu ne commites pas tout seul.
-2. Redéploiement sur mon feu vert, depuis boomball/ en bash : set -a && . ../.env && set +a puis
-   npm run deploy:function -- resolve-action create-match. Règle d'IA seule : aucune migration,
-   ENGINE_VERSION reste 5, les matchs ouverts continuent. Puis npm run e2e et
-   npm run e2e:playthrough contre les fonctions redéployées, et lecture des captures : la maison
-   doit montrer des Dash joués en premier puis une marche, et un gardien qui rentre en (7,1) ou
-   (7,43) avant de se planter.
-3. Ma partie, puis mes retours en chat. Tu les lis contre les événements du match en base
+1. Si git status montre smoke.spec.ts ou des documents modifiés : je tape /commit. Tu ne
+   commites pas tout seul.
+2. Ma partie, puis mes retours en chat. Tu les lis contre les événements du match en base
    (match_events et matches.kickoff, un script Node de lecture avec la clé de service dans le
    scratchpad, comme pour 2H.8) avant de proposer quoi que ce soit. Les questions sur ce que
-   fait l'IA se répondent par les événements, pas par une capture.
-4. Un sweep seulement si je le demande, un seul, contre 09 §12 : compte onze minutes maintenant
+   fait l'IA se répondent par les événements, pas par une capture. Un trait connu : dans 6 tours
+   sur 401 d'auto-jeu le Dash vient après une première marche (« moves 8, dashes, moves 7 »),
+   parce que des termes de positionValue lisent la position courante (rejoin, looseBallReach,
+   keenerMateNear) et que le plan est reconstruit après chaque pas ; même case finale, ordre du
+   fil différent, détail en 07 §10 sous 2H.9. À ne changer que si je m'en plains.
+3. Un sweep seulement si je le demande, un seul, contre 09 §12 : compte onze minutes maintenant
    qu'un match d'auto-jeu dure 1,1 s, et le rapport imprime ses constantes.
-5. Journal 07 §10, 08 §5, ce fichier, puis /update et /save quand je les tape.
+4. Mes retours forment soit la porte franchie vers la phase 3 (2.5D, A20 React 19 en premier
+   pas), soit une 2H.10 de corrections : liste par rôle triée par priorité que je corrige, écarts
+   écrits dans 00 AVANT la première ligne de code, journal 07 §10, 08 §5, ce fichier, puis /update
+   et /save quand je les tape.
 
 Ce qu'il faut savoir tout de suite.
 

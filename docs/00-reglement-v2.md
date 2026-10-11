@@ -613,7 +613,7 @@ positif et sans passe légale, chaque case atteignable d'où un coéquipier est 
 vaut `relaunch`, moins un demi-point par case de distance à sa bouche et la pénalité d'attaque
 d'opportunité de la route, hors de la laisse ; une fois sur place, la passe suit.
 
-## C11. Décisions du 2026-10-11 après la partie à la porte de 2H.8, **sous-phase 2H.9, dans le code depuis le 2026-10-11, fonctions à redéployer**
+## C11. Décisions du 2026-10-11 après la partie à la porte de 2H.8, **sous-phase 2H.9, dans le code et en ligne depuis le 2026-10-11 (moteur 5, `resolve-action` v15, `create-match` v13)**
 
 > Écrites par le fil principal (Fable 5.1) sur les cinq retours de Jérôme après sa partie sur le
 > moteur 5 (star, 40 à 20), lus contre les événements du match en base, puis deux questions
