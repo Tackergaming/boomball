@@ -1474,7 +1474,10 @@ propre chrono, puis un chrono neuf pour le tour). **Pas de sweep**, à sa demand
 dans douze matchs d'auto-jeu sur douze, et Thessa l'a pris dans la partie `a17c22a5`, contre C10
 Trajector 3 et C10 commune 6. Cause lue dans le code : le plan « marcher, ramasser, passer » de
 2H.10 se note sur `grabPayload` sans le facteur `chaseKickoff`, qui ne pèse que dans
-`positionValue`. Antérieur à 2H.12, non corrigé : à Jérôme de dire.
+`positionValue`. Antérieur à 2H.12. **Tranché par Jérôme le même soir** : le Trajector laissera le
+ballon du coup d'envoi aux Strikers, **à coder au prochain lot de corrections**, en `00` C15 avec
+ses retours, pas avant. Ses trois matchs du moteur 6 de l'après-midi ne se consignent pas.
 
-**Ce qui attend Jérôme** : sa partie sur 2H.12 consignée par `dump-match.ts`, le constat du coup
-d'envoi, et un sweep seulement s'il le demande.
+**Ce qui attend Jérôme** : sa partie sur 2H.12, jouée le 2026-10-12 au soir, à consigner par
+`dump-match.ts` au prochain tour de dev (prévu le 2026-10-17), et un sweep seulement s'il le
+demande.

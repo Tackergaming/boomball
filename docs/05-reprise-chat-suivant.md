@@ -1,8 +1,9 @@
 # Reprise du chat suivant, Boomball
 
 > Écrit par le fil principal (Opus 5.5) le 2026-10-12, à la fin du chat qui a écrit C14, codé et
-> mis en ligne 2H.12 (l'humain choisit sa place dans son rôle, le Breaker ramasse d'abord). À
-> coller tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
+> mis en ligne 2H.12 (l'humain choisit sa place dans son rôle, le Breaker ramasse d'abord), puis
+> mis à jour après les réponses de Jérôme le même soir. Prochain tour de dev prévu le samedi
+> 2026-10-17. À coller tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
@@ -35,28 +36,30 @@ tour commence ; place 2 ou 3 : mon slot passe derrière une ou deux IA du rôle.
 propre chrono et mon tour repart sur un chrono neuf ; chrono expiré ou popup fermée, je joue
 dernier. Mon Trajector, qui joue avant la popup, planifie avec moi en dernier.
 
-NON COMMITÉ dans la copie de travail, à commiter en premier (par /commit, sans me demander de
-valider le message) : ce que /update aura écrit le 2026-10-12 s'il a été lancé après le dernier
-commit. check_drift.py disait « aucune dérive » au commit.
+Tout est commité et poussé au 2026-10-12 au soir, /update compris (CONTEXT.md, HISTORY.md, le
+bandeau de 04). check_drift.py disait « aucune dérive ». Vérifie git status avant toute chose.
 
 Les quatre fichiers du vault modifiés hors de nos sessions (Sapphire Hammer.md, la PREP de la
 scène 1.2 Ilthavax, sa battlemap et les prompts de battlemap de la scène 1.3) ne sont pas à
 nous : ne les commite pas sans mon feu vert.
 
-DEUX CHOSES OUVERTES, à me poser en début de chat si je n'en parle pas.
+DÉCIDÉ PAR MOI LE 2026-10-12 AU SOIR, À CODER AU PROCHAIN LOT DE CORRECTIONS, PAS AVANT : le
+Trajector laisse le ballon du coup d'envoi aux Strikers (C10 Trajector 3 et C10 commune 6, qu'il
+enfreint aujourd'hui). Constat du fil principal : il le prend dans douze matchs d'auto-jeu sur
+douze et l'a pris dans ma partie a17c22a5 (Thessa), parce que le plan « marcher, ramasser,
+passer » de 2H.10 se note sur grabPayload sans le facteur chaseKickoff, qui ne pèse que dans
+positionValue. À écrire en C15 avec mes retours de la partie, avant le code.
+Mes trois matchs du moteur 6 de l'après-midi du 2026-10-12 (Shrapnel oath) ne se consignent pas.
 
-1. Constat du fil principal, sans décision : le Trajector prend le ballon du coup d'envoi, dans
-   douze matchs d'auto-jeu sur douze et dans ma partie a17c22a5 (Thessa), contre C10 Trajector 3
-   et C10 commune 6. Cause lue dans le code : le plan « marcher, ramasser, passer » de 2H.10 se
-   note sur grabPayload sans le facteur chaseKickoff, qui ne pèse que dans positionValue. À moi
-   de dire si on corrige.
-2. Mes trois matchs du 2026-10-12 sur le moteur 6, après la mise en ligne de 2H.11 (Shrapnel
-   oath, 7a059776, 08a495b4 et 3665fa4a, ce dernier en Trajector), ne sont pas consignés. À moi
-   de dire s'ils comptent comme ma partie sur 2H.11.
-
-LA TÂCHE : ma partie sur 2H.12, consignée avec dump-match.ts. Pas de lecture round par round
-sauf si je la demande ou si tu la proposes avec une raison. Un sweep seulement si je le demande,
-un seul, contre 09 §12, quatorze minutes.
+LA TÂCHE.
+1. Ma partie sur 2H.12, jouée le 2026-10-12 au soir sur le moteur 7 : la retrouver par
+   dump-match.ts --list (horaires en UTC) et la consigner. Elle doit se rejouer sans écart
+   d'événement ; une ligne DIFFERS sur une passe interceptée est l'artefact connu du dump. Pas de
+   lecture round par round sauf si je la demande ou si tu la proposes avec une raison.
+2. Mes retours, en chat, puis C15 dans 00 avant toute ligne de code, avec le correctif du coup
+   d'envoi ci-dessus. Puis la sous-phase 2H.13 comme les précédentes : tests, sous-agents Sonnet
+   sur le borné, harnais, redéploiement sur mon feu vert explicite, journal, commit.
+3. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, quatorze minutes.
 
 Ce qu'il faut savoir tout de suite.
 
