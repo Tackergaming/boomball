@@ -932,7 +932,7 @@ relire le code contre les mots. **Codé en 2H.10.**
 - **Vitesse** : 2,7 ms par décision en moyenne et 25 ms au pire sur un match vétéran, comme en
   2H.9 ; le test des cinquante millisecondes passe.
 
-## C13. Décisions du 2026-10-12 après la partie à la porte de 2H.10, **sous-phase 2H.11, codée le 2026-10-12, fonctions à redéployer (moteur 6)**
+## C13. Décisions du 2026-10-12 après la partie à la porte de 2H.10, **sous-phase 2H.11, dans le code et en ligne depuis le 2026-10-12 (moteur 6, `resolve-action` v17, `create-match` v15)**
 
 > Écrites par le fil principal (Fable 5.1) sur la lecture **round par round et joueur par joueur** de
 > la partie de Jérôme sur le moteur 6 (star, 30 à 50, match `a17c22a5`, consigné dans

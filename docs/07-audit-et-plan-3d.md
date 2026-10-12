@@ -1430,7 +1430,14 @@ point par point avant la première ligne de code, plus l'écart 57 et neuf poids
 
 **Ce que ça change à l'écran** : rien. Aucun composant du client n'est touché.
 
-**Ce qui attend Jérôme** : son feu vert de redéploiement (`resolve-action` et `create-match`,
-`ENGINE_VERSION` reste 6, pas de migration), puis sa partie sur 2H.11 consignée par
-`dump-match.ts`, et **un sweep quand il le demandera**, contre `09` §12, en comptant quatorze
-minutes.
+**La mise en ligne, le 2026-10-12 dans le même chat**, par le fil principal (Fable 5.1), après le
+commit `0ffa299` et son feu vert :
+
+| Quoi | État |
+|---|---|
+| Redéploiement | `resolve-action` v17 et `create-match` v15, **la cinquième passe en ligne**, moteur 6 inchangé, aucune migration, aucun match archivé |
+| Harnais sur les fonctions redéployées | Smoke vert en 25 s, playthrough vert en 18 s, 14 requêtes humaines, 0 refusée, un match entier jusqu'au sifflet, perdu 10 à 40 sur le ballon par le compte e2e en dix rounds |
+| Ce que les captures montrent | Au round 9, Derro Flintlock, Striker de l'équipe qui n'a pas la balle, **dashe dix cases vers le porteur** en traversant deux allonges, les deux manquées : le Dash d'approche de C13 point 4 par une route que la route sûre ne pouvait pas éviter ; le siège humain, piloté par le planificateur de 2H.11 depuis Node, dashe lui aussi |
+
+**Ce qui attend Jérôme** : sa partie sur 2H.11 consignée par `dump-match.ts`, `CONTEXT.md` par
+`/update`, et **un sweep quand il le demandera**, contre `09` §12, en comptant quatorze minutes.

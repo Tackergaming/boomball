@@ -19,12 +19,11 @@ codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien d
 bouge » ; il n'y a pas de sweep de 2H.8 à 2H.11. 04 est l'histoire, à lire seulement quand une
 décision d'ingénierie te surprend.
 
-Où on en est : 2H.11 est CODÉE et COMMITÉE le 2026-10-12, PAS ENCORE EN LIGNE. Le dépôt porte
-ENGINE_VERSION 6 comme les fonctions en ligne (resolve-action v16, create-match v14), donc le
-harnais joue sans épingle, mais la maison en ligne joue encore la quatrième passe tant que les
-deux fonctions ne sont pas redéployées. 530 tests verts sur 23 fichiers (503 avant), typecheck
-vert, build du client vert, smoke vert en 34 s, playthrough vert en 45 s (16 requêtes humaines,
-0 refusée). Pas de sweep, à ma demande. Dix-huit matchs d'auto-jeu joués à la main pour
+Où on en est : 2H.11 est CODÉE, COMMITÉE (0ffa299 puis le commit de mise en ligne) et EN LIGNE
+depuis le 2026-10-12 sur mon feu vert : resolve-action v17, create-match v15, ENGINE_VERSION
+toujours 6, aucune migration, aucun match archivé. 530 tests verts sur 23 fichiers (503 avant),
+typecheck vert, build du client vert, smoke et playthrough verts sur les fonctions redéployées
+(14 requêtes humaines, 0 refusée). Pas de sweep, à ma demande. Dix-huit matchs d'auto-jeu joués à la main pour
 contrôler que le sport se joue encore, pas un sweep : 2,5 à 3,5 buts par match sur six graines
 par Tier, contre 1,1 à 2,2 au dernier sweep de 09 §12 ; c'est au sweep que je demanderai de le
 dire. Un match d'auto-jeu dure 1,5 s, donc un sweep environ quatorze minutes.
@@ -42,14 +41,12 @@ nous : ne les commite pas sans mon feu vert.
 
 LA TÂCHE, dans cet ordre.
 
-1. Redéployer sur mon feu vert explicite (ENGINE_VERSION reste 6, pas de migration) : depuis
-   boomball/ en bash, set -a && . ../.env && set +a puis npm run deploy:function --
-   resolve-action create-match. Puis rejouer npm run e2e et npm run e2e:playthrough sur les
-   fonctions redéployées, compléter le journal 07 §10 (le bloc « mise en ligne » de 2H.11, comme
-   en 2H.10), 08 §5 et son en-tête, le skill, CONTEXT.md par /update, commit.
+1. Si CONTEXT.md et HISTORY.md ne portent pas encore 2H.11 en ligne, c'est que je n'ai pas tapé
+   /update : propose-le, ne le lance pas.
 2. Ma partie sur 2H.11. Consignée avec dump-match.ts (--list puis --match <id>), viewer.html
-   ouvert ; pas de lecture round par round sauf si je la demande ou si tu la proposes avec une
-   raison.
+   ouvert ; vérifier zéro écart d'événement et zéro décision « DIFFERS » puisque dépôt et
+   fonctions sont alignés ; pas de lecture round par round sauf si je la demande ou si tu la
+   proposes avec une raison. Mes retours forment C14 avant toute ligne de code.
 3. Un sweep si je le demande, un seul, contre 09 §12, quatorze minutes.
 
 Ce qu'il faut savoir tout de suite.
@@ -92,7 +89,8 @@ Ce qu'il faut savoir tout de suite.
    --match <id>. Il écrit match.md, viewer.html, events.json, kickoff.json et match.json dans
    docs/matches/<date>-<id8>/ et rejoue le match en local. Les horaires de --list sont en UTC,
    deux heures de moins que l'heure de Paris. Un match joué par les fonctions de la quatrième
-   passe et rejoué par le dépôt de la cinquième affichera des décisions « DIFFERS » : normal.
+   passe (avant le 2026-10-12 après-midi) et rejoué par le dépôt de la cinquième affichera des
+   décisions « DIFFERS » : normal ; un match joué depuis doit n'en afficher aucune.
    Pour publier le viewer en artefact privé, l'outil Artifact sur viewer.html ; pour lire les
    plans d'une décision sans ouvrir le navigateur, le JSON est dans la balise match-data du
    viewer.
