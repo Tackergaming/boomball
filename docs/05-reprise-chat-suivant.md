@@ -1,8 +1,8 @@
 # Reprise du chat suivant, Boomball
 
-> Écrit par le fil principal (Fable 5.1) le 2026-10-12, à la fin du chat qui a codé 2H.11, la
-> cinquième passe de l'IA. À coller tel quel comme premier message du chat suivant, dans le
-> workspace `jarvis-jdr`.
+> Écrit par le fil principal le 2026-10-12, à la fin du chat qui a codé et mis en ligne 2H.11, la
+> cinquième passe de l'IA, et où Jérôme a dicté deux nouvelles règles et répondu aux deux
+> questions qu'elles posaient. À coller tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
@@ -35,19 +35,59 @@ légitime à portée (C10 commune 3) et, pour le Breaker, par une proie à port�
 20). Une précision du fil principal : un porteur sans aucune menace ne recule jamais, la lettre
 du point 12 l'aurait permis.
 
+NON COMMITÉ dans la copie de travail, à commiter en premier (par /commit, sans me demander de
+valider le message) : context/CONTEXT.md, context/HISTORY.md et le bandeau de
+boomball/docs/04-etat-des-lieux.md, écrits par /update le 2026-10-12 (2H.11 en ligne, la lecture
+de ma partie et C13), plus ce fichier 05. check_drift.py dit « aucune dérive ».
+
 Les quatre fichiers du vault modifiés hors de nos sessions (Sapphire Hammer.md, la PREP de la
 scène 1.2 Ilthavax, sa battlemap et les prompts de battlemap de la scène 1.3) ne sont pas à
 nous : ne les commite pas sans mon feu vert.
 
+DEUX NOUVELLES RÈGLES, dictées par moi le 2026-10-12 à la fin du chat précédent. Elles forment
+C14 et la sous-phase 2H.12. Le fil principal les a reformulées ainsi, j'ai validé le principe et
+répondu à ses deux questions le même jour ; les réponses sont écrites dans chaque règle.
+
+Règle 1, l'humain choisit sa place dans son rôle. Si je joue un Striker ou un Breaker, quand le
+premier tour de mon rôle arrive dans le round, une popup me demande si je veux jouer en premier,
+deuxième ou troisième de mon rôle, pour ce round seulement. Les IA du même rôle prennent les
+places restantes dans leur ordre par la situation (écart 51). Elle REMPLACE l'écart 55 (l'humain
+dernier de son rôle) pour le Striker et le Breaker ; le Trajector et le Bulwark sont seuls de leur
+rôle, rien ne change pour eux. Tranché par moi : un camp n'a que deux Breakers, donc pour un
+Breaker humain la popup propose premier ou deuxième ; si un coéquipier du rôle est évacué, elle ne
+propose que les places qui existent ; si le chrono expire ou si je ferme la popup sans choisir, je
+joue dernier de mon rôle, comme aujourd'hui. Elle touche le moteur : une action ou un état nouveau pour ce
+choix, très probablement ENGINE_VERSION 7, redéploiement et matchs ouverts archivés ; à confirmer
+en lisant engine/initiative.ts, reduce.ts et l'écran de match (client/src/screens/Match.tsx et
+voisins) avant de me le dire. Le harnais e2e et le siège humain du playthrough devront savoir
+répondre à la popup.
+
+Règle 2, le Breaker ramasse d'abord. Quand la balle est au sol à portée, le Breaker la ramasse en
+priorité. « À portée », tranché par moi : même en Dash, donc toute balle qu'il atteint dans le
+tour avec seize cases (le plan « dash, marcher, ramasser » existe pour lui ; il ne pourra plus
+lancer, l'Action étant partie dans le Dash). Il ne la laisse plus à un Striker ou au Trajector. Elle REMPLACE C10 Breaker 7 et C12
+commune 6 pour le Breaker (yieldToKeener, keenerMateNear) ; la suite, le Breaker porteur qui
+passe à la première occasion (handOff, chainException), n'est pas touchée sauf si je le dis.
+
 LA TÂCHE, dans cet ordre.
 
-1. Si CONTEXT.md et HISTORY.md ne portent pas encore 2H.11 en ligne, c'est que je n'ai pas tapé
-   /update : propose-le, ne le lance pas.
-2. Ma partie sur 2H.11. Consignée avec dump-match.ts (--list puis --match <id>), viewer.html
-   ouvert ; vérifier zéro écart d'événement et zéro décision « DIFFERS » puisque dépôt et
-   fonctions sont alignés ; pas de lecture round par round sauf si je la demande ou si tu la
-   proposes avec une raison. Mes retours forment C14 avant toute ligne de code.
-3. Un sweep si je le demande, un seul, contre 09 §12, quatorze minutes.
+1. Commiter l'état ci-dessus.
+2. Écrire C14 dans 00 avant toute ligne de code (l'écart 58 pour la popup, la règle d'IA du
+   Breaker), avec mes réponses ci-dessus, et me le faire valider. Si la lecture du code soulève
+   une question que mes réponses ne tranchent pas, pose-la en chat avant d'écrire.
+3. Coder 2H.12 : la règle 2 d'abord (ai/, poids et chooseAction, avec ses tests), puis la règle 1
+   (moteur, client, harnais). Tests en même temps ; sous-agents Sonnet, effort précisé, sur ce
+   qui est borné et disjoint (les tests d'une règle, le composant de popup si c'est un fichier à
+   part). Le test des cinquante millisecondes fait foi sur la vitesse. Écrire « comment 2H.12 est
+   codée » à la fin de C14.
+4. Vérifier : npm test, typecheck, build du client, npm run e2e puis e2e:playthrough. Si
+   ENGINE_VERSION monte, épingler la version en ligne le temps du run (voir le skill) et la
+   remettre. La popup doit être vue au harnais, capture lue.
+5. Redéployer sur mon feu vert explicite, rejouer smoke et playthrough sur les fonctions
+   redéployées, journal 07 §10, 08 §5, skill, /update proposé, commit.
+6. Ma partie sur 2H.12, consignée avec dump-match.ts. Pas de lecture round par round sauf si je
+   la demande ou si tu la proposes avec une raison. Un sweep seulement si je le demande, un seul,
+   contre 09 §12, quatorze minutes.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -112,7 +152,7 @@ Ce qu'il faut savoir tout de suite.
    fois en dev. Ne l'enlève pas.
 
 9. L'initiative (écart 51) est un ordre sans comptes ; un humain joue en DERNIER de son rôle
-   (écart 55) ; écart 54, promoteBulwark ; écart 53, penaltyBox indexé par l'équipe qui DÉFEND la
+   (écart 55, que la règle 1 ci-dessus va remplacer pour le Striker et le Breaker) ; écart 54, promoteBulwark ; écart 53, penaltyBox indexé par l'équipe qui DÉFEND la
    bouche ; 53 bis, applyPass le remet à null quand le Bulwark lance ; écart 56, turn.startedAt
    est la case de début de tour ; écart 57, un porteur ne tente jamais le Spark, legalActions et
    reduce. Deux faits de règle constatés sans décision : l'équipe qui a l'humain joue juste après
@@ -133,7 +173,8 @@ Ce qu'il faut savoir tout de suite.
     remplacements, un script Python écrit par Write dans le scratchpad puis python -I.
 
 12. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 57 de 00 partie
-    C, et C11, C12 et C13 en entier. Dette connue : arenas.art et le champ art du spec nomment
+    C, et C11, C12 et C13 en entier, sauf l'écart 55, C10 Breaker 7 et C12 commune 6 que mes deux
+    nouvelles règles remplacent. Dette connue : arenas.art et le champ art du spec nomment
     trois JPEG retirés ; substituteEntry et substitute_entry restent et ne sont plus lus ; A20
     (React 19) reste le premier pas de la phase 3 ; le choix de direction d'un Breaker humain à la
     parade est automatique ; le marquage des cases sous allonge adverse à l'écran lit « la route
