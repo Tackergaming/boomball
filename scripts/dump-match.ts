@@ -24,7 +24,7 @@
  * `match.md` into `--out`, by default `docs/matches/<date>-<id8>/`.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Arena } from '../engine/arena.js';
@@ -184,10 +184,67 @@ interface Decision {
   unitId: UnitId;
   human: boolean;
   before: { at: Point; hp: number; holding: boolean; feetLeft: number; actionUsed: boolean };
+  /** The board as it stood when the decision was taken, for the viewer. */
+  board: BoardSnapshot;
   plans: { why: string; score: number; steps: string[] }[];
   played: Action;
   produced: readonly MatchEvent[];
   agrees: boolean | null;
+}
+
+/**
+ * What `viewer.html` draws for one decision: the pieces on the board before the
+ * action, nothing the engine does not already hold. Kept small on purpose, there
+ * are four hundred of them in a match.
+ */
+interface BoardSnapshot {
+  round: number;
+  turnIndex: number;
+  ladder: { rank: number; actor: string; team: string | null }[];
+  units: {
+    id: UnitId;
+    x: number;
+    y: number;
+    hp: number;
+    maxHp: number;
+    ball: boolean;
+    status: string;
+    dodging: boolean;
+    braced: boolean;
+  }[];
+  payload: MatchState['payload'];
+  spark: MatchState['spark'];
+  crackers: MatchState['crackers'];
+  score: MatchState['score'];
+  penaltyBox: MatchState['penaltyBox'];
+}
+
+function snapshot(s: MatchState): BoardSnapshot {
+  return {
+    round: s.round,
+    turnIndex: s.turnIndex,
+    ladder: s.turnOrder.map((slot) => ({
+      rank: slot.rank,
+      actor: slot.actor.kind === 'unit' ? slot.actor.unitId : slot.actor.kind,
+      team: slot.team,
+    })),
+    units: s.units.map((u) => ({
+      id: u.id,
+      x: u.x,
+      y: u.y,
+      hp: u.hp,
+      maxHp: u.maxHp,
+      ball: u.holdingPayload,
+      status: u.status,
+      dodging: u.dodging,
+      braced: u.braced,
+    })),
+    payload: s.payload,
+    spark: s.spark,
+    crackers: s.crackers,
+    score: s.score,
+    penaltyBox: s.penaltyBox,
+  };
 }
 
 const decisions: Decision[] = [];
@@ -353,7 +410,9 @@ while (state.phase !== 'finished' && state.turn && cursor < stored.length && gua
     break;
   }
   const unit = unitOf(state, unitId);
-  const plans = rankPlans(arena, state, unitId, orders).slice(0, 3);
+  // Three plans in match.md, eight in the viewer: the question is often why a
+  // plan lost, and the fourth to eighth say so.
+  const plans = rankPlans(arena, state, unitId, orders).slice(0, 8);
   const result = reduce(arena, state, { unitId, action });
   if (!result.ok) {
     console.error(`the engine refused the rebuilt action of ${unitId} at seq ${cursor}: ${result.reason}`);
@@ -372,6 +431,7 @@ while (state.phase !== 'finished' && state.turn && cursor < stored.length && gua
       feetLeft: state.turn.movementFeetRemaining,
       actionUsed: state.turn.actionUsed,
     },
+    board: snapshot(state),
     plans: plans.map((p) => ({ why: p.why, score: Math.round(p.score * 10) / 10, steps: p.steps.map(describe) })),
     played: action,
     produced: result.events,
@@ -520,7 +580,7 @@ for (let seq = 0; seq < stored.length; seq++) {
     const top = d.plans[0];
     const tag = d.agrees === false ? ' · **DIFFERS**' : '';
     md.push(
-      `- at (${b.at.x}, ${b.at.y}), ${b.hp} hp${b.holding ? ', ball' : ''}, ${b.feetLeft} ft${b.actionUsed ? ', Action spent' : ''} · plan: « ${top?.why ?? 'end turn'} » [${top?.score ?? 0}]${d.plans.slice(1).map((p) => ` / « ${p.why} » [${p.score}]`).join('')} · played: ${describe(d.played)}${tag}`,
+      `- at (${b.at.x}, ${b.at.y}), ${b.hp} hp${b.holding ? ', ball' : ''}, ${b.feetLeft} ft${b.actionUsed ? ', Action spent' : ''} · plan: « ${top?.why ?? 'end turn'} » [${top?.score ?? 0}]${d.plans.slice(1, 3).map((p) => ` / « ${p.why} » [${p.score}]`).join('')} · played: ${describe(d.played)}${tag}`,
     );
   }
   const text = line(e);
@@ -580,4 +640,53 @@ const totals = [...perUnit.values()].reduce(
 md.push('', `Turns ${totals.turns}, Action unused ${totals.pocket}, dashes ${totals.dashes}, AI decisions differing from this checkout ${totals.differs}.`);
 
 await writeFile(join(outDir, 'match.md'), md.join('\n') + '\n');
-console.log(`written to ${outDir}`);
+
+// -- The viewer -------------------------------------------------------------
+//
+// `viewer.html` is `scripts/match-viewer.html` with the match poured into it:
+// one board per decision, the events it produced, the plans the AI ranked, so
+// the match can be read round by round and player by player on a drawn pitch
+// instead of in coordinates. Self-contained, opens from the disk or as an
+// artifact. The template is read from the working directory because esbuild
+// bundles this script into a temporary file.
+
+const viewer = {
+  match: {
+    id: match.id,
+    createdAt: match.created_at,
+    finishedAt: match.finished_at,
+    tier: match.tier,
+    engine: match.engine_version,
+    team: teamName(match.team_id),
+    score: { A: match.score_a, B: match.score_b },
+    winner: match.winner,
+    draw: match.is_draw,
+    humans: participants.map((p) => ({ unitId: p.unit_id, name: p.character_name })),
+    replay: { decisions: decisions.length, mismatches: mismatches.length, leftover },
+  },
+  arena: { rows: KILL_SILO.rows, furnaces: KILL_SILO.furnaces, starts: KILL_SILO.starts },
+  units: match.kickoff.state.units.map((u) => ({ id: u.id, name: u.name, team: u.team, role: u.role, tier: u.tier })),
+  decisions: decisions.map((d) => ({
+    seq: d.seq,
+    round: d.round,
+    unitId: d.unitId,
+    human: d.human,
+    before: d.before,
+    board: d.board,
+    plans: d.plans,
+    played: describe(d.played),
+    agrees: d.agrees,
+    events: d.produced,
+    lines: d.produced.map(line).filter((l): l is string => l !== null),
+  })),
+  final: snapshot(state),
+};
+const template = await readFile(join(process.cwd(), 'scripts', 'match-viewer.html'), 'utf8');
+const poured = JSON.stringify(viewer).replace(/<\//g, '<\\/');
+if (!template.includes('__MATCH_DATA__')) throw new Error('scripts/match-viewer.html has no __MATCH_DATA__ slot');
+const title = `${teamName(match.team_id)}, ${match.created_at.slice(0, 10)}`;
+await writeFile(
+  join(outDir, 'viewer.html'),
+  template.replace('__MATCH_TITLE__', () => title).replace('__MATCH_DATA__', () => poured),
+);
+console.log(`written to ${outDir} (match.md, viewer.html)`);

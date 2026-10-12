@@ -1,0 +1,597 @@
+<title>__MATCH_TITLE__</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: one drawn pitch across the top, the ladder of the round on the right,
+     the decision under the pitch. The pitch keeps its own dark steel in both
+     themes, it is the device; the page around it follows the viewer's theme. */
+  :root {
+    --bg: #f3f1ec;
+    --panel: #ffffff;
+    --fg: #1d2126;
+    --muted: #68707a;
+    --line: #d9d5cc;
+    --accent: #b8651c;
+    --pitch: #23272d;
+    --pitch-line: #3a4049;
+    --solid: #0f1114;
+    --team-a: #3d9ad1;
+    --team-b: #d4553d;
+    --ball: #f2c531;
+    --spark: #7ff3ff;
+    --cracker: #ff8a3d;
+    --font-ui: 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif;
+    --font-data: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15181c; --panel: #1d2126; --fg: #e8e6e1; --muted: #9aa2ab; --line: #30363d;
+      --accent: #e0893a; --pitch: #1a1d22; --pitch-line: #2d333b; --solid: #080a0c;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15181c; --panel: #1d2126; --fg: #e8e6e1; --muted: #9aa2ab; --line: #30363d;
+    --accent: #e0893a; --pitch: #1a1d22; --pitch-line: #2d333b; --solid: #080a0c;
+    color-scheme: dark;
+  }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.35; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-block: 12px 32px; padding-inline: 16px; display: grid; gap: 12px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px; }
+  header h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+  header .score { font-family: var(--font-data); font-size: 18px; font-variant-numeric: tabular-nums; }
+  header .score b { font-weight: 500; }
+  .a { color: var(--team-a); } .b { color: var(--team-b); }
+  header .meta { color: var(--muted); font-size: 14px; }
+  .rounds { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .rounds button, .ctl button {
+    font: inherit; font-weight: 600; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 4px; padding: 4px 10px; cursor: pointer; min-width: 34px;
+  }
+  .rounds button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .rounds button:focus-visible, .ctl button:focus-visible, .ladder li:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
+  .ctl .mode[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .ctl .hint { color: var(--muted); font-size: 13px; }
+  .board { background: var(--pitch); border-radius: 6px; padding: 6px; overflow-x: auto; }
+  .board svg { display: block; width: 100%; height: auto; max-width: 100%; font-family: var(--font-data); }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+  @media (max-width: 820px) { .cols { grid-template-columns: 1fr; } .ctl { margin-left: 0; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  .who { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; margin-bottom: 8px; }
+  .who .name { font-size: 20px; font-weight: 700; }
+  .who .tag { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+  .who .tag.human { border-color: var(--accent); color: var(--accent); }
+  .who .tag.differs { border-color: var(--team-b); color: var(--team-b); }
+  .facts { font-family: var(--font-data); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .played { font-family: var(--font-data); font-size: 14px; margin: 8px 0; }
+  .played b { font-weight: 500; color: var(--accent); }
+  ol.plans, ul.events { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 4px; }
+  ol.plans li { display: grid; grid-template-columns: 3.6em 1fr; gap: 8px; font-size: 14px; }
+  ol.plans li .s { font-family: var(--font-data); font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+  ol.plans li:first-child .s { color: var(--fg); font-weight: 500; }
+  ul.events li { font-family: var(--font-data); font-size: 13px; padding-left: 12px; position: relative; }
+  ul.events li::before { content: '·'; position: absolute; left: 0; color: var(--muted); }
+  ul.events li.big { font-weight: 500; color: var(--accent); }
+  .ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .ladder li { display: grid; grid-template-columns: 1.6em 10px 1fr; gap: 8px; align-items: baseline; padding: 5px 6px; border-radius: 4px; cursor: pointer; }
+  .ladder li:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+  .ladder li[aria-current="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .ladder .n { font-family: var(--font-data); color: var(--muted); font-size: 13px; text-align: right; }
+  .ladder .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; position: relative; top: 1px; }
+  .ladder .dot.A { background: var(--team-a); } .ladder .dot.B { background: var(--team-b); }
+  .ladder .dot.hz { background: var(--cracker); border-radius: 2px; }
+  .ladder .dot.sp { background: var(--spark); }
+  .ladder .u { font-weight: 600; }
+  .ladder .r { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .ladder .sum { grid-column: 3; font-family: var(--font-data); font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+  .legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .legend .la::before { background: var(--team-a); } .legend .lb::before { background: var(--team-b); }
+  .legend .lball::before { background: var(--ball); } .legend .lspark::before { background: var(--spark); }
+  .legend .lcr::before { background: var(--cracker); border-radius: 2px; }
+  .legend .lbox::before { background: #8a5cff; opacity: .6; border-radius: 1px; }
+  @media (prefers-reduced-motion: reduce) { .pulse { animation: none !important; } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  .pulse { animation: pulse 1.6s ease-in-out infinite; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1 id="title"></h1>
+    <div class="score" id="score"></div>
+    <div class="meta" id="meta"></div>
+  </header>
+
+  <div class="rounds" id="rounds" role="group" aria-label="Rounds">
+    <div class="ctl">
+      <button type="button" id="prevTurn" title="Tour précédent (Maj + flèche gauche)">◀◀ tour</button>
+      <button type="button" id="prev" title="Décision précédente (flèche gauche)">◀</button>
+      <button type="button" id="next" title="Décision suivante (flèche droite)">▶</button>
+      <button type="button" id="nextTurn" title="Tour suivant (Maj + flèche droite)">tour ▶▶</button>
+      <button type="button" class="mode" id="mode" aria-pressed="false" title="Toutes les flèches du round sur un seul plateau (R)">Vue du round</button>
+      <span class="hint">flèches : décision, Maj + flèches : tour, R : vue du round</span>
+    </div>
+  </div>
+
+  <div class="board"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+  <div class="legend">
+    <span class="la" id="legA"></span><span class="lb" id="legB"></span><span class="lball">Payload</span>
+    <span class="lspark">Spark</span><span class="lcr">Cracker</span><span class="lbox">surface de réparation fermée</span>
+    <span>T Trajector, S Striker, B Breaker, K Bulwark · anneau clair : humain · trait plein : marche, pointillé : recul ou poussée</span>
+  </div>
+
+  <div class="cols">
+    <section class="card" id="decision"><h2>Décision</h2><div id="decisionBody"></div></section>
+    <section class="card"><h2 id="ladderTitle">Échelle du round</h2><ol class="ladder" id="ladder"></ol></section>
+  </div>
+</div>
+
+<script id="match-data" type="application/json">__MATCH_DATA__</script>
+<script>
+(function () {
+  const D = JSON.parse(document.getElementById('match-data').textContent);
+  const ROWS = D.arena.rows;            // top row first = y 44, Furnace B; each row is 15 characters along x
+  const W = ROWS.length;                // 45, the length of the pitch (y), drawn horizontally
+  const H = ROWS[0].length;             // 15, the width of the pitch (x), drawn vertically
+  const C = 24, PADL = 26, PADT = 20, PADR = 8, PADB = 8;
+  const unitsById = new Map(D.units.map((u) => [u.id, u]));
+  const humans = new Set(D.match.humans.map((h) => h.unitId));
+  const ROLE = { trajector: 'T', striker: 'S', breaker: 'B', bulwark: 'K' };
+  const TEAM_NAME = { A: D.match.team, B: 'The House' };
+  const roleFr = { trajector: 'Trajector', striker: 'Striker', breaker: 'Breaker', bulwark: 'Bulwark' };
+
+  // -- Turns: consecutive decisions of one unit in one round --------------------
+  const turns = [];
+  D.decisions.forEach((d, i) => {
+    const last = turns[turns.length - 1];
+    if (last && last.round === d.round && last.unitId === d.unitId) last.decisions.push(i);
+    else turns.push({ round: d.round, unitId: d.unitId, decisions: [i] });
+  });
+  turns.forEach((t, k) => {
+    t.index = k;
+    t.first = t.decisions[0];
+    t.last = t.decisions[t.decisions.length - 1];
+    t.startPos = pos(D.decisions[t.first].board, t.unitId);
+    const after = D.decisions[t.last + 1] ? D.decisions[t.last + 1].board : D.final;
+    t.endPos = pos(after, t.unitId);
+    t.afterBoard = after;
+  });
+  const roundNumbers = [...new Set(turns.map((t) => t.round))].sort((a, b) => a - b);
+  const turnOfDecision = []; turns.forEach((t) => t.decisions.forEach((i) => { turnOfDecision[i] = t; }));
+
+  function pos(board, unitId) {
+    const u = board.units.find((x) => x.id === unitId);
+    return u && u.status === 'active' ? { x: u.x, y: u.y } : null;
+  }
+  function cellKey(p) { return p.x + ',' + p.y; }
+  function solid(x, y) { return x < 0 || y < 0 || x >= H || y >= W || ROWS[W - 1 - y][x] === '#'; }
+  function sx(p) { return PADL + (p.y + 0.5) * C; }
+  function sy(p) { return PADT + (p.x + 0.5) * C; }
+
+  let cur = 0;            // decision index
+  let mode = 'turn';      // or 'round'
+  let hover = null;       // unit id under the pointer, in round mode
+
+  // -- Header -----------------------------------------------------------------
+  const when = new Date(D.match.createdAt);
+  const dateFr = when.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const timeFr = when.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('title').textContent = `${D.match.team}, ${dateFr}`;
+  document.getElementById('score').innerHTML = `<b class="a">${D.match.team}</b> ${D.match.score.A} · ${D.match.score.B} <b class="b">The House</b>`;
+  const hum = D.match.humans.map((h) => `${h.name} (${h.unitId})`).join(', ');
+  document.getElementById('meta').textContent = `${timeFr} · ${D.match.tier} · moteur ${D.match.engine} · ${D.decisions.length} décisions, ${D.match.replay.mismatches} écart d'événement · humain : ${hum || 'aucun'}`;
+  document.getElementById('legA').textContent = D.match.team;
+  document.getElementById('legB').textContent = 'The House';
+
+  // -- Round pills --------------------------------------------------------------
+  const roundsEl = document.getElementById('rounds');
+  const pills = new Map();
+  roundNumbers.forEach((r) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = 'R' + r; b.id = 'round-' + r;
+    b.addEventListener('click', () => go(turns.find((t) => t.round === r).first));
+    roundsEl.insertBefore(b, roundsEl.querySelector('.ctl'));
+    pills.set(r, b);
+  });
+
+  document.getElementById('prev').addEventListener('click', () => go(cur - 1));
+  document.getElementById('next').addEventListener('click', () => go(cur + 1));
+  document.getElementById('prevTurn').addEventListener('click', () => stepTurn(-1));
+  document.getElementById('nextTurn').addEventListener('click', () => stepTurn(1));
+  document.getElementById('mode').addEventListener('click', toggleMode);
+  document.addEventListener('keydown', (e) => {
+    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); e.shiftKey ? stepTurn(1) : go(cur + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); e.shiftKey ? stepTurn(-1) : go(cur - 1); }
+    else if (e.key === 'r' || e.key === 'R') toggleMode();
+  });
+
+  function toggleMode() { mode = mode === 'turn' ? 'round' : 'turn'; render(); }
+  function stepTurn(dir) {
+    const t = turnOfDecision[cur];
+    const n = turns[t.index + dir];
+    if (n) go(n.first);
+  }
+  function go(i) {
+    if (i < 0 || i >= D.decisions.length) return;
+    cur = i;
+    render();
+  }
+
+  // -- SVG helpers -----------------------------------------------------------------
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(name, attrs, parent, text) {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+    if (text !== undefined) n.textContent = text;
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function teamColor(team) { return team === 'A' ? 'var(--team-a)' : 'var(--team-b)'; }
+  function arrow(parent, from, to, color, opts) {
+    opts = opts || {};
+    const x1 = sx(from), y1 = sy(from), x2 = sx(to), y2 = sy(to);
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const headLen = 7, back = opts.back || 0;
+    const ex = x2 - ux * back, ey = y2 - uy * back;
+    el('line', { x1, y1, x2: ex - ux * 4, y2: ey - uy * 4, stroke: color, 'stroke-width': opts.width || 2.2, 'stroke-dasharray': opts.dash || null, 'stroke-linecap': 'round', opacity: opts.opacity || 1 }, parent);
+    const px = -uy, py = ux;
+    el('polygon', { points: `${ex},${ey} ${ex - ux * headLen + px * 4},${ey - uy * headLen + py * 4} ${ex - ux * headLen - px * 4},${ey - uy * headLen - py * 4}`, fill: color, opacity: opts.opacity || 1 }, parent);
+  }
+  function polyline(parent, points, color, opts) {
+    opts = opts || {};
+    if (points.length < 2) return;
+    const pts = points.map((p) => `${sx(p)},${sy(p)}`).join(' ');
+    el('polyline', { points: pts, fill: 'none', stroke: color, 'stroke-width': opts.width || 2.4, 'stroke-dasharray': opts.dash || null, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: opts.opacity || 0.95 }, parent);
+    const a = points[points.length - 2], b = points[points.length - 1];
+    arrow(parent, a, b, color, { width: opts.width || 2.4, dash: opts.dash, opacity: opts.opacity || 0.95 });
+  }
+
+  function boxCells(board) {
+    const out = [];
+    for (const f of D.arena.furnaces) {
+      const until = board.penaltyBox && board.penaltyBox[f.defendedBy];
+      if (until === null || until === undefined || until < board.round) continue;
+      for (let x = 0; x < H; x++) for (let y = 0; y < W; y++) {
+        if (solid(x, y)) continue;
+        if (f.cells.some((c) => Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) <= 3)) out.push({ x, y, team: f.defendedBy });
+      }
+    }
+    return out;
+  }
+
+  function drawBoard(board, draw) {
+    const svg = document.getElementById('svg');
+    svg.innerHTML = '';
+    const width = PADL + W * C + PADR, height = PADT + H * C + PADB;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    const g0 = el('g', {}, svg);
+    // cells
+    for (let x = 0; x < H; x++) for (let y = 0; y < W; y++) {
+      const isSolid = solid(x, y);
+      el('rect', { x: PADL + y * C, y: PADT + x * C, width: C, height: C, fill: isSolid ? 'var(--solid)' : 'none', stroke: 'var(--pitch-line)', 'stroke-width': 0.5 }, g0);
+    }
+    // thirds and halfway line
+    el('line', { x1: PADL + 22.5 * C, y1: PADT, x2: PADL + 22.5 * C, y2: PADT + H * C, stroke: '#5b6470', 'stroke-width': 1, 'stroke-dasharray': '4 4' }, g0);
+    // furnace hatches
+    for (const f of D.arena.furnaces) for (const c of f.cells) {
+      el('rect', { x: PADL + c.y * C + 1, y: PADT + c.x * C + 1, width: C - 2, height: C - 2, fill: teamColor(f.defendedBy), opacity: 0.55, rx: 2 }, g0);
+    }
+    // penalty box
+    for (const c of boxCells(board)) {
+      el('rect', { x: PADL + c.y * C, y: PADT + c.x * C, width: C, height: C, fill: '#8a5cff', opacity: 0.28 }, g0);
+    }
+    // axis labels
+    for (let y = 0; y < W; y++) el('text', { x: PADL + (y + 0.5) * C, y: PADT - 6, 'text-anchor': 'middle', 'font-size': 9, fill: '#8d96a1' }, g0, String(y));
+    for (let x = 0; x < H; x++) el('text', { x: PADL - 6, y: PADT + (x + 0.5) * C + 3, 'text-anchor': 'end', 'font-size': 9, fill: '#8d96a1' }, g0, String(x));
+    el('text', { x: PADL + 2, y: height - 1, 'font-size': 9, fill: '#6b737e' }, g0, `← bouche ${TEAM_NAME.A} (y 0)`);
+    el('text', { x: width - PADR - 2, y: height - 1, 'font-size': 9, fill: '#6b737e', 'text-anchor': 'end' }, g0, `bouche The House (y 44) →`);
+
+    const gPath = el('g', {}, svg);     // trails under the pieces
+    const gPieces = el('g', {}, svg);
+    const gTop = el('g', {}, svg);      // marks over the pieces
+    draw(gPath, gPieces, gTop);
+  }
+
+  function drawPieces(g, board, opts) {
+    opts = opts || {};
+    // crackers
+    for (const c of board.crackers) if (c.state === 'live') {
+      const p = { x: c.x, y: c.y };
+      el('rect', { x: sx(p) - 6, y: sy(p) - 6, width: 12, height: 12, rx: 2, fill: '#2a1409', stroke: 'var(--cracker)', 'stroke-width': 2, transform: `rotate(45 ${sx(p)} ${sy(p)})` }, g);
+      el('title', {}, g.lastChild, c.id);
+    }
+    // spark
+    if (board.spark && board.spark.state === 'live') {
+      const p = { x: board.spark.x, y: board.spark.y }, cx = sx(p), cy = sy(p), r = 9, r2 = 3.5;
+      const pts = [];
+      for (let i = 0; i < 8; i++) { const a = (Math.PI / 4) * i - Math.PI / 2, rr = i % 2 ? r2 : r; pts.push(`${cx + Math.cos(a) * rr},${cy + Math.sin(a) * rr}`); }
+      el('polygon', { points: pts.join(' '), fill: 'var(--spark)', stroke: '#0e4f58', 'stroke-width': 1 }, g);
+    }
+    // loose ball
+    if (board.payload && board.payload.carriedBy === null) {
+      const p = { x: board.payload.x, y: board.payload.y };
+      el('circle', { cx: sx(p), cy: sy(p), r: 5.5, fill: 'var(--ball)', stroke: '#5a4300', 'stroke-width': 1.2 }, g);
+    }
+    // units
+    for (const u of board.units) {
+      if (u.status !== 'active') continue;
+      const meta = unitsById.get(u.id);
+      const p = { x: u.x, y: u.y }, cx = sx(p), cy = sy(p);
+      const dim = opts.dimOthers && opts.actor !== u.id;
+      const grp = el('g', { opacity: dim ? 0.55 : 1, 'data-unit': u.id, style: 'cursor:pointer' }, g);
+      if (humans.has(u.id)) el('circle', { cx, cy, r: 11.5, fill: 'none', stroke: '#fff', 'stroke-width': 2 }, grp);
+      el('circle', { cx, cy, r: 9.5, fill: teamColor(meta.team), stroke: u.braced ? '#fff' : '#0b0d10', 'stroke-width': u.braced ? 2 : 1, 'stroke-dasharray': u.dodging ? '2 2' : null }, grp);
+      el('text', { x: cx, y: cy + 3.6, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: '#fff', style: 'pointer-events:none' }, grp, ROLE[meta.role]);
+      // hp bar under the piece
+      const w = 18, frac = Math.max(0, Math.min(1, u.hp / u.maxHp));
+      el('rect', { x: cx - w / 2, y: cy + 10.5, width: w, height: 2.2, fill: '#000', opacity: 0.6 }, grp);
+      el('rect', { x: cx - w / 2, y: cy + 10.5, width: w * frac, height: 2.2, fill: frac > 0.5 ? '#7ad36b' : frac > 0.25 ? '#f2c531' : '#ff5a4a' }, grp);
+      if (u.ball) el('circle', { cx: cx + 7.5, cy: cy - 7.5, r: 4.5, fill: 'var(--ball)', stroke: '#5a4300', 'stroke-width': 1 }, grp);
+      el('title', {}, grp, `${meta.name} (${meta.team} ${roleFr[meta.role]}) · ${u.hp}/${u.maxHp} PV · (${u.x}, ${u.y})${u.ball ? ' · porte le Payload' : ''}${u.braced ? ' · planté' : ''}${u.dodging ? ' · Dodge' : ''}`);
+      if (opts.labels || opts.actor === u.id || hover === u.id) {
+        const label = el('text', { x: cx, y: cy - 14, 'text-anchor': 'middle', 'font-size': 10, fill: '#fff', 'font-weight': 600, 'paint-order': 'stroke', stroke: '#000', 'stroke-width': 3, style: 'pointer-events:none' }, grp, meta.name.split(' ')[0]);
+        void label;
+      }
+      grp.addEventListener('mouseenter', () => { if (mode === 'round') { hover = u.id; render(); } });
+      grp.addEventListener('mouseleave', () => { if (mode === 'round' && hover === u.id) { hover = null; render(); } });
+      grp.addEventListener('click', () => {
+        const t = turns.find((x) => x.round === board.round && x.unitId === u.id);
+        if (t) go(t.first);
+      });
+    }
+  }
+
+  // -- Turn mode: one decision, its trails ----------------------------------------
+  function renderTurn() {
+    const d = D.decisions[cur];
+    const t = turnOfDecision[cur];
+    const board = d.board;
+    drawBoard(board, (gPath, gPieces, gTop) => {
+      // running positions while the events play
+      const at = new Map(board.units.filter((u) => u.status === 'active').map((u) => [u.id, { x: u.x, y: u.y }]));
+      let spark = board.spark && board.spark.state === 'live' ? { x: board.spark.x, y: board.spark.y } : null;
+      let ball = board.payload.carriedBy === null ? { x: board.payload.x, y: board.payload.y } : null;
+      const crackers = new Map(board.crackers.map((c) => [c.id, { x: c.x, y: c.y }]));
+      const opp = { A: D.arena.furnaces.find((f) => f.defendedBy === 'B'), B: D.arena.furnaces.find((f) => f.defendedBy === 'A') };
+
+      // start of the turn, when the actor has already moved earlier in it
+      if (t.startPos && at.get(d.unitId) && (t.startPos.x !== at.get(d.unitId).x || t.startPos.y !== at.get(d.unitId).y)) {
+        el('circle', { cx: sx(t.startPos), cy: sy(t.startPos), r: 8, fill: 'none', stroke: '#fff', 'stroke-width': 1.5, 'stroke-dasharray': '3 3', opacity: 0.8 }, gPath);
+        polyline(gPath, [t.startPos, at.get(d.unitId)], '#ffffff', { width: 1.2, dash: '3 4', opacity: 0.45 });
+      }
+
+      for (const e of d.events) {
+        switch (e.kind) {
+          case 'moved': {
+            const meta = unitsById.get(e.unitId);
+            const from = at.get(e.unitId) || e.from;
+            if (from) polyline(gPath, [from, ...e.path], teamColor(meta.team), { width: 3 });
+            at.set(e.unitId, e.to);
+            if (board.payload.carriedBy === e.unitId || (ball === null && at.get(e.unitId))) { /* ball travels with its carrier */ }
+            break;
+          }
+          case 'recoiled': {
+            const meta = unitsById.get(e.unitId);
+            const from = at.get(e.unitId);
+            if (from) polyline(gPath, [from, e.to], teamColor(meta.team), { width: 2, dash: '4 3' });
+            at.set(e.unitId, e.to);
+            break;
+          }
+          case 'relocated': {
+            const meta = unitsById.get(e.unitId);
+            const from = at.get(e.unitId);
+            if (from) polyline(gPath, [from, e.to], teamColor(meta.team), { width: 2, dash: '2 3' });
+            at.set(e.unitId, e.to);
+            break;
+          }
+          case 'shoved': {
+            const a = at.get(e.shoverId), b = at.get(e.targetId);
+            if (a && b) el('line', { x1: sx(a), y1: sy(a), x2: sx(b), y2: sy(b), stroke: e.success ? '#fff' : '#9aa2ab', 'stroke-width': 2.5, 'stroke-dasharray': '2 2' }, gTop);
+            if (e.success && e.pushedTo && b) { polyline(gTop, [b, e.pushedTo], '#ffffff', { width: 2, dash: '4 3' }); at.set(e.targetId, e.pushedTo); }
+            break;
+          }
+          case 'attacked':
+          case 'opportunityAttacked': {
+            const a = at.get(e.attackerId), b = at.get(e.targetId);
+            if (a && b) el('line', { x1: sx(a), y1: sy(a), x2: sx(b), y2: sy(b), stroke: e.hit ? '#ff5a4a' : '#9aa2ab', 'stroke-width': e.hit ? 2.5 : 1.5, opacity: 0.9 }, gTop);
+            if (b && e.hit) el('circle', { cx: sx(b), cy: sy(b), r: 13, fill: 'none', stroke: '#ff5a4a', 'stroke-width': 1.5, opacity: 0.8 }, gTop);
+            break;
+          }
+          case 'passed': {
+            const a = at.get(e.fromId), b = at.get(e.toId);
+            if (a && b) {
+              const mx = (sx(a) + sx(b)) / 2, my = (sy(a) + sy(b)) / 2 - Math.min(40, Math.hypot(sx(b) - sx(a), sy(b) - sy(a)) * 0.25);
+              el('path', { d: `M${sx(a)},${sy(a)} Q${mx},${my} ${sx(b)},${sy(b)}`, fill: 'none', stroke: 'var(--ball)', 'stroke-width': 2.5, 'stroke-dasharray': e.caught ? null : '5 4' }, gTop);
+              el('circle', { cx: sx(b), cy: sy(b), r: 12, fill: 'none', stroke: 'var(--ball)', 'stroke-width': 1.5 }, gTop);
+            }
+            break;
+          }
+          case 'passIntercepted': {
+            const i = at.get(e.interceptorId);
+            if (i) el('circle', { cx: sx(i), cy: sy(i), r: 13, fill: 'none', stroke: e.success ? 'var(--ball)' : '#9aa2ab', 'stroke-width': 2, 'stroke-dasharray': '3 2' }, gTop);
+            break;
+          }
+          case 'shotAtFurnace': {
+            const a = at.get(e.unitId);
+            const meta = unitsById.get(e.unitId);
+            const f = opp[meta.team];
+            if (a && f) { const m = f.cells[1]; el('line', { x1: sx(a), y1: sy(a), x2: sx(m), y2: sy(m), stroke: 'var(--ball)', 'stroke-width': 3, 'stroke-dasharray': e.scored ? null : '6 4' }, gTop); }
+            break;
+          }
+          case 'payloadScattered': {
+            if (ball) polyline(gTop, [ball, e.to], 'var(--ball)', { width: 2, dash: '3 3' });
+            ball = e.to;
+            break;
+          }
+          case 'payloadDropped': { ball = e.at; break; }
+          case 'crackerMoved': {
+            polyline(gPath, [e.from, ...e.path], 'var(--cracker)', { width: 2.2 });
+            crackers.set(e.crackerId, e.to);
+            break;
+          }
+          case 'crackerDetonated': {
+            el('circle', { cx: sx(e.at), cy: sy(e.at), r: 15, fill: 'var(--cracker)', opacity: 0.35 }, gTop);
+            el('circle', { cx: sx(e.at), cy: sy(e.at), r: 15, fill: 'none', stroke: 'var(--cracker)', 'stroke-width': 2 }, gTop);
+            break;
+          }
+          case 'sparkMoved': {
+            if (spark) polyline(gTop, [spark, e.to], 'var(--spark)', { width: 2, dash: e.cause === 'escape' ? '2 3' : null });
+            spark = e.to;
+            break;
+          }
+          case 'sparkEntered': { spark = e.at; el('circle', { cx: sx(e.at), cy: sy(e.at), r: 14, fill: 'none', stroke: 'var(--spark)', 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }, gTop); break; }
+          case 'sparkCaught': {
+            const a = at.get(e.unitId);
+            if (a) el('circle', { cx: sx(a), cy: sy(a), r: 14, fill: 'none', stroke: 'var(--spark)', 'stroke-width': e.caught ? 3 : 1.5, 'stroke-dasharray': e.caught ? null : '3 3' }, gTop);
+            break;
+          }
+          case 'evacuated': {
+            const a = at.get(e.unitId);
+            if (a) { el('line', { x1: sx(a) - 9, y1: sy(a) - 9, x2: sx(a) + 9, y2: sy(a) + 9, stroke: '#fff', 'stroke-width': 2.5 }, gTop); el('line', { x1: sx(a) - 9, y1: sy(a) + 9, x2: sx(a) + 9, y2: sy(a) - 9, stroke: '#fff', 'stroke-width': 2.5 }, gTop); }
+            break;
+          }
+          default: break;
+        }
+      }
+      drawPieces(gPieces, board, { actor: d.unitId });
+      const a = at.get(d.unitId) || t.startPos;
+      const p0 = pos(board, d.unitId);
+      if (p0) el('circle', { cx: sx(p0), cy: sy(p0), r: 14, fill: 'none', stroke: '#fff', 'stroke-width': 2, class: 'pulse' }, gTop);
+      void a;
+    });
+
+    // decision card
+    const meta = unitsById.get(d.unitId);
+    const k = t.decisions.indexOf(cur) + 1;
+    const roundTurns = turns.filter((x) => x.round === d.round);
+    const tn = roundTurns.indexOf(t) + 1;
+    const b = d.before;
+    const tags = [`<span class="tag">${meta.team === 'A' ? D.match.team : 'The House'}</span>`, `<span class="tag">${roleFr[meta.role]}</span>`];
+    if (d.human) tags.push('<span class="tag human">humain</span>');
+    if (d.agrees === false) tags.push('<span class="tag differs">diffère du dépôt</span>');
+    const plans = d.plans.map((p) => `<li><span class="s">${p.score}</span><span>${esc(p.why)}</span></li>`).join('');
+    const lines = d.lines.map((l) => `<li class="${l.startsWith('**') ? 'big' : ''}">${esc(l.replace(/\*\*/g, ''))}</li>`).join('');
+    document.getElementById('decisionBody').innerHTML = `
+      <div class="who"><span class="name">${esc(meta.name)}</span>${tags.join('')}</div>
+      <div class="facts">Round ${d.round} · tour ${tn}/${roundTurns.length} · décision ${k}/${t.decisions.length} · en (${b.at.x}, ${b.at.y}) · ${b.hp} PV · ${b.feetLeft} ft${b.actionUsed ? ' · Action dépensée' : ''}${b.holding ? ' · porte le Payload' : ''}</div>
+      <div class="played">Joué : <b>${esc(d.played)}</b></div>
+      <h2>${d.human ? 'Ce que l’IA aurait joué à sa place' : 'Les plans que l’IA a classés'}</h2>
+      <ol class="plans">${plans || '<li><span class="s"></span><span>aucun plan noté</span></li>'}</ol>
+      <h2 style="margin-top:10px">Ce qui s’est passé</h2>
+      <ul class="events">${lines || '<li>rien</li>'}</ul>`;
+  }
+
+  // -- Round mode: every turn of the round as one arrow ----------------------------
+  function renderRound() {
+    const d = D.decisions[cur];
+    const round = d.round;
+    const roundTurns = turns.filter((t) => t.round === round);
+    const board = D.decisions[roundTurns[0].first].board;
+    const current = turnOfDecision[cur];
+    drawBoard(board, (gPath, gPieces, gTop) => {
+      roundTurns.forEach((t, i) => {
+        const meta = unitsById.get(t.unitId);
+        const color = teamColor(meta.team);
+        const focus = hover ? hover === t.unitId : t === current;
+        const faint = hover || current ? (focus ? 1 : 0.35) : 0.9;
+        if (t.startPos && t.endPos && (t.startPos.x !== t.endPos.x || t.startPos.y !== t.endPos.y)) {
+          polyline(gPath, [t.startPos, t.endPos], color, { width: focus ? 3.4 : 2.2, opacity: faint });
+          const mx = (sx(t.startPos) + sx(t.endPos)) / 2, my = (sy(t.startPos) + sy(t.endPos)) / 2;
+          el('circle', { cx: mx, cy: my, r: 7, fill: '#0b0d10', stroke: color, 'stroke-width': 1.5, opacity: faint }, gTop);
+          el('text', { x: mx, y: my + 3.2, 'text-anchor': 'middle', 'font-size': 9, fill: '#fff', 'font-weight': 700, opacity: faint }, gTop, String(i + 1));
+          // where it ended
+          el('circle', { cx: sx(t.endPos), cy: sy(t.endPos), r: 5, fill: color, stroke: '#fff', 'stroke-width': 1, opacity: faint }, gTop);
+        } else if (t.startPos) {
+          el('text', { x: sx(t.startPos) + 12, y: sy(t.startPos) - 10, 'font-size': 9, fill: '#fff', 'font-weight': 700, 'paint-order': 'stroke', stroke: '#000', 'stroke-width': 3, opacity: faint }, gTop, String(i + 1));
+        }
+      });
+      drawPieces(gPieces, board, { labels: true });
+    });
+
+    const summary = roundTurns.map((t, i) => {
+      const meta = unitsById.get(t.unitId);
+      return `<li><span class="n">${i + 1}</span><span>${esc(meta.name)}</span><span class="facts">${t.startPos ? `(${t.startPos.x}, ${t.startPos.y})` : 'hors jeu'} → ${t.endPos ? `(${t.endPos.x}, ${t.endPos.y})` : 'évacué'}</span></li>`;
+    }).join('');
+    const first = D.decisions[roundTurns[0].first];
+    const bb = first.board;
+    const carrier = bb.payload.carriedBy ? unitsById.get(bb.payload.carriedBy) : null;
+    document.getElementById('decisionBody').innerHTML = `
+      <div class="who"><span class="name">Round ${round}, vue d’ensemble</span><span class="tag">${bb.score.A} · ${bb.score.B} au début du round</span></div>
+      <div class="facts">Le plateau est celui du début du round. Une flèche par tour, du point de départ au point d’arrivée, numérotée dans l’ordre de l’échelle. Survole un pion ou un tour de l’échelle pour isoler sa flèche, clique pour ouvrir son tour.</div>
+      <div class="played">Payload au début du round : <b>${carrier ? `${esc(carrier.name)} (${carrier.team})` : `au sol en (${bb.payload.x}, ${bb.payload.y})`}</b>${bb.spark.state === 'live' ? ` · Spark en (${bb.spark.x}, ${bb.spark.y})` : ''}</div>
+      <ol class="plans" style="grid-template-columns:1fr">${summary}</ol>`;
+  }
+
+  function renderLadder() {
+    const d = D.decisions[cur];
+    const roundTurns = turns.filter((t) => t.round === d.round);
+    const current = turnOfDecision[cur];
+    const board = D.decisions[roundTurns[0].first].board;
+    document.getElementById('ladderTitle').textContent = `Échelle du round ${d.round}`;
+    const ol = document.getElementById('ladder');
+    ol.innerHTML = '';
+    let n = 0;
+    // walk the ladder of the round, hazards included, and attach the turns played
+    const byUnit = new Map(roundTurns.map((t) => [t.unitId, t]));
+    const seen = new Set();
+    const rows = [];
+    for (const slot of board.ladder) {
+      if (slot.actor === 'spark' || slot.actor === 'crackers') { rows.push({ hazard: slot.actor }); continue; }
+      const t = byUnit.get(slot.actor);
+      if (!t) { rows.push({ skipped: slot.actor }); continue; }
+      seen.add(slot.actor); rows.push({ turn: t });
+    }
+    for (const t of roundTurns) if (!seen.has(t.unitId)) rows.push({ turn: t }); // a relaunching keeper, a reordered ladder
+    for (const row of rows) {
+      const li = document.createElement('li');
+      li.tabIndex = 0;
+      if (row.hazard) {
+        li.innerHTML = `<span class="n"></span><span class="dot ${row.hazard === 'spark' ? 'sp' : 'hz'}"></span><span class="r">${row.hazard === 'spark' ? 'le Spark dérive' : 'les Crackers roulent'}</span>`;
+        li.style.cursor = 'default';
+        ol.appendChild(li); continue;
+      }
+      if (row.skipped) {
+        const meta = unitsById.get(row.skipped);
+        li.innerHTML = `<span class="n"></span><span class="dot ${meta.team}"></span><span class="r">${esc(meta.name)}, pas de tour (évacué ou échelle réordonnée)</span>`;
+        li.style.cursor = 'default';
+        ol.appendChild(li); continue;
+      }
+      const t = row.turn; n++;
+      const meta = unitsById.get(t.unitId);
+      const acts = t.decisions.map((i) => D.decisions[i].played).filter((p) => p !== 'endTurn');
+      const differs = t.decisions.some((i) => D.decisions[i].agrees === false);
+      li.setAttribute('aria-current', t === current ? 'true' : 'false');
+      li.innerHTML = `<span class="n">${n}</span><span class="dot ${meta.team}"></span><span class="u">${esc(meta.name)} <span class="r">${roleFr[meta.role]}${humans.has(t.unitId) ? ', humain' : ''}${differs ? ', diffère' : ''}</span></span><span class="sum">${esc(acts.join(' · ') || 'passe son tour')}</span>`;
+      li.addEventListener('click', () => go(t.first));
+      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(t.first); } });
+      li.addEventListener('mouseenter', () => { if (mode === 'round') { hover = t.unitId; render(); } });
+      li.addEventListener('mouseleave', () => { if (mode === 'round' && hover === t.unitId) { hover = null; render(); } });
+      ol.appendChild(li);
+    }
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+  function render() {
+    const d = D.decisions[cur];
+    pills.forEach((b, r) => b.setAttribute('aria-pressed', r === d.round ? 'true' : 'false'));
+    document.getElementById('mode').setAttribute('aria-pressed', mode === 'round' ? 'true' : 'false');
+    document.getElementById('prev').disabled = cur === 0;
+    document.getElementById('next').disabled = cur === D.decisions.length - 1;
+    if (mode === 'round') renderRound(); else renderTurn();
+    renderLadder();
+    try { localStorage.setItem('boomball-viewer-' + D.match.id, String(cur)); } catch (e) { /* storage may be unavailable */ }
+  }
+
+  try {
+    const saved = Number(localStorage.getItem('boomball-viewer-' + D.match.id));
+    if (Number.isFinite(saved) && saved > 0 && saved < D.decisions.length) cur = saved;
+  } catch (e) { /* storage may be unavailable */ }
+  render();
+})();
+</script>

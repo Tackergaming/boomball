@@ -719,7 +719,7 @@ le code contre les mots. **Codé en 2H.9.**
   prend environ 11 minutes au lieu de 5. `reachableCells` a perdu son tri par itération pour une
   file à seaux (sous-agent Sonnet), ce qui profite aussi au client.
 
-## C12. Décisions du 2026-10-11 après la partie à la porte de 2H.9, **sous-phase 2H.10, pas encore dans le code**
+## C12. Décisions du 2026-10-11 après la partie à la porte de 2H.9, **sous-phase 2H.10, dans le code et en ligne depuis le 2026-10-11 (moteur 6, `resolve-action` v16, `create-match` v14)**
 
 > Écrites par le fil principal (Fable 5.1) sur les deux retours de Jérôme en chat après sa partie
 > sur le moteur 5 avec le plan de tour (star, 50 à 0, match `0291a651`, consigné tour par tour
@@ -931,3 +931,190 @@ relire le code contre les mots. **Codé en 2H.10.**
   avant comme après la marche.
 - **Vitesse** : 2,7 ms par décision en moyenne et 25 ms au pire sur un match vétéran, comme en
   2H.9 ; le test des cinquante millisecondes passe.
+
+## C13. Décisions du 2026-10-12 après la partie à la porte de 2H.10, **sous-phase 2H.11, pas encore dans le code**
+
+> Écrites par le fil principal (Fable 5.1) sur la lecture **round par round et joueur par joueur** de
+> la partie de Jérôme sur le moteur 6 (star, 30 à 50, match `a17c22a5`, consigné dans
+> `docs/matches/2026-10-12-a17c22a5/`, zéro écart d'événement, zéro décision d'IA différente du
+> dépôt). La lecture s'est faite sur un **visualiseur du match** produit par `dump-match.ts` depuis
+> le gabarit `scripts/match-viewer.html` (`viewer.html` à côté de `match.md`, aussi publié en
+> artefact privé) : le terrain dessiné, une flèche par tour en vue du round, et pour chaque
+> décision les **huit** plans que l'IA du dépôt classe, avec leur note. Jérôme a jugé chaque joueur
+> de chaque round ; les réponses du fil principal ont lu les huit plans et le code. **Cette lecture
+> complète n'est pas à refaire à chaque partie : sur sa demande, ou sur proposition du fil
+> principal.** Tout ce qui suit est dicté par lui et validé point par point avant la première
+> ligne de code, sauf les trois points ouverts de la fin, qui sont des constats du fil principal
+> qu'il n'a pas encore tranchés.
+>
+> Un seul écart de règle, 57. Il ne change ni la forme de l'état ni celle des événements :
+> **`ENGINE_VERSION` reste 6**, les fonctions sont à redéployer. Le reste est l'IA.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 57 | Attraper le Spark : Action, sur sa case, DC 20 (B9, écart 49) ; rien n'interdit la tentative à un porteur | **Un porteur ne tente jamais le Spark : les mains sont prises.** `legalActions` ne propose plus la prise à une unité qui tient le ballon, humain comme IA | Jérôme, le 2026-10-12, round 10 : Harrow porteur a tenté le Spark à 20 %, raté, et n'avait plus d'Action pour le Dash qui le mettait hors d'atteinte ; le Cracker renaissant l'a touché pour 14 sur la case où il s'est replié | **À faire en 2H.11**, fil principal, `legalActions.ts` |
+
+**Ce que la partie a montré**, pour mémoire. Dix tentatives de Spark hors Trajector (Osric 2,
+Kregg 3 dont une réussie sur un 20 naturel au round 8, Sarn 2, Harrow 2 dont une en portant la
+balle, Gullo 1), parce que le plan « marcher puis attraper » de 2H.10 était offert à tous les
+rôles. Au round 1 les deux Breakers A ont marché huit cases pour frapper un Cracker, puis abandonné
+la frappe pour un Dash « vers Tacker » qui ne pouvait pas l'atteindre. Les relais des Strikers et
+du Trajector étaient notés contre la case **actuelle** du porteur, qui n'avait pas encore joué,
+donc valaient zéro dès qu'il fallait courir devant. Tacker au round 6 et Dolm au round 7 avaient un
+tir à 65 % à portée de marche que l'IA classait neuvième ou plus loin derrière des passes. Au
+round 4 Thessa a reculé sur la balle après sa frappe et l'a ramassée sans pouvoir la passer. Au
+round 5 Brann a marché sept cases **en arrière** pour rendre légale une passe à un Striker « devant
+lui ». Au round 8 Thessa, chasseuse, s'est mise exactement sur la case où la dérive allait poser le
+Spark : le code avait raison. L'attaque d'opportunité d'un Trajector sur un Breaker valait 1,4
+point. The House n'a rien joué de faux aux rounds 3, 5, 9 et 10.
+
+**Les poids changés par Jérôme**, le 2026-10-12.
+
+| Poids | Avant | Après |
+|---|---|---|
+| `shove`, Breaker | 50 | **30** |
+| `stripCarrier`, les quatre rôles | 70 / 80 / 80 / 70 | **150** |
+| `screenCarrier`, Breaker | 0 | **80** |
+| `carrierSafety`, Breaker | 50 | **80** |
+| `guardStrike`, Breaker | 50 | **150** |
+| `batCracker`, Striker | 18 | **8** |
+| `batCracker`, Trajector | 14 | **5** |
+| `wantsEscort`, Breaker | 1 | **0** |
+| `shoot`, Striker | 120 | **150**, en plus de `relief` sur le tir (point 13), tranché sur question fermée |
+
+**L'IA, cinquième passe : les décisions, par thème puis par rôle, triées par priorité.** Les mots
+sont ceux de Jérôme, le numéro du round dit d'où ils viennent.
+
+*Le Spark.*
+
+1. **Aucun rôle sauf le Trajector ne va de lui-même sur la case du Spark.** Le plan « marcher
+   puis attraper » n'existe que pour le rôle dont `chaseSpark` est positif. Un Striker, un Breaker
+   ou un Bulwark qui se trouve sur la case du Spark par hasard, poussé ou reculé, le tente, Action
+   en main et mains libres (C10 commune 1 tient pour lui). Un porteur jamais, écart 57.
+2. **Le chasseur, Action dépensée, va vers la case où le Spark sera après la prochaine dérive**,
+   comme aujourd'hui (round 8), jamais vers un relais : il joue en premier après la dérive et
+   chaque case compte pour arriver dessus avec son Action.
+
+*Commun aux rôles de champ, le plan de tour.*
+
+3. **Le relais se juge contre la case où sera le porteur**, pas contre celle où il est : s'il n'a
+   pas encore joué, sa route de huit cases vers la bouche, la même ligne que le mur du Breaker en
+   C12 (`wardLine`). Vaut pour `outlet`, `laneCover` et `rejoin`, Striker et Trajector (round 1,
+   Kregg ; round 2, Thessa, Kregg, Osric).
+4. **Le Dash d'approche du porteur adverse est un plan pour les trois rôles de champ**, noté sur la
+   distance refermée, même s'il n'arrive pas au contact, et il concourt contre la batte et le
+   Cracker. **C12 Trajector 3 (« pas de Dash pour finir au contact du porteur ») et C12 Breaker 3
+   (« pas de Dash sur le porteur ») sont remplacés par ce point**, écrits à une époque où la route
+   sûre n'existait pas (round 1, Thessa Grapple, Gullo, Corvo, Brann ; round 8, Harrow, Sarn).
+   Les valeurs font que frapper un Cracker n'est **presque jamais** une bonne option pour un
+   Striker ou un Trajector : les `batCracker` ci-dessus.
+5. **En attaque sans la balle, un Striker ou un Trajector ne frappe que faute de mieux** : la
+   batte et le Cracker sur un non-porteur valent 0,2 fois leur valeur en attaque. Le relais garde
+   sa place **même quand le porteur a un tir à portée de marche**, pour la relance et le rebond
+   d'un tir manqué (round 2 ; round 6, question tranchée).
+6. **Un plan « marcher puis frapper » se tient jusqu'à la frappe.** Le plancher du Dash de mur
+   prend le même facteur de menace que le mur, et ne s'offre que pour un Dash qui referme
+   réellement l'écart avec le mouvement restant (round 1, Sarn et Harrow).
+7. **Après un Dash, la marche va au bout de ce que le Dash a acheté vers sa cible**, jamais quatre
+   cases sur huit (round 1, Sarn).
+8. **Le Disengage s'ouvre à tout rôle pressé**, porteur ou non : « disengage, puis marche » existe
+   dès qu'une unité commence son tour au contact d'un adversaire et qu'aucune route sans allonge
+   n'atteint la case voulue ; il coûte l'Action et concourt au score (round 3, Thessa, Osric,
+   Kregg).
+9. **Un receveur qui n'a pas joué peut être derrière de plus de trois cases, jusqu'à huit**, son
+   propre déplacement, qu'il soit ou non le tout prochain à jouer. La passe se note sur le
+   terrain qu'il portera, son déplacement moins son retard. Au-delà de huit, la balle recule même
+   après sa marche (round 4, Thessa vers Osric à quatre cases).
+10. **Après l'Action dépensée, la case du ballon vaut une fin de tour de porteur**, terrain et
+    sécurité, jamais le poids du ramassage : « reculer sur la balle » n'est plus un plan de
+    ramassage. Ramasser puis lancer, Action en main, garde sa priorité (round 4, Thessa).
+11. **Devant ou derrière se juge depuis la case de début de tour** (écart 56), pour la chaîne comme
+    pour l'exception du Breaker porteur, et **un lancer en arrière coûte `BACKWARD_STEP` pour tout
+    lanceur**, pas seulement le dernier maillon. Un porteur ne marche jamais en arrière pour
+    rendre une passe légale (round 5, Brann).
+12. **Un porteur ne recule jamais, Dash compris, sauf si aucune case devant lui n'est moins
+    exposée que celle où il se tient.** Le Breaker porteur sans passe légale avance vers la bouche
+    (round 5, Brann et son Dash vers son propre but).
+13. **Le tir est une délivrance comme la passe : il reçoit `relief`**, l'exposition de la case de
+    départ rendue au lanceur. Et une passe ne vaut jamais plus que le tir propre que le lanceur a
+    lui-même après sa marche (round 6, Tacker ; round 7, Dolm : 78 contre 155 et 224).
+14. **La passe se note aussi sur l'exposition du receveur à l'arrivée**, le compte de voisines
+    libres qu'un adversaire peut atteindre avant qu'il rejoue, comme pour le porteur en C12 (round
+    2, la passe à Sarn que Tacker a refusée ; round 5, la passe de Brann dans le paquet).
+15. **Une attaque d'opportunité provoquée coûte au moins 5 points**, quels que soient l'attaquant
+    et les PV, et à valeur égale le plan qui en provoque le moins l'emporte. La formule de C12
+    commune 8 reste au-dessus du plancher (round 9, Sarn, 1,4 point pour l'allonge d'un
+    Trajector).
+16. **Les menaces sur le porteur tiennent compte de la laisse du gardien adverse** : il ne compte
+    que sur les cases à quatre cases ou moins de sa bouche (round 10, Harrow arrêté en (10, 33)
+    au lieu de (10, 37)).
+17. **L'IA lit le round et le score.** Au dernier round, l'équipe qui a la balle et qui mène ou
+    égalise **joue la possession** : le porteur s'éloigne de tout adversaire, Dodge ou Dash, ne
+    passe qu'à un receveur moins exposé que lui et ne tire qu'à portée propre. L'équipe qui n'a
+    pas la balle **ne court plus après ce qu'elle ne peut pas atteindre avant le sifflet** : elle
+    frappe et bouscule ce qui est à portée, et seul le Trajector tente le Spark. Avant le dernier
+    round rien ne change. La mort subite se joue comme un dernier round par les deux camps (round
+    10, Osric ; les cinq battes de The House).
+18. **À égalité, la place prise à côté du porteur se choisit entre le porteur et l'adversaire le
+    plus proche.** Départage seulement (round 3, Harrow en (0, 27) plutôt que (1, 27)).
+
+*Breaker.*
+
+19. **En attaque, la protection du porteur passe devant le Cracker, menacé ou non** : la place
+    prise à son contact garde sa valeur pleine quelle que soit la distance des adversaires, et le
+    Cracker ne vient qu'après. Le facteur 0,3 de `wardThreatened` disparaît (round 1, Sarn et
+    Harrow partis frapper un Cracker à huit cases de Tacker).
+20. **En défense, frapper un adversaire atteignable passe avant toute posture.** L'écran de C10
+    Breaker 5 (« le chemin des adversaires vers ses Strikers ») **disparaît** : l'Action dépensée et
+    personne à frapper, le mouvement restant va **vers le porteur adverse**, adjacent ou au plus
+    près, puis sur la ligne des Crackers (round 2, Vesk Bellows ; round 8, Harrow et Sarn collés à
+    des coéquipiers inutiles).
+21. **La proie se juge sur la chance de l'évacuer** : dégâts attendus de la batte rapportés aux PV
+    de la cible, à la place de l'ordre fixe Strikers, Breakers, Trajector de C10 Breaker 4 et C12
+    Breaker 9 (`prey` devient une fonction, plus une table) (round 2, Brann devant Sarn et
+    Thessa).
+22. **Pendant la relance adverse, la proie est le receveur probable**, un adversaire que le gardien
+    peut servir après sa propre marche, à vue et à portée : il compte double, et l'Action
+    dépensée le Breaker finit son tour collé à lui (round 6, Sarn ; round 8, Brann).
+23. **Le poste de parade vaut les dégâts qu'il épargne**, dans la même monnaie que l'attaque
+    d'opportunité : dégâts attendus du Cracker rapportés aux PV du coéquipier visé, contre dégâts
+    attendus des allonges rapportés aux siens (round 4, Harrow, cinq allonges et 17 PV pour en
+    épargner 5 à Thessa).
+
+*Trajector.*
+
+24. Les points 1, 2, 3, 4, 5 et 8 ci-dessus ; **C12 Trajector 3 est récrit par le point 4**.
+
+*Striker.*
+
+25. Les points 3, 4, 5, 8 et 13 ; rien de propre au rôle en plus.
+
+*Bulwark.*
+
+26. Rien : relance, plantage et blocages justes dans la partie. Le blocage marche depuis toute
+    case à deux cases ou moins de la bouche, (7, 1) et (8, 1) sont équivalentes.
+
+*Trois constats du fil principal, tranchés par Jérôme sur questions fermées le 2026-10-12.*
+
+27. **La ligne du Cracker pour un porteur se calcule vers chaque case d'arrivée candidate**, le
+    ballon bougeant avec lui. Aujourd'hui elle est lue vers la case où le ballon est maintenant,
+    là où le porteur se tient : au round 10 (10, 30) et (3, 30) étaient notées pareil, et le
+    Cracker 2 a roulé huit cases sur la première, 14 PV.
+28. **Le chasseur de Spark garde l'exception du ballon au sol** : « ramasser puis lancer » lui
+    reste permis quand le ballon est à portée de marche, avec le bonus `chaseSpark` sur la passe
+    pour qu'il s'en débarrasse aussitôt (round 6, Thessa ramasse et sert Tacker, qui marque).
+    C'est la seule entorse à C10 Trajector 1, « le Spark et rien d'autre ».
+29. **Une parade n'explose jamais sur le pareur.** Quand aucune face de l'arc n'épargne tout le
+    monde, `parryDirection` prend la face qui touche le coéquipier le plus solide en PV, jamais
+    celle qui revient sur le pareur (round 7, Harrow en (11, 19) : les trois faces touchaient un
+    coéquipier, deux d'entre elles lui-même parce que l'écart 36b renvoie un Cracker en arrière
+    sur sa propre diagonale quand il touche un pilier par le coin seul). L'écart 36b ne change
+    pas ; seul le repli du choix de face change, dans `rules/ordnance.ts`.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`. `ENGINE_VERSION` reste 6.
+L'écart 57 dans `engine/legalActions.ts`, le point 29 dans `engine/rules/ordnance.ts` ; l'IA dans
+`ai/chooseAction.ts`, `ai/evaluate.ts` et les quatre fiches ; les fonctions à redéployer sur le
+feu vert de Jérôme. **Un seul sweep à la fin, si
+Jérôme le demande**, contre `09` §12, en comptant onze minutes. Les 503 tests sont le filet, le
+test des cinquante millisecondes fait foi sur la vitesse, et le visualiseur sert à relire la
+partie suivante.
