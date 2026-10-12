@@ -184,6 +184,9 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
         : `${name(event.unitId)} shoots and it comes back out.`;
     case 'relocated':
       return `${name(event.unitId)} is moved out of the penalty box.`;
+    case 'placeChosen':
+      // Écart 58: the human's place in its role this round.
+      return `${name(event.unitId)} plays ${['first', 'second', 'third'][event.place - 1] ?? `number ${event.place}`} of the role this round.`;
     case 'substituteEntered':
       return `${name(event.unitId)} comes on.`;
     case 'scored':

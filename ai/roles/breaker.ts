@@ -20,10 +20,11 @@
  * movement left goes towards the carrier, then onto the line a Cracker will
  * roll down so the parry fires (`parryPost`, worth the blast it spares a
  * team-mate), which is why it is the one role with no fear of them, unless it
- * carries. It leaves a loose ball to a Striker or Trajector within two cells
- * who has not played yet (`yieldToKeener`), and when it does end up holding
- * it, hands off at the first chance (`handOff`), to a Striker ahead even one
- * who has played, if nobody can intercept (`chainException`).
+ * carries. A loose ball within its reach, a Dash included, it picks up before
+ * anything else since 2H.12 (`pickupFirst`; it used to leave it to a Striker
+ * or Trajector within two cells, `yieldToKeener`), and holding it, it hands
+ * off at the first chance (`handOff`), to a Striker ahead even one who has
+ * played, if nobody can intercept (`chainException`).
  *
  * It all but never shoots: `shoot` is low enough that it passes to anyone
  * rather than try.
@@ -61,7 +62,7 @@ export const BREAKER: RoleWeights = {
   wantsEscort: 0,
   guardStrike: 150,
   parryPost: 1,
-  yieldToKeener: 1,
+  yieldToKeener: 0,
   handOff: 40,
   rejoin: 0,
   leash: 99,
@@ -81,6 +82,8 @@ export const BREAKER: RoleWeights = {
   receiver: 0.8,
   idleSwing: 1,
   chainException: 1,
+  // 2H.12, Jérôme's sixth pass.
+  pickupFirst: 1,
 
   avoidOpportunity: 20,
   // Zero on purpose: the line a Cracker rolls down is where this role wants

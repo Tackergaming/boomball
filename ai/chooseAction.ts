@@ -71,6 +71,7 @@ import {
 import { sparkIsLive } from '../engine/types.js';
 import { recoilDestination } from '../engine/rules/combat.js';
 import {
+  key,
   safePathTo,
   safeReachableCells,
   type SafeReachable,
@@ -143,6 +144,15 @@ export function rankPlans(
   const legal = legalActions(arena, state);
   if (!legal || legal.unitId !== unitId) return [];
 
+  // Écart 58 is a human's choice and never an AI's, but the playthrough's
+  // human seat and the match dump ask: the last place, as under écart 55,
+  // is the one that leads.
+  if (legal.choosePlace.length > 0) {
+    return legal.choosePlace
+      .map((place) => ({ steps: [{ kind: 'choosePlace', place } as Action], score: place, why: `play ${ordinal(place)} of the role` }))
+      .reverse();
+  }
+
   const unit = unitOf(state, unitId);
   const board = buildBoard(arena, state, unit, legal, weightsFor(unit.role), ordersFor(orders, unitId));
 
@@ -185,6 +195,10 @@ export function chooseAction(
 }
 
 const END_TURN: Action = { kind: 'endTurn' };
+
+function ordinal(n: number): string {
+  return n === 1 ? 'first' : n === 2 ? 'second' : 'third';
+}
 
 // -- The planner --------------------------------------------------------------
 
@@ -251,6 +265,13 @@ class Planner {
   private readonly wardGap: number;
   /** Whether no cell ahead of a carrier is safer than where it stands (2H.11, point 12). */
   private noSaferAhead: boolean | null = null;
+  /**
+   * Whether a loose ball this unit reaches this turn, a Dash included, goes
+   * before everything (2H.12, `00` C14, `pickupFirst`), and the Dash's routes
+   * when that reach was needed to tell.
+   */
+  private readonly ballFirst: boolean;
+  private far: Map<string, SafeReachable> | null = null;
 
   constructor(private readonly board: Board) {
     const { unit, state, arena, legal, weights: w } = board;
@@ -311,6 +332,23 @@ class Planner {
     const carrierBeside = foe !== null && distance(unit, foe) <= 1;
     const anyone = w.hunt > 0 && legal.attack.length + legal.shove.length + legal.batCracker.length > 0;
     this.violence = carrierBeside || anyone;
+
+    // The Breaker picks up first (2H.12, `00` C14, Jérôme): a loose ball it
+    // reaches this turn, with sixteen cells when the Dash is still there,
+    // goes before any target in reach. Only the Spark under its feet ranks
+    // above (C10 Breaker 1): then the catch goes first, and the ball after it
+    // when a walk reaches it.
+    const ball = state.payload;
+    let ballFirst = false;
+    if (w.pickupFirst > 0 && ball.carriedBy === null && !unit.holdingPayload && !board.hunter) {
+      const feet = state.turn!.movementFeetRemaining + (legal.canDash ? MOVE_SPEED_FEET : 0);
+      if (legal.canGrabPayload || this.reach.has(key(ball))) ballFirst = true;
+      else if (legal.canDash && distance(unit, ball) <= feet / 5) {
+        this.far = safeReachableCells(arena, state, unit, feet);
+        ballFirst = this.far.has(key(ball));
+      }
+    }
+    this.ballFirst = ballFirst;
   }
 
   plans(): Plan[] {
@@ -380,7 +418,11 @@ class Planner {
       const acts = hasAction && (unit.holdingPayload || onBall || onSpark || this.somethingBeside(cell));
       // After a Dash the walk is priced by the Dash's own floors (2H.11, point 7).
       const chased = this.dashed ? this.chaseFloor(cell, reachable.provocations, 0) : null;
-      if (ground <= 0 && !canBrace && !acts && !chased && !(onBall && hasAction)) continue;
+      // Walking onto the ball to pick it up: with the Action for anybody the
+      // ball is not left to, without it for the role that picks up first
+      // (2H.12), which is the second half of "dash, walk, pick up".
+      const fetch = onBall && (hasAction ? share > 0 : this.ballFirst);
+      if (ground <= 0 && !canBrace && !acts && !chased && !fetch) continue;
       const route = safePathTo(state, unit, this.reach, cell);
       if (!route) continue;
       const walked = route.length;
@@ -395,7 +437,12 @@ class Planner {
       const provocations = reachable.provocations;
 
       if (gain > 0) out.push({ steps: [move], score: gain, why, provocations });
-      if (!hasAction) continue;
+      if (!hasAction) {
+        if (fetch) {
+          out.push({ steps: [move, { kind: 'grabPayload' }], score: gain, why: `walk to ${to(cell)} and pick the Payload up`, provocations });
+        }
+        continue;
+      }
 
       // Go home, then dig in (2H.9): the keeper's plan has two steps now.
       if (canBrace) {
@@ -414,7 +461,7 @@ class Planner {
       // the carrier's turn being rebuilt once the ball is in hand.
       if (onBall && share > 0) {
         const taken = positionValue(this.board, cell, true) - this.pvHere - exposed - (unit.braced ? w.brace : 0);
-        if (taken > 0) {
+        if (taken > 0 || this.ballFirst) {
           out.push({ steps: [move, { kind: 'grabPayload' }], score: taken, why: `walk to ${to(cell)} and pick the Payload up`, provocations });
         }
         for (const priced of this.throwsAfterPickup(cell)) {
@@ -527,6 +574,37 @@ class Planner {
       }
     }
 
+    // The Breaker picks up first (2H.12): every plan that takes the ball goes
+    // ahead of every plan that does not, and they rank among themselves as
+    // before, the throw after the pickup included. Standing on the Spark, the
+    // catch goes first (C10 Breaker 1), then the walk onto the ball.
+    if (this.ballFirst) {
+      const sparkFirst = legal.catchSpark !== null;
+      if (sparkFirst && this.reach.has(key(state.payload))) {
+        const ballCell = this.reach.get(key(state.payload))!;
+        const route = safePathTo(state, unit, this.reach, ballCell.cell);
+        if (route) {
+          const exposed = ballCell.provocations === 0 ? 0 : this.exposure(unit, route);
+          const odds = chance(statsFor(unit.role, unit.tier).agility, legal.catchSpark!.against);
+          out.push({
+            steps: [{ kind: 'catchSpark' }, { kind: 'move', path: route }, { kind: 'grabPayload' }],
+            score: w.catchSpark * odds + this.pv(ballCell.cell) - this.pvHere - exposed,
+            why: `catch the Spark, then walk to ${to(ballCell.cell)} and pick the Payload up`,
+            provocations: ballCell.provocations,
+          });
+        }
+      }
+      // The catch is worth the whole bonus and the pickup half of it on top,
+      // so "catch, walk, pick up" leads, any catch comes next, and the plain
+      // pickup after that.
+      return out.map((plan) => {
+        const catches = sparkFirst && plan.steps[0]?.kind === 'catchSpark';
+        const grabs = plan.steps.some((s) => s.kind === 'grabPayload');
+        if (!catches && !grabs) return plan;
+        const bonus = sparkFirst ? (catches ? PICKUP_FIRST : 0) + (grabs ? PICKUP_FIRST / 2 : 0) : PICKUP_FIRST;
+        return { ...plan, score: plan.score + bonus, why: `${sparkFirst ? 'the Spark, then the ball' : 'the ball first'}: ${plan.why}` };
+      });
+    }
     return out;
   }
 
@@ -736,7 +814,7 @@ class Planner {
     const relaunching = unit.holdingPayload && w.relaunch > 0;
 
     const barred = this.violence && !this.board.hunter;
-    const far = safeReachableCells(arena, state, unit, state.turn!.movementFeetRemaining + MOVE_SPEED_FEET);
+    const far = this.far ?? safeReachableCells(arena, state, unit, state.turn!.movementFeetRemaining + MOVE_SPEED_FEET);
 
     for (const reachable of far.values()) {
       const cell = reachable.cell;
@@ -762,6 +840,26 @@ class Planner {
       }
       if (gain <= 0) continue;
       out.push({ steps: [{ kind: 'dash' }, { kind: 'move', path: route }], score: gain, why, provocations: reachable.provocations });
+    }
+
+    // Dash, walk, pick up (2H.12, `00` C14): the loose ball a plain move does
+    // not reach, for the role that picks up first. A target in reach does not
+    // bar it, "en priorité"; the throw waits for the next turn, the Action
+    // having gone into the Dash.
+    const ball = state.payload;
+    const ballAt = key(ball);
+    const fetch = this.ballFirst && !this.reach.has(ballAt) && !this.board.legal.canGrabPayload ? far.get(ballAt) : undefined;
+    if (fetch) {
+      const route = safePathTo(state, unit, far, fetch.cell);
+      if (route) {
+        const exposed = fetch.provocations === 0 ? 0 : this.exposure(unit, route);
+        out.push({
+          steps: [{ kind: 'dash' }, { kind: 'move', path: route }, { kind: 'grabPayload' }],
+          score: this.pv(fetch.cell) - this.pvHere - exposed - (unit.braced ? w.brace : 0),
+          why: `dash, walk to (${ball.x}, ${ball.y}) and pick the Payload up`,
+          provocations: fetch.provocations,
+        });
+      }
     }
     return out;
   }
@@ -1109,6 +1207,15 @@ class Planner {
 
 /** A cell walked before a throw costs this much: movement the thrower will not have after. */
 const WALK_BEFORE_THROW = 0.25;
+
+/**
+ * What a plan that picks the loose ball up gains, for the role that picks up
+ * first (2H.12, `00` C14, `pickupFirst`): more than any other plan of a
+ * turn is worth, so the pickup outranks every target in reach and the plans
+ * that take the ball still rank among themselves on their own value.
+ */
+const PICKUP_FIRST = 1000;
+
 /** The keeper's relaunch reads every cell of range to its mouth at this much (Jérôme, 2026-10-11). */
 const RELAUNCH_STEP = 0.5;
 /** What a last link's throw loses per cell it goes backwards (2H.10). */
@@ -1232,6 +1339,8 @@ function actionKey(action: Action): string {
       return `${action.kind}:${action.targetId}`;
     case 'batCracker':
       return `batCracker:${action.crackerId}:${action.direction}`;
+    case 'choosePlace':
+      return `choosePlace:${action.place}`;
     default:
       return action.kind;
   }

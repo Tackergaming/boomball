@@ -33,12 +33,22 @@ import {
   view,
   waitForArrival,
   waitForHook,
-  waitForMyTurn,
+  waitForPlayableTurn,
   watch,
 } from './harness.js';
 
 test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   const shots = new Shots(page, info, stamp());
+  // Écart 58 (2H.12): a human Striker is asked its place in its role every
+  // round. The smoke answers on screen, first place, then the close button
+  // (last, the default), then second, so all three paths are clicked.
+  const picks: (number | 'close')[] = [1, 'close', 2];
+  let asked = 0;
+  const myTurn = () =>
+    waitForPlayableTurn(page, (places) => {
+      const pick = picks[asked++ % picks.length]!;
+      return pick === 'close' ? pick : Math.min(pick, places);
+    }, shots);
   const seen = watch(page);
 
   // -- Hub ------------------------------------------------------------------
@@ -84,7 +94,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   }
 
   await page.getByRole('button', { name: 'instant', exact: true }).click();
-  expect(await waitForMyTurn(page)).toBe('turn');
+  expect(await myTurn()).toBe('turn');
   await shots.take('match-open');
 
   // A resumed match can carry a deadline long gone: the server spends that turn
@@ -92,7 +102,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   let at = await view(page);
   if (at.deadline !== null && at.deadline < Date.now()) {
     await act(page, { kind: 'endTurn' });
-    expect(await waitForMyTurn(page)).toBe('turn');
+    expect(await myTurn()).toBe('turn');
     await shots.take('after-expired-turn');
     at = await view(page);
   }
@@ -111,7 +121,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   await shots.take('turn-1-moved');
 
   await act(page, { kind: 'endTurn' });
-  expect(await waitForMyTurn(page)).toBe('turn');
+  expect(await myTurn()).toBe('turn');
   const afterOne = await view(page);
   expect(afterOne.seq).toBeGreaterThan(at.seq);
   await shots.take('turn-1-house-played');
@@ -150,7 +160,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   await shots.take('turn-2-dodged');
 
   await page.getByRole('button', { name: 'End turn', exact: true }).click();
-  expect(await waitForMyTurn(page)).toBe('turn');
+  expect(await myTurn()).toBe('turn');
   const afterTwo = await view(page);
   expect(afterTwo.seq).toBeGreaterThan(afterOne.seq);
   await shots.take('turn-2-house-played');
@@ -201,7 +211,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   await page.getByRole('button', { name: 'instant', exact: true }).click();
   await page.evaluate(() => window.__boomball?.skipReplay());
 
-  expect(await waitForMyTurn(page)).toBe('turn');
+  expect(await myTurn()).toBe('turn');
   const samplesOfSend = await stopSendWatch(page);
   const boardAfterSend = await boardOf(page);
   await shots.take('final-board');

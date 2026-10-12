@@ -64,6 +64,7 @@ function giveTurnTo(state: MatchState, unitId: UnitId): MatchState {
       actionUsed: false,
       objectInteractionUsed: false,
       disengaged: false,
+      placing: null,
     },
   };
 }
@@ -314,13 +315,16 @@ describe("Jérôme's fifth pass, 2H.11", () => {
   });
 
   it('point 10: once the Action is spent the ball is a carrier\'s end of turn, safety included', () => {
-    // The Breaker has no Action left and the ball lies two cells off. Three B
+    // A Striker has no Action left and the ball lies two cells off. Three B
     // Strikers stand on the ball's doorstep: ending there is a carrier's end
-    // of turn into three shovers, so it does not. Without them it does.
-    const stage = (threats: boolean): MatchState => {
+    // of turn into three shovers, so it does not. Without them it does. Until
+    // 2H.12 the scene was the Breaker's; since C14 the Breaker picks the ball
+    // up first, Action or not, so the rule is read on a Striker and the
+    // Breaker's side of it is asserted the other way below.
+    const stage = (who: string, threats: boolean): MatchState => {
       let s = parkB(board(), { x: 7, y: 2 });
       s = { ...s, payload: { carriedBy: null, x: 7, y: 22 }, lastCarrierTeam: 'A' };
-      s = clockOn(put(s, breaker, { x: 7, y: 24 }), breaker);
+      s = clockOn(put(s, who, { x: 7, y: 24 }), who);
       s = { ...s, turn: { ...s.turn!, actionUsed: true } };
       if (threats) {
         s = put(s, 'B-striker-2', { x: 6, y: 20 });
@@ -334,13 +338,18 @@ describe("Jérôme's fifth pass, 2H.11", () => {
       return end !== null && end.x === 7 && end.y === 22;
     };
 
-    const hot = stage(true);
-    const hotPlans = rankPlans(arena, hot, breaker);
-    expect(onBall(chooseAction(arena, hot, breaker)), JSON.stringify(show(hotPlans))).toBe(false);
+    const hot = stage(OPENER, true);
+    const hotPlans = rankPlans(arena, hot, OPENER);
+    expect(onBall(chooseAction(arena, hot, OPENER)), JSON.stringify(show(hotPlans))).toBe(false);
 
-    const calm = stage(false);
-    const calmPlans = rankPlans(arena, calm, breaker);
-    expect(onBall(chooseAction(arena, calm, breaker)), JSON.stringify(show(calmPlans))).toBe(true);
+    const calm = stage(OPENER, false);
+    const calmPlans = rankPlans(arena, calm, OPENER);
+    expect(onBall(chooseAction(arena, calm, OPENER)), JSON.stringify(show(calmPlans))).toBe(true);
+
+    // The Breaker picks it up all the same (2H.12, `00` C14).
+    const breakerHot = stage(breaker, true);
+    const breakerPlans = rankPlans(arena, breakerHot, breaker);
+    expect(breakerPlans[0]!.steps.map((s) => s.kind), JSON.stringify(show(breakerPlans))).toEqual(['move', 'grabPayload']);
   });
 
   it('point 12: a carrier never walks backwards', () => {

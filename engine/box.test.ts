@@ -49,6 +49,7 @@ function clockOn(state: MatchState, id: UnitId): MatchState {
       actionUsed: false,
       objectInteractionUsed: false,
       disengaged: false,
+      placing: null,
     },
   };
 }

@@ -163,6 +163,10 @@ function teamSlots(arena: Arena, state: MatchState, team: TeamId): Omit<TurnSlot
     // in its role, after every AI of that role on its side, so that it reads
     // what its team-mates of the same role have done before it moves. Two or
     // three humans of the same role keep their kick-off d20 between them.
+    // Since écart 58 (2H.12) this is only where a human Striker or Breaker
+    // starts the round: when its role's first turn comes, it is asked its
+    // place (`placementAt`, `placeHuman`), and the last is what it gets when
+    // it does not choose.
     for (const unit of [...ai, ...humans]) {
       out.push({ actor: { kind: 'unit', unitId: unit.id }, blockId: null, team });
     }
@@ -225,6 +229,98 @@ export function promoteBulwark(
   const head = ours[0]!.i;
   const reordered = [...without.slice(0, head), keeperAt.slot, ...without.slice(head)];
   return reordered.map((slot, i) => ({ ...slot, rank: i + 1 }));
+}
+
+// -- The human's place in its role (écart 58, 2H.12) --------------------------
+
+/**
+ * The roles in which a human chooses its place each round. The Trajector and
+ * the Bulwark are alone in theirs.
+ */
+export const PLACE_ROLES: readonly Role[] = ['striker', 'breaker'];
+
+/**
+ * The slot indices of the role block the slot at `index` belongs to: the run
+ * of consecutive unit slots of the same side and role around it. The ladder
+ * builds each role of a side in one run (`teamSlots`), and neither the
+ * relaunch nor a placement breaks a run.
+ */
+function roleBlock(state: MatchState, index: number): number[] {
+  const unitOfSlot = (i: number): Unit | null => {
+    const slot = state.turnOrder[i];
+    if (!slot || slot.actor.kind !== 'unit') return null;
+    const id = slot.actor.unitId;
+    return state.units.find((u) => u.id === id) ?? null;
+  };
+  const anchor = unitOfSlot(index);
+  if (!anchor) return [];
+  const same = (i: number): boolean => {
+    const u = unitOfSlot(i);
+    return u !== null && u.team === anchor.team && u.role === anchor.role;
+  };
+  let start = index;
+  while (start > 0 && same(start - 1)) start--;
+  const out: number[] = [];
+  for (let i = start; i < state.turnOrder.length && same(i); i++) out.push(i);
+  return out;
+}
+
+/**
+ * Whether the ladder, about to open the turn at `index`, must first ask a
+ * human its place in its role (écart 58, Jérôme on 2026-10-12): the slot is
+ * the first turn of a Striker or Breaker block that holds exactly one human,
+ * who has not chosen this round, and at least two units of the block are
+ * still on the field. Returns the human and the number of places, or null.
+ * Two or three humans of one role (the coop, phase 7) keep the order of
+ * écart 55 and their kick-off d20: no popup.
+ */
+export function placementAt(state: MatchState, index: number): { unitId: string; places: number } | null {
+  const block = roleBlock(state, index);
+  if (block.length < 2) return null;
+  const units = block.map((i) => {
+    const slot = state.turnOrder[i]!;
+    const id = (slot.actor as { unitId: string }).unitId;
+    return { slot, unit: state.units.find((u) => u.id === id)! };
+  });
+  if (!PLACE_ROLES.includes(units[0]!.unit.role)) return null;
+  const humans = units.filter((u) => isHuman(u.unit));
+  if (humans.length !== 1) return null;
+  const human = humans[0]!;
+  if (human.slot.placed || human.unit.status !== 'active') return null;
+  // Only before the block has begun: nobody of it is behind the cursor.
+  if (block[0]! < index && units.slice(0, block.indexOf(index)).some((u) => u.unit.status === 'active')) return null;
+  const places = units.filter((u) => u.unit.status === 'active').length;
+  return places >= 2 ? { unitId: human.unit.id, places } : null;
+}
+
+/**
+ * The ladder with the human's slot moved to `place` of its role block,
+ * counted among the units still on the field, and marked as placed: place 1
+ * at the cursor, place 2 right after the first active AI of the block, and
+ * so on. The AI keep their order by the situation. Ranks are renumbered.
+ * Unmarked (`mark` false) while the human is being asked: its slot only sits
+ * at the cursor so that the slot on the clock is the turn's unit.
+ */
+export function placeHuman(state: MatchState, index: number, unitId: string, place: number, mark = true): TurnSlot[] {
+  const order = state.turnOrder;
+  const at = order.findIndex((s) => s.actor.kind === 'unit' && s.actor.unitId === unitId);
+  if (at < 0) return [...order];
+  const slot: TurnSlot = mark ? { ...order[at]!, placed: true } : order[at]!;
+  const without = order.filter((_, i) => i !== at);
+  const rest: MatchState = { ...state, turnOrder: without };
+  // The block, from the cursor on, without the human.
+  const block = roleBlock(rest, index).filter((i) => i >= index);
+  let insertAt = index;
+  let passed = 0;
+  for (const i of block) {
+    if (passed >= place - 1) break;
+    const id = (without[i]!.actor as { unitId: string }).unitId;
+    const unit = state.units.find((u) => u.id === id);
+    insertAt = i + 1;
+    if (unit && unit.status === 'active') passed++;
+  }
+  const placed = [...without.slice(0, insertAt), slot, ...without.slice(insertAt)];
+  return placed.map((s, i) => ({ ...s, rank: i + 1 }));
 }
 
 /**

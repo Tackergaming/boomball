@@ -16,7 +16,7 @@ import { expect, test } from '@playwright/test';
 import { chooseAction } from '../ai/chooseAction.js';
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import { Shots, act, report, roundMarkers, stamp, state, view, waitForHook, waitForMyTurn, watch } from './harness.js';
+import { Shots, act, report, roundMarkers, stamp, state, view, waitForHook, waitForPlayableTurn, watch } from './harness.js';
 
 const arena = new Arena(KILL_SILO);
 
@@ -49,7 +49,9 @@ test('@playthrough plays the open match to the final whistle', async ({ page }, 
   let turns = 0;
   let refusals = 0;
   for (let i = 0; i < 200; i++) {
-    if ((await waitForMyTurn(page, 120_000)) === 'finished') break;
+    // Écart 58 (2H.12): the place prompt is answered on screen, a different
+    // place each round, so every place is played across a match.
+    if ((await waitForPlayableTurn(page, (places, round) => ((round - 1) % places) + 1, shots, 120_000)) === 'finished') break;
 
     const board = await state(page);
     if (!board.turn) throw new Error('no turn is open and the match is not finished');

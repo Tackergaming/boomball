@@ -128,7 +128,7 @@ export function submitAction(
   const events = [...result.events];
   return {
     ok: true,
-    step: advance(arena, { ...session, state: result.state }, events, now, orders),
+    step: advance(arena, { ...session, state: result.state }, events, now, orders, clockKey(state)),
   };
 }
 
@@ -230,6 +230,15 @@ export function expireIfDue(
   const events: MatchEvent[] = [];
   let current = state;
 
+  // A human asked its place in its role who lets the clock run out plays
+  // last of its role, as under écart 55 (écart 58, Jérôme on 2026-10-12).
+  if (state.turn.placing != null) {
+    const placed = reduce(arena, current, { unitId, action: { kind: 'choosePlace', place: state.turn.placing } });
+    if (!placed.ok) throw new Error(`a place could not be chosen on the clock: ${placed.reason}`);
+    events.push(...placed.events);
+    return advance(arena, { ...session, state: placed.state }, events, now, orders, clockKey(state));
+  }
+
   // Dodge is refused once the Action is spent, which is the common case for a
   // player who acted and then went quiet. Ending the turn is the part that has
   // to happen either way.
@@ -243,7 +252,7 @@ export function expireIfDue(
   if (!ended.ok) throw new Error(`a turn could not be ended on the clock: ${ended.reason}`);
   events.push(...ended.events);
 
-  return advance(arena, { ...session, state: ended.state }, events, now, orders);
+  return advance(arena, { ...session, state: ended.state }, events, now, orders, clockKey(state));
 }
 
 // -- Running the machine ----------------------------------------------------
@@ -262,13 +271,15 @@ function advance(
   events: MatchEvent[],
   now: number,
   orders: readonly AllyOrder[],
+  // Who was on the clock before this step, so the deadline below can tell a
+  // turn that carried on from a turn that started. Read by the caller on the
+  // state before the human's action: after a place chosen first (écart 58)
+  // the state handed in here is already the human's turn, which has to get a
+  // fresh clock and not the one the choice was given.
+  wasOnClock: string | null = clockKey(session.state),
 ): SessionStep {
   let current = session.state;
   let spent = 0;
-
-  // Who was on the clock before this step, so the deadline below can tell a
-  // turn that carried on from a turn that started.
-  const wasOnClock = session.state.turn?.unitId ?? null;
 
   while (current.phase !== 'finished' && current.turn) {
     const unit = unitById(current, current.turn.unitId);
@@ -313,13 +324,24 @@ function advance(
 function deadlineFor(
   state: MatchState,
   now: number,
-  wasOnClock: UnitId | null,
+  wasOnClock: string | null,
   standing: number | null,
 ): number | null {
   if (state.phase === 'finished' || !state.turn) return null;
   if (!isHuman(unitById(state, state.turn.unitId))) return null;
   // Same unit still on the clock, and it already had a deadline: it is the same
   // turn continuing, so it keeps the time it was given.
-  if (standing !== null && wasOnClock === state.turn.unitId) return standing;
+  if (standing !== null && wasOnClock === clockKey(state)) return standing;
   return now + TURN_TIMER_SECONDS * 1000;
+}
+
+/**
+ * What the clock is running for: the unit on the turn, and whether it is
+ * choosing its place in its role. The choice has its own clock and the turn
+ * that follows starts a fresh one, the first place included (écart 58,
+ * Jérôme on 2026-10-12).
+ */
+function clockKey(state: MatchState): string | null {
+  if (!state.turn) return null;
+  return state.turn.placing != null ? `${state.turn.unitId}#place` : state.turn.unitId;
 }

@@ -88,6 +88,12 @@ export interface LegalActions {
   readonly canDisengage: boolean;
   /** Brace, the Bulwark's dig-in (écart 52): only that role, Action in hand. */
   readonly canBrace: boolean;
+  /**
+   * The places on offer while a human chooses its place in its role (écart
+   * 58, 2H.12), 1 first; empty in a turn being played. While it is not
+   * empty, nothing else is legal, not even ending the turn.
+   */
+  readonly choosePlace: readonly number[];
   /** Every action above that needs no further choice, ready to send as is. */
   readonly simple: readonly Action[];
 }
@@ -192,6 +198,28 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
   const unit = state.units.find((u) => u.id === turn.unitId);
   if (!unit || unit.status !== 'active') return null;
 
+  // Écart 58: a human asked its place has that choice and nothing else.
+  if (turn.placing != null) {
+    const places = Array.from({ length: turn.placing }, (_, i) => i + 1);
+    return {
+      unitId: unit.id,
+      destinations: new Map(),
+      attack: [],
+      shove: [],
+      pass: [],
+      shoot: null,
+      batCracker: [],
+      catchSpark: null,
+      canGrabPayload: false,
+      canDash: false,
+      canDodge: false,
+      canDisengage: false,
+      canBrace: false,
+      choosePlace: places,
+      simple: places.map((place) => ({ kind: 'choosePlace', place })),
+    };
+  }
+
   const hasAction = !turn.actionUsed;
   const options = actionOptionsAt(arena, state, unit, unit);
 
@@ -225,6 +253,7 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
     canDodge: hasAction,
     canDisengage: hasAction,
     canBrace,
+    choosePlace: [],
     simple,
   };
 }
@@ -252,7 +281,8 @@ export function onlyEndTurnLeft(legal: LegalActions): boolean {
     !legal.canDash &&
     !legal.canDodge &&
     !legal.canDisengage &&
-    !legal.canBrace
+    !legal.canBrace &&
+    legal.choosePlace.length === 0
   );
 }
 

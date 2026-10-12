@@ -170,6 +170,43 @@ export async function waitForMyTurn(page: Page, timeout = 90_000): Promise<'turn
   return over ? 'finished' : 'turn';
 }
 
+/**
+ * The place prompt of écart 58 (2H.12), answered the way a player does: by a
+ * click on the popup on screen, never through the hook. `pick` is given the
+ * places on offer and the round, and returns a place or 'close' (play last).
+ * Captures the popup the first time it is seen when `shots` is given. Returns
+ * like `waitForMyTurn`, once a turn is actually playable.
+ */
+export async function waitForPlayableTurn(
+  page: Page,
+  pick: (places: number, round: number) => number | 'close',
+  shots?: Shots,
+  timeout = 90_000,
+): Promise<'turn' | 'finished'> {
+  for (let guard = 0; guard < 4; guard++) {
+    if ((await waitForMyTurn(page, timeout)) === 'finished') return 'finished';
+    const board = await state(page);
+    const placing = board.turn?.placing ?? null;
+    if (placing === null) return 'turn';
+
+    const prompt = page.getByTestId('place-prompt');
+    await prompt.waitFor({ state: 'visible', timeout: 10_000 });
+    if (shots && !placeSeen) {
+      placeSeen = true;
+      await shots.take(`place-prompt-round-${board.round}`);
+    }
+    const choice = pick(placing, board.round);
+    const seq = (await view(page)).seq;
+    if (choice === 'close') await page.getByTestId('place-close').click();
+    else await prompt.locator(`[data-place="${choice}"]`).click();
+    await page.waitForFunction((before) => (window.__boomball?.seq ?? before) !== before || !window.__boomball, seq, {
+      timeout: 30_000,
+    });
+  }
+  throw new Error('the place prompt came back four times in a row');
+}
+let placeSeen = false;
+
 export async function summary(page: Page): Promise<LegalSummary> {
   const legal = await page.evaluate(() => window.__boomball?.legalSummary() ?? null);
   if (!legal) throw new Error('no legal actions: it is not this client\'s turn');

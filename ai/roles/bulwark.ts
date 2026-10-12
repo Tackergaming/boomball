@@ -59,6 +59,8 @@ export const BULWARK: RoleWeights = {
   receiver: 0.4,
   idleSwing: 1,
   chainException: 0,
+  // 2H.12, Jérôme's sixth pass.
+  pickupFirst: 0,
 
   avoidOpportunity: 30,
   avoidCrackers: 8,

@@ -1234,3 +1234,108 @@ sont dans les fiches tels quels ; ce qui suit dit ce que chaque point a changé 
   coéquipier le plus solide en PV.
 - **Vitesse.** Un match d'auto-jeu dure environ 1,5 s contre 1,2 s, donc un sweep environ
   quatorze minutes ; le test des cinquante millisecondes passe.
+
+## C14. Décisions du 2026-10-12 à la fin du chat de mise en ligne de 2H.11, **sous-phase 2H.12, dans le code depuis le 2026-10-12 (moteur 7)**
+
+> Écrites par le fil principal (Opus 5.5) sur les deux règles dictées par Jérôme le 2026-10-12,
+> reformulées par le fil principal du chat précédent, principe validé par Jérôme et deux questions
+> tranchées par lui le même jour ; puis, dans le chat suivant, après lecture de
+> `engine/initiative.ts`, `engine/reduce.ts`, `server/session.ts` et de l'écran de match, une
+> question de plus tranchée par lui (le chrono de la popup). **Validées avant la première ligne de
+> code.** L'écart 58 ajoute une action, un champ au tour et deux événements : **`ENGINE_VERSION`
+> monte à 7**, les matchs ouverts du moteur 6 sont archivés au redéploiement.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 58 | Écart 55 : un humain joue en dernier de son rôle | **L'humain choisit sa place dans son rôle, round par round.** Si l'humain joue un **Striker ou un Breaker**, quand le premier tour de son rôle arrive dans le round, une popup lui demande s'il veut jouer **premier, deuxième ou troisième de son rôle**, pour ce round seulement. Les IA du même rôle prennent les places restantes dans leur ordre par la situation (écart 51). Un camp n'a que deux Breakers : pour un Breaker humain la popup propose premier ou deuxième. Si un coéquipier du rôle est évacué, elle ne propose que les places qui existent ; s'il n'en reste qu'une, pas de popup. **La popup a son propre chrono**, `TURN_TIMER_SECONDS`, et le tour qui suit repart sur un chrono neuf, place 1 comprise. Chrono expiré ou popup fermée sans choix : **il joue dernier de son rôle**, comme sous l'écart 55. Le Trajector et le Bulwark sont seuls de leur rôle, rien ne change pour eux. **Remplace l'écart 55 pour le Striker et le Breaker** | Jérôme, le 2026-10-12 : jouer toujours dernier de son rôle le privait de choisir entre ouvrir le jeu et lire ce que ses coéquipiers du même rôle font avant lui | **Fait en 2H.12**, fil principal, voir « comment 2H.12 est codée » |
+
+**Comment l'écart 58 se lit dans le moteur**, décidé par le fil principal à la lecture du code et
+dit à Jérôme avant l'écriture. Tout le serveur et le client lisent `state.turn.unitId` pour savoir
+qui est interrogé, à qui est le chrono et où la boucle d'IA s'arrête : la popup est donc **un tour
+d'attente de choix**. Quand l'échelle atteint le premier slot actif du rôle de l'humain dans son
+équipe, et que ce rôle compte au moins deux unités actives, le moteur ouvre un tour à l'humain
+avec `turn.placing`, le nombre de places offertes ; son slot passe en tête du rôle le temps du
+choix. La seule action légale est `choosePlace { place }`. Place 1 : son tour commence aussitôt.
+Place 2 ou 3 : son slot est remis derrière une ou deux IA actives du rôle, le tour passe à la
+première IA, et le sien s'ouvre quand l'échelle l'atteint, sans seconde popup. Deux événements,
+`placeOffered` et `placeChosen`. Chrono expiré : le serveur joue `choosePlace` à la dernière place.
+Trois conséquences écrites telles quelles : **le Trajector, qui joue avant la popup, planifie avec
+l'humain à la dernière place**, ne connaissant pas encore le choix, alors que les IA du rôle lisent
+l'échelle déjà réordonnée ; une relance du gardien (écart 54) ne touche pas au rôle ; **plusieurs
+humains du même rôle, en coop, n'ont pas de popup** et gardent l'ordre de l'écart 55 et du d20, à
+relire en phase 7.
+
+**L'IA, sixième passe : le Breaker ramasse d'abord**, dicté par Jérôme le 2026-10-12. Ses mots.
+
+1. **Quand la balle est au sol à portée, le Breaker la ramasse en priorité.** « À portée » : **même
+   en Dash**, toute balle qu'il atteint dans le tour avec seize cases. Le plan « dash, marcher,
+   ramasser » existe pour lui ; il ne pourra plus lancer dans ce tour, l'Action étant partie dans
+   le Dash. **Il ne la laisse plus à un Striker ni au Trajector**, qu'ils aient joué ou non.
+   **Remplace C10 Breaker 7 et C12 commune 6 pour le Breaker** (`yieldToKeener`, `keenerMateNear`),
+   et C12 Breaker 5.
+2. La suite ne bouge pas : le Breaker porteur passe à la première occasion (`handOff`), avec son
+   exception à la chaîne (`chainException`).
+3. Lu par le fil principal dans l'ordre de C10 Breaker : **seul le Spark sous ses pieds reste
+   au-dessus** (C10 Breaker 1) ; la parade est une Réaction et ne concourt pas. « En priorité »
+   passe devant une cible légitime à portée : le Dash vers la balle n'est pas interdit par C10
+   commune 3.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`. `ENGINE_VERSION` 7 pour
+l'écart 58. L'IA change dans `ai/chooseAction.ts` et la fiche du Breaker. **Un seul sweep à la fin,
+si Jérôme le demande**, contre `09` §12, en comptant quatorze minutes ; l'écart 58 ne joue pas en
+auto-jeu, faute d'humain. Les 530 tests sont le filet, le test des cinquante millisecondes fait foi
+sur la vitesse.
+
+**Comment 2H.12 est codée**, par le fil principal (Opus 5.5) le 2026-10-12, avec trois sous-agents
+Sonnet nommés ci-dessous, pour relire le code contre les mots.
+
+- **Le Breaker ramasse d'abord (`pickupFirst`, Breaker 1, autres rôles 0 ; `yieldToKeener` Breaker
+  1 → 0).** Le `Planner` de `ai/chooseAction.ts` calcule `ballFirst` une fois par décision : ballon
+  au sol, unité qui ne porte pas, case du ballon dans sa marche, ou dans les seize cases du Dash
+  quand l'Action est là (`safeReachableCells` sur la marche plus le Dash, gardé pour les plans de
+  Dash). Alors **tout plan qui contient le ramassage gagne `PICKUP_FIRST` (1000)**, plus que ce
+  que vaut n'importe quel autre plan d'un tour ; entre eux ils se classent comme avant, donc
+  « marcher, ramasser, passer » bat « marcher, ramasser » quand la passe vaut quelque chose. Deux
+  plans nouveaux : **« dash, marcher, ramasser »** dans `dashPlans`, non barré par une cible à
+  portée ; et **« marcher, ramasser » sans Action**, la seconde moitié du précédent une fois le Dash
+  joué, que le point 10 de C13 refuse aux autres rôles. **Le Spark sous ses pieds** : la prise
+  reçoit le bonus entier et le ramassage la moitié en plus, avec un plan « attraper, marcher,
+  ramasser » quand la marche atteint le ballon ; sans ce traitement, trouvé par le sous-agent des
+  tests, « marcher, ramasser » (72,5) passait devant la prise (55,6), et c'était déjà vrai avant
+  2H.12. `handOff` et `chainException` ne bougent pas. Tests : `ai/sixthPass.test.ts`, 8 tests,
+  **sous-agent Sonnet effort moyen** ; dans `ai/ai.test.ts` la scène « laisse le ballon au Striker »
+  devient « le prend quand même », et la scène du point 10 de C13 dans `ai/fifthPass.test.ts` se
+  lit sur un Striker, le Breaker y ramassant désormais.
+- **L'écart 58 dans le moteur, `ENGINE_VERSION` 7.** L'action `choosePlace { place }`
+  (`engine/actions.ts`), `turn.placing` (`engine/types.ts`), `placed` sur le slot de l'humain une
+  fois le choix fait, les événements `placeOffered` et `placeChosen`. `placementAt` et
+  `placeHuman` dans `engine/initiative.ts` : le bloc d'un rôle est la suite de slots d'un même camp
+  et d'un même rôle, la popup ne vient que s'il compte un seul humain, au moins deux unités
+  actives, et que l'humain n'a pas choisi ce round. `advance` dans `reduce.ts` l'ouvre par
+  `offerPlace` au lieu de `beginTurn` ; `applyChoosePlace` place le slot derrière `place - 1` IA
+  actives du rôle, puis commence le tour de l'humain (place 1) ou repart de la première IA.
+  `legalActions` ne propose que `choosePlace` pendant le choix, et `onlyEndTurnLeft` en tient
+  compte, sinon le client passait le tour tout seul. Un tour écrit avant le moteur 7 n'a pas le
+  champ : les tests de `placing` sont en égalité lâche.
+- **Le serveur** (`server/session.ts`) : le chrono expiré pendant le choix joue `choosePlace` à la
+  dernière place. **La popup a son propre chrono** : la clé d'horloge distingue le choix du tour
+  (`clockKey`), et elle est lue **avant** l'action humaine ; lue après, comme avant 2H.12, le tour
+  qui suit une place 1 gardait l'échéance du choix. Défaut trouvé par le sous-agent des tests du
+  moteur, corrigé par le fil principal. Tests : `engine/placement.test.ts`, 11 tests, **sous-agent
+  Sonnet effort élevé** ; `server/session.test.ts` répond à la popup par la dernière place avant de
+  jouer ses tours.
+- **L'IA face à la popup** : jamais en match, faute d'IA humaine ; `rankPlans` répond la dernière
+  place pour le siège humain du playthrough et pour `dump-match.ts`, qui reconstruit
+  `choosePlace` depuis `placeChosen` et écrit les deux lignes.
+- **L'écran** : `client/src/match/PlacePrompt.tsx`, **sous-agent Sonnet effort moyen**, une
+  carte au-dessus du plateau, un bouton par place (`data-place`), « Close, play last »
+  (`data-testid="place-close"`), Échap et clic à côté valent la dernière place, le chrono affiché.
+  `Match.tsx` l'ouvre quand `turn.placing` est posé et que c'est le tour du joueur, et éteint la
+  barre d'actions derrière. Le fil dit « X plays second of the role this round ».
+- **Le harnais** : `waitForPlayableTurn` dans `e2e/harness.ts` répond à la popup **par un clic à
+  l'écran** et la capture la première fois ; le smoke clique la place 1, puis « Close », puis la
+  place 2 ; le playthrough une place différente à chaque round.
+- **Mesuré** : 549 tests sur 25 fichiers contre 530, typecheck et build du client verts, le test
+  des cinquante millisecondes passe. Dix-huit matchs d'auto-jeu, six graines par Tier, pour voir
+  que le sport se joue encore, pas un sweep : 2,7 / 2,0 / 3,3 buts de ballon par match (rookie,
+  veteran, star), 57 ramassages de Breaker sur les dix-huit, 1,3 à 1,4 s par match.

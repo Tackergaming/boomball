@@ -25,6 +25,14 @@ export interface DiceRoll {
 export type MatchEvent =
   | { readonly kind: 'roundStarted'; readonly round: number }
   | { readonly kind: 'turnStarted'; readonly unitId: UnitId; readonly round: number }
+  /**
+   * Écart 58 (2H.12): the first turn of a human's role has come round, and
+   * the human is asked which place of the role it takes this round, out of
+   * `places`. Nothing else happens until `placeChosen`.
+   */
+  | { readonly kind: 'placeOffered'; readonly unitId: UnitId; readonly round: number; readonly places: number }
+  /** The place taken, 1 first. A clock that runs out takes the last (`server/session.ts`). */
+  | { readonly kind: 'placeChosen'; readonly unitId: UnitId; readonly place: number }
   | {
       readonly kind: 'moved';
       readonly unitId: UnitId;

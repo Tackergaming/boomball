@@ -62,6 +62,8 @@ export const TRAJECTOR: RoleWeights = {
   receiver: 1,
   idleSwing: 0.2,
   chainException: 0,
+  // 2H.12, Jérôme's sixth pass.
+  pickupFirst: 0,
 
   avoidOpportunity: 50,
   avoidCrackers: 14,

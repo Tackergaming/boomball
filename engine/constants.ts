@@ -41,11 +41,14 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * `relaunch` on the state); version 6 is 2H.10, decided by Jérôme on
  * 2026-10-11 after his engine 5 game: the turn state remembers the cell the
  * turn started on (`startedAt`, écart 56), a memory for the AI and the match
- * dump that no rule of play reads. Nothing in the engine reads the version:
+ * dump that no rule of play reads; version 7 is 2H.12, decided by Jérôme on
+ * 2026-10-12: a human Striker or Breaker chooses its place in its role each
+ * round (écart 58, `turn.placing`, the `choosePlace` action and two events).
+ * Nothing in the engine reads the version:
  * the server stamps it on `matches` and refuses a mismatch, and the client
  * archives what it cannot play.
  */
-export const ENGINE_VERSION = 6;
+export const ENGINE_VERSION = 7;
 
 // -- The penalty box (écart 53) --------------------------------------------
 

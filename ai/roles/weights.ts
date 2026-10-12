@@ -178,7 +178,8 @@ export interface RoleWeights {
    * mate within two cells of the ball has a higher `chaseLoosePayload`, this
    * unit neither walks onto the ball nor picks it up. Zero means it takes
    * whatever is at its feet. A number rather than a role test so the table
-   * stays data.
+   * stays data. Zero everywhere since 2H.12: the Breaker, the one role that
+   * yielded (C10 Breaker 7), now picks the ball up first (`pickupFirst`).
    */
   readonly yieldToKeener: number;
   /**
@@ -276,6 +277,18 @@ export interface RoleWeights {
    * can intercept. One for the Breaker, zero elsewhere.
    */
   readonly chainException: number;
+
+  // -- Jérôme's sixth pass, 2H.12, 2026-10-12 ---------------------------------
+  /**
+   * Picking a loose ball up before anything else (2H.12, `00` C14, Jérôme:
+   * "le Breaker ramasse d'abord"): when the ball lies within what this unit
+   * reaches this turn, a Dash's sixteen cells included, every plan that picks
+   * it up goes ahead of every plan that does not, a legitimate target in reach
+   * included. Only a catch of the Spark from where it stands ranks above. The
+   * Dash leaves no Action for a throw: "dash, walk, pick up" is the plan. One
+   * for the Breaker, zero elsewhere.
+   */
+  readonly pickupFirst: number;
 
   // -- The goalkeeper's tether, 2H.7 ------------------------------------------
   /**

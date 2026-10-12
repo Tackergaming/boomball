@@ -34,7 +34,7 @@ import {
 } from './constants.js';
 import type { MatchEvent } from './events.js';
 import { directionFromD8, distance, lineTo, stepCostFeet, type Point } from './geometry.js';
-import { buildTurnOrder, promoteBulwark } from './initiative.js';
+import { buildTurnOrder, placeHuman, placementAt, promoteBulwark } from './initiative.js';
 import { Rng } from './rng.js';
 import {
   attackMode,
@@ -116,6 +116,19 @@ export function reduce(arena: Arena, state: MatchState, command: Command): Reduc
   if (!unit) return { ok: false, reason: `no unit with id ${command.unitId}` };
   if (unit.status !== 'active') return { ok: false, reason: `${unit.name} is off the field` };
 
+  // Écart 58: while a human is asked its place in its role, that is the only
+  // thing it can send, and it can send it at no other time. Loose equality on
+  // purpose: a turn written before engine 7 has no such field.
+  if (turn.placing != null) {
+    if (command.action.kind !== 'choosePlace') {
+      return { ok: false, reason: `${unit.name} has to choose a place in its role first` };
+    }
+    return applyChoosePlace(arena, state, unit, command.action.place);
+  }
+  if (command.action.kind === 'choosePlace') {
+    return { ok: false, reason: 'no place is being chosen' };
+  }
+
   return apply(arena, state, unit, command.action);
 }
 
@@ -149,6 +162,8 @@ function apply(arena: Arena, state: MatchState, unit: Unit, action: Action): Red
       return applyShoot(ctx);
     case 'endTurn':
       return applyEndTurn(arena, state, unit);
+    case 'choosePlace':
+      return { ok: false, reason: 'no place is being chosen' };
   }
 }
 
@@ -1276,10 +1291,59 @@ function advance(arena: Arena, state: MatchState, events: MatchEvent[]): ReduceR
       continue;
     }
 
+    // Écart 58: the first turn of a human's Striker or Breaker block asks it
+    // its place first.
+    const asked = placementAt(current, current.turnIndex);
+    if (asked) return { ok: true, state: offerPlace(current, asked.unitId, asked.places, log), events: log };
+
     return { ok: true, state: beginTurn(current, unit, log), events: log };
   }
 
   return { ok: false, reason: 'the initiative ladder did not settle' };
+}
+
+/**
+ * The human is asked its place in its role (écart 58, 2H.12). Its slot moves
+ * to the cursor so the slot on the clock is the turn's unit, and a turn opens
+ * that has not begun: nothing lapses, no `turnStarted`, `placing` set.
+ */
+function offerPlace(state: MatchState, unitId: UnitId, places: number, log: MatchEvent[]): MatchState {
+  const human = state.units.find((u) => u.id === unitId)!;
+  log.push({ kind: 'placeOffered', unitId, round: state.round, places });
+  return {
+    ...state,
+    turnOrder: placeHuman(state, state.turnIndex, unitId, 1, false),
+    turn: {
+      unitId,
+      startedAt: { x: human.x, y: human.y },
+      movementFeetRemaining: MOVE_SPEED_FEET,
+      actionUsed: false,
+      objectInteractionUsed: false,
+      disengaged: false,
+      placing: places,
+    },
+  };
+}
+
+/**
+ * The place chosen. First: the human's turn begins at once. Later: its slot
+ * goes behind one or two AI of its role, still on the field, and the ladder
+ * moves on from the cursor, which now holds the first of them; the human's
+ * turn opens when the ladder reaches it, without asking again.
+ */
+function applyChoosePlace(arena: Arena, state: MatchState, unit: Unit, place: number): ReduceResult {
+  const places = state.turn!.placing!;
+  if (!Number.isInteger(place) || place < 1 || place > places) {
+    return { ok: false, reason: `place ${place} is not on offer: 1 to ${places}` };
+  }
+  const log: MatchEvent[] = [{ kind: 'placeChosen', unitId: unit.id, place }];
+  const placed: MatchState = {
+    ...state,
+    turnOrder: placeHuman(state, state.turnIndex, unit.id, place),
+    turn: null,
+  };
+  if (place === 1) return { ok: true, state: beginTurn(placed, unit, log), events: log };
+  return advance(arena, { ...placed, turnIndex: placed.turnIndex - 1 }, log);
 }
 
 /**
@@ -1300,6 +1364,7 @@ function beginTurn(state: MatchState, unit: Unit, log: MatchEvent[]): MatchState
       actionUsed: false,
       objectInteractionUsed: false,
       disengaged: false,
+      placing: null,
     },
   };
 }

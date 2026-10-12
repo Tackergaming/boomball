@@ -86,6 +86,7 @@ function giveTurnTo(state: MatchState, unitId: UnitId): MatchState {
       actionUsed: false,
       objectInteractionUsed: false,
       disengaged: false,
+      placing: null,
     },
   };
 }
@@ -444,7 +445,9 @@ describe('the Breaker, bodyguard', () => {
     expect((best.action as { targetId: UnitId }).targetId).toBe('B-striker-2');
   });
 
-  it('leaves a loose ball to a Striker standing beside it, and takes it when nobody better is near', () => {
+  it('takes a loose ball even with a Striker standing beside it (2H.12, `00` C14)', () => {
+    // Until 2H.12 it left the ball to the Striker (C10 Breaker 7); Jérôme's
+    // sixth pass: the Breaker picks up first and leaves it to nobody.
     const loose: MatchState = {
       ...giveTurnTo(put(board(), breaker, { x: 7, y: 24 }), breaker),
       payload: { carriedBy: null, x: 7, y: 22 },
@@ -454,9 +457,8 @@ describe('the Breaker, bodyguard', () => {
     expect(alone.some((e) => e.kind === 'payloadGrabbed')).toBe(true);
 
     const withStriker = put(loose, 'A-striker-2', { x: 6, y: 22 });
-    const yielded = playOutTurn(withStriker, breaker);
-    expect(yielded.some((e) => e.kind === 'payloadGrabbed')).toBe(false);
-    expect(yielded.some((e) => e.kind === 'moved' && e.to.x === 7 && e.to.y === 22)).toBe(false);
+    const taken = playOutTurn(withStriker, breaker);
+    expect(taken.some((e) => e.kind === 'payloadGrabbed')).toBe(true);
   });
 
   it('posts itself on the line a Cracker will roll down, where the parry fires', () => {

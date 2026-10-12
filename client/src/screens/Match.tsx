@@ -30,6 +30,7 @@ import { ActionBar, type Pending } from '../match/ActionBar.js';
 import { Announce } from '../match/Announce.js';
 import { Board } from '../match/Board.js';
 import { Briefing, hasBeenBriefed } from '../match/Briefing.js';
+import { PlacePrompt } from '../match/PlacePrompt.js';
 import { Feed } from '../match/Feed.js';
 import { Ladder } from '../match/Ladder.js';
 import { TurnStrip } from '../match/TurnStrip.js';
@@ -104,6 +105,13 @@ export function Match({
    * aimed at a position that is no longer there.
    */
   const canAct = yours && !replaying && !match.busy && !briefing;
+
+  /**
+   * The place in its role this player is being asked for (écart 58, 2H.12),
+   * the number of places on offer, or null. The popup is the whole of the
+   * turn while it is up: the bar and the board have nothing legal behind it.
+   */
+  const placing = yours && !replaying ? state?.turn?.placing ?? null : null;
 
   const legal = useMemo(
     () => (state && yours && !replaying ? legalActions(arena, state) : null),
@@ -393,6 +401,21 @@ export function Match({
               />
             )}
 
+            {placing !== null && onClock && !briefing && (
+              <PlacePrompt
+                name={onClock.name}
+                role={onClock.role === 'breaker' ? 'breaker' : 'striker'}
+                places={placing}
+                secondsLeft={left}
+                busy={match.busy}
+                onChoose={(place) => act({ kind: 'choosePlace', place })}
+                // Closing without a choice is the last place, as under écart 55.
+                onClose={() => {
+                  if (!match.busy) act({ kind: 'choosePlace', place: placing });
+                }}
+              />
+            )}
+
             {briefing && <Briefing onClose={() => setBriefing(false)} />}
           </div>
 
@@ -476,7 +499,7 @@ export function Match({
 
           <ActionBar
             legal={legal}
-            yours={canAct}
+            yours={canAct && placing === null}
             busy={match.busy}
             movementFeet={state.turn?.movementFeetRemaining ?? 0}
             onAct={act}

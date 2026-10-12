@@ -90,6 +90,16 @@ export interface EndTurnAction {
   readonly kind: 'endTurn';
 }
 
+/**
+ * The human's place in its role this round (écart 58, 2H.12): 1 plays first
+ * of its role, 2 after one AI of the role, 3 after two. The only action
+ * open while `turn.placing` is set, and open at no other time.
+ */
+export interface ChoosePlaceAction {
+  readonly kind: 'choosePlace';
+  readonly place: number;
+}
+
 export type Action =
   | MoveAction
   | DashAction
@@ -103,6 +113,7 @@ export type Action =
   | PassAction
   | ShootAction
   | BraceAction
+  | ChoosePlaceAction
   | EndTurnAction;
 
 export type ActionKind = Action['kind'];

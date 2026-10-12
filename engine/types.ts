@@ -141,6 +141,12 @@ export interface TurnSlot {
    * initiative fairness question when both teams resolve on the same numbers.
    */
   readonly team: TeamId | null;
+  /**
+   * Set on a human's slot once it has chosen its place in its role this
+   * round (écart 58), so the ladder does not ask twice. The ladder is rebuilt
+   * every round, which clears it.
+   */
+  readonly placed?: true;
 }
 
 /**
@@ -161,6 +167,13 @@ export interface TurnState {
   readonly objectInteractionUsed: boolean;
   /** Disengage holds for this turn only, so it lives here and not on the unit. */
   readonly disengaged: boolean;
+  /**
+   * Écart 58 (2H.12, engine version 7): set while a human is choosing its
+   * place in its role, to the number of places offered (2 or 3). The turn
+   * has not begun: no `turnStarted`, no stance lapsed, and the only action
+   * is `choosePlace`. Null in every turn that is being played.
+   */
+  readonly placing: number | null;
 }
 
 // -- The match ---------------------------------------------------------------

@@ -115,10 +115,22 @@ describe('the replay projects, it does not invent', () => {
     // Ending the turn is the click that hands the house its whole round, which
     // is the batch this module exists for: one request, thirteen AI turns.
     const opened = open(3);
-    const before = opened.session.state;
+    // Asked its place in its role first (écart 58): the last, as under écart 55.
+    let session = opened.session;
+    if (session.state.turn!.placing !== null) {
+      const placed = submitAction(
+        arena,
+        session,
+        { humanId: 'jerome', unitId: session.state.turn!.unitId, action: { kind: 'choosePlace', place: session.state.turn!.placing } },
+        T0,
+      );
+      if (!placed.ok) throw new Error(placed.reason);
+      session = placed.step.session;
+    }
+    const before = session.state;
     const result = submitAction(
       arena,
-      opened.session,
+      session,
       { humanId: 'jerome', unitId: before.turn!.unitId, action: { kind: 'endTurn' } },
       T0,
     );

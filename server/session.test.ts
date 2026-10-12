@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import type { Action } from '../engine/actions.js';
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
 import { ENGINE_VERSION, TURN_TIMER_SECONDS } from '../engine/constants.js';
@@ -42,6 +43,28 @@ function open(humans: readonly HumanSeat[], seed = 5) {
   return openSession(arena, fresh(humans, seed), T0);
 }
 
+/**
+ * Answers the place a human is asked in its role (écart 58, 2H.12) with the
+ * last, as under écart 55, until a turn is actually being played. Most of
+ * these tests are about a turn, not about the choice before it.
+ */
+function settle(session: Session, now = T0): Session {
+  for (let guard = 0; guard < 10 && session.state.turn?.placing != null; guard++) {
+    const unit = unitById(session.state, session.state.turn.unitId);
+    const humanId = unit.controller.kind === 'human' ? unit.controller.humanId : '';
+    const result = submitAction(arena, session, { humanId, unitId: unit.id, action: turnAction(session) }, now);
+    if (!result.ok) throw new Error(result.reason);
+    session = result.step.session;
+  }
+  return session;
+}
+
+/** Ending the turn, or, asked its place (écart 58), taking the last. */
+function turnAction(session: Session): Action {
+  const placing = session.state.turn?.placing ?? null;
+  return placing !== null ? { kind: 'choosePlace', place: placing } : { kind: 'endTurn' };
+}
+
 /** The unit the session is currently waiting on. */
 function onTheClock(session: Session) {
   return unitById(session.state, session.state.turn!.unitId);
@@ -58,7 +81,7 @@ describe('opening a session', () => {
   });
 
   it('puts the human on the clock and nobody else', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
 
     // Expressed in the constant, not in sixty seconds. The timer moved to a
     // hundred and twenty and these were the only two places that noticed.
@@ -71,7 +94,7 @@ describe('opening a session', () => {
 
 describe('the clock belongs to the turn, not to the request', () => {
   it('does not restart when the same player acts again inside their turn', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const opened = session.turnDeadline!;
     const unitId = session.state.turn!.unitId;
 
@@ -94,7 +117,7 @@ describe('the clock belongs to the turn, not to the request', () => {
   });
 
   it('makes a fresh one when the turn actually changes hands', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const opened = session.turnDeadline!;
 
     const ended = submitAction(
@@ -117,7 +140,7 @@ describe('the clock belongs to the turn, not to the request', () => {
 
 describe('who may move what', () => {
   it('refuses an action sent for a unit whose turn it is not', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const other = session.state.units.find((u) => u.id !== session.state.turn!.unitId)!;
 
     const result = submitAction(
@@ -152,7 +175,7 @@ describe('who may move what', () => {
   });
 
   it('hands back the engine\'s own reason when the move itself is illegal', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const mine = session.state.turn!.unitId;
 
     // The Spark is not on the field at kick-off, so this is refused by `reduce`
@@ -173,7 +196,7 @@ describe('who may move what', () => {
 
 describe('one click, every AI turn behind it', () => {
   it('resolves the whole AI block in a single pass and returns one batch of events', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const mine = session.state.turn!.unitId;
 
     const result = submitAction(
@@ -211,7 +234,7 @@ describe('one click, every AI turn behind it', () => {
       const result = submitAction(
         arena,
         session,
-        { humanId: 'jerome', unitId: unit.id, action: { kind: 'endTurn' } },
+        { humanId: 'jerome', unitId: unit.id, action: turnAction(session) },
         T0,
       );
       expect(result.ok).toBe(true);
@@ -236,7 +259,7 @@ describe('one click, every AI turn behind it', () => {
       const result = submitAction(
         arena,
         session,
-        { humanId: 'jerome', unitId: session.state.turn!.unitId, action: { kind: 'endTurn' } },
+        { humanId: 'jerome', unitId: session.state.turn!.unitId, action: turnAction(session) },
         T0,
       );
       if (!result.ok) throw new Error(result.reason);
@@ -265,7 +288,7 @@ describe('one click, every AI turn behind it', () => {
         const result = submitAction(
           arena,
           session,
-          { humanId: 'jerome', unitId: session.state.turn!.unitId, action: { kind: 'endTurn' } },
+          { humanId: 'jerome', unitId: session.state.turn!.unitId, action: turnAction(session) },
           T0,
         );
         if (!result.ok) throw new Error(result.reason);
@@ -281,7 +304,7 @@ describe('one click, every AI turn behind it', () => {
 
 describe('a player who goes quiet', () => {
   it('does not freeze the match: the turn is spent on Dodge and play moves on', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const stalled = onTheClock(session);
 
     const step = expireIfDue(arena, session, session.turnDeadline! + 1);
@@ -300,7 +323,7 @@ describe('a player who goes quiet', () => {
   });
 
   it('does nothing at all while the clock is still running', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     expect(expireIfDue(arena, session, session.turnDeadline! - 1)).toBeNull();
   });
 
@@ -321,7 +344,7 @@ describe('a player who goes quiet', () => {
 
 describe('a request that arrives late', () => {
   it('settles the clock and does not play the action it carried (A28)', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const unitId = session.state.turn!.unitId;
     const late = session.turnDeadline! + 1;
 
@@ -338,7 +361,7 @@ describe('a request that arrives late', () => {
   });
 
   it('plays the action when the clock is still running', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const unitId = session.state.turn!.unitId;
     const inTime = session.turnDeadline! - 1;
 
@@ -353,7 +376,7 @@ describe('a request that arrives late', () => {
   });
 
   it('still refuses an illegal action in time, with the engine\'s reason', () => {
-    const { session } = open(SOLO);
+    const session = settle(open(SOLO).session);
     const served = serveAction(
       arena,
       session,
@@ -393,7 +416,7 @@ describe('three players', () => {
       const result = submitAction(
         arena,
         session,
-        { humanId: owner, unitId: unit.id, action: { kind: 'endTurn' } },
+        { humanId: owner, unitId: unit.id, action: turnAction(session) },
         T0,
       );
       expect(result.ok).toBe(true);
