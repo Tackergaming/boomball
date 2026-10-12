@@ -1441,3 +1441,40 @@ commit `0ffa299` et son feu vert :
 
 **Ce qui attend Jérôme** : sa partie sur 2H.11 consignée par `dump-match.ts`, `CONTEXT.md` par
 `/update`, et **un sweep quand il le demandera**, contre `09` §12, en comptant quatorze minutes.
+
+### Sous-phase 2H.12, « l'humain choisit sa place dans son rôle, le Breaker ramasse d'abord », codée et en ligne le 2026-10-12, porte ouverte
+
+Par le fil principal (Opus 5.5), avec trois sous-agents Sonnet nommés ci-dessous, à partir de `00`
+C14 : les deux règles dictées par Jérôme le 2026-10-12, écrites avant la première ligne de code, et
+la question du chrono de la popup tranchée par lui en chat (« je prends ta recommandation » : son
+propre chrono, puis un chrono neuf pour le tour). **Pas de sweep**, à sa demande.
+
+| Quoi | État |
+|---|---|
+| Écart 58, la popup | Fait, fil principal : `choosePlace`, `turn.placing`, `placeOffered` et `placeChosen`, `placementAt` et `placeHuman` dans `engine/initiative.ts`, `offerPlace` et `applyChoosePlace` dans `reduce.ts`, `legalActions` et `onlyEndTurnLeft`. **`ENGINE_VERSION` 7** |
+| Le serveur | `expireIfDue` joue la dernière place ; `clockKey` sépare le chrono du choix de celui du tour, lu **avant** l'action humaine |
+| Le Breaker ramasse d'abord | Fait, fil principal : `pickupFirst` (Breaker 1), `yieldToKeener` Breaker 0, `ballFirst` et `PICKUP_FIRST` dans `ai/chooseAction.ts`, les plans « dash, marcher, ramasser » et « attraper, marcher, ramasser » |
+| L'écran | `client/src/match/PlacePrompt.tsx`, **sous-agent Sonnet effort moyen** ; `Match.tsx` et le fil, fil principal |
+| Tests | `ai/sixthPass.test.ts`, 8 tests, **sous-agent Sonnet effort moyen**, qui a trouvé que la prise du Spark sous les pieds perdait contre un ramassage ordinaire (défaut antérieur à 2H.12, corrigé) ; `engine/placement.test.ts`, 11 tests, **sous-agent Sonnet effort élevé**, qui a trouvé que le tour suivant une place 1 gardait l'échéance du choix (corrigé). `session.test.ts`, `replay.test.ts`, `ai.test.ts` et `fifthPass.test.ts` ajustés par le fil principal |
+| Vérification | `npm test` **549 tests sur 25 fichiers contre 530**, typecheck racine, scripts et e2e verts, client typecheck et build verts, le test des cinquante millisecondes passe. Dix-huit matchs d'auto-jeu, pas un sweep : 2,7 / 2,0 / 3,3 buts de ballon par match, 1,3 à 1,4 s par match |
+| Harnais avant la mise en ligne | Smoke vert en 31 s et playthrough vert en 25 s, `ENGINE_VERSION` épinglée à 6 le temps du run puis remise à 7 : pas de popup, les fonctions en ligne étant du moteur 6 |
+| Commit | `bf00089` |
+
+**La mise en ligne, le 2026-10-12 dans le même chat**, sur le feu vert de Jérôme (question fermée,
+« Oui, redéploie ») :
+
+| Quoi | État |
+|---|---|
+| Redéploiement | `resolve-action` v18 et `create-match` v16, **moteur 7**, les matchs ouverts du moteur 6 archivés, aucune migration |
+| Smoke | Vert en 28 s au second essai ; le premier a expiré à la connexion dans `global-setup.ts`, juste après le déploiement. **La popup est vue au harnais**, capture `04-place-prompt-round-1.png` lue : « When does Giff play? », trois boutons 1st, 2nd, 3rd (default), « Close, play last », 120 s, la barre d'actions éteinte derrière ; le joueur passe en tête de ses Strikers dans la chaîne le temps du choix |
+| Playthrough | Vert en 26 s, 17 requêtes humaines, 0 refusée, 60 à 30 ; la popup répondue à l'écran à chaque round, places 1, 3, 2, 1, 2, 3 |
+| Consigné par `dump-match.ts` | 445 décisions rejouées, 0 écart d'événement ; une ligne DIFFERS, la relance du gardien B au round 9 interceptée : le receveur d'une passe volée n'est pas écrit dans les événements et le dump retient la première passe qui produit les mêmes jets. Artefact connu du dump, pas une différence d'IA. Dossier non gardé |
+
+**Un constat du fil principal, sans décision** : **le Trajector prend le ballon du coup d'envoi**
+dans douze matchs d'auto-jeu sur douze, et Thessa l'a pris dans la partie `a17c22a5`, contre C10
+Trajector 3 et C10 commune 6. Cause lue dans le code : le plan « marcher, ramasser, passer » de
+2H.10 se note sur `grabPayload` sans le facteur `chaseKickoff`, qui ne pèse que dans
+`positionValue`. Antérieur à 2H.12, non corrigé : à Jérôme de dire.
+
+**Ce qui attend Jérôme** : sa partie sur 2H.12 consignée par `dump-match.ts`, le constat du coup
+d'envoi, et un sweep seulement s'il le demande.

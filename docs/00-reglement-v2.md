@@ -1235,7 +1235,7 @@ sont dans les fiches tels quels ; ce qui suit dit ce que chaque point a changé 
 - **Vitesse.** Un match d'auto-jeu dure environ 1,5 s contre 1,2 s, donc un sweep environ
   quatorze minutes ; le test des cinquante millisecondes passe.
 
-## C14. Décisions du 2026-10-12 à la fin du chat de mise en ligne de 2H.11, **sous-phase 2H.12, dans le code depuis le 2026-10-12 (moteur 7)**
+## C14. Décisions du 2026-10-12 à la fin du chat de mise en ligne de 2H.11, **sous-phase 2H.12, dans le code et en ligne depuis le 2026-10-12 (moteur 7, `resolve-action` v18, `create-match` v16)**
 
 > Écrites par le fil principal (Opus 5.5) sur les deux règles dictées par Jérôme le 2026-10-12,
 > reformulées par le fil principal du chat précédent, principe validé par Jérôme et deux questions
@@ -1338,4 +1338,6 @@ Sonnet nommés ci-dessous, pour relire le code contre les mots.
 - **Mesuré** : 549 tests sur 25 fichiers contre 530, typecheck et build du client verts, le test
   des cinquante millisecondes passe. Dix-huit matchs d'auto-jeu, six graines par Tier, pour voir
   que le sport se joue encore, pas un sweep : 2,7 / 2,0 / 3,3 buts de ballon par match (rookie,
-  veteran, star), 57 ramassages de Breaker sur les dix-huit, 1,3 à 1,4 s par match.
+  veteran, star), 57 ramassages de Breaker sur les dix-huit, 1,3 à 1,4 s par match. Smoke et
+  playthrough verts sur les fonctions redéployées du moteur 7, **la popup vue au harnais**, capture
+  lue, journal en `07` §10.
