@@ -5,7 +5,10 @@
  * the two things agility buys: the throw, and the Spark drifting through the
  * middle third from round six. It is the only role that will cross the whole
  * pitch to be near the Spark, and since lot 3 slowed the thing down to six cells a
- * round, that trip actually arrives.
+ * round, that trip actually arrives. Since 2H.11 (`00` C13) it dashes towards
+ * the other side's carrier when a move falls short (`approachDash`), swings at
+ * a bystander only for want of anything better while its side has the ball
+ * (`idleSwing`), and all but never bats a Cracker (`batCracker`).
  *
  * It is also the easiest role to kill, hence the readiest Dodge.
  */
@@ -21,8 +24,8 @@ export const TRAJECTOR: RoleWeights = {
 
   attack: 8,
   shove: 25,
-  stripCarrier: 70,
-  batCracker: 14,
+  stripCarrier: 150,
+  batCracker: 5,
 
   catchSpark: 300,
   chaseSpark: 75,
@@ -40,7 +43,6 @@ export const TRAJECTOR: RoleWeights = {
   yieldToKeener: 0,
   handOff: 0,
   rejoin: 30,
-  screen: 0,
   leash: 99,
   looseBallReach: 99,
   brace: 0,
@@ -50,14 +52,15 @@ export const TRAJECTOR: RoleWeights = {
 
   // 2H.8, Jérôme's second pass.
   chaseKickoff: 0,
-  prey: { striker: 1, breaker: 1, trajector: 1, bulwark: 1 },
+  preyByHp: 0,
   hunt: 0,
   relaunch: 0,
 
-  // 2H.10, Jérôme's fourth pass.
-  pressDash: 0,
+  // 2H.10, Jérôme's fourth pass; 2H.11, his fifth.
+  approachDash: 1,
   shoveBystander: 0,
   receiver: 1,
+  idleSwing: 0.2,
   chainException: 0,
 
   avoidOpportunity: 50,

@@ -754,6 +754,8 @@ function applyCatchSpark(ctx: TurnCtx): ReduceResult {
   if (state.spark.x !== unit.x || state.spark.y !== unit.y) {
     return { ok: false, reason: 'the Spark is not in this cell' };
   }
+  // Écart 57 (2H.11): a carrier's hands are full.
+  if (unit.holdingPayload) return { ok: false, reason: `${unit.name} is holding the Payload` };
 
   const agility = statsFor(unit.role, unit.tier).agility;
   const outcome = rollAgainst(ctx.rng, agility, SPARK_CATCH_DC);

@@ -30,6 +30,19 @@
  * hit points. The ball is picked up and thrown in the one plan. A carrier
  * ends its turn where the fewest opponents can come and shove it.
  *
+ * **The fifth pass** (2H.11, `00` C13, Jérôme's reading of the engine 6 game
+ * round by round). Only the Spark hunter walks onto the Spark; the three field
+ * roles dash towards the other side's carrier for the ground it closes, and
+ * the wall and the approach are priced the same before and after the walk;
+ * after a Dash the walk goes to the end of what the Dash bought; Disengage is
+ * open to anybody pressed; a receiver still to play may be a whole move
+ * behind; the cell the ball lies in is a carrier's end of turn once the
+ * Action is spent; a carrier never walks backwards unless nothing ahead is
+ * safer; a shot is relieved like a pass and a pass never outprices the clean
+ * shot a Striker has itself; a pass is priced on the receiver's exposure; an
+ * opportunity attack costs five points at the least; the last round reads
+ * the score.
+ *
  * One call still returns **one** action: the first step of the best plan. The
  * caller loops until it gets `endTurn` back, exactly as an interface loops on
  * clicks, and the plan is rebuilt from scratch after every step, because the
@@ -53,6 +66,7 @@ import {
   CRACKER_SAVE_DC,
   MOVE_SPEED_FEET,
   PAYLOAD_PASS_AC,
+  PAYLOAD_RANGE_CELLS,
 } from '../engine/constants.js';
 import { sparkIsLive } from '../engine/types.js';
 import { recoilDestination } from '../engine/rules/combat.js';
@@ -85,8 +99,11 @@ import {
   nextToPlay,
   ORDER_PULL,
   positionValue,
+  preyOf,
+  receiverExposure,
   shotQuality,
   unitOf,
+  visibleRange,
   type Board,
 } from './evaluate.js';
 import { findOrder, ordersFor, type AllyOrder } from './orders.js';
@@ -106,6 +123,11 @@ export interface Plan {
   readonly steps: readonly Action[];
   readonly score: number;
   readonly why: string;
+  /**
+   * The opportunity attacks its routes provoke (2H.11, `00` C13 point 15):
+   * on a tie, the plan that provokes fewer wins.
+   */
+  readonly provocations?: number;
 }
 
 /**
@@ -199,16 +221,87 @@ class Planner {
   /**
    * What a throw relieves this carrier of (2H.10): the exposure priced into
    * the cell it stands on is a carrier's, and once the ball has left its hands
-   * it is nobody's. Zero when the unit does not carry.
+   * it is nobody's. Zero when the unit does not carry. The shot is relieved
+   * exactly as the pass (2H.11, point 13).
    */
   private readonly relief: number;
+  /** The exposure of the cell the unit stands on, for the carrier's rules below. */
+  private readonly exposureHere: number;
+  /**
+   * The best shot this unit would have from any cell of its plain move, and
+   * the best clean one (2H.11, point 13): a pass is priced against the shot
+   * the thrower has itself after its walk, never against the cell it throws
+   * from, and a Striker's pass never outprices its own clean shot.
+   */
+  private readonly ownShot: number;
+  private readonly ownCleanShot: number;
+  /**
+   * Whether this unit has dashed this turn (2H.11, point 7): the Action is
+   * gone and the movement left is more than a plain move. The walk then goes
+   * to the end of what the Dash bought, priced by the same floors as the Dash.
+   */
+  private readonly dashed: boolean;
+  /** The other side's carrier, when this role dashes or walks towards it. */
+  private readonly foe: Unit | null;
+  /** Where our own carrier will be, when this role walls for it. */
+  private readonly wardAt: Point | null;
+  private readonly ward: Unit | null;
+  /** The nearest a plain move gets to the foe, and to the ward's place. */
+  private readonly foeGap: number;
+  private readonly wardGap: number;
+  /** Whether no cell ahead of a carrier is safer than where it stands (2H.11, point 12). */
+  private noSaferAhead: boolean | null = null;
 
   constructor(private readonly board: Board) {
     const { unit, state, arena, legal, weights: w } = board;
     this.here = { x: unit.x, y: unit.y };
     this.reach = safeReachableCells(arena, state, unit, state.turn!.movementFeetRemaining);
     this.pvHere = this.pv(this.here);
-    this.relief = unit.holdingPayload ? w.carrierSafety * carrierExposure(board, this.here) : 0;
+    this.exposureHere = unit.holdingPayload ? carrierExposure(board, this.here) : 0;
+    this.relief = unit.holdingPayload ? w.carrierSafety * this.exposureHere : 0;
+    this.dashed = !legal.canDash && state.turn!.movementFeetRemaining > MOVE_SPEED_FEET;
+
+    let own = 0;
+    let clean = 0;
+    const cleanAt = (cell: Point): boolean => {
+      const seen = visibleRange(arena, cell, board.targetFurnace);
+      return seen !== null && seen <= PAYLOAD_RANGE_CELLS;
+    };
+    for (const cell of [this.here, ...[...this.reach.values()].map((r) => r.cell)]) {
+      const q = shotQuality(board, unit, cell);
+      own = Math.max(own, q);
+      if (cleanAt(cell)) clean = Math.max(clean, q);
+    }
+    this.ownShot = own;
+    this.ownCleanShot = clean;
+
+    // The approach and the wall (2H.11, point 4; C10 Breaker 6). Read once:
+    // the gap a plain move leaves, or the gap from here after a Dash.
+    const carrier = board.carrier;
+    const free = carrier !== null && !unit.holdingPayload && !board.hunter;
+    // A hunter role (the Breaker) swings at an opponent it can reach before it
+    // runs at the carrier (C10 Breaker 4, C13 point 20): no approach while a
+    // prey is within a move's swing.
+    const preyNear =
+      w.hunt > 0 &&
+      board.enemies.some((e) => distance(e, unit) <= 1 || [...this.reach.values()].some((r) => distance(e, r.cell) <= 1));
+    this.foe =
+      free && carrier.team !== unit.team && w.approachDash > 0 && w.pressCarrier > 0 && !board.whistle && !preyNear
+        ? carrier
+        : null;
+    this.ward =
+      free && carrier.team === unit.team && carrier.id !== unit.id && w.block > 0 && weightsFor(carrier.role).wantsEscort > 0
+        ? carrier
+        : null;
+    this.wardAt = this.ward ? board.wardLine[board.wardLine.length - 1]! : null;
+    const nearest = (target: Point): number => {
+      let best = distance(unit, target);
+      if (this.dashed) return best;
+      for (const { cell } of this.reach.values()) best = Math.min(best, distance(cell, target));
+      return best;
+    };
+    this.foeGap = this.foe ? nearest(this.foe) : Infinity;
+    this.wardGap = this.wardAt ? nearest(this.wardAt) : Infinity;
 
     // A target is legitimate for every role when it carries the ball; for the
     // Breaker, which hunts, whoever is in reach and any Cracker (C10 commune
@@ -233,6 +326,7 @@ class Planner {
     if (hasAction) {
       for (const priced of this.actionsAt(this.here, legal, null, state)) {
         if (isThrow(priced.action)) {
+          // A throw, shot or pass, is a relief (2H.11, point 13).
           out.push({ steps: [priced.action], score: priced.value + this.relief, why: priced.why });
           continue;
         }
@@ -247,8 +341,10 @@ class Planner {
     }
 
     // The pickup is free and the plan is rebuilt once the ball is in hand.
-    if (legal.canGrabPayload) {
-      const share = keenerMateNear(this.board) ? 1 - w.yieldToKeener : 1;
+    // Left to a keener team-mate who has not played, it is not picked up at
+    // all, nor picked up and thrown (C12 commune 6).
+    const share = keenerMateNear(this.board) ? 1 - w.yieldToKeener : 1;
+    if (legal.canGrabPayload && share > 0) {
       out.push({
         steps: [{ kind: 'grabPayload' }],
         score: w.grabPayload * share,
@@ -272,26 +368,38 @@ class Planner {
     for (const reachable of this.reach.values()) {
       const cell = reachable.cell;
       const onBall = loose && cell.x === state.payload.x && cell.y === state.payload.y;
-      const onSpark = sparkIsLive(state.spark) && cell.x === state.spark.x && cell.y === state.spark.y;
+      // Only the Spark hunter walks onto the Spark (2H.11, point 1): for
+      // every other role the catch is a thing that happens where it stands.
+      const onSpark =
+        w.chaseSpark > 0 && sparkIsLive(state.spark) && cell.x === state.spark.x && cell.y === state.spark.y;
+      // A carrier never walks backwards unless nothing ahead is safer (2H.11, point 12).
+      if (!this.carrierMayEnd(cell)) continue;
       // A cell worth less than this one, with nothing to do from it, is no
       // plan at all: the route is not even drawn.
       const ground = this.pv(cell) - this.pvHere;
       const acts = hasAction && (unit.holdingPayload || onBall || onSpark || this.somethingBeside(cell));
-      if (ground <= 0 && !canBrace && !acts) continue;
+      // After a Dash the walk is priced by the Dash's own floors (2H.11, point 7).
+      const chased = this.dashed ? this.chaseFloor(cell, reachable.provocations, 0) : null;
+      if (ground <= 0 && !canBrace && !acts && !chased && !(onBall && hasAction)) continue;
       const route = safePathTo(state, unit, this.reach, cell);
       if (!route) continue;
       const walked = route.length;
       const exposed = reachable.provocations === 0 ? 0 : this.exposure(unit, route);
-      const gain = ground - exposed - (unit.braced ? w.brace : 0);
+      let gain = ground - exposed - (unit.braced ? w.brace : 0);
+      let why = `walk to ${to(cell)}`;
+      if (chased && chased.gain - exposed > gain) {
+        gain = chased.gain - exposed;
+        why = chased.why;
+      }
       const move: Action = { kind: 'move', path: route };
-      const to = `(${cell.x}, ${cell.y})`;
+      const provocations = reachable.provocations;
 
-      if (gain > 0) out.push({ steps: [move], score: gain, why: `walk to ${to}` });
+      if (gain > 0) out.push({ steps: [move], score: gain, why, provocations });
       if (!hasAction) continue;
 
       // Go home, then dig in (2H.9): the keeper's plan has two steps now.
       if (canBrace) {
-        out.push({ steps: [move, { kind: 'brace' }], score: gain + w.brace, why: `walk to ${to}, then dig in` });
+        out.push({ steps: [move, { kind: 'brace' }], score: gain + w.brace, why: `walk to ${to(cell)}, then dig in`, provocations });
       }
 
       // Nothing to swing at from a cell with nobody beside it, and nothing to
@@ -300,14 +408,21 @@ class Planner {
 
       // Walk onto the loose ball, pick it up, throw it (2H.10): the pickup is
       // free, so the Action is still there for the throw, which is the one
-      // thing that gets a ball out of a scrum within the round.
-      if (onBall) {
-        const share = keenerMateNear(this.board) ? 1 - w.yieldToKeener : 1;
+      // thing that gets a ball out of a scrum within the round. With the
+      // Action in hand the pickup keeps its weight (2H.11, point 10): the
+      // plan that walks onto the ball and takes it is priced on the pickup,
+      // the carrier's turn being rebuilt once the ball is in hand.
+      if (onBall && share > 0) {
+        const taken = positionValue(this.board, cell, true) - this.pvHere - exposed - (unit.braced ? w.brace : 0);
+        if (taken > 0) {
+          out.push({ steps: [move, { kind: 'grabPayload' }], score: taken, why: `walk to ${to(cell)} and pick the Payload up`, provocations });
+        }
         for (const priced of this.throwsAfterPickup(cell)) {
           out.push({
             steps: [move, { kind: 'grabPayload' }, priced.action],
             score: w.grabPayload * share + priced.value - exposed - walked * WALK_BEFORE_THROW,
-            why: `walk to ${to}, pick the Payload up, then ${priced.why}`,
+            why: `walk to ${to(cell)}, pick the Payload up, then ${priced.why}`,
+            provocations,
           });
         }
       }
@@ -327,7 +442,8 @@ class Planner {
           out.push({
             steps: [move, priced.action],
             score: priced.value + this.relief - exposed - walked * WALK_BEFORE_THROW,
-            why: `walk to ${to}, then ${priced.why}`,
+            why: `walk to ${to(cell)}, then ${priced.why}`,
+            provocations,
           });
           continue;
         }
@@ -337,8 +453,9 @@ class Planner {
           this.withRetreat(
             [move, priced.action],
             moved - exposed + priced.value,
-            `walk to ${to}, then ${priced.why}`,
+            `walk to ${to(cell)}, then ${priced.why}`,
             retreat,
+            provocations,
           ),
         );
       }
@@ -362,32 +479,125 @@ class Planner {
           ),
         );
       }
+      // The possession (2H.11, point 17): on the last round with the score
+      // in hand, the carrier may Dodge to keep the ball, worth half of what
+      // it is exposed to where it stands, the walk away counted on top.
+      if (this.board.possession && unit.holdingPayload) {
+        const retreat = this.retreatFrom(this.here, state.turn!.movementFeetRemaining, unit.braced);
+        out.push(
+          this.withRetreat(
+            [{ kind: 'dodge' }],
+            w.carrierSafety * this.exposureHere * DODGE_RELIEF,
+            'dodge to keep the ball to the whistle',
+            retreat,
+          ),
+        );
+      }
     }
 
-    // Pressed, carrying, and with ground to gain if the swings could be bought
-    // off. That is the whole case for Disengage, and it has to be read against
-    // the unpenalised ground or the action never fires when it is most needed.
-    if (hasAction && legal.canDisengage && unit.holdingPayload && legal.shove.length > 0) {
+    // Pressed, with ground to gain if the swings could be bought off. That is
+    // the whole case for Disengage, open to any role since 2H.11 (point 8):
+    // "disengage, then walk" exists as soon as the unit starts its turn
+    // beside an opponent and the cell it wants cannot be reached by a route
+    // that provokes nobody. It has to be read against the unpenalised ground
+    // or the action never fires when it is most needed.
+    if (hasAction && legal.canDisengage && legal.shove.length > 0 && !this.board.hunter) {
       let best: SafeReachable | null = null;
       let bestClean = 0;
+      let bestSafe = 0;
       for (const reachable of this.reach.values()) {
+        if (!this.carrierMayEnd(reachable.cell)) continue;
         const clean = this.pv(reachable.cell) - this.pvHere;
+        if (reachable.provocations === 0) {
+          bestSafe = Math.max(bestSafe, clean);
+          continue;
+        }
         if (clean > bestClean) {
           bestClean = clean;
           best = reachable;
         }
       }
-      const route = best ? safePathTo(state, unit, this.reach, best.cell) : null;
+      const route = best && bestClean > bestSafe ? safePathTo(state, unit, this.reach, best.cell) : null;
       if (best && route) {
         out.push({
           steps: [{ kind: 'disengage' }, { kind: 'move', path: route }],
           score: w.disengage * Math.min(1, bestClean / 12) + bestClean,
-          why: `walk the ball out clean past ${legal.shove.length} to (${best.cell.x}, ${best.cell.y})`,
+          why: `${unit.holdingPayload ? 'walk the ball out' : 'walk out'} clean past ${legal.shove.length} to (${best.cell.x}, ${best.cell.y})`,
         });
       }
     }
 
     return out;
+  }
+
+  // -- The carrier's rules ------------------------------------------------------
+
+  /**
+   * Whether a carrier may end its turn on a cell (2H.11, `00` C13 point 12):
+   * never further from the mouth it attacks than where it stands, unless no
+   * cell ahead, this one included, is less exposed than where it stands. The
+   * keeper relaunching is exempt: it steps out for a line and walks home.
+   * Everybody else may go anywhere.
+   */
+  private carrierMayEnd(cell: Point): boolean {
+    const { unit, weights: w } = this.board;
+    if (!unit.holdingPayload || w.relaunch > 0) return true;
+    const target = this.board.targetFurnace;
+    if (rangeToFurnace(cell, target) <= rangeToFurnace(this.here, target)) return true;
+    // Nothing threatens where it stands: nothing behind can be safer.
+    if (this.exposureHere === 0) return false;
+    if (this.noSaferAhead === null) {
+      let safer = false;
+      const hereRange = rangeToFurnace(this.here, target);
+      for (const { cell: c } of this.reach.values()) {
+        if (rangeToFurnace(c, target) > hereRange) continue;
+        if (carrierExposure(this.board, c) < this.exposureHere) {
+          safer = true;
+          break;
+        }
+      }
+      this.noSaferAhead = !safer;
+    }
+    return this.noSaferAhead;
+  }
+
+  /**
+   * The floors a cell is worth for closing on the other side's carrier
+   * (2H.11, point 4) or on our own (C10 Breaker 6), before the route's
+   * swings. Read by the Dash, and by the walk after a Dash (point 7), with
+   * the same formula, so a plan holds from one step to the next (point 6).
+   * Null when the cell closes nothing.
+   */
+  private chaseFloor(cell: Point, provocations: number, exposed: number): { gain: number; why: string; press: boolean; closer: boolean } | null {
+    const { weights: w } = this.board;
+    // A unit told where to stand is not running after anybody.
+    if (findOrder(this.board.orders, 'holdZone')) return null;
+    const cells = MOVE_SPEED_FEET / 5;
+    let best: { gain: number; why: string; press: boolean; closer: boolean } | null = null;
+
+    if (this.foe && this.foeGap > 1) {
+      const gap = distance(cell, this.foe);
+      if (gap < this.foeGap) {
+        // Adjacent by a route that provokes nobody is the press itself (C10
+        // Striker 6, 2H.10); otherwise the share of a move's length closed.
+        const press = gap <= 1 && provocations === 0;
+        const closed = Math.min(1, (this.foeGap - gap) / cells);
+        const gain = (press ? w.pressCarrier : w.pressCarrier * closed) - exposed;
+        best = { gain, why: press ? `get on ${this.foe.name}` : `close on ${this.foe.name}`, press, closer: false };
+      }
+    }
+    if (this.ward && this.wardAt && this.wardGap > 2) {
+      const gap = distance(cell, this.wardAt);
+      if (gap < this.wardGap) {
+        // Beside the carrier, or a move's worth of the gap closed, is worth
+        // the whole place: far from its carrier the Breaker runs.
+        const closed = Math.min(1, (this.wardGap - gap) / cells);
+        const gain = (gap <= 2 ? w.block : w.block * closed) - exposed;
+        if (!best || gain > best.gain) best = { gain, why: `get beside ${this.ward.name}`, press: false, closer: true };
+        else best = { ...best, closer: true };
+      }
+    }
+    return best;
   }
 
   // -- Cells ------------------------------------------------------------------
@@ -441,7 +651,10 @@ class Planner {
       const might = statsFor(swinger.role, swinger.tier).might;
       share += (chance(might, ac) * ((BAT_DAMAGE_DIE + 1) / 2 + might)) / Math.max(1, mover.hp);
     }
-    return share * this.board.weights.avoidOpportunity + (share >= 1 ? LETHAL_ROUTE : 0);
+    // Five points a swing at the least (2H.11, point 15): a Trajector's bat
+    // on a Breaker read 1.4 points and the Breaker walked through it.
+    const priced = Math.max(share * this.board.weights.avoidOpportunity, provoked.length * OPPORTUNITY_FLOOR);
+    return priced + (share >= 1 ? LETHAL_ROUTE : 0);
   }
 
   /**
@@ -460,6 +673,7 @@ class Planner {
     // best found, no route can bring it back over, since a route only costs.
     const cells: { reachable: SafeReachable; clean: number }[] = [];
     for (const reachable of reach.values()) {
+      if (!this.carrierMayEnd(reachable.cell)) continue;
       const clean = this.pv(reachable.cell) - base;
       if (clean > 0) cells.push({ reachable, clean });
     }
@@ -475,67 +689,50 @@ class Planner {
     return best;
   }
 
-  private withRetreat(steps: Action[], score: number, why: string, retreat: Retreat | null): Plan {
-    if (!retreat) return { steps, score, why };
+  private withRetreat(steps: Action[], score: number, why: string, retreat: Retreat | null, provocations = 0): Plan {
+    if (!retreat) return { steps, score, why, provocations };
     const end = retreat.path[retreat.path.length - 1]!;
     return {
       steps: [...steps, { kind: 'move', path: retreat.path }],
       score: score + retreat.gain,
       why: `${why}, then walk to (${end.x}, ${end.y})`,
+      provocations,
     };
   }
 
   // -- The Dash ---------------------------------------------------------------
 
   /**
-   * Dash (2H.8, Jérôme's second pass; 2H.9, his third; 2H.10, his fourth).
-   * One reason never to, and the price otherwise.
+   * Dash (2H.8, Jérôme's second pass; 2H.9, his third; 2H.10, his fourth;
+   * 2H.11, his fifth). One reason never to, and the price otherwise.
    *
    * Never: a legitimate target in reach. "Une cible à portée se frappe ou se
    * bouscule, jamais un déplacement de trois cases à la place": with the
    * carrier beside, or anybody beside a Breaker, the Dash is not, except to
-   * **press** or to **wall**. The hunter is exempt, since it swings at nobody.
+   * **close on the other side's carrier** or to **wall** for our own. The
+   * hunter is exempt, since it swings at nobody.
    *
    * The price: the ground it buys, which is the end cell read with the Action
    * spent, less what the route is swung at for. Compared with every plan that
    * does use the Action, and with the plain walk, which it only beats when the
    * extra cells are worth something: a Dash to nowhere is not offered.
    *
-   * The press (the Striker's alone, `pressDash`): the other side's carrier is
-   * out of reach of a plain move but a Dash gets this unit adjacent to it,
-   * **by a route that crosses no opponent's reach**. Worth at least the press
-   * itself, so a Striker twelve cells from the carrier dashes to finish on it
-   * and holds the opportunity attack when it leaves. Never beyond the leash.
-   * The wall: our own carrier is more than a move away from a Breaker. Worth
-   * at least `block` when the Dash gets it beside the carrier, and the share
-   * of the gap it closes otherwise, so it runs towards the carrier rather than
-   * hit a straggler (C10 Breaker 6).
+   * The approach (2H.11, `00` C13 point 4, replacing C12 Trajector 3 and
+   * Breaker 3): for the three field roles (`approachDash`), a Dash towards
+   * the other side's carrier is worth `pressCarrier` times the share of a
+   * move's length it closes, the whole press when it lands adjacent **by a
+   * route that crosses no opponent's reach**, and it competes on value with
+   * the bat and the Cracker. Never beyond the leash, never on the last round
+   * when the carrier cannot be had before the whistle (point 17). The wall:
+   * our own carrier is more than a move away from a Breaker. Worth at least
+   * `block` when the Dash gets it beside the carrier, and the share of the
+   * gap it closes otherwise, so it runs towards the carrier rather than hit a
+   * straggler (C10 Breaker 6). Both floors are `chaseFloor`, read the same
+   * by the walk that follows the Dash (point 7).
    */
   private dashPlans(): Plan[] {
     const { arena, state, unit, weights: w } = this.board;
     const out: Plan[] = [];
-    const carrier = this.board.carrier;
-
-    const free = carrier !== null && !unit.holdingPayload && !this.board.hunter;
-    // The other side's carrier, when this role dashes to press it.
-    const foe = free && carrier.team !== unit.team && w.pressDash > 0 && w.pressCarrier > 0 ? carrier : null;
-    // Our own carrier, when this role walls for it and it wants a wall.
-    const ward =
-      free && carrier.team === unit.team && carrier.id !== unit.id && w.block > 0 && weightsFor(carrier.role).wantsEscort > 0
-        ? carrier
-        : null;
-    const nearest = (cells: Iterable<SafeReachable>, target: Point): number => {
-      let best = distance(unit, target);
-      for (const { cell } of cells) best = Math.min(best, distance(cell, target));
-      return best;
-    };
-    const foeGap = foe ? nearest(this.reach.values(), foe) : Infinity;
-    // The place to be is where the carrier will be: the end of its way when it
-    // has not played yet (`wardLine`), its cell otherwise.
-    const wardAt = ward ? this.board.wardLine[this.board.wardLine.length - 1]! : null;
-    const wardGap = wardAt ? nearest(this.reach.values(), wardAt) : Infinity;
-    const pressNeeded = foe !== null && foeGap > 1;
-    const wallNeeded = ward !== null && wardGap > 2;
     const relaunching = unit.holdingPayload && w.relaunch > 0;
 
     const barred = this.violence && !this.board.hunter;
@@ -545,36 +742,26 @@ class Planner {
       const cell = reachable.cell;
       const leashed = !relaunching && rangeToFurnace(cell, this.board.ownFurnace) > w.leash;
       if (leashed) continue;
-      const press = foe !== null && pressNeeded && distance(cell, foe) <= 1 && reachable.provocations === 0;
-      const closer = wardAt !== null && wallNeeded && distance(cell, wardAt) < wardGap;
-      if (barred && !press && !closer) continue;
+      if (!this.carrierMayEnd(cell)) continue;
+      const chased = this.chaseFloor(cell, reachable.provocations, 0);
+      if (barred && !chased?.closer) continue;
 
       // The route is only drawn for a cell that could be worth it: the ground
       // alone, before the swings on the way, bounds the gain from above.
       const bound = this.pv(cell) - this.pvHere - (unit.braced ? w.brace : 0);
-      if (bound <= 0 && !press && !closer) continue;
+      if (bound <= 0 && !chased) continue;
 
       const route = safePathTo(state, unit, far, cell);
       if (!route) continue;
       const exposed = reachable.provocations === 0 ? 0 : this.exposure(unit, route);
       let gain = bound - exposed;
       let why = `dash, then walk to (${cell.x}, ${cell.y})`;
-      if (press && w.pressCarrier - exposed > gain) {
-        gain = w.pressCarrier - exposed;
-        why = `dash to get on ${foe!.name}`;
-      } else if (closer) {
-        // Beside the carrier, or a move's worth of the gap closed, is worth
-        // the whole place: far from its carrier the Breaker runs (C10 Breaker 6).
-        const gap = distance(cell, wardAt!);
-        const closed = Math.min(1, (wardGap - gap) / (MOVE_SPEED_FEET / 5));
-        const floor = (gap <= 2 ? w.block : w.block * closed) - exposed;
-        if (floor > gain) {
-          gain = floor;
-          why = `dash to get beside ${ward!.name}`;
-        }
+      if (chased && chased.gain - exposed > gain) {
+        gain = chased.gain - exposed;
+        why = `dash to ${chased.why}`;
       }
       if (gain <= 0) continue;
-      out.push({ steps: [{ kind: 'dash' }, { kind: 'move', path: route }], score: gain, why });
+      out.push({ steps: [{ kind: 'dash' }, { kind: 'move', path: route }], score: gain, why, provocations: reachable.provocations });
     }
     return out;
   }
@@ -593,7 +780,9 @@ class Planner {
     const out: Priced[] = [];
     out.push(...this.throwsAt(at, options));
     if (!this.board.hunter) out.push(...this.violenceAt(at, options, from, there));
-    if (options.catchSpark) {
+    // The catch is a plan from a walked cell only for the role that hunts the
+    // Spark (2H.11, point 1); where the unit stands, anybody tries it.
+    if (options.catchSpark && (from === null || this.board.weights.chaseSpark > 0)) {
       const { unit, weights: w } = this.board;
       const odds = chance(statsFor(unit.role, unit.tier).agility, options.catchSpark.against);
       out.push({
@@ -630,7 +819,9 @@ class Planner {
     // (Jérôme, 2026-10-11): it steps out as far as a line needs, no further.
     const home = w.relaunch > 0 ? rangeToFurnace(at, this.board.ownFurnace) * RELAUNCH_STEP : 0;
 
-    if (options.shoot) {
+    // The possession (2H.11, point 17): on the last round with the score in
+    // hand, only a clean shot is taken.
+    if (options.shoot && !(this.board.possession && options.shoot.mode !== 'normal')) {
       const odds = chance(aim, options.shoot.against, options.shoot.mode);
       out.push({
         action: { kind: 'shoot' },
@@ -666,11 +857,21 @@ class Planner {
     // Pressed where the throw is made: a hand-off is a way out of it.
     const pressed = options.shove.length > 0;
     const thrower: Unit = at === this.here ? unit : unitAt(unit, at);
-    const mine = shotQuality(this.board, unit, at);
+    // The shot the thrower has itself after its walk (2H.11, point 13), not
+    // the one from the cell it throws from: read from the cell alone, a pass
+    // to a team-mate holding the same shot as the thrower read as a whole
+    // opening and outpriced the thrower's own shot three times over.
+    const mine = Math.max(shotQuality(this.board, unit, at), this.ownShot);
+    // And a role that would rather shoot than pass never prices a pass above
+    // the clean shot it has itself (point 13). Not the keeper relaunching,
+    // nor the hunter unloading, whose throw is the point.
+    const cap = !unload && w.shoot > w.pass && this.ownCleanShot > 0 ? w.shoot * this.ownCleanShot : Infinity;
 
     // The ground the ball gains is read from where the turn started (écart
     // 56), so a step forward before the throw is not counted as a longer
-    // throw, and the plan reads the same before and after the step.
+    // throw, and the plan reads the same before and after the step. Ahead
+    // and behind are read from there too (2H.11, point 11): a carrier never
+    // walks backwards to make a pass legal.
     const origin = state.turn?.startedAt ?? this.here;
 
     for (const option of options.pass) {
@@ -679,13 +880,23 @@ class Planner {
 
       const played = hasPlayedThisRound(state, mate.id);
       const risk = passInterceptors(arena, state, thrower, lineTo(at, mate)).length;
-      const ahead = rangeToFurnace(mate, this.board.targetFurnace) < rangeToFurnace(at, this.board.targetFurnace);
+      const ahead = rangeToFurnace(mate, this.board.targetFurnace) < rangeToFurnace(origin, this.board.targetFurnace);
       const exception = w.chainException > 0 && mate.role === 'striker' && ahead && risk === 0;
       if (played && !lastLink && !unload && !exception) continue;
 
+      // A receiver still to play may be a whole move behind (2H.11, point
+      // 9), whether or not it is the next to play: its own run carries the
+      // ball back past the thrower. Further than that the ball goes backwards
+      // even after the run, and a receiver that has played carries nothing.
       const gained =
         rangeToFurnace(origin, this.board.targetFurnace) - rangeToFurnace(mate, this.board.targetFurnace);
-      if (gained < 0 && !lastLink && !unload && !exception && (next?.id !== mate.id || -gained > 3)) continue;
+      if (gained < 0 && !lastLink && !unload && !exception && (played || -gained > moveCells)) continue;
+
+      // The receiver's exposure where the ball arrives (2H.11, point 14), and
+      // the possession (point 17): only to somebody less exposed than the
+      // thrower is.
+      const arrival = w.carrierSafety > 0 ? this.arrivalExposure(mate, at) : 0;
+      if (this.board.possession && arrival >= this.exposureHere) continue;
 
       // Worth the ground the ball will have gained once the receiver has moved
       // too: a receiver still to play adds its whole run. Capped so a chain of
@@ -715,32 +926,47 @@ class Planner {
       const safety = 1 / (1 + risk);
       const ordered = called?.receiverId === mate.id ? ORDER_PULL : 0;
 
-      // The last link never throws backwards on a tie (2H.10): a throw that
-      // loses ground costs a little per cell, so the ground gained decides
+      // A throw backwards costs a little per cell, for every thrower (2H.11,
+      // point 11; the last link alone since 2H.10): the ground gained decides
       // before the unit id ever does.
-      const backwards = lastLink && !unload && gained < 0 ? -gained * BACKWARD_STEP : 0;
+      const backwards = !unload && gained < 0 ? -gained * BACKWARD_STEP : 0;
 
       // `handOff` is the flat appetite of a role that should not be carrying at
       // all: for a Breaker a throw that gains nothing still beats walking.
       // `unloadBonus` is flat and outside `safety` on purpose: the keeper
       // throws into two interceptors rather than hold or dig in, and the safety
       // term still ranks the receivers, safe first, far second.
-      out.push({
-        action: { kind: 'pass', targetId: mate.id },
-        value:
-          (w.pass * odds * (progress + opening * 3) + w.handOff * odds) * safety +
+      const value = Math.min(
+        cap,
+        (w.pass * odds * (progress + opening * 3) + w.handOff * odds) * safety +
           unloadBonus * odds +
           ordered -
           risk * INTERCEPT_CAUTION -
           backwards -
           home,
-        why: `pass to ${mate.name}, ${gained} cells on${played ? (exception ? ', ahead and clear' : ', last link') : ''}, shot ${Math.round(mine * 100)} to ${Math.round(theirs * 100)}, ${risk} in the lane`,
+      );
+      out.push({
+        action: { kind: 'pass', targetId: mate.id },
+        value: value - w.carrierSafety * arrival,
+        why: `pass to ${mate.name}, ${gained} cells on${played ? (exception ? ', ahead and clear' : ', last link') : ''}, shot ${Math.round(mine * 100)} to ${Math.round(theirs * 100)}, ${risk} in the lane${arrival > 0 ? `, ${arrival.toFixed(1)} on arrival` : ''}`,
         landing: at,
       });
     }
 
     return out;
   }
+
+  /** `receiverExposure`, once per receiver and throwing cell. */
+  private arrivalExposure(mate: Unit, at: Point): number {
+    const k = `${mate.id}:${at.x},${at.y}`;
+    let v = this.arrivals.get(k);
+    if (v === undefined) {
+      v = receiverExposure(this.board, mate, at);
+      this.arrivals.set(k, v);
+    }
+    return v;
+  }
+  private readonly arrivals = new Map<string, number>();
 
   // -- Violence -----------------------------------------------------------------
 
@@ -760,6 +986,10 @@ class Planner {
     const ownCarrier = this.board.carrier && this.board.carrier.team === unit.team ? this.board.carrier : null;
     const onOurCarrier = (target: Unit): boolean =>
       ownCarrier !== null && ownCarrier.id !== unit.id && distance(target, ownCarrier) <= 1;
+    // In attack without the ball, a swing at a bystander is worth a share of
+    // itself (2H.11, point 5, `idleSwing`): a Striker or a Trajector swings
+    // only for want of anything better. Not at somebody on our carrier.
+    const idle = (target: Unit): number => (ownCarrier !== null && !onOurCarrier(target) ? w.idleSwing : 1);
 
     for (const option of options.attack) {
       if (!fresh(option)) continue;
@@ -769,13 +999,13 @@ class Planner {
       // A swing does not make anyone drop the ball: a carrier is only worth
       // the strip when the swing can evacuate it (2H.10, "contre le porteur on
       // bouscule"). Everybody else is worth what this role makes of its shirt
-      // (`prey`): the Breaker's Strikers first, Breakers, then the Trajector.
+      // (`prey`, 2H.11: the likeliest to evacuate first).
       let value =
-        w.attack * (target.holdingPayload ? 1 : w.prey[target.role]) +
+        w.attack * (target.holdingPayload ? 1 : preyOf(this.board, target)) * idle(target) +
         (target.holdingPayload ? w.stripCarrier * batEvacuates(stats.might, target.hp) : 0);
       if (onOurCarrier(target)) value += w.guardStrike;
       if (marked?.targetId === target.id) value += ORDER_PULL;
-      if (target.hp <= 4.5 + stats.might) value *= 1.4;
+      if (w.preyByHp === 0 && target.hp <= 4.5 + stats.might) value *= 1.4;
 
       out.push({
         action: { kind: 'attack', targetId: target.id },
@@ -793,7 +1023,7 @@ class Planner {
       // A successful Shove takes the ball, which is the only way to get it off
       // somebody without waiting for a pass. On anybody else it is a cell of
       // push, worth what this role makes of that (`shoveBystander`, 2H.10).
-      let value = target.holdingPayload ? w.shove + w.stripCarrier : w.shove * w.shoveBystander;
+      let value = target.holdingPayload ? w.shove + w.stripCarrier : w.shove * w.shoveBystander * idle(target);
       if (onOurCarrier(target)) value += w.guardStrike;
       if (marked?.targetId === target.id) value += ORDER_PULL * 0.5;
 
@@ -810,7 +1040,7 @@ class Planner {
       });
     }
 
-    out.push(...this.crackersAt(at, options, from, there));
+    out.push(...this.crackersAt(at, options, from, there, idle));
     return out;
   }
 
@@ -821,7 +1051,13 @@ class Planner {
    * team-mate are never offered, and a line that hits nobody is still worth a
    * little when it clears the thing away from the swinger.
    */
-  private crackersAt(at: Point, options: ActionOptions, from: Point | null, there: MatchState): Priced[] {
+  private crackersAt(
+    at: Point,
+    options: ActionOptions,
+    from: Point | null,
+    there: MatchState,
+    idle: (target: Unit) => number,
+  ): Priced[] {
     const { arena, unit, weights: w } = this.board;
     const out: Priced[] = [];
     const odds = chance(statsFor(unit.role, unit.tier).might, CRACKER_AC);
@@ -841,11 +1077,12 @@ class Planner {
 
         if (struck) {
           // A blast does not make anyone drop the ball either: the strip is
-          // worth the chance it evacuates the carrier. Strikers first, then
-          // Breakers, then the Trajector, for the Cracker as for the bat.
+          // worth the chance it evacuates the carrier. The likeliest to
+          // evacuate first, for the Cracker as for the bat (2H.11, point 21),
+          // and a share of itself in attack (point 5).
           const value =
-            (w.batCracker + (struck.holdingPayload ? w.stripCarrier * crackerEvacuates(struck) : 0)) *
-            w.prey[struck.role];
+            (w.batCracker * idle(struck) + (struck.holdingPayload ? w.stripCarrier * crackerEvacuates(struck) : 0)) *
+            preyOf(this.board, struck);
           out.push({
             action: { kind: 'batCracker', crackerId: cracker.id, direction },
             value: value * odds,
@@ -880,6 +1117,15 @@ const BACKWARD_STEP = 0.5;
 const INTERCEPT_CAUTION = 4;
 /** Added to the price of a route whose opportunity attacks are expected to take every hit point left. */
 const LETHAL_ROUTE = 100;
+/** What one opportunity attack costs at the least, whoever swings and whatever is left (2H.11, point 15). */
+const OPPORTUNITY_FLOOR = 5;
+/** The share of a carrier's exposure a Dodge buys off, for the possession of the last round (2H.11, point 17). */
+const DODGE_RELIEF = 0.5;
+
+/** A cell, in the words of a plan. */
+function to(cell: Point): string {
+  return `(${cell.x}, ${cell.y})`;
+}
 
 /** The actions that do something to the board, as opposed to the stances. */
 const SPENDS_ON_THE_BOARD: ReadonlySet<Action['kind']> = new Set([
@@ -955,13 +1201,15 @@ export function crackerEvacuates(target: Unit): number {
 
 /**
  * Best first. The AI rolls no dice, so two plans worth the same have to
- * resolve the same way every time or a match stops replaying: the shorter
- * plan first, so a Dash to nowhere never beats the plain walk; then the one
- * that acts before it walks; then the steps themselves.
+ * resolve the same way every time or a match stops replaying: the plan that
+ * provokes fewer opportunity attacks first (2H.11, point 15); then the
+ * shorter plan, so a Dash to nowhere never beats the plain walk; then the
+ * one that acts before it walks; then the steps themselves.
  */
 function rank(plans: readonly Plan[]): Plan[] {
   return [...plans].sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    if ((a.provocations ?? 0) !== (b.provocations ?? 0)) return (a.provocations ?? 0) - (b.provocations ?? 0);
     if (a.steps.length !== b.steps.length) return a.steps.length - b.steps.length;
     const aWalks = a.steps[0]?.kind === 'move' ? 1 : 0;
     const bWalks = b.steps[0]?.kind === 'move' ? 1 : 0;

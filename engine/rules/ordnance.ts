@@ -304,9 +304,18 @@ export function parryFaces(arrival: number): number[] {
  * "otherwise" is never a blast on a team-mate when a quiet line exists: when
  * no face reaches an opponent, the arrival face is kept unless it would go off
  * on one of the Breaker's own, in which case the first neighbouring face that
- * strikes nobody is taken, and failing that the arrival face after all. The
- * runs are read off the board as it stands, with the Breaker on the cell the
- * Cracker is sent from, which the run never crosses.
+ * strikes nobody is taken. The runs are read off the board as it stands, with
+ * the Breaker on the cell the Cracker is sent from, which the run never
+ * crosses.
+ *
+ * **A parry never goes off on the parrier** (2H.11, `00` C13 point 29, Jérôme
+ * after his engine 6 game). When every face of the arc strikes one of the
+ * Breaker's own, the Cracker goes down the face that strikes the sturdiest
+ * team-mate in hit points, never a face that bounces back onto the Breaker's
+ * own cell, which écart 36b produces whenever a Cracker clips a pillar by the
+ * corner and comes straight back down its diagonal. Only when every face comes
+ * back on the Breaker itself is the arrival face kept, there being nothing
+ * else to send it down.
  */
 export function parryDirection(
   arena: Arena,
@@ -328,7 +337,17 @@ export function parryDirection(
   const straight = runs[0]!;
   if (!straight.run.struck) return straight.face;
   const quiet = runs.find(({ run }) => run.struck === null);
-  return quiet ? quiet.face : straight.face;
+  if (quiet) return quiet.face;
+
+  // Every face strikes one of our own: the sturdiest team-mate, never the
+  // parrier itself (point 29). Ties fall to the arc order, arrival face first.
+  let sturdiest: { face: number; hp: number } | null = null;
+  for (const { face, run } of runs) {
+    const mate = run.struck;
+    if (!mate || mate.id === breaker.id) continue;
+    if (sturdiest === null || mate.hp > sturdiest.hp) sturdiest = { face, hp: mate.hp };
+  }
+  return sturdiest ? sturdiest.face : straight.face;
 }
 
 /** Walks a path in travel order and stops on the first player standing in it. */

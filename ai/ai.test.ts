@@ -533,10 +533,11 @@ describe('the chain', () => {
     expect(passes.map((c) => (c.action as { targetId: string }).targetId)).toContain('A-striker-3');
   });
 
-  it('throws a little backwards to the very next to play, never further back', () => {
-    // A-striker-3 is the next on the ladder after OPENER.
-    let state = put(staged(), 'A-striker-3', { x: 7, y: 20 }); // two behind
-    state = put(state, 'A-striker-4', { x: 7, y: 17 }); // five behind, and not next
+  it('throws backwards to a receiver still to play up to a move behind, never further (2H.11)', () => {
+    // Both Strikers are still to play. Five behind is inside the receiver's
+    // own move, next to play or not (C13 point 9); nine behind is not.
+    let state = put(staged(), 'A-striker-3', { x: 7, y: 17 }); // five behind, and the next to play
+    state = put(state, 'A-striker-4', { x: 7, y: 13 }); // nine behind
     const targets = rankActions(arena, state, OPENER)
       .filter((c) => c.action.kind === 'pass')
       .map((c) => (c.action as { targetId: string }).targetId);
@@ -703,8 +704,11 @@ describe('sight and cover', () => {
     ].find((c) => hasLineOfSight(arena, carrier, c));
     expect(visible).toBeDefined();
 
-    let staged = carrying(put(board(), 'A-breaker-5', carrier), 'A-breaker-5');
+    // The Trajector has played, so the relay is read against where it stands
+    // (2H.11, C13 point 3); a carrier still to play is read along its way.
+    let staged = carrying(put(board(), 'A-trajector-7', carrier), 'A-trajector-7');
     staged = giveTurnTo(put(staged, 'A-striker-2', { x: 7, y: 6 }), 'A-striker-2');
+    expect(hasPlayedThisRound(staged, 'A-trajector-7')).toBe(true);
     const view = viewOf(staged, 'A-striker-2', 'striker');
 
     expect(outlet(view, hidden)).toBe(0);
@@ -719,7 +723,7 @@ describe('sight and cover', () => {
     expect(hasLineOfSight(arena, carrier, target)).toBe(true);
     expect(lineTo(carrier, target).some((c) => distance(c, guard) <= 1)).toBe(true);
 
-    let staged = carrying(put(board(), 'A-breaker-5', carrier), 'A-breaker-5');
+    let staged = carrying(put(board(), 'A-trajector-7', carrier), 'A-trajector-7');
     staged = giveTurnTo(put(staged, 'A-striker-2', { x: 7, y: 19 }), 'A-striker-2');
 
     const clean = viewOf(staged, 'A-striker-2', 'striker');
@@ -831,16 +835,21 @@ describe("Jérôme's second pass on the roles, 2H.8", () => {
     expect(events.some((e) => e.kind === 'shoved' && e.targetId === 'B-striker-2')).toBe(true);
   });
 
-  it('the Breaker in defence, carrier out of reach, swings at the Striker before the Trajector', () => {
+  it('the Breaker in defence, carrier out of reach, swings at the opponent it is likeliest to evacuate (2H.11)', () => {
+    // C13 point 21: the prey is read on the bat's expected damage over the
+    // hit points left, not on a fixed order of roles. A fresh Trajector on
+    // twenty-five comes before a fresh Striker on thirty; a Striker on ten
+    // comes before both.
     const breaker = 'A-breaker-5';
-    let staged = put(board(), breaker, { x: 7, y: 20 });
-    staged = carrying(put(staged, 'B-striker-2', { x: 7, y: 40 }), 'B-striker-2');
-    staged = put(staged, 'B-trajector-7', { x: 6, y: 20 });
-    staged = put(staged, 'B-striker-3', { x: 8, y: 20 });
-    staged = giveTurnTo(staged, breaker);
-
-    const best = rankActions(arena, staged, breaker)[0]!;
-    expect(best.action).toEqual({ kind: 'attack', targetId: 'B-striker-3' });
+    const scene = (strikerHp: number): MatchState => {
+      let staged = put(board(), breaker, { x: 7, y: 20 });
+      staged = carrying(put(staged, 'B-striker-2', { x: 7, y: 40 }), 'B-striker-2');
+      staged = put(staged, 'B-trajector-7', { x: 6, y: 20 });
+      staged = put(staged, 'B-striker-3', { x: 8, y: 20 }, { hp: strikerHp });
+      return giveTurnTo(staged, breaker);
+    };
+    expect(rankActions(arena, scene(30), breaker)[0]!.action).toEqual({ kind: 'attack', targetId: 'B-trajector-7' });
+    expect(rankActions(arena, scene(10), breaker)[0]!.action).toEqual({ kind: 'attack', targetId: 'B-striker-3' });
   });
 
   it('the Breaker in defence walks over to a Striker it can reach rather than take a stance', () => {
@@ -933,9 +942,12 @@ describe("Jérôme's second pass on the roles, 2H.8", () => {
     expect(legalActions(arena, staged)!.attack).toHaveLength(1);
     expect(rankActions(arena, staged, breaker).some((c) => c.action.kind === 'dash')).toBe(false);
 
-    // Only a legitimate target bars the Dash: a Striker's is the carrier.
+    // Only a legitimate target bars the Dash: a Striker's is the carrier. The
+    // rest of B is parked at the A end, since the ball's cell is priced as a
+    // carrier's end of turn once the Action is spent (2H.11, C13 point 10).
     const striker = OPENER;
     let loose = put(board(), striker, { x: 7, y: 30 });
+    loose = { ...loose, units: loose.units.map((u) => (u.team === 'B' ? { ...u, x: 7, y: 2 } : u)) };
     loose = put(loose, 'B-breaker-5', { x: 7, y: 31 });
     loose = { ...loose, payload: { carriedBy: null, x: 7, y: 42 }, lastCarrierTeam: 'A' };
     loose = giveTurnTo(loose, striker);
@@ -1210,8 +1222,11 @@ describe("Jérôme's fourth pass, 2H.10", () => {
   });
 
   it('keeps the ball for a clean shot next turn rather than throw at disadvantage now', () => {
+    // Two cells of movement left: no cell in clean range is within reach,
+    // otherwise the clean shot now is taken (2H.11, C13 point 13).
     let staged = carrying(put(board(), OPENER, { x: 5, y: 32 }), OPENER);
     staged = parkB(staged);
+    staged = { ...staged, turn: { ...staged.turn!, movementFeetRemaining: 10 } };
     const legal = legalActions(arena, staged)!;
     expect(legal.shoot?.mode).toBe('disadvantage');
 
@@ -1354,9 +1369,11 @@ describe('orders bias the table', () => {
   });
 
   it('sends the ball to the team-mate that called for it', () => {
-    let staged = carrying(put(board(), OPENER, { x: 7, y: 22 }), OPENER);
-    staged = put(staged, 'A-striker-3', { x: 4, y: 22 });
-    staged = put(staged, 'A-striker-4', { x: 10, y: 22 });
+    // Deep in its own half, so that no Dash buys the carrier a shot to hold
+    // for next turn, which is worth more than any order.
+    let staged = carrying(put(board(), OPENER, { x: 7, y: 10 }), OPENER);
+    staged = put(staged, 'A-striker-3', { x: 4, y: 10 });
+    staged = put(staged, 'A-striker-4', { x: 10, y: 10 });
 
     const orders: AllyOrder[] = [
       { kind: 'callForPass', to: OPENER, receiverId: 'A-striker-3' },

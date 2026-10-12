@@ -150,6 +150,41 @@ describe('what it offers against whom', () => {
     expect(legal.shove.map((t) => t.unitId)).toEqual([enemy.id]);
   });
 
+  it('offers the Spark to a player on its cell who is not carrying the ball', () => {
+    const start = base();
+    const actor = start.units.find((u) => u.id === start.turn!.unitId)!;
+    const state: MatchState = {
+      ...start,
+      spark: { state: 'live', x: actor.x, y: actor.y, heading: 1 },
+      units: start.units.map((u) => (u.id === actor.id ? { ...u, holdingPayload: false } : u)),
+    };
+
+    const legal = legalActions(arena, state)!;
+    expect(legal.catchSpark).not.toBeNull();
+    expect(legal.simple).toContainEqual({ kind: 'catchSpark' });
+  });
+
+  it('never offers the Spark to a carrier, and the engine refuses it too (écart 57)', () => {
+    // A carrier standing on the Spark has the ball to deliver; trying for the
+    // Spark is not a move it gets, in the menu or by hand.
+    const start = base();
+    const actor = start.units.find((u) => u.id === start.turn!.unitId)!;
+    const state: MatchState = {
+      ...start,
+      spark: { state: 'live', x: actor.x, y: actor.y, heading: 1 },
+      payload: { ...start.payload, carriedBy: actor.id, x: actor.x, y: actor.y },
+      units: start.units.map((u) => (u.id === actor.id ? { ...u, holdingPayload: true } : u)),
+    };
+
+    const legal = legalActions(arena, state)!;
+    expect(legal.catchSpark).toBeNull();
+    expect(legal.simple).not.toContainEqual({ kind: 'catchSpark' });
+
+    const result = reduce(arena, state, { unitId: actor.id, action: { kind: 'catchSpark' } });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/holding the Payload/);
+  });
+
   it('offers a pass only to team-mates inside sixty feet and in sight', () => {
     const start = base();
     const actor = start.units.find((u) => u.id === start.turn!.unitId)!;

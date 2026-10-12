@@ -1408,3 +1408,29 @@ commit `0dfbaad` (`/commit`) et son feu vert :
 **Ce qui attend Jérôme** : sa partie sur le moteur 6, consignée par `dump-match.ts` ; ses retours
 en C13 avant le code ; **un sweep quand il le demandera**, contre `09` §12, en comptant onze
 minutes.
+
+### Sous-phase 2H.11, « la cinquième passe de l'IA, l'écart 57, la parade », codée le 2026-10-12, porte ouverte
+
+Par le fil principal (Fable 5.1), avec deux sous-agents Sonnet nommés ci-dessous, à partir de
+`00` C13, les vingt-neuf points dictés par Jérôme le 2026-10-12 après la lecture round par round
+de sa partie sur le moteur 6 (star, 30 à 50, match `a17c22a5`, visualiseur `viewer.html`), validés
+point par point avant la première ligne de code, plus l'écart 57 et neuf poids. **Pas de sweep**,
+à sa demande. Pas de redéploiement : il attend son feu vert.
+
+| Quoi | État |
+|---|---|
+| Écart 57, un porteur ne tente jamais le Spark | Fait, fil principal. `actionOptionsAt` dans `engine/legalActions.ts` ne propose pas la prise à une unité qui tient le ballon, `applyCatchSpark` dans `reduce.ts` la refuse. Aucune forme d'état ne change, **`ENGINE_VERSION` reste 6**. 2 tests dans `legalActions.test.ts`, **sous-agent Sonnet effort moyen** |
+| Point 29, une parade n'explose jamais sur le pareur | Fait, fil principal. `parryDirection` dans `engine/rules/ordnance.ts` : à défaut de face qui touche un adversaire ou personne, la face qui touche le coéquipier le plus solide en PV, jamais celle qui revient sur le Breaker. 2 tests dans `ordnance.test.ts`, le même sous-agent |
+| Les neuf poids | Dans les quatre fiches tels que dictés : `shove` Breaker 30, `stripCarrier` 150 partout, `screenCarrier` Breaker 80, `carrierSafety` Breaker 80, `guardStrike` 150, `batCracker` Striker 8 et Trajector 5, `wantsEscort` Breaker 0, `shoot` Striker 150 |
+| La cinquième passe de l'IA | Fait, fil principal, `ai/chooseAction.ts` et `ai/evaluate.ts`, détail point par point dans « comment la cinquième passe est codée » en `00` C13. Les fiches gagnent `approachDash` (remplace `pressDash`), `idleSwing` et `preyByHp` (remplace la table `prey`), perdent `screen` ; `parryPost` devient un interrupteur en monnaie d'allonge. Deux lectures du fil principal à relire par Jérôme : la proie par chance d'évacuer est **normalisée sur un Striker frais du Tier** pour que `attack` garde son échelle ; et l'approche en Dash reste interdite par une cible légitime à portée (C10 commune 3) et, pour le Breaker, par une proie à portée de marche (point 20) |
+| Ce que le code a corrigé en route | Un porteur sans menace nulle part pouvait reculer par la lettre du point 12 (« aucune case devant lui n'est moins exposée ») : sans exposition, pas de recul. Le calcul d'une ligne de Cracker par case candidate (point 27) coûtait trois fois le match : remplacé par un champ de distance par Cracker et par décision |
+| Tests | `ai/fifthPass.test.ts`, nouveau, **sous-agent Sonnet effort élevé**, 23 tests : un par point codé (1, 4, 5, 7, 8, 10, 12, 13, 14, 15, 16, 17 au dernier round et en mort subite, 19, 20, 22, 23, 27, 28), plus l'écart 57 côté IA. Dans `ai/ai.test.ts`, fil principal : la chaîne accepte un receveur jusqu'à huit cases derrière (point 9), les scènes de vue et de couverture lisent un Trajector porteur qui a joué (point 3), le Breaker frappe la proie la plus facile à évacuer (point 21), la scène « garde pour un tir propre » ne laisse plus de tir propre à portée de marche (point 13 : l'ancienne passait grâce à la passe gonflée que ce point corrige), deux scènes d'ordres et une de Dash repositionnées hors des nouveaux planchers |
+| Vérification | `npm test` **530 tests sur 23 fichiers contre 503**, `npm run typecheck` vert (racine, scripts, e2e), client typecheck et build verts. Dix-huit matchs d'auto-jeu joués à la main pour contrôler que le sport se joue encore, pas un sweep : 2,5 à 3,5 buts par match sur six graines par Tier, contre 1,1 à 2,2 au dernier sweep de `09` §12, à lire au sweep que Jérôme demandera. 1,5 s par match contre 1,2 s, donc un sweep environ quatorze minutes ; le test des cinquante millisecondes passe |
+| Harnais | Smoke vert en 34 s et playthrough vert en 45 s, 16 requêtes humaines, 0 refusée, un match entier jusqu'au sifflet, contre les fonctions en ligne du moteur 6 sans épingle (le siège humain est piloté par le planificateur de 2H.11 depuis Node, la maison en ligne joue encore la quatrième passe) |
+
+**Ce que ça change à l'écran** : rien. Aucun composant du client n'est touché.
+
+**Ce qui attend Jérôme** : son feu vert de redéploiement (`resolve-action` et `create-match`,
+`ENGINE_VERSION` reste 6, pas de migration), puis sa partie sur 2H.11 consignée par
+`dump-match.ts`, et **un sweep quand il le demandera**, contre `09` §12, en comptant quatorze
+minutes.

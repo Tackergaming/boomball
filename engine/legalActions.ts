@@ -172,8 +172,10 @@ export function actionOptionsAt(
         .filter((c) => c.state === 'live' && distance(at, c) === 1)
         .map((c) => ({ crackerId: c.id, against: CRACKER_AC, directions: openLines(arena, c) }));
 
+  // A carrier never tries for the Spark (écart 57, 2H.11): its hands are
+  // full. Human or AI, the door does not offer it, and `reduce` refuses it.
   const catchSpark: CatchOption | null =
-    sparkIsLive(state.spark) && state.spark.x === at.x && state.spark.y === at.y
+    !holding && sparkIsLive(state.spark) && state.spark.x === at.x && state.spark.y === at.y
       ? { against: SPARK_CATCH_DC, mode: 'normal' }
       : null;
 

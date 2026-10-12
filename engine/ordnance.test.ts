@@ -697,6 +697,43 @@ describe('the arc of the parry', () => {
     expect([4, 6]).toContain(chosen);
   });
 
+  /** Breaker at (7, 22), arrival 5: the south line comes back on the Breaker, so the choice is between the diagonals. */
+  function mateScene(southEastHp: number, southWestHp: number) {
+    const board = cleared(fresh());
+    const breaker = board.units.find((u) => u.team === 'B' && u.role === 'breaker')!;
+    const [east, west] = board.units.filter((u) => u.team === 'B' && u.id !== breaker.id);
+    let state = place(board, breaker.id, { x: 7, y: 22 });
+    state = place(state, east!.id, { x: 8, y: 21 });
+    state = place(state, west!.id, { x: 6, y: 21 });
+    state = {
+      ...state,
+      units: state.units.map((u) =>
+        u.id === east!.id ? { ...u, hp: southEastHp } : u.id === west!.id ? { ...u, hp: southWestHp } : u,
+      ),
+    };
+    return { state, breaker: state.units.find((u) => u.id === breaker.id)!, east: east!, west: west! };
+  }
+
+  it('sends a parry onto the sturdier team-mate when every face strikes the parrier or a mate (C13 point 29)', () => {
+    // The south line comes back on the Breaker; both diagonals hit a mate.
+    // The Cracker goes down the face of the mate with more hit points.
+    const { state, breaker, west } = mateScene(10, 40);
+    const chosen = parryDirection(arena, state, breaker, 5);
+    expect(chosen).toBe(6);
+    const run = battedCrackerRun(arena, state, { x: 7, y: 22 }, chosen);
+    expect(run.struck?.id).toBe(west.id);
+    expect(run.struck?.id).not.toBe(breaker.id);
+  });
+
+  it('follows the hit points, not the side: swap them and the face swaps', () => {
+    const { state, breaker, east } = mateScene(40, 10);
+    const chosen = parryDirection(arena, state, breaker, 5);
+    expect(chosen).toBe(4);
+    const run = battedCrackerRun(arena, state, { x: 7, y: 22 }, chosen);
+    expect(run.struck?.id).toBe(east.id);
+    expect(run.struck?.id).not.toBe(breaker.id);
+  });
+
   it('turns off the arrival face when it would go off on a team-mate and a quiet face exists', () => {
     const board = cleared(fresh());
     const breaker = board.units.find((u) => u.team === 'B' && u.role === 'breaker')!;

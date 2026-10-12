@@ -6,16 +6,19 @@
  * 2H.10 (Jérôme, 2026-10-11) it carries the ball without losing it: it ends
  * its turn where the fewest opponents can come and shove it
  * (`carrierSafety`), holds a clean shot for next turn rather than throw at
- * disadvantage, presses the other side's carrier only by a route that crosses
- * nobody's reach (`pressDash`), never shoves a bystander (`shoveBystander`),
- * and stays off its team-mates (`spread`), taking a place beside its own
- * carrier only when its relay does not suffer for it (`block`).
+ * disadvantage, never shoves a bystander (`shoveBystander`), and stays off
+ * its team-mates (`spread`), taking a place beside its own carrier only when
+ * its relay does not suffer for it (`block`). Since 2H.11 (`00` C13) it
+ * dashes towards the other side's carrier when a move falls short
+ * (`approachDash`), swings at a bystander only for want of anything better
+ * while its side has the ball (`idleSwing`), and all but never bats a Cracker
+ * (`batCracker`).
  */
 
 import type { RoleWeights } from './weights.js';
 
 export const STRIKER: RoleWeights = {
-  shoot: 120,
+  shoot: 150,
   pass: 45,
   grabPayload: 90,
   carryToFurnace: 70,
@@ -23,8 +26,8 @@ export const STRIKER: RoleWeights = {
 
   attack: 15,
   shove: 30,
-  stripCarrier: 80,
-  batCracker: 18,
+  stripCarrier: 150,
+  batCracker: 8,
 
   catchSpark: 300,
   chaseSpark: 0,
@@ -42,7 +45,6 @@ export const STRIKER: RoleWeights = {
   yieldToKeener: 0,
   handOff: 0,
   rejoin: 40,
-  screen: 0,
   leash: 99,
   looseBallReach: 99,
   brace: 0,
@@ -52,14 +54,15 @@ export const STRIKER: RoleWeights = {
 
   // 2H.8, Jérôme's second pass.
   chaseKickoff: 1,
-  prey: { striker: 1, breaker: 1, trajector: 1, bulwark: 1 },
+  preyByHp: 0,
   hunt: 0,
   relaunch: 0,
 
-  // 2H.10, Jérôme's fourth pass.
-  pressDash: 1,
+  // 2H.10, Jérôme's fourth pass; 2H.11, his fifth.
+  approachDash: 1,
   shoveBystander: 0,
   receiver: 1,
+  idleSwing: 0.2,
   chainException: 0,
 
   avoidOpportunity: 40,

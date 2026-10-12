@@ -21,7 +21,7 @@ export const BULWARK: RoleWeights = {
 
   attack: 30,
   shove: 40,
-  stripCarrier: 70,
+  stripCarrier: 150,
   batCracker: 20,
 
   catchSpark: 300,
@@ -40,7 +40,6 @@ export const BULWARK: RoleWeights = {
   yieldToKeener: 0,
   handOff: 0,
   rejoin: 0,
-  screen: 0,
   leash: 4,
   looseBallReach: 3,
   brace: 40,
@@ -50,14 +49,15 @@ export const BULWARK: RoleWeights = {
 
   // 2H.8, Jérôme's second pass.
   chaseKickoff: 1,
-  prey: { striker: 1, breaker: 1, trajector: 1, bulwark: 1 },
+  preyByHp: 0,
   hunt: 0,
   relaunch: 150,
 
-  // 2H.10, Jérôme's fourth pass.
-  pressDash: 0,
+  // 2H.10, Jérôme's fourth pass; 2H.11, his fifth.
+  approachDash: 0,
   shoveBystander: 1,
   receiver: 0.4,
+  idleSwing: 1,
   chainException: 0,
 
   avoidOpportunity: 30,

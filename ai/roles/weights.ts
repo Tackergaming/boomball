@@ -83,7 +83,12 @@ export interface RoleWeights {
   // -- Position -------------------------------------------------------------
   /** Staying between the opposition and the Furnace this team defends. */
   readonly guardFurnace: number;
-  /** Staying near a team-mate who is carrying. */
+  /**
+   * Staying near a team-mate who is carrying: a gradient towards where the
+   * carrier will be (`wardLine`), read on top of the place beside it
+   * (`block`). Eighty for the Breaker since 2H.11 (Jérôme's weights of
+   * 2026-10-12), so that it crosses the pitch to its carrier before anything.
+   */
   readonly screenCarrier: number;
   /**
    * Being inside shooting range while a team-mate carries. This is what puts a
@@ -112,9 +117,11 @@ export interface RoleWeights {
    * the carrier moves, and **every team-mate standing in one takes that place
    * away**. Two beside the carrier, six places instead of eight. That is the
    * whole worth of being adjacent; the side and the straight line to the
-   * threat count for nothing. Read when an opponent can reach the carrier at
-   * all (a Dash away). Highest for the Breaker, whose first job in attack this
-   * is, before a Cracker and before any straggler; small for a Striker, which
+   * threat count for nothing. Worth the same whether or not an opponent can
+   * reach the carrier (2H.11, `00` C13 point 19: the protection comes before
+   * the Cracker, threatened or not; the 0.3 factor of 2H.10 is gone). Highest
+   * for the Breaker, whose first job in attack this is, before a Cracker and
+   * before any straggler; small for a Striker, which
    * only takes a place when its relay (`supportAttack`, `cover`) does not
    * suffer for it. Also the price of a Dash when the carrier is too far to
    * reach this turn: a Breaker far from its carrier runs rather than swing at
@@ -140,11 +147,13 @@ export interface RoleWeights {
    */
   readonly carrierSafety: number;
   /**
-   * Whether this role, when it carries, is worth escorting: one for a field
-   * player, zero for the goalkeeper. A keeper handed a fresh ball after a goal
-   * needs outlets up the pitch, not two Breakers on its shoulders in the mouth;
-   * that was the A31 huddle, and this is what keeps the bodyguard out of it.
-   * Read off the **carrier's** table by `escort`.
+   * Whether this role, when it carries, is worth escorting: one for a Striker
+   * and the Trajector, zero for the goalkeeper and, since 2H.11 (Jérôme's
+   * weights of 2026-10-12), for the Breaker, which hands the ball off rather
+   * than keep it. A keeper handed a fresh ball after a goal needs outlets up
+   * the pitch, not two Breakers on its shoulders in the mouth; that was the
+   * A31 huddle, and this is what keeps the bodyguard out of it. Read off the
+   * **carrier's** table by `block`.
    */
   readonly wantsEscort: number;
   /**
@@ -155,9 +164,13 @@ export interface RoleWeights {
   /**
    * Standing on the line a Cracker will roll down towards the ball at the next
    * count 20, so that it arrives on this unit and the parry (écart 47) fires.
-   * The one positive reading of `crackerPressure`, and the Breaker's weapon:
-   * Jérôme chose to have it go and post there on purpose, 3d6 on a miss being
-   * the price of the role. Zero for every other role, which run from the line.
+   * The one positive reading of `crackerPressure`, and the Breaker's weapon.
+   * Since 2H.11 (`00` C13 point 23) the post is worth **the damage it
+   * spares**, in the currency of the opportunity attack: the Cracker's
+   * expected blast over the hit points of the team-mate it would otherwise go
+   * off on, times `avoidOpportunity`, and nothing when the line ends on an
+   * opponent, on nobody, or on the loose ball. This is the switch: one for the
+   * Breaker, zero for every other role, which run from the line.
    */
   readonly parryPost: number;
   /**
@@ -181,15 +194,6 @@ export interface RoleWeights {
    * the roles that do not run ahead.
    */
   readonly rejoin: number;
-  /**
-   * Standing between an opponent and a team-mate who handles the ball, when
-   * the other side has it: the bodyguard's defensive stance, Jérôme's words,
-   * "so that no opponent can finish adjacent to a Striker". First priority of
-   * the Breaker's position in defence, the Cracker line second. Zero for
-   * every other role.
-   */
-  readonly screen: number;
-
   // -- Jérôme's second pass on the roles, 2H.8, 2026-10-11 ------------------
   /**
    * The share of the kick-off ball this role wants: the ball nobody has
@@ -199,12 +203,17 @@ export interface RoleWeights {
    */
   readonly chaseKickoff: number;
   /**
-   * What a swing at each opposing role is worth, as a share of `attack`. The
-   * Breaker's order in defence when the carrier is out of reach: Strikers
-   * first, then Breakers, then the Trajector. One across the board for the
-   * roles that have no preference.
+   * Whether a swing weighs its target by the odds of evacuating it (2H.11,
+   * `00` C13 point 21, Jérôme after his engine 6 game): the expected damage
+   * of this unit's bat over the target's hit points left, read as a share of
+   * the same figure against a fresh Striker of the tier, so that a swing at
+   * a full Striker is still worth `attack` and a swing at somebody one bat
+   * from the tunnel is worth three or four of them. Until 2H.11 this was a
+   * fixed table, Strikers 1, Breakers 0.8, the Trajector 0.6. One for the
+   * Breaker, zero for the roles that read every shirt as one. Read by the bat,
+   * the Cracker it sends and the place beside a prey (`hunt`).
    */
-  readonly prey: Readonly<Record<Role, number>>;
+  readonly preyByHp: number;
   /**
    * Finishing adjacent to an opponent it can swing at, when the other side
    * has the ball and their carrier is out of reach: "porteur hors de portée,
@@ -223,15 +232,16 @@ export interface RoleWeights {
 
   // -- Jérôme's fourth pass on the roles, 2H.10, 2026-10-11 ------------------
   /**
-   * Whether this role dashes to finish adjacent to the other side's carrier
-   * without an Action left, to hold the opportunity attack when it leaves:
-   * C10 Striker 6, and the Striker's alone. One for the Striker, zero for
-   * everybody else; a Trajector shoves if it gets there walking, a Breaker
-   * swings at whoever is in reach, a keeper never leaves its leash. Even for
-   * the Striker the Dash only goes by a route that crosses no opponent's
-   * reach (2H.10, "pas tout droit comme un con").
+   * Whether this role dashes towards the other side's carrier when a plain
+   * move does not get it there (2H.11, `00` C13 point 4, replacing C12
+   * Trajector 3 and Breaker 3): the Dash is a plan for the three field roles,
+   * worth `pressCarrier` times the share of a move's length it closes, the
+   * whole press when it lands adjacent by a route that provokes nobody, and
+   * it competes on value with the bat and the Cracker. One for the Striker,
+   * the Breaker and the Trajector; zero for the keeper, whose leash forbids
+   * it anyway (C12 Bulwark 1).
    */
-  readonly pressDash: number;
+  readonly approachDash: number;
   /**
    * What a Shove on somebody who is not carrying is worth, as a share of
    * `shove`. Thirteen shoves in seventeen went at a non-carrier in the engine
@@ -250,6 +260,15 @@ export interface RoleWeights {
    * game a Striker threw to a Breaker on a tie broken by the unit id.
    */
   readonly receiver: number;
+  /**
+   * What a swing or a Cracker at somebody who is not carrying is worth while
+   * our own side has the ball and this unit does not (2H.11, `00` C13 point
+   * 5): a Striker or a Trajector in attack swings only for want of anything
+   * better, so a bystander is worth a fifth of the usual, and the relay keeps
+   * its place even when the carrier has a shot within a move. One for the
+   * Breaker and the keeper.
+   */
+  readonly idleSwing: number;
   /**
    * The Breaker's exception to the chain (2H.10, Jérôme): a Breaker holding
    * the ball throws to a Striker nearer the opposing mouth than itself even

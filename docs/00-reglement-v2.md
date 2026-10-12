@@ -932,7 +932,7 @@ relire le code contre les mots. **Codé en 2H.10.**
 - **Vitesse** : 2,7 ms par décision en moyenne et 25 ms au pire sur un match vétéran, comme en
   2H.9 ; le test des cinquante millisecondes passe.
 
-## C13. Décisions du 2026-10-12 après la partie à la porte de 2H.10, **sous-phase 2H.11, pas encore dans le code**
+## C13. Décisions du 2026-10-12 après la partie à la porte de 2H.10, **sous-phase 2H.11, codée le 2026-10-12, fonctions à redéployer (moteur 6)**
 
 > Écrites par le fil principal (Fable 5.1) sur la lecture **round par round et joueur par joueur** de
 > la partie de Jérôme sur le moteur 6 (star, 30 à 50, match `a17c22a5`, consigné dans
@@ -952,7 +952,7 @@ relire le code contre les mots. **Codé en 2H.10.**
 
 | # | Règle v2 | Règle décidée | Raison | État |
 |---|---|---|---|---|
-| 57 | Attraper le Spark : Action, sur sa case, DC 20 (B9, écart 49) ; rien n'interdit la tentative à un porteur | **Un porteur ne tente jamais le Spark : les mains sont prises.** `legalActions` ne propose plus la prise à une unité qui tient le ballon, humain comme IA | Jérôme, le 2026-10-12, round 10 : Harrow porteur a tenté le Spark à 20 %, raté, et n'avait plus d'Action pour le Dash qui le mettait hors d'atteinte ; le Cracker renaissant l'a touché pour 14 sur la case où il s'est replié | **À faire en 2H.11**, fil principal, `legalActions.ts` |
+| 57 | Attraper le Spark : Action, sur sa case, DC 20 (B9, écart 49) ; rien n'interdit la tentative à un porteur | **Un porteur ne tente jamais le Spark : les mains sont prises.** `legalActions` ne propose plus la prise à une unité qui tient le ballon, humain comme IA | Jérôme, le 2026-10-12, round 10 : Harrow porteur a tenté le Spark à 20 %, raté, et n'avait plus d'Action pour le Dash qui le mettait hors d'atteinte ; le Cracker renaissant l'a touché pour 14 sur la case où il s'est replié | **Fait en 2H.11**, fil principal : `actionOptionsAt` dans `legalActions.ts` ne propose pas la prise à une unité qui tient le ballon, et `applyCatchSpark` dans `reduce.ts` la refuse (« is holding the Payload »). 2 tests dans `legalActions.test.ts`, sous-agent Sonnet |
 
 **Ce que la partie a montré**, pour mémoire. Dix tentatives de Spark hors Trajector (Osric 2,
 Kregg 3 dont une réussie sur un 20 naturel au round 8, Sarn 2, Harrow 2 dont une en portant la
@@ -1115,6 +1115,122 @@ sont ceux de Jérôme, le numéro du round dit d'où ils viennent.
 L'écart 57 dans `engine/legalActions.ts`, le point 29 dans `engine/rules/ordnance.ts` ; l'IA dans
 `ai/chooseAction.ts`, `ai/evaluate.ts` et les quatre fiches ; les fonctions à redéployer sur le
 feu vert de Jérôme. **Un seul sweep à la fin, si
-Jérôme le demande**, contre `09` §12, en comptant onze minutes. Les 503 tests sont le filet, le
-test des cinquante millisecondes fait foi sur la vitesse, et le visualiseur sert à relire la
-partie suivante.
+Jérôme le demande**, contre `09` §12, en comptant quatorze minutes depuis cette passe. Les 503
+tests sont le filet, le test des cinquante millisecondes fait foi sur la vitesse, et le
+visualiseur sert à relire la partie suivante.
+
+**Comment la cinquième passe est codée**, par le fil principal (Fable 5.1) le 2026-10-12, pour
+relire le code contre les mots, poids par poids. **Codé en 2H.11.** Les neuf poids de Jérôme
+sont dans les fiches tels quels ; ce qui suit dit ce que chaque point a changé dans
+`ai/chooseAction.ts`, `ai/evaluate.ts` et les fiches.
+
+- **Le Spark (points 1 et 2, écart 57).** `actionsAt` ne propose la prise depuis une case
+  marchée qu'au rôle dont `chaseSpark` est positif, et la boucle des cases ne marque la case du
+  Spark comme « une case qui débloque une action » que pour lui ; depuis la case où l'unité se
+  tient, tout rôle la tente (C10 commune 1). Le chasseur garde `Board.sparkNext`, et sa case
+  sur le Spark ne vaut la prise que les mains libres. `legalActions` et `reduce` refusent la
+  prise à un porteur.
+- **Le relais contre la case où sera le porteur (point 3).** `carrierStands` donne les cases
+  d'où le porteur allié est lu : sa case s'il a joué, sinon chaque case ouverte de `wardLine`,
+  sa route de huit cases vers la bouche. `outlet` et `laneCover` prennent le meilleur de ces
+  points (portée, vue, terrain gagné, intercepteurs), `rejoin` ne se lit que si aucun point
+  n'est à portée de passe, `screenCarrier` lit la proximité au point le plus proche. Les scènes
+  de 2H.2 sur la vue et la couverture lisent désormais un Trajector porteur qui a joué.
+- **Le Dash d'approche (point 4, `approachDash`, remplace `pressDash`).** `chaseFloor` note une
+  case d'arrivée par `pressCarrier` fois la part d'un déplacement qu'elle referme sur le porteur
+  adverse, par rapport au plus près qu'une marche simple arrive, et par `pressCarrier` entier
+  quand elle finit adjacente par une route qui ne provoque personne (la presse de C10 Striker
+  6). Striker, Trajector et Breaker le lisent ; le gardien jamais (laisse). Deux bornes : une
+  cible légitime à portée interdit toujours le Dash (C10 commune 3, le mur du Breaker seul
+  exempt), et un rôle chasseur (`hunt` positif) ne s'approche pas du porteur tant qu'une proie
+  est à portée de marche, parce qu'il la frappe d'abord (point 20).
+- **La batte faute de mieux (point 5, `idleSwing`).** Quand son camp a la balle et que l'unité
+  ne la porte pas, une batte, une bousculade de non-porteur ou un Cracker sur un adversaire qui
+  n'est pas collé au porteur allié valent `idleSwing` fois leur valeur : 0,2 pour Striker et
+  Trajector, 1 pour Breaker et Bulwark. Rien ne retire au relais la valeur d'un tir que le
+  porteur aurait à portée de marche.
+- **Le plan qui se tient (points 6 et 7).** Le plancher du mur et celui de l'approche sont la
+  même fonction (`chaseFloor`), lue par le Dash avec l'écart qu'une marche simple laisse, et
+  **par la marche qui suit un Dash** (`dashed` : l'Action partie et plus d'un déplacement
+  restant) avec l'écart depuis la case où l'unité se tient : la marche va donc au bout de ce
+  que le Dash a acheté. Le facteur 0,3 de `wardThreatened` a disparu de `block` comme du
+  plancher.
+- **Disengage pour tout rôle pressé (point 8).** Le plan « disengage, puis marche » existe pour
+  toute unité qui commence son tour adjacente à un adversaire quand la meilleure case
+  atteignable par une route qui provoque vaut plus que la meilleure atteignable par une route
+  sûre ; noté `disengage × min(1, gain/12) + gain`. Le chasseur de Spark en est exempt : il
+  prend l'allonge et part (C10 Trajector 1).
+- **Le receveur en arrière (point 9).** Un receveur qui n'a pas joué peut être jusqu'à huit
+  cases derrière la case de début de tour, tout prochain ou non ; `potential` note son
+  déplacement moins son retard. Au-delà de huit, ou s'il a joué, pas de passe en arrière hors
+  dernier maillon, exception du Breaker et relance.
+- **La case du ballon, Action dépensée (point 10).** `positionValue` sans Action lit la case du
+  ballon au sol comme une fin de tour de porteur, `carrierEnd` : terrain vers la bouche moins
+  `carrierSafety × carrierExposure`, les menaces étant désormais construites aussi quand le
+  ballon est au sol. Avec l'Action, le plan explicite `[move, grabPayload]` vaut le ramassage
+  (`positionValue` avec Action), et `[move, grabPayload, lancer]` comme avant ; aucun des deux
+  n'existe quand un coéquipier plus avide qui n'a pas joué est à deux cases (C12 commune 6).
+- **Devant et derrière depuis le début de tour (point 11).** `ahead`, pour l'exception du
+  Breaker porteur, et `gained` se lisent depuis `turn.startedAt` ; `BACKWARD_STEP` se paie pour
+  tout lanceur et plus seulement le dernier maillon.
+- **Le porteur ne recule jamais (point 12).** `carrierMayEnd` refuse à un porteur toute case
+  d'arrivée plus loin de la bouche adverse que celle où il se tient, pour la marche, le Dash, le
+  repli et le Disengage, sauf si aucune case devant lui n'est moins exposée (`noSaferAhead`).
+  Le gardien qui relance est exempt.
+- **Le tir délivré et la passe bornée (point 13).** Le tir recevait déjà `relief` avec la passe
+  (`isThrow`). Ce qui manquait : `mine`, le tir du lanceur dans l'ouverture d'une passe, se lit
+  désormais sur le meilleur tir qu'il a lui-même sur une case de sa marche (`ownShot`) et non sur
+  la case d'où il lance ; et pour un rôle dont `shoot` dépasse `pass` (le Striker) une passe ne
+  vaut jamais plus que `shoot × ownCleanShot`, son meilleur tir propre à une marche. Pas de
+  borne pour la relance ni pour le chasseur qui se débarrasse du ballon. `shoot` Striker 150.
+- **L'exposition du receveur (point 14).** `receiverExposure` lit, pour un receveur qui a déjà
+  joué, les adversaires qui rejoueront avant lui et les places libres autour de sa case, le
+  lanceur comptant comme allié adjacent s'il l'est ; un receveur qui n'a pas joué lit zéro, il
+  bougera avant eux. La passe perd `carrierSafety × exposition`.
+- **Cinq points par allonge (point 15).** `Planner.exposure` vaut au moins `OPPORTUNITY_FLOOR`
+  (5) par attaque provoquée, la formule de C12 commune 8 au-dessus ; `Plan.provocations` porte
+  le compte et `rank` départage à note égale par le moins de provocations.
+- **La laisse du gardien adverse (point 16).** `carrierThreats` ne retient, pour un Bulwark, que
+  les cases à `leash` cases ou moins de sa bouche.
+- **Le round et le score (point 17).** `Board.lastRound` (round 10 ou mort subite),
+  `Board.possession` (notre balle, score égal ou en notre faveur) et `Board.whistle` (leur
+  balle). En possession, `carrierEnd` lit la distance à l'adversaire le plus proche à la place
+  du terrain, le tir n'est proposé qu'à portée propre, la passe seulement à un receveur moins
+  exposé que le lanceur, et un Dodge vaut `carrierSafety × exposition × 0,5` plus le repli. Au
+  sifflet, la pente `pressCarrier` et l'approche en Dash disparaissent, seules la case adjacente
+  et les frappes à portée comptent. Avant le dernier round, rien ne change.
+- **Le départage de la place prise (point 18).** `block` multiplie par 1,001 une place située
+  entre le porteur et l'adversaire le plus proche.
+- **La protection avant le Cracker (point 19).** `block` ne lit plus `wardThreatened`, retiré du
+  `Board` ; `screenCarrier` Breaker 80, `wantsEscort` Breaker 0, `carrierSafety` Breaker 80,
+  `guardStrike` 150, `shove` Breaker 30, `stripCarrier` 150 partout.
+- **L'écran disparaît (point 20).** Le poids `screen` et la fonction du même nom sont retirés.
+  En défense, Action dépensée, le mouvement restant suit la pente `pressCarrier` vers le porteur
+  adverse, puis `parryPost`.
+- **La proie par chance d'évacuer (point 21, `preyByHp`).** `prey(board, cible)` vaut les
+  dégâts attendus de la batte sur les PV restants de la cible, plafonnés à un, rapportés à la
+  même part contre un Striker frais du Tier : une batte sur un Striker plein vaut toujours
+  `attack`, un Trajector à 25 lit au-dessus, un Breaker à 50 au-dessous, une cible à une batte
+  du tunnel trois ou quatre Strikers. Lue par la batte, le Cracker envoyé et la place à côté
+  d'une proie ; 1 pour les rôles qui lisent tout maillot pareil (`preyByHp` 0). La table
+  `prey` et le facteur 1,4 du Breaker sur une cible presque à terre sont retirés.
+- **Le receveur probable de la relance (point 22).** `Board.relaunchReceivers` liste, quand le
+  gardien adverse porte, les adversaires qu'il peut servir après sa propre marche, à vue et à
+  portée ; `preyOf` les compte double, et une case adjacente à l'un d'eux vaut `hunt × proie`
+  même l'Action dépensée (`receiverAdjacency`).
+- **Le poste de parade en PV (point 23).** `parryPost` vaut `crackerAverage(coéquipier) /
+  ses PV`, multiplié par `avoidOpportunity` dans `positionValue`, pour une ligne qui finit sur
+  un coéquipier (`Board.crackerStrikes`) ou sur le ballon au sol qu'un coéquipier qui n'a pas
+  joué va prendre ; zéro pour une ligne qui finit sur un adversaire ou sur personne. Le poids
+  `parryPost` devient l'interrupteur, 1 pour le Breaker.
+- **La ligne du Cracker vers la case d'arrivée (point 27).** `carrierCrackerPressure` lit, pour
+  un porteur, un champ de distance par Cracker depuis sa case en contournant les obstacles, une
+  fois par décision : 1 sur une case à huit pas ou moins, 0,5 à neuf. Le calcul d'un chemin par
+  case candidate a coûté trois fois le match et a été remplacé par ce champ.
+- **Le chasseur et le ballon au sol (point 28).** Inchangé : `throwsAfterPickup` offre au
+  chasseur « marcher, ramasser, lancer » avec `chaseSpark` sur la passe.
+- **La parade (point 29).** `parryDirection` ne renvoie jamais une face qui revient sur le
+  pareur : à défaut de face qui touche un adversaire ou personne, celle qui touche le
+  coéquipier le plus solide en PV.
+- **Vitesse.** Un match d'auto-jeu dure environ 1,5 s contre 1,2 s, donc un sweep environ
+  quatorze minutes ; le test des cinquante millisecondes passe.
