@@ -15,7 +15,9 @@
 > le coup d'envoi, le porteur au plus près de la bouche, le tireur laisse son rebond, le gardien
 > jamais dans une allonge, l'appel qui lève la chaîne, et avec elle le Spark qui fuit les
 > Trajectors et revient à 9 cases des deux, le Shove qui prend le ballon, la relance Trajector,
-> Strikers, Bulwark, Breakers, le chrono d'un rôle sans popup réparé), **617 tests**, et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et
+> Strikers, Bulwark, Breakers, le chrono d'un rôle sans popup réparé ; puis la huitième, 2H.14 : la
+> passe gratuite après le Shove qui prend le ballon, écart 63, le Trajector en relais au coup
+> d'envoi, moteur 9 codé le 2026-10-14 soir et pas encore en ligne), **643 tests**, et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et
 > 2H.7, Crackers à 8, portée 9/12, Spark 20, le sweep donne 1,46 à 1,80 buts par match (`09` §12),
 > équilibrage re-clos par Jérôme sur ce tableau le 2026-10-10, pas de sweep depuis. **Le moteur 8
 > est le jeu en ligne** : `resolve-action` v19 et `create-match` v17 déployées le 2026-10-14 avec
