@@ -24,15 +24,17 @@ est codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute ri
 bouge » ; il n'y a pas de sweep de 2H.8 à 2H.14. 04 est l'histoire, à lire seulement quand une
 décision d'ingénierie te surprend.
 
-Où on en est : 2H.14 est CODÉE et COMMITÉE le 2026-10-14 au soir, ENGINE_VERSION 9, et PAS
-ENCORE EN LIGNE : les fonctions déployées sont resolve-action v19 et create-match v17, moteur
-8. Le redéploiement attend mon feu vert explicite ; tant qu'il n'a pas eu lieu, le harnais e2e
-se joue avec ENGINE_VERSION épinglée à 8 le temps du run, puis remise à 9 avant tout commit. Au
-redéploiement, les matchs ouverts du moteur 8 sont archivés, aucune migration. 643 tests verts
+Où on en est : 2H.14 est CODÉE, COMMITÉE (e8c0fee puis les commits de contexte) et EN LIGNE
+depuis le 2026-10-14 au soir sur mon feu vert : resolve-action v20, create-match v18,
+ENGINE_VERSION 9, aucune migration, les matchs ouverts du moteur 8 archivés. 643 tests verts
 sur 29 fichiers (617 avant), typecheck racine, scripts, e2e et client verts, build du client
-vert, smoke (34 s) et playthrough (29 s, 18 requêtes humaines, 0 refusée) verts sur les fonctions
-du moteur 8, la popup vue en haut à gauche, les carrés orange vus autour de chaque adversaire,
-plus de ligne de tiers. Pas de sweep, pas demandé.
+vert, smoke (40 s) et playthrough (37 s, 20 requêtes humaines, 0 refusée) verts sur les fonctions
+redéployées, le match e2e du moteur 9 (7d631b71) rejoué sans écart, la popup vue en haut à
+gauche, les carrés orange vus autour de chaque adversaire, plus de ligne de tiers. Pas de sweep,
+pas demandé. Les textures CC0 de la phase 3 sont choisies et téléchargées dans
+context/import/textures-ambientcg/ : MetalPlates013 le sol, 011 les parois, 014 les caisses.
+Je veux les pions version 2 (modèles 3D) mais Meshy et Tripo exigent un abonnement pour
+télécharger : la voie gratuite reste à trouver, la phase 3 démarre avec la version 1 en code.
 Dix-huit matchs d'auto-jeu de contrôle (scripts/control-2h14.ts) : 1,7 / 1,8 / 1,8 buts de
 ballon par match (rookie, veteran, star), 92 prises de balle sur 93 Shove réussis, 87 passes
 gratuites jouées derrière dont 4 volées, le Trajector ne prend jamais le coup d'envoi et ne
@@ -56,22 +58,20 @@ vert.
 
 LA TÂCHE.
 1. Vérifier git status avant toute chose ; tout est commité au 2026-10-14 au soir.
-2. Si la ligne « Où on en est » dit « PAS ENCORE EN LIGNE » : me demander le feu vert, puis
-   depuis boomball/ en bash set -a && . ../.env && set +a, npm run deploy:function pour
-   resolve-action et create-match, smoke et playthrough sur les fonctions redéployées sans
-   épingle, journal en 07 §10, commit.
-3. Mes parties sur 2H.14 : les retrouver par dump-match.ts --list (horaires en UTC) et
+2. Mes parties sur 2H.14 : les retrouver par dump-match.ts --list (horaires en UTC) et
    consigner celles que je nomme. Un match du moteur 8 ne se rejoue plus avec le dépôt du
    moteur 9. Pas de lecture round par round sauf si je la demande ou si tu la proposes avec
-   une raison.
+   une raison. Un fait à relire avec moi : en ligne, un Breaker a joué sa passe gratuite vers
+   son gardien treize cases derrière lui, les trois receveurs à portée étant tous derrière.
+3. Mes retours s'il y en a, en chat, puis C17 dans 00 avant toute ligne de code.
 4. Puis la phase 3 de 08 §5, la scène 2.5D statique, dont A20 (React 19) est le premier pas :
    dépendances three, fiber, drei (07 §4.3), layoutGeometry.ts, Silo.tsx, Camera.tsx en trois
    quarts fixe avec deux zooms et sans rotation (J4), les pions version 1 de 07 §5 (socle
    hexagonal, capsule, glyphe de rôle, plaque Html), l'interrupteur 2D / 3D, le crochet
    cellToScreen sur la caméra 3D. Ce que Jérôme prépare : deux ou trois textures CC0 d'ambientCG
    (sol riveté, paroi courbe rouillée, caisse ou pilier), à convertir en WebP 1K ; il a généré un
-   Giff 3D avec Meshy, à déposer en glb (et fbx pour Mixamo) dans context/import/, licence CC BY à
-   créditer ; c'est la version 2 des pions, hors done, à intégrer seulement s'il la demande.
+   Giff 3D avec Meshy mais ne peut pas le télécharger sans abonnement ; il veut la version 2 des
+   pions, à intégrer dès qu'un glb existe dans context/import/, licence à créditer.
 5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
 
 Ce qu'il faut savoir tout de suite.

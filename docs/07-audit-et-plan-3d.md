@@ -1534,7 +1534,17 @@ chat (« n'importe quand dans le tour », « b »), C16 validé avant la premiè
 | Harnais | Le serveur Vite de Jérôme occupant 5173 sans le crochet, un second Vite avec le crochet sur 5174 et `BASE_URL` ; `ENGINE_VERSION` épinglée à 8 le temps du run puis remise à 9. Smoke vert en 34 s, playthrough vert en 29 s (18 requêtes humaines, 0 refusée). Captures lues : **la popup en haut à gauche**, **les carrés orange autour de chaque adversaire pendant la popup comme pendant le tour**, **plus aucune ligne de tiers**, et dans le fil du playthrough « Ogga Sparshot shoves Dolm Ramrod and takes the Payload » |
 | Commit | `e8c0fee` |
 
-**Ce qui attend Jérôme** : son feu vert de redéploiement (`resolve-action` v20, `create-match`
-v18, moteur 9, les matchs ouverts du moteur 8 archivés), sa partie sur 2H.14, et un sweep
-seulement s'il le demande. Puis la phase 3, la scène 2.5D statique, dont A20 (React 19) est le
-premier pas ; il a déjà généré un Giff en 3D avec Meshy, à déposer en `glb` dans `context/import/`.
+**La mise en ligne, le 2026-10-14 dans le même chat**, par le fil principal (Fable 5.1), sur le feu
+vert de Jérôme (« oui, redéploie ») :
+
+| Quoi | État |
+|---|---|
+| Redéploiement | `resolve-action` v20 et `create-match` v18, **moteur 9**, les matchs ouverts du moteur 8 archivés, aucune migration |
+| Harnais sur le moteur 9, sans épingle | Sur un second Vite avec le crochet sur 5174, le 5173 restant au `npm run dev` de Jérôme : smoke vert en 40 s, playthrough vert en 37 s, 20 requêtes humaines, 0 refusée, 60 à 10 |
+| Consigné par `dump-match.ts` | Match `7d631b71`, 454 décisions rejouées, 0 écart d'événement, 0 DIFFERS. **La passe gratuite vue en ligne** : Harrow Slagborn, Breaker B, Action dépensée après son Shove, passe à son gardien treize cases derrière lui, les trois receveurs à portée étant tous derrière ; à relire par Jérôme. Dossier non gardé |
+| Les textures CC0 de la phase 3 | Choisies par Jérôme le 2026-10-14 sur ambientCG : `MetalPlates013` pour le sol en plaques rivetées, `MetalPlates011` pour les parois courbes du tube, `MetalPlates014` pour les caisses et piliers. Les trois archives 1K JPG sont dans `context/import/textures-ambientcg/`, à convertir en WebP 1K en phase 3 |
+| Les pions | Jérôme veut la **version 2** (modèles 3D) ; Meshy et Tripo exigent un abonnement pour télécharger, voie gratuite à trouver (TRELLIS en local ou un Space Hugging Face). La phase 3 démarre avec la version 1 en code et accueille la version 2 quand un `glb` existe |
+
+**Ce qui attend Jérôme** : sa partie sur 2H.14, un sweep seulement s'il le demande, un `glb` de Giff
+dans `context/import/`. Puis la phase 3, la scène 2.5D statique, dont A20 (React 19) est le premier
+pas.
