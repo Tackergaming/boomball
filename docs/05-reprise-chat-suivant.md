@@ -78,9 +78,15 @@ LA TÂCHE.
    hexagonal, capsule, glyphe de rôle, plaque Html), l'interrupteur 2D / 3D, le crochet
    cellToScreen sur la caméra 3D. Ce que Jérôme prépare : deux ou trois textures CC0 d'ambientCG
    (sol riveté, paroi courbe rouillée, caisse ou pilier), à convertir en WebP 1K ; il a généré un
-   Giff 3D avec Meshy mais ne peut pas le télécharger sans abonnement ; voie gratuite proposée,
-   TRELLIS en local sur sa RTX 4060 ou un Space Hugging Face ; son glb remplace la capsule dès
-   qu'il existe dans context/import/, licence à créditer. Les trois archives de textures (19 Mo)
+   Giff 3D : SON GLB EST LÀ, context/import/giff-boomball.glb, sorti d'un Space Hugging Face
+   (TRELLIS, générateur trimesh), vérifié le 2026-10-14 au soir par le fil principal : glTF 2.0,
+   un maillage de 20 848 sommets et 27 239 triangles, POSITION et TEXCOORD_0 sans normales (à
+   recalculer au chargement), un matériau PBR avec une texture PNG embarquée, pas de rig ni
+   d'animation, boîte d'environ 0,8 x 1,0 x 0,94 centrée à l'origine, Y vers le haut, 2 Mo. À
+   charger par useGLTF de drei, mettre à l'échelle d'une case, orienter vers la bouche attaquée,
+   et instancier pour les quatorze pions (environ 380 000 triangles au total, à décimer si le
+   GPU intégré souffre). L'image source est context/import/Giff-boomball-2d.jpg, un Giff en
+   armure à la batte sur fond noir, la référence de style pour tout le reste. Les trois archives de textures (19 Mo)
    sont dans context/import/textures-ambientcg/, non commitées.
 5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
 
