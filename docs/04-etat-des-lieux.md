@@ -17,11 +17,12 @@
 > Trajectors et revient à 9 cases des deux, le Shove qui prend le ballon, la relance Trajector,
 > Strikers, Bulwark, Breakers, le chrono d'un rôle sans popup réparé ; puis la huitième, 2H.14 : la
 > passe gratuite après le Shove qui prend le ballon, écart 63, le Trajector en relais au coup
-> d'envoi, moteur 9 codé le 2026-10-14 soir et pas encore en ligne), **643 tests**, et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et
+> d'envoi, moteur 9 en ligne le 2026-10-14 soir ; puis 2H.15 la même nuit : les cases orange
+> retirées et la 2.5D en un seul bloc derrière « See it in 3D », en local), **652 tests**, et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et
 > 2H.7, Crackers à 8, portée 9/12, Spark 20, le sweep donne 1,46 à 1,80 buts par match (`09` §12),
-> équilibrage re-clos par Jérôme sur ce tableau le 2026-10-10, pas de sweep depuis. **Le moteur 8
-> est le jeu en ligne** : `resolve-action` v19 et `create-match` v17 déployées le 2026-10-14 avec
-> son feu vert pour 2H.13 (`00` C15), les matchs du moteur 7 archivés ; ses matchs sont consignés
+> équilibrage re-clos par Jérôme sur ce tableau le 2026-10-10, pas de sweep depuis. **Le moteur 9
+> est le jeu en ligne** : `resolve-action` v20 et `create-match` v18 déployées le 2026-10-14 au soir avec
+> son feu vert pour 2H.14 (`00` C16), les matchs du moteur 8 archivés ; ses matchs sont consignés
 > et rejoués dans `docs/matches/` par `scripts/dump-match.ts`, lus sur le visualiseur
 > `viewer.html` ou contre les événements, et ses décisions sont `00` C13 à C15, écrites avant le
 > code.

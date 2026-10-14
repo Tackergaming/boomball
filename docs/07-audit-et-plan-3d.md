@@ -1576,6 +1576,7 @@ vert. **Pas de sweep**, pas demandé.
 | Captures lues | Le silo entier : sol riveté, caisses, piliers, parois, les deux bouches cyan et magenta, la minicarte, les plaques lisibles. Le zoom rapproché : **son Giff en armure, batte à la main, debout sur son socle**, quatorze fois, les caisses texturées, le sol. Le survol : la route pointillée et « clean ». À revoir par lui : l'orientation du modèle (`MODEL_YAW` dans `Tokens.tsx` à ajuster s'il regarde de côté), la hauteur des caisses, la couleur des piliers, le noir sous la lèvre avant en vue large |
 | Commit | `8168ef5` |
 
-**Ce qui attend Jérôme** : sa partie en 3D (« See it in 3D » sur l'écran de match, le choix est
-gardé), ses retours, et la décision de `00` C17 sur la passe gratuite au gardien. Un sweep
+**Lancé par Jérôme le soir même : « le jeu n'a pas planté ».** Ses parties en 3D viennent le
+lendemain. **Ce qui attend Jérôme** : ses parties en 3D (« See it in 3D » sur l'écran de match, le
+choix est gardé), ses retours en `00` C18, et l'option de `00` C17 sur la passe gratuite au gardien. Un sweep
 seulement s'il le demande.

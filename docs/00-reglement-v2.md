@@ -1651,7 +1651,8 @@ sous-agents Sonnet nommés ci-dessous, pour relire le code contre les mots. **Co
 > `docs/matches/2026-10-14-ab27b827/` (465 décisions). Un seul retour, d'écran. **Aucun écart de
 > règle, rien dans l'IA, aucune constante de `00` ne bouge : `ENGINE_VERSION` reste 9, les
 > fonctions ne sont pas à redéployer.** La sous-phase 2H.15 porte ce retour et, derrière lui, la
-> scène 2.5D construite en un seul bloc (`07` §10, `08` §5), client seul.
+> scène 2.5D construite en un seul bloc (`07` §10, `08` §5), client seul. **Validé par Jérôme le
+> 2026-10-14 dans la nuit (« ok c17 »)** ; l'option sur la passe gratuite au gardien reste à choisir.
 
 **Le retour, ses mots : « enlève les cases orange, c'est trop. »** Les carrés orange de 2H.14
 (toute case adjacente à un adversaire, marquée à chaque tour, `data-reach`) **sont retirés du
