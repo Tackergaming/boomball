@@ -1574,7 +1574,7 @@ vert. **Pas de sweep**, pas demandé.
 | Tests | **652 sur 30 fichiers contre 643 sur 29** ; typecheck racine, scripts, e2e et client verts ; build du client vert |
 | Harnais | `e2e/board3d.spec.ts`, `npm run e2e:board3d`, sur le Vite 5174 avec le crochet (le 5173 restant à Jérôme) : passe en 3D, capture le silo entier, attend son tour, demande `cellToScreen` d'une case atteignable, qui est la projection de la caméra, **clique à la souris à cet endroit** et voit le pion arriver, zoom rapproché, le tour de l'équipe adverse, retour 2D, zéro erreur console. Vert en 1,4 min. `npm run e2e` exclut `@board3d`. **Smoke 2D vert en 24,5 s et playthrough vert en 23 s** sur le même Vite, après un correctif du smoke lui-même : un Dodge sans mouvement vide le tour, qui se passe tout seul, et le bouton « End turn » qu'il cliquait ensuite avait disparu derrière la popup du round suivant (course pré-existante, le clic est désormais tolérant) |
 | Captures lues | Le silo entier : sol riveté, caisses, piliers, parois, les deux bouches cyan et magenta, la minicarte, les plaques lisibles. Le zoom rapproché : **son Giff en armure, batte à la main, debout sur son socle**, quatorze fois, les caisses texturées, le sol. Le survol : la route pointillée et « clean ». À revoir par lui : l'orientation du modèle (`MODEL_YAW` dans `Tokens.tsx` à ajuster s'il regarde de côté), la hauteur des caisses, la couleur des piliers, le noir sous la lèvre avant en vue large |
-| Commit | voir git |
+| Commit | `8168ef5` |
 
 **Ce qui attend Jérôme** : sa partie en 3D (« See it in 3D » sur l'écran de match, le choix est
 gardé), ses retours, et la décision de `00` C17 sur la passe gratuite au gardien. Un sweep
