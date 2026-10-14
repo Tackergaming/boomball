@@ -1,0 +1,34 @@
+{
+  "match": {
+    "id": "b5910869-94f9-468a-be5d-bb9600e262f4",
+    "team_id": "0e00cc43-e150-4186-8911-80dd9c329ca7",
+    "arena_id": "kill-silo",
+    "tier": "star",
+    "phase": "finished",
+    "round": 10,
+    "score_a": 70,
+    "score_b": 0,
+    "rng_seed": 2574868229,
+    "turn_deadline": null,
+    "winner": "A",
+    "is_draw": false,
+    "created_at": "2026-10-14T17:49:07.700686+00:00",
+    "finished_at": "2026-10-14T17:59:24.755+00:00",
+    "orders": [],
+    "engine_version": 8
+  },
+  "team": {
+    "id": "0e00cc43-e150-4186-8911-80dd9c329ca7",
+    "name": "Shrapnel oath",
+    "owner": "6eb5302a-ba82-4f2e-9ae6-a8acbfe469df"
+  },
+  "participants": [
+    {
+      "match_id": "b5910869-94f9-468a-be5d-bb9600e262f4",
+      "unit_id": "A-striker-2",
+      "profile_id": "6eb5302a-ba82-4f2e-9ae6-a8acbfe469df",
+      "role": "striker",
+      "character_name": "Tacker"
+    }
+  ]
+}

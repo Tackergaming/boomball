@@ -1525,3 +1525,120 @@ sous-agents Sonnet nommés ci-dessous, pour relire le code contre les mots. **Co
   playthrough vert en 30 s (21 requêtes humaines, 0 refusée), `ENGINE_VERSION` épinglée à 7 le
   temps du run puis remise à 8, **la popup vue dans la colonne de droite**, capture lue, le terrain
   lisible derrière.
+
+## C16. Décisions du 2026-10-14 après trois matchs sur le moteur 8, **sous-phase 2H.14**
+
+> Écrites par le fil principal (Fable 5.1) sur les cinq retours de Jérôme après **trois matchs sur
+> le moteur 8** le 2026-10-14 au soir, tous star, équipe Shrapnel oath, consignés et rejoués sans
+> aucun écart d'événement dans `docs/matches/` : `20edbca9` (Striker, 30-20), `b5910869` (Striker,
+> 70-0), `dc474770` (Trajector, 70-30). Chaque retour a été lu contre les événements en base, les
+> plans du visualiseur et le code avant d'être reformulé, puis **tranché par lui en chat le
+> 2026-10-14, avant la première ligne de code** : deux questions fermées (« n'importe quand dans le
+> tour », « b »), le reste accepté tel que reformulé.
+>
+> Un écart de règle, 63, qui révise l'écart 61 ; une règle d'IA au coup d'envoi ; trois retours
+> d'écran. L'état du tour gagne un champ : **`ENGINE_VERSION` monte à 9**, un match du moteur 8 ne
+> se rejoue plus avec ce dépôt, les matchs ouverts du moteur 8 sont archivés au redéploiement.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 63 | Écart 61 : un Shove réussi sur un porteur met le ballon dans les mains du bousculeur, qui « a dépensé son Action, ne passe ni ne tire ce tour » | **Le bousculeur gagne une passe gratuite pour le reste de son tour.** Le ballon est dans ses mains à l'instant, personne ne bouge (écart 61 inchangé), et il peut, **n'importe quand dans le reste du tour**, donc depuis la case du Shove ou après avoir marché avec son mouvement restant, faire **une passe sans Action** à tout coéquipier à portée et en vue, **qu'il ait déjà joué ce round ou non**. Cette passe est interceptable comme toute passe (écart 48), bornée par la portée et la ligne de vue (écart 34). **Jamais de tir** : l'Action est partie dans le Shove, et la passe gratuite n'ouvre que la passe. Une seule passe gratuite par Shove ; le tour fini sans l'avoir jouée, elle est perdue. Les quatre rôles, humain ou IA, Bulwark compris. L'Action reste dépensée pour tout le reste : pas de Dash, de Dodge, de Disengage ni de batte après le Shove | Jérôme : « quand on désarme la balle à un porteur, on peut gratuitement faire une passe s'il y a quelqu'un à portée, qu'il ait joué ou pas, mais pas tirer pour marquer un but ». Question tranchée : « n'importe quand dans le tour » | **Fait en 2H.14**, fil principal : `turn.freePass` dans `engine/types.ts`, posé par `applyShove` sur un porteur, consommé par `applyPass`, lu par `legalActions` ; **`ENGINE_VERSION` 9**. 14 tests dans `engine/c16.test.ts`, sous-agent Sonnet |
+
+**Ce que les trois matchs ont montré**, pour mémoire. Dans `b5910869`, Osric Rivet, Trajector A,
+dashe au round 1 de (12, 14) à (5, 1), treize cases vers sa propre bouche, meilleur plan « dash,
+then walk to (5, 1) » à 1,7 point ; dans `dc474770` le même plan était en tête pour le Trajector
+humain, qui a cliqué ailleurs ; dans `20edbca9` le Trajector A n'est allé devant que parce qu'un
+Cracker à frapper valait 2,5. La cause : quand le Trajector A joue, premier de son équipe au round
+1, **personne ne porte encore le ballon**, donc relais, mur et sécurité du porteur valent zéro, et
+la seule pente restante est `guardFurnace`. Le journal de 2H.10 (« le Trajector vers l'avant au
+premier tour, fait par construction ») était faux dans ce cas. Le Trajector B, lui, joue après
+que A a pris le ballon et ferme sur le porteur, comme attendu.
+
+**L'IA, huitième passe.** Les mots sont ceux de Jérôme, les lectures du code sont du fil principal.
+
+1. **Au coup d'envoi, le Trajector se place en relais du ballon, jamais en arrière.** Option b,
+   tranchée par Jérôme : tant que le ballon n'a jamais été porté (`lastCarrierTeam` nul) et qu'il
+   est au sol, le Trajector le lit **comme s'il était déjà porté par un Striker allié qui n'a pas
+   joué, debout sur la case du ballon**, avec sa route de huit cases vers la bouche adverse : la
+   même ligne que `wardLine`, lue par `outlet`, `laneCover` et `rejoin`. Il finit donc devant le
+   ballon, à portée de passe et à vue, comme un relais ordinaire (C10 Trajector 8). Et, en garde,
+   la règle de C12 devient un filtre dur comme `carrierMayEnd` : **au round du coup d'envoi, son
+   plan ne finit jamais plus près de sa propre bouche que sa case de départ**, Dash et repli
+   compris. `chaseKickoff` reste à zéro : il ne ramasse toujours pas.
+2. **La passe gratuite dans le plan de tour.** Après un Shove réussi sur un porteur, le plan
+   reconstruit voit un porteur sans Action mais avec `freePass` : les plans « passer » et
+   « marcher puis passer » existent pour lui avec le mouvement restant, notés comme toute passe
+   (terrain gagné depuis la case de début de tour, exposition du receveur, intercepteurs, `relief`),
+   et **les deux filtres de la chaîne sont levés** comme pour un receveur appelé (C15 point 6) :
+   un receveur qui a joué, ou derrière, est permis, `BACKWARD_STEP` se paie quand même. Le tir
+   n'est pas offert. Le Shove lui-même ne change pas de valeur (C15 point 7, `stripCarrier` 150) :
+   la passe qui suit se juge sur le plateau que le dé a laissé.
+
+**Trois retours d'écran, sans règle.**
+
+- **La popup de place naît en haut à gauche** du corps de l'écran, au lieu du haut de la colonne de
+  droite ; toujours déplaçable par son bandeau, position gardée le temps du match, Échap et
+  « Close, play last » inchangés.
+- **Les cases sous allonge adverse se marquent en permanence.** Le marquage lisait, pendant le tour
+  du joueur seulement, les cases atteignables dont la route la plus courte provoque une allonge
+  (dette connue de 2H.10), d'où ses absences. Décidé, proposition du fil principal acceptée : le
+  même carré orange marque, **à chaque tour, le sien comme ceux des IA**, toute case ouverte
+  adjacente à un adversaire actif de l'équipe du joueur, c'est-à-dire l'allonge que quitter
+  provoque. La route sous le curseur reste orange quand elle provoque, cyan sinon.
+- **Les pointillés des tiers disparaissent** du plateau. Les tiers restent dans le fil et dans la
+  règle d'entrée du Spark ; aucune règle ni aucun test ne lisait ces deux lignes.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`. `ENGINE_VERSION` 9 pour
+`turn.freePass`. Le moteur dans `reduce.ts` (`applyShove`, `applyPass`), `legalActions.ts` et
+`types.ts` ; l'IA dans `ai/chooseAction.ts` (la passe gratuite, le filtre du coup d'envoi) et
+`ai/evaluate.ts` (le relais du coup d'envoi) ; l'écran dans `Board.tsx` et `screens/Match.tsx`. Les
+fonctions à redéployer sur le feu vert de Jérôme. **Un seul sweep à la fin, si Jérôme le demande**,
+contre `09` §12, en comptant seize minutes. Les 617 tests sont le filet, le test des cinquante
+millisecondes fait foi sur la vitesse.
+
+**Comment 2H.14 est codée**, par le fil principal (Fable 5.1) le 2026-10-14, avec deux
+sous-agents Sonnet nommés ci-dessous, pour relire le code contre les mots. **Codé en 2H.14.**
+
+- **Écart 63, le moteur.** `TurnState.freePass` (`types.ts`), faux à l'ouverture de tout tour ;
+  `applyShove` le pose quand le Shove réussit sur un porteur, après avoir donné le ballon au
+  bousculeur ; `applyPass` accepte `actionUsed` quand `freePass` est posé et l'efface en
+  lançant, interception comprise ; `legalActions` offre `pass` sous `hasAction || freePass`, et
+  rien d'autre : le tir, le Dash, le Dodge, le Disengage, la batte restent sous l'Action. Un
+  `move` ne consomme pas la passe. **`ENGINE_VERSION` 9.** La barre d'actions lit `legal.pass`
+  et n'a pas changé.
+- **La passe gratuite dans le plan de tour (point 2).** `freeThrow` dans `Planner.plans` :
+  Action partie, porteur, `turn.freePass`. Depuis sa case, `throwsAt(here, legal)` filtré sur
+  `pass`, noté valeur plus `relief` ; depuis chaque case atteignable, `throwsAt(cell, options,
+  there)` filtré sur `pass`, noté moins l'exposition de la route et `WALK_BEFORE_THROW` par case,
+  la borne `carrierMayEnd` tenant toujours. Dans `throwsAt`, `free` lève les deux filtres de la
+  chaîne (receveur qui a joué, receveur derrière) comme `summoned` ; portée, vue,
+  `INTERCEPT_CAUTION`, `BACKWARD_STEP` et l'exposition du receveur tiennent. Le Shove garde sa
+  valeur (C15 point 7).
+- **Le relais du coup d'envoi (point 1).** `Board.kickoffRelay` dans `evaluate.ts` : ballon au
+  sol, `lastCarrierTeam` nul, `chaseKickoff` zéro, pas de porteur allié ; alors `wardLine` part de
+  la case du ballon vers la bouche adverse sur huit cases (`carriedForward`) et `carrierCanServe`
+  est vrai. `outlet` et `laneCover` ne refusent plus l'absence de porteur quand `kickoffRelay`
+  est posé, `laneCover` lisant les intercepteurs sur le maillot de l'unité. La branche
+  « coéquipier du porteur » de `positionValue` est sortie en `relayValue` (`screenCarrier`,
+  `block`, `supportAttack × outlet`, `cover × laneCover`, `spread`, `rejoin`) et lue aussi dans
+  la branche « ballon au sol » quand `kickoffRelay` est posé. `kickoffMayEnd` dans
+  `chooseAction.ts`, lu par `mayEnd` aux quatre portes de `carrierMayEnd` (marche, Disengage,
+  repli, Dash), refuse toute case plus près de `ownFurnace` que `turn.startedAt`. Mesuré : le
+  Trajector A finit en (7, 21) à (10, 31) selon la graine, à 51 points pour (8, 29), sept cases
+  devant le ballon ; jamais un ramassage.
+- **L'écran.** `screens/Match.tsx` fait naître la popup en `{ x: 0, y: 0 }` du corps ;
+  `Board.tsx` calcule `watched` depuis les adversaires actifs de l'équipe du joueur (huit cases
+  autour de chacun, hors obstacle et hors terrain), sans `legal`, et dessine le même carré orange
+  avec `data-reach` ; `swingsTo` garde la lecture de la route au survol. Les lignes des tiers et
+  l'import `THIRD_LENGTH` sont retirés.
+- **Tests** : `engine/c16.test.ts`, 14 tests, **sous-agent Sonnet effort élevé** ;
+  `ai/eighthPass.test.ts`, 12 tests, **sous-agent Sonnet effort élevé** ; un test de `c15`
+  retitré. **643 tests sur 29 fichiers contre 617 sur 27**, typecheck racine, scripts et e2e
+  verts, client typecheck et build verts.
+- **Mesuré** sur dix-huit matchs d'auto-jeu, `scripts/control-2h14.ts`, pas un sweep : 1,7 / 1,8
+  / 1,8 buts de ballon par match ; 93 Shove réussis, 92 prises de balle, 87 passes gratuites
+  jouées derrière, 4 volées ; Trajector 0/18 au coup d'envoi, 0/36 qui recule au round 1, 36/36 à
+  portée de passe du ballon. Smoke vert en 34 s et playthrough vert en 29 s (18 requêtes
+  humaines, 0 refusée), `ENGINE_VERSION` épinglée à 8 le temps du run, sur un Vite dédié avec le
+  crochet sur 5174 ; captures lues : la popup en haut à gauche, les carrés orange autour de
+  chaque adversaire pendant la popup comme pendant le tour, plus de ligne de tiers.

@@ -476,7 +476,11 @@ function applyShove(ctx: TurnCtx, targetId: UnitId): ReduceResult {
   // to walk onto it, which a human reads as a shove that won nothing.
   if (target.unit.holdingPayload) {
     ctx.log.push(shoved(null, true));
-    const stripped = replaceUnit(next, { ...target.unit, holdingPayload: false });
+    // And since écart 63 (2H.14, Jérôme on 2026-10-14) the shover may throw
+    // one pass for the rest of its turn without an Action: from this cell or
+    // after walking what it has left. A pass, never a shot.
+    const freed: MatchState = { ...next, turn: { ...next.turn!, freePass: true } };
+    const stripped = replaceUnit(freed, { ...target.unit, holdingPayload: false });
     const shover = stripped.units.find((u) => u.id === unit.id)!;
     return done(ctx, {
       ...replaceUnit(stripped, { ...shover, holdingPayload: true }),
@@ -923,7 +927,9 @@ function applyGrabPayload(ctx: TurnCtx): ReduceResult {
 function applyPass(ctx: TurnCtx, targetId: UnitId): ReduceResult {
   const { state, unit, arena } = ctx;
   const turn = state.turn!;
-  if (turn.actionUsed) return { ok: false, reason: `${unit.name} has already acted` };
+  // The free pass after a Shove that took the ball (écart 63) throws without
+  // the Action; it is spent by the throw, whatever becomes of the ball.
+  if (turn.actionUsed && !turn.freePass) return { ok: false, reason: `${unit.name} has already acted` };
   if (!unit.holdingPayload) return { ok: false, reason: `${unit.name} is not holding the Payload` };
 
   const mate = state.units.find((u) => u.id === targetId);
@@ -937,7 +943,7 @@ function applyPass(ctx: TurnCtx, targetId: UnitId): ReduceResult {
   }
 
   const thrower: Unit = { ...unit, holdingPayload: false };
-  let next: MatchState = { ...replaceUnit(state, thrower), turn: { ...turn, actionUsed: true } };
+  let next: MatchState = { ...replaceUnit(state, thrower), turn: { ...turn, actionUsed: true, freePass: false } };
 
   // Écart 53 bis (2H.9, Jérôme's retour 3 on the engine 5 game): the box in
   // front of this keeper's own mouth opens the instant its throw leaves its
@@ -1344,6 +1350,7 @@ function offerPlace(state: MatchState, unitId: UnitId, places: number, log: Matc
       disengaged: false,
       placing: places,
       shot: false,
+      freePass: false,
     },
   };
 }
@@ -1389,6 +1396,7 @@ function beginTurn(state: MatchState, unit: Unit, log: MatchEvent[]): MatchState
       disengaged: false,
       placing: null,
       shot: false,
+      freePass: false,
     },
   };
 }

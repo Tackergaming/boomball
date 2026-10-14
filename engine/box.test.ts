@@ -49,6 +49,7 @@ function clockOn(state: MatchState, id: UnitId): MatchState {
       movementFeetRemaining: MOVE_SPEED_FEET,
       actionUsed: false,
       objectInteractionUsed: false,
+      freePass: false,
       disengaged: false,
       placing: null,
       shot: false,

@@ -181,6 +181,14 @@ export interface TurnState {
    * to play could take it.
    */
   readonly shot: boolean;
+  /**
+   * Écart 63 (2H.14, engine version 9, Jérôme on 2026-10-14): a Shove that
+   * took the Payload off a carrier leaves the shover one pass for the rest of
+   * its turn, from wherever its movement takes it, with the Action already
+   * spent. One pass, never a shot. `applyShove` sets it, `applyPass` spends
+   * it, and a turn that ends without throwing loses it.
+   */
+  readonly freePass: boolean;
 }
 
 // -- The match ---------------------------------------------------------------

@@ -76,6 +76,7 @@ function clockOn(state: MatchState, id: UnitId): MatchState {
       movementFeetRemaining: MOVE_SPEED_FEET,
       actionUsed: false,
       objectInteractionUsed: false,
+      freePass: false,
       disengaged: false,
       placing: null,
       shot: false,
@@ -439,11 +440,11 @@ describe('a Shove on a carrier puts the ball in the shover’s hands (écart 61)
     expect(after.turn!.movementFeetRemaining).toBe(before.turn!.movementFeetRemaining);
   });
 
-  it('lets the shover walk off with it, but neither pass nor shoot this turn', () => {
+  // The pass after the Shove is the free pass of écart 63 since 2H.14, tested
+  // in `c16.test.ts`; the shot stays barred.
+  it('lets the shover walk off with it, but never shoot this turn', () => {
     const { after } = shove('A-striker-2', { x: 7, y: 22 }, { x: 8, y: 22 }, true, true);
 
-    const pass = act(after, { kind: 'pass', targetId: 'A-striker-3' });
-    expect(pass.ok).toBe(false);
     expect(act(after, { kind: 'shoot' }).ok).toBe(false);
 
     const walked = must(after, { kind: 'move', path: [{ x: 6, y: 22 }] });

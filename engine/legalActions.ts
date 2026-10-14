@@ -225,7 +225,9 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
 
   const attack = hasAction ? options.attack : [];
   const shove = hasAction ? options.shove : [];
-  const pass = hasAction ? options.pass : [];
+  // The pass alone survives the Action after a Shove that took the ball
+  // (écart 63, 2H.14): `turn.freePass`. The shot does not.
+  const pass = hasAction || turn.freePass ? options.pass : [];
   const shoot = hasAction ? options.shoot : null;
   const batCracker = hasAction ? options.batCracker : [];
   const catchSpark = hasAction ? options.catchSpark : null;

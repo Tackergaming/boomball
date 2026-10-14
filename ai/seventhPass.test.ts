@@ -62,6 +62,7 @@ function giveTurnTo(state: MatchState, unitId: UnitId): MatchState {
       movementFeetRemaining: MOVE_SPEED_FEET,
       actionUsed: false,
       objectInteractionUsed: false,
+      freePass: false,
       disengaged: false,
       placing: null,
       shot: false,

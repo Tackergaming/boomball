@@ -389,6 +389,18 @@ class Planner {
       }
     }
 
+    // The free pass after a Shove that took the ball (écart 63, 2H.14, `00`
+    // C16 point 2): the Action is gone, one throw is not. From here, or from
+    // any cell the movement left reaches, a pass and only a pass, priced
+    // like every pass and relieved like every throw.
+    const freeThrow = !hasAction && unit.holdingPayload && state.turn?.freePass === true;
+    if (freeThrow) {
+      for (const priced of this.throwsAt(this.here, legal)) {
+        if (priced.action.kind !== 'pass') continue;
+        out.push({ steps: [priced.action], score: priced.value + this.relief, why: priced.why });
+      }
+    }
+
     // The pickup is free and the plan is rebuilt once the ball is in hand.
     // Left to a keener team-mate who has not played, it is not picked up at
     // all, nor picked up and thrown (C12 commune 6).
@@ -428,7 +440,7 @@ class Planner {
       const onSpark =
         w.chaseSpark > 0 && sparkIsLive(state.spark) && cell.x === state.spark.x && cell.y === state.spark.y;
       // A carrier never walks backwards unless nothing ahead is safer (2H.11, point 12).
-      if (!this.carrierMayEnd(cell)) continue;
+      if (!this.mayEnd(cell)) continue;
       // A cell worth less than this one, with nothing to do from it, is no
       // plan at all: the route is not even drawn.
       const ground = this.pv(cell) - this.pvHere;
@@ -439,7 +451,7 @@ class Planner {
       // ball is not left to, without it for the role that picks up first
       // (2H.12), which is the second half of "dash, walk, pick up".
       const fetch = onBall && (hasAction ? share > 0 : this.ballFirst);
-      if (ground <= 0 && !canBrace && !acts && !chased && !fetch) continue;
+      if (ground <= 0 && !canBrace && !acts && !chased && !fetch && !freeThrow) continue;
       const route = safePathTo(state, unit, this.reach, cell);
       if (!route) continue;
       const walked = route.length;
@@ -457,6 +469,21 @@ class Planner {
       if (!hasAction) {
         if (fetch) {
           out.push({ steps: [move, { kind: 'grabPayload' }], score: gain, why: `walk to ${to(cell)} and pick the Payload up`, provocations });
+        }
+        // Walk, then throw the free pass (écart 63): the throw is priced on
+        // the throw, every cell walked costing a little, as for any throw.
+        if (freeThrow) {
+          const there = this.stateWithUnitAt(cell);
+          const options = actionOptionsAt(arena, there, unitAt(unit, cell), cell);
+          for (const priced of this.throwsAt(cell, options, there)) {
+            if (priced.action.kind !== 'pass') continue;
+            out.push({
+              steps: [move, priced.action],
+              score: priced.value + this.relief - exposed - walked * WALK_BEFORE_THROW,
+              why: `walk to ${to(cell)}, then ${priced.why}`,
+              provocations,
+            });
+          }
         }
         continue;
       }
@@ -571,7 +598,7 @@ class Planner {
       let bestClean = 0;
       let bestSafe = 0;
       for (const reachable of this.reach.values()) {
-        if (!this.carrierMayEnd(reachable.cell)) continue;
+        if (!this.mayEnd(reachable.cell)) continue;
         const clean = this.pv(reachable.cell) - this.pvHere;
         if (reachable.provocations === 0) {
           bestSafe = Math.max(bestSafe, clean);
@@ -627,6 +654,25 @@ class Planner {
   }
 
   // -- The carrier's rules ------------------------------------------------------
+
+  /** Where a plan may end: the carrier's rule and the kick-off rule, both. */
+  private mayEnd(cell: Point): boolean {
+    return this.kickoffMayEnd(cell) && this.carrierMayEnd(cell);
+  }
+
+  /**
+   * At the kick-off the Trajector never ends nearer its own mouth than the
+   * cell its turn started on (2H.14, `00` C16 point 1, the guard of C12's
+   * "il ne recule jamais au premier tour"): Dash and retreat included. Read
+   * for the role that reads the kick-off ball as already carried
+   * (`kickoffRelay`), nobody else.
+   */
+  private kickoffMayEnd(cell: Point): boolean {
+    if (!this.board.kickoffRelay) return true;
+    const own = this.board.ownFurnace;
+    const start = this.board.state.turn?.startedAt ?? this.here;
+    return rangeToFurnace(cell, own) >= rangeToFurnace(start, own);
+  }
 
   /**
    * Whether a carrier may end its turn on a cell (2H.11, `00` C13 point 12):
@@ -769,7 +815,7 @@ class Planner {
     // best found, no route can bring it back over, since a route only costs.
     const cells: { reachable: SafeReachable; clean: number }[] = [];
     for (const reachable of reach.values()) {
-      if (!this.carrierMayEnd(reachable.cell)) continue;
+      if (!this.mayEnd(reachable.cell)) continue;
       const clean = this.pv(reachable.cell) - base;
       if (clean > 0) cells.push({ reachable, clean });
     }
@@ -838,7 +884,7 @@ class Planner {
       const cell = reachable.cell;
       const leashed = !relaunching && rangeToFurnace(cell, this.board.ownFurnace) > w.leash;
       if (leashed) continue;
-      if (!this.carrierMayEnd(cell)) continue;
+      if (!this.mayEnd(cell)) continue;
       const chased = this.chaseFloor(cell, reachable.provocations, 0);
       if (barred && !chased?.closer) continue;
 
@@ -969,6 +1015,11 @@ class Planner {
     // hunter, which has to get rid of the ball to go and hunt (2H.8).
     const unload = w.relaunch > 0 || this.board.hunter;
     const unloadBonus = w.relaunch + (this.board.hunter ? w.chaseSpark : 0);
+    // The free pass after a Shove that took the ball (écart 63, 2H.14, Jérôme:
+    // "qu'il ait joué ou pas") lifts the two filters of the chain, like a
+    // call for the ball does; range, sight, the interceptors and the cost of
+    // a throw backwards still rule.
+    const free = this.board.state.turn?.freePass === true && this.board.state.turn.unitId === unit.id;
 
     // Pressed where the throw is made: a hand-off is a way out of it.
     const pressed = options.shove.length > 0;
@@ -1005,7 +1056,7 @@ class Planner {
       // to whether or not it has played or stands behind; range, sight and the
       // interceptors still rule.
       const summoned = called?.receiverId === mate.id;
-      if (played && !lastLink && !unload && !exception && !summoned) continue;
+      if (played && !lastLink && !unload && !exception && !summoned && !free) continue;
 
       // A receiver still to play may be a whole move behind (2H.11, point
       // 9), whether or not it is the next to play: its own run carries the
@@ -1013,7 +1064,7 @@ class Planner {
       // even after the run, and a receiver that has played carries nothing.
       const gained =
         rangeToFurnace(origin, this.board.targetFurnace) - rangeToFurnace(mate, this.board.targetFurnace);
-      if (gained < 0 && !lastLink && !unload && !exception && !summoned && (played || -gained > moveCells)) continue;
+      if (gained < 0 && !lastLink && !unload && !exception && !summoned && !free && (played || -gained > moveCells)) continue;
 
       // The receiver's exposure where the ball arrives (2H.11, point 14), and
       // the possession (point 17): only to somebody less exposed than the

@@ -267,16 +267,16 @@ export function Match({
    */
   const [called, setCalled] = useState(false);
 
-  // The place popup floats over the top of the right column, outside the pitch,
-  // and the player can drag it (2026-10-14). The parent owns the position so it
-  // survives the popup unmounting between rounds: kept for the whole match.
+  // The place popup is born at the top left of the body (Jérôme, 2026-10-14,
+  // 2H.14; it used to sit over the right column) and the player can drag it.
+  // The parent owns the position so it survives the popup unmounting between
+  // rounds: kept for the whole match.
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [placePos, setPlacePos] = useState<{ x: number; y: number } | null>(null);
   const placeShown = placing !== null && !briefing;
   useLayoutEffect(() => {
     if (!placeShown || placePos !== null) return;
-    const rect = bodyRef.current?.getBoundingClientRect();
-    setPlacePos(rect && rect.width > 0 ? { x: Math.max(0, rect.width - 340), y: 0 } : { x: 0, y: 0 });
+    setPlacePos({ x: 0, y: 0 });
   }, [placeShown, placePos]);
 
   const postOrders = match.order;

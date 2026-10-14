@@ -107,6 +107,16 @@ export interface Board {
    */
   readonly hunter: boolean;
   /**
+   * Whether this unit reads the kick-off ball as already carried (2H.14,
+   * `00` C16 point 1, Jérôme's option b): the ball lies where nobody has yet
+   * carried it, and this role never takes it (`chaseKickoff` zero, the
+   * Trajector). `wardLine` then runs from the ball's cell a move's length
+   * towards the mouth it attacks, as for a Striker carrier still to play,
+   * and the relay terms read it: the Trajector ends up ahead of the ball, in
+   * range and in sight, instead of walking home on `guardFurnace`.
+   */
+  readonly kickoffRelay: boolean;
+  /**
    * Whether this unit, having shot this turn and missed, leaves the rebound
    * alone (2H.13, `00` C15 point 3, Jérôme): true when the ball lies loose
    * and a team-mate still to play this round reaches its cell with a move,
@@ -272,6 +282,14 @@ export function buildBoard(
       rangeToFurnace(unit, targetFurnace) < rangeToFurnace(ward, targetFurnace);
     carrierCanServe = played || lastLink || exception;
   }
+  // The kick-off ball, read as carried by the role that never takes it
+  // (2H.14, `00` C16 point 1): see `kickoffRelay`.
+  const kickoffRelay = !ward && carried === null && state.lastCarrierTeam === null && weights.chaseKickoff === 0;
+  if (kickoffRelay) {
+    const at = { x: state.payload.x, y: state.payload.y };
+    wardLine = [at, ...lineTo(at, carriedForward({ ...unit, x: at.x, y: at.y }, targetFurnace))];
+    carrierCanServe = true;
+  }
 
   // The clock and the score (2H.11, point 17): read on the last round only.
   const lastRound = state.round >= MATCH_ROUNDS || state.phase === 'suddenDeath';
@@ -300,6 +318,7 @@ export function buildBoard(
     crackerLines,
     crackerStrikes,
     hunter: sparkIsLive(state.spark) && weights.chaseSpark > 0,
+    kickoffRelay,
     shooterYields,
     threats,
     carrierReachable,
@@ -663,8 +682,8 @@ export function passReach(cell: Point, carrier: Point): number {
  * a team that wants the ball to come out has to stand.
  */
 export function outlet(board: Board, cell: Point): number {
-  const carrier = board.carrier;
-  if (!carrier) return 0;
+  // No carrier and no kick-off ball read as one (2H.14): nothing to relay.
+  if (!board.carrier && !board.kickoffRelay) return 0;
 
   // Read against where the carrier will be (2H.11, `00` C13 point 3): its
   // cell once it has played, otherwise every cell of its way to the mouth,
@@ -712,7 +731,9 @@ export function carrierStands(board: Board): readonly Point[] {
  * is priced by `avoidOpportunity`.
  */
 export function laneCover(board: Board, cell: Point): number {
-  const carrier = board.carrier;
+  // The kick-off ball read as carried (2H.14) is thrown by the unit's own
+  // shirt for the interceptors' sake: it is a Striker's throw in all but name.
+  const carrier = board.carrier ?? (board.kickoffRelay ? board.unit : null);
   if (!carrier) return 0;
 
   let best = 0;
@@ -851,6 +872,35 @@ export function block(board: Board, cell: Point): number {
 
 /** What settles a tie and nothing else: a thousandth of the place. */
 const TIE_BREAK = 0.001;
+
+/**
+ * What a cell is worth to a team-mate of our carrier (2H.10 and 2H.11), and
+ * since 2H.14 to the Trajector at the kick-off, which reads the loose ball as
+ * carried (`kickoffRelay`). Towards where the carrier will be (2H.11, point
+ * 3, `carrierStands`); a place taken beside it (`block`); getting open, in
+ * its sight, ahead of it, ideally with a shot (`outlet`, the A31 fix: without
+ * the sight and the ground gained a support player either strands its
+ * carrier at the far end or stands on its keeper's shoulder after a goal);
+ * unmarked (`laneCover`); spread out (C10 Striker 5); and, out of the
+ * carrier's reach altogether, something to come back for (`rejoin`). An
+ * outlet the carrier has no right to throw to this round is worth a
+ * fraction (`carrierCanServe`).
+ */
+function relayValue(board: Board, cell: Point): number {
+  const { unit, weights: w } = board;
+  let value = 0;
+  const stands = carrierStands(board);
+  let closeness = 0;
+  for (const at of stands) closeness = Math.max(closeness, nearness(cell, at));
+  value += w.screenCarrier * closeness;
+  if (w.block > 0) value += w.block * block(board, cell);
+  const serve = board.carrierCanServe ? 1 : UNSERVED_OUTLET;
+  if (w.supportAttack > 0) value += w.supportAttack * serve * outlet(board, cell);
+  if (w.cover > 0) value += w.cover * serve * laneCover(board, cell);
+  if (w.spread > 0) value -= w.spread * crowding(board, cell);
+  if (stands.every((at) => passReach(unit, at) === 0)) value += w.rejoin * closeness;
+  return value;
+}
 
 /** Adjacent team-mates who are not the carrier: the Striker's crowding (C10 Striker 5). */
 export function crowding(board: Board, cell: Point): number {
@@ -1095,29 +1145,11 @@ export function positionValue(board: Board, cell: Point, actionLeft = true): num
     if (cell.x === state.payload.x && cell.y === state.payload.y) {
       value += actionLeft ? w.grabPayload * share : share * carrierEnd(board, cell, false);
     }
+    // The kick-off ball read as carried (2H.14, `00` C16 point 1): the
+    // Trajector prices the relay it will be once a Striker has taken it.
+    if (board.kickoffRelay) value += relayValue(board, cell);
   } else if (board.carrier && board.carrier.team === unit.team) {
-    // Towards where the carrier will be (2H.11, point 3), see `carrierStands`.
-    const stands = carrierStands(board);
-    let closeness = 0;
-    for (const at of stands) closeness = Math.max(closeness, nearness(cell, at));
-    value += w.screenCarrier * closeness;
-    // A place taken beside our carrier (2H.10). See `block`.
-    if (w.block > 0) value += w.block * block(board, cell);
-    // Getting open: reachable, in the carrier's sight, ahead of it, and ideally
-    // with a shot. See `outlet`. Without the sight and the ground gained, a
-    // support player either walks to the far end and strands its carrier, or,
-    // after a goal, stands on its goalkeeper's shoulder for the rest of the
-    // match (A31). An outlet the carrier will have no right to throw to this
-    // round is worth a fraction (2H.10): see `carrierCanServe`.
-    const serve = board.carrierCanServe ? 1 : UNSERVED_OUTLET;
-    if (w.supportAttack > 0) value += w.supportAttack * serve * outlet(board, cell);
-    // And unmarked: a lane nobody is standing beside. See `laneCover`.
-    if (w.cover > 0) value += w.cover * serve * laneCover(board, cell);
-    // Spread out, never on a team-mate (C10 Striker 5, coded in 2H.10).
-    if (w.spread > 0) value -= w.spread * crowding(board, cell);
-    // Out of the carrier's reach altogether, every term above is zero and a
-    // Striker up the pitch had nothing to come back for. See `rejoin`.
-    if (stands.every((at) => passReach(unit, at) === 0)) value += w.rejoin * closeness;
+    value += relayValue(board, cell);
   } else if (board.carrier) {
     // On the last round, a carrier out of reach is not run after (2H.11,
     // point 17): only the contact is worth anything, and the swings are

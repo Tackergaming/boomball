@@ -13,8 +13,10 @@
  * drawing, and nowhere else. `testHook.cellToScreen` applies the same rule to
  * the stage element, so a script clicks where this file drew.
  *
- * The three thirds are marked by two faint lines and carry no rule: they are
- * there for the eye, not for the game.
+ * The thirds are not drawn (Jérôme, 2026-10-14, 2H.14): they carry no rule
+ * and the two dotted lines only cluttered the floor. The cells beside an
+ * opponent are marked in amber on every turn, the player's and the house's
+ * alike, because leaving one is what draws the opportunity attack.
  *
  * **Things move.** The board is handed the beat's final `state` and, beside it,
  * a `Motion`: the list of things that travelled during the beat. The state says
@@ -34,7 +36,7 @@ import { boxClosed, penaltyBoxCells } from '../../../engine/rules/box.js';
 import { pathCostFeet, pathTo, reachableCells, type Reachable } from '../../../engine/rules/movement.js';
 import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
-import { ARENA_HEIGHT, ARENA_WIDTH, THIRD_LENGTH, arena, spec } from '../lib/arena.js';
+import { ARENA_HEIGHT, ARENA_WIDTH, arena, spec } from '../lib/arena.js';
 import type { Pending } from './ActionBar.js';
 import type { Motion, MotionStep } from './motion.js';
 
@@ -358,24 +360,30 @@ export function Board({
   }, [legal, canMove, mover, planned, state]);
 
   /**
-   * The cells that are watched. `opportunityAttackers(state, mover, from, to)`
-   * answers "who is passed by stepping from one cell to the next", which needs
-   * a destination the player has not chosen, so it cannot say whether a cell on
-   * its own is inside someone's reach without inventing a `to`. Rather than
-   * invent one, a cell is marked when the shortest route that arrives there
-   * draws at least one swing (`provokedAlong(...).length > 0`). That is also
-   * what the player is deciding about: arriving in a reach costs nothing, it is
-   * the walk that went through one on the way that does.
+   * The cells under an opponent's reach (2H.14, Jérôme on 2026-10-14): every
+   * open cell beside an active opponent of the player's side, marked on every
+   * turn, the player's and the house's alike. Leaving one of them is what
+   * draws the swing; the route under the cursor turns amber when it does.
+   * Before 2H.14 a cell was marked during the player's turn only, and only
+   * when the shortest route in drew a swing, which is why the marks came and
+   * went: that reading is still what `swingsTo` prices on the route itself.
    */
   const watched = useMemo(() => {
     const out = new Set<string>();
-    if (!reachable || !mover) return out;
-    for (const [key, step] of reachable) {
-      const found = swingsTo(state, mover, planned, reachable, step.cell);
-      if (found && found.swings > 0) out.add(key);
+    for (const foe of units) {
+      if (foe.team === own) continue;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          if (dx === 0 && dy === 0) continue;
+          const cell = { x: foe.x + dx, y: foe.y + dy };
+          if (cell.x < 0 || cell.y < 0 || cell.x >= ARENA_WIDTH || cell.y >= ARENA_HEIGHT) continue;
+          if (arena.isSolid(cell)) continue;
+          out.add(`${cell.x},${cell.y}`);
+        }
+      }
     }
     return out;
-  }, [reachable, mover, planned, state]);
+  }, [units, own]);
 
   const origin: Point | null = mover ? { x: mover.x, y: mover.y } : null;
   const ahead = hover && reachable && mover ? swingsTo(state, mover, planned, reachable, hover) : null;
@@ -497,8 +505,8 @@ export function Board({
           by forty-five, and a border would make the SVG a different size. */}
       <div style={S.stage} ref={stageRef} data-board-stage>
         <svg viewBox={`0 0 ${COLS} ${ROWS}`} style={S.svg} shapeRendering="crispEdges">
-          {/* 1 to 5. The floor, the grid, the obstacles, the Furnaces and the
-              thirds. Nothing here moves, so it is drawn once. */}
+          {/* 1 to 5. The floor, the grid, the obstacles and the Furnaces.
+              Nothing here moves, so it is drawn once. */}
           <Backdrop own={own} />
 
           {/* 5b. The closed penalty boxes (écart 53): violet wash and a dashed
@@ -554,16 +562,16 @@ export function Board({
               />
             ))}
 
-          {/* 6b. Cells whose shortest way in draws a swing, in amber inside the
-              cell. Painted over the cyan and deaf to the mouse. */}
-          {reachable &&
-            [...watched].map((key) => {
-              const step = reachable.get(key)!;
+          {/* 6b. Cells under an opponent's reach, in amber inside the cell, on
+              every turn (2H.14). Painted over the cyan and deaf to the mouse. */}
+          {[...watched].map((key) => {
+              const [cx, cy] = key.split(',').map(Number) as [number, number];
               return (
                 <rect
                   key={`w${key}`}
-                  x={step.cell.y + 0.2}
-                  y={step.cell.x + 0.2}
+                  data-reach={key}
+                  x={cy + 0.2}
+                  y={cx + 0.2}
                   width={0.6}
                   height={0.6}
                   fill="none"
@@ -731,7 +739,7 @@ export function Board({
 
 /**
  * The layers that never change while a match is on: the floor, the grid, the
- * obstacles, the Furnaces and the thirds. Memoised on the only thing they
+ * obstacles and the Furnaces. Memoised on the only thing they
  * depend on, so a frame of animation does not rebuild some seven hundred
  * elements to move a dozen.
  */
@@ -797,20 +805,7 @@ const Backdrop = memo(function Backdrop({ own }: { own: 'A' | 'B' }) {
         )),
       )}
 
-      {/* 5. The thirds: two faint lines between columns, nothing more.
-          They carry no rule. */}
-      {range(ARENA_HEIGHT / THIRD_LENGTH - 1).map((i) => (
-        <line
-          key={`t${i}`}
-          x1={(i + 1) * THIRD_LENGTH}
-          y1={0}
-          x2={(i + 1) * THIRD_LENGTH}
-          y2={ROWS}
-          stroke="rgba(201,180,137,.28)"
-          strokeWidth={0.04}
-          strokeDasharray="0.3 0.3"
-        />
-      ))}
+      {/* The thirds are not drawn (2H.14): no rule, no line. */}
     </g>
   );
 });

@@ -43,12 +43,15 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * turn started on (`startedAt`, écart 56), a memory for the AI and the match
  * dump that no rule of play reads; version 7 is 2H.12, decided by Jérôme on
  * 2026-10-12: a human Striker or Breaker chooses its place in its role each
- * round (écart 58, `turn.placing`, the `choosePlace` action and two events).
+ * round (écart 58, `turn.placing`, the `choosePlace` action and two events);
+ * version 8 is 2H.13 (écarts 59 to 62, `turn.shot`, `recoilBlocked`); version
+ * 9 is 2H.14, decided by Jérôme on 2026-10-14: the free pass after a Shove
+ * that took the ball (écart 63, `turn.freePass`).
  * Nothing in the engine reads the version:
  * the server stamps it on `matches` and refuses a mismatch, and the client
  * archives what it cannot play.
  */
-export const ENGINE_VERSION = 8;
+export const ENGINE_VERSION = 9;
 
 // -- The penalty box (écart 53) --------------------------------------------
 

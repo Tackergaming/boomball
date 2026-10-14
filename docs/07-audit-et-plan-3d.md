@@ -1513,3 +1513,28 @@ la première ligne de code. **Pas de sweep**, à sa demande.
 
 **Ce qui attend Jérôme** : sa partie sur 2H.13, à consigner par `dump-match.ts`, et un sweep
 seulement s'il le demande.
+
+### Sous-phase 2H.14, « la passe gratuite après le Shove, le relais du Trajector au coup d'envoi, trois retours d'écran », codée le 2026-10-14, porte ouverte
+
+Par le fil principal (Fable 5.1), avec deux sous-agents Sonnet nommés ci-dessous, à partir de
+`00` C16 : les cinq retours de Jérôme après ses trois matchs sur le moteur 8, lus contre les
+événements, les plans du visualiseur et le code, reformulés, deux questions fermées tranchées en
+chat (« n'importe quand dans le tour », « b »), C16 validé avant la première ligne de code.
+**Pas de sweep**, pas demandé.
+
+| Quoi | État |
+|---|---|
+| Les matchs | Trois sur le moteur 8 le 2026-10-14 au soir, consignés et rejoués sans écart ni DIFFERS : `20edbca9` (Striker, 30-20), `b5910869` (Striker, 70-0), `dc474770` (Trajector, 70-30), gardés dans `docs/matches/` |
+| Le Trajector qui recule | Cause lue dans `b5910869` : premier de son équipe au round 1, personne ne porte le ballon, relais et mur valent zéro, `guardFurnace` seul tire, « dash, then walk to (5, 1) » à 1,7. Le journal de 2H.10 disait « fait par construction » : faux dans ce cas |
+| Écart 63, la passe gratuite | Fait, fil principal : `turn.freePass` (`types.ts`), posé par `applyShove` sur un porteur, consommé par `applyPass` (qui accepte `actionUsed` avec `freePass`), lu par `legalActions` (la passe seule survit à l'Action). **`ENGINE_VERSION` 9**. Un match du moteur 8 ne se rejoue plus avec ce dépôt |
+| L'IA, huitième passe | Fait, fil principal. **Point 1** : `Board.kickoffRelay` dans `evaluate.ts` (ballon jamais porté, rôle à `chaseKickoff` zéro) pose `wardLine` depuis la case du ballon vers la bouche adverse, `carrierCanServe` vrai ; `outlet` et `laneCover` lisent ces cases sans porteur ; la branche « coéquipier du porteur » de `positionValue` est sortie en `relayValue` et lue aussi au coup d'envoi ; `kickoffMayEnd` dans `chooseAction.ts`, lu par `mayEnd` aux quatre portes de `carrierMayEnd`, refuse toute case plus près de sa bouche que `turn.startedAt`. **Point 2** : `freeThrow` dans `Planner.plans` offre « passer » et « marcher puis passer » sans Action, `throwsAt` lève les deux filtres de la chaîne (`free`), jamais le tir |
+| L'écran | Fait, fil principal : la popup naît en `{ x: 0, y: 0 }` du corps (`screens/Match.tsx`) ; `Board.tsx` marque en permanence, `data-reach`, toute case ouverte adjacente à un adversaire actif de l'équipe du joueur, le marquage « la route la plus courte provoque » retiré avec la dette qui allait avec ; les deux lignes des tiers retirées, `THIRD_LENGTH` plus importé |
+| Tests | `engine/c16.test.ts`, 14 tests, **sous-agent Sonnet effort élevé** (le Shove qui pose la passe, le Shove raté ou sur un non-porteur qui ne la pose pas, `legalActions` après le Shove, la passe acceptée puis la seconde refusée, marcher puis passer, le tir et le Dash refusés, le tour suivant sans passe, la passe interceptable sur 120 graines, la version 9) ; `ai/eighthPass.test.ts`, 12 tests, **sous-agent Sonnet effort élevé** (le Trajector A finit en (8, 29) à 51 points, jamais plus près de sa bouche, aucun plan ne ramasse ; la passe gratuite vers un receveur devant, qui a joué, derrière, « marcher puis passer », jamais de tir, les filtres tiennent sans passe gratuite) ; un test de `c15` retitré, la passe étant désormais permise. **643 tests sur 29 fichiers contre 617 sur 27**, typecheck racine, scripts et e2e verts, client typecheck et build verts |
+| Vérification | Dix-huit matchs d'auto-jeu (`scripts/control-2h14.ts`), pas un sweep : 1,7 / 1,8 / 1,8 buts de ballon par match ; 92 prises de balle sur 93 Shove réussis, **87 passes gratuites jouées derrière, 4 volées** ; Trajector 0/18 au coup d'envoi ; **0 Trajector sur 36 qui recule au round 1, 36 sur 36 finissent à portée de passe du ballon**, les A en (7, 21) à (10, 31), les B en relais ou sur le porteur ; 1,4 à 2,7 s par match selon la charge de la machine, le même dépôt mesuré par `control-2h13.ts` dans la même fourchette |
+| Harnais | Le serveur Vite de Jérôme occupant 5173 sans le crochet, un second Vite avec le crochet sur 5174 et `BASE_URL` ; `ENGINE_VERSION` épinglée à 8 le temps du run puis remise à 9. Smoke vert en 34 s, playthrough vert en 29 s (18 requêtes humaines, 0 refusée). Captures lues : **la popup en haut à gauche**, **les carrés orange autour de chaque adversaire pendant la popup comme pendant le tour**, **plus aucune ligne de tiers**, et dans le fil du playthrough « Ogga Sparshot shoves Dolm Ramrod and takes the Payload » |
+| Commit | À suivre |
+
+**Ce qui attend Jérôme** : son feu vert de redéploiement (`resolve-action` v20, `create-match`
+v18, moteur 9, les matchs ouverts du moteur 8 archivés), sa partie sur 2H.14, et un sweep
+seulement s'il le demande. Puis la phase 3, la scène 2.5D statique, dont A20 (React 19) est le
+premier pas ; il a déjà généré un Giff en 3D avec Meshy, à déposer en `glb` dans `context/import/`.
