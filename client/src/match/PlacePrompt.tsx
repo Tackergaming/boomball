@@ -7,12 +7,16 @@
  * the role is off the field). This replaces écart 55's "a human always plays
  * last of its role", which kept the player from ever opening a play.
  *
- * Closing the popup without choosing, by the button, Escape or a click on the
- * scrim, is a choice too: the player plays last, as before. The popup carries
- * its own clock, and the parent passes the seconds left.
+ * Closing the popup without choosing, by the button or Escape, is a choice too:
+ * the player plays last, as before. The popup carries its own clock, and the
+ * parent passes the seconds left.
+ *
+ * Jérôme, 2026-10-14: no scrim and not in the middle of the screen. The card
+ * floats over the right column so the pitch stays readable while choosing, and
+ * its header is a handle to drag it. The parent owns the position.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface PlacePromptProps {
   /** The player's Giff name, e.g. "Tacker". */
@@ -24,6 +28,9 @@ export interface PlacePromptProps {
   readonly secondsLeft: number | null;
   /** True while a request is in flight: buttons disabled. */
   readonly busy: boolean;
+  /** Top-left corner inside the positioned parent, in px. */
+  readonly position: { readonly x: number; readonly y: number };
+  readonly onMove: (position: { x: number; y: number }) => void;
   readonly onChoose: (place: number) => void;
   /** Closing without choosing: the caller sends the last place. */
   readonly onClose: () => void;
@@ -32,7 +39,50 @@ export interface PlacePromptProps {
 const ORDINAL = ['', '1st', '2nd', '3rd'];
 const HINT = ['', 'open the play', 'read one team-mate first', 'read two team-mates first'];
 
-export function PlacePrompt({ name, role, places, secondsLeft, busy, onChoose, onClose }: PlacePromptProps) {
+/** Pixels of the card that must stay inside the parent. */
+const KEEP = 60;
+
+export function PlacePrompt({
+  name,
+  role,
+  places,
+  secondsLeft,
+  busy,
+  position,
+  onMove,
+  onChoose,
+  onClose,
+}: PlacePromptProps) {
+  const card = useRef<HTMLDivElement | null>(null);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
+
+  const clamp = (x: number, y: number) => {
+    const el = card.current;
+    const parent = el?.offsetParent as HTMLElement | null;
+    if (!el || !parent) return { x, y };
+    return {
+      x: Math.min(Math.max(x, KEEP - el.offsetWidth), parent.clientWidth - KEEP),
+      y: Math.min(Math.max(y, 0), parent.clientHeight - KEEP),
+    };
+  };
+
+  const onDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    drag.current = { dx: event.clientX - position.x, dy: event.clientY - position.y };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+  const onDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return;
+    onMove(clamp(event.clientX - drag.current.dx, event.clientY - drag.current.dy));
+  };
+  const onUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -45,11 +95,27 @@ export function PlacePrompt({ name, role, places, secondsLeft, busy, onChoose, o
   const slots = Array.from({ length: places }, (_, i) => i + 1);
 
   return (
-    <div style={S.scrim} onClick={onClose}>
-      <div style={S.panel} data-testid="place-prompt" onClick={(event) => event.stopPropagation()}>
+    <div
+      ref={card}
+      style={{ ...S.panel, left: position.x, top: position.y }}
+      data-testid="place-prompt"
+    >
+      <div
+        style={S.handle}
+        title="Drag to move"
+        onPointerDown={onDown}
+        onPointerMove={onDrag}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+      >
         <p className="label" style={{ margin: 0, color: 'var(--brass)' }}>
           Round order
         </p>
+        <span aria-hidden style={S.grip}>
+          ⋮⋮
+        </span>
+      </div>
+      <div style={S.content}>
         <h2 className="display" style={S.title}>
           When does {name} play?
         </h2>
@@ -87,37 +153,44 @@ export function PlacePrompt({ name, role, places, secondsLeft, busy, onChoose, o
 }
 
 const S: Record<string, React.CSSProperties> = {
-  scrim: {
-    position: 'absolute',
-    inset: 0,
-    display: 'grid',
-    placeItems: 'center',
-    background: 'rgba(4,5,7,.78)',
-    zIndex: 10,
-  },
   panel: {
-    width: 480,
-    maxWidth: '92%',
-    padding: 26,
+    position: 'absolute',
+    zIndex: 10,
+    boxSizing: 'border-box',
+    width: 340,
+    maxWidth: '100%',
+    minWidth: 0,
     background: 'var(--panel)',
     border: '1px solid var(--brass-dim)',
-    boxShadow: '0 20px 60px rgba(0,0,0,.6)',
+    boxShadow: '0 12px 36px rgba(0,0,0,.55)',
   },
-  title: { margin: '6px 0 10px', fontSize: 26 },
+  handle: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 14px',
+    borderBottom: '1px solid var(--line)',
+    cursor: 'grab',
+    touchAction: 'none',
+    userSelect: 'none',
+  },
+  grip: { color: 'var(--text-dim)', letterSpacing: '-.1em' },
+  content: { padding: '12px 14px 14px' },
+  title: { margin: '0 0 8px', fontSize: 22 },
   body: { margin: 0, fontSize: 12, lineHeight: 1.6, color: 'var(--text-dim)' },
-  row: { display: 'flex', gap: 10, marginTop: 18 },
+  row: { display: 'flex', gap: 8, marginTop: 12 },
   place: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: 4,
-    padding: '12px 8px',
+    padding: '10px 6px',
     background: 'var(--panel-deep)',
     border: '1px solid var(--line)',
   },
   ordinal: { fontSize: 22, color: 'var(--brass)' },
   hint: { fontSize: 11, lineHeight: 1.4, color: 'var(--text-dim)', textAlign: 'center' },
-  actions: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 18 },
+  actions: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 12 },
   clock: { marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 14, letterSpacing: '.06em' },
 };

@@ -5,6 +5,7 @@ import { KILL_SILO } from './arenas/kill-silo.js';
 import { MOVE_SPEED_FEET, PENALTY_BOX_CELLS, PENALTY_BOX_ROUNDS } from './constants.js';
 import type { MatchEvent } from './events.js';
 import { distance, type Point } from './geometry.js';
+import { RELAUNCH_ORDER } from './initiative.js';
 import { openMatch, reduce } from './reduce.js';
 import { barredCells, boxClosed, penaltyBoxCells } from './rules/box.js';
 import { pushDestination } from './rules/combat.js';
@@ -50,6 +51,7 @@ function clockOn(state: MatchState, id: UnitId): MatchState {
       objectInteractionUsed: false,
       disengaged: false,
       placing: null,
+      shot: false,
     },
   };
 }
@@ -203,18 +205,27 @@ describe('the penalty box, écart 53', () => {
   });
 });
 
-describe('the keeper’s relaunch, écart 54', () => {
+describe('the keeper’s relaunch, écart 54 reordered by écart 62', () => {
   function sideSlots(state: MatchState, team: 'A' | 'B'): UnitId[] {
     return state.turnOrder
       .filter((s) => s.actor.kind === 'unit' && s.team === team)
       .map((s) => (s.actor as { unitId: UnitId }).unitId);
   }
 
+  function sideRoles(state: MatchState, team: 'A' | 'B'): string[] {
+    return sideSlots(state, team).map((id) => unit(state, id).role);
+  }
+
   function firstIndexOf(state: MatchState, team: 'A' | 'B'): number {
     return state.turnOrder.findIndex((s) => s.actor.kind === 'unit' && s.team === team);
   }
 
-  it('moves the conceding keeper to the head of its block when that block is still ahead', () => {
+  /** The same slots regrouped Trajector, Strikers, Bulwark, Breakers, order kept inside a role. */
+  function inRelaunchOrder(state: MatchState, ids: readonly UnitId[]): UnitId[] {
+    return RELAUNCH_ORDER.flatMap((role) => ids.filter((id) => unit(state, id).role === role));
+  }
+
+  it('moves the conceding keeper in front of its Breakers when that block is still ahead', () => {
     // Pick a seed on which B's block comes before A's, so A is still to play.
     for (let seed = 1; seed < 40; seed++) {
       const probe = parked(seed);
@@ -226,12 +237,17 @@ describe('the keeper’s relaunch, écart 54', () => {
         return s;
       });
       expect(firstIndexOf(before, 'A')).toBeGreaterThan(before.turnIndex);
-      expect(sideSlots(before, 'A')[0]).not.toBe('A-bulwark-1');
+      // Before the goal the keeper is last of its block (ROLE_ORDER).
+      expect(sideRoles(before, 'A').at(-1)).toBe('bulwark');
 
-      expect(sideSlots(after, 'A')[0]).toBe('A-bulwark-1');
-      expect(sideSlots(after, 'A').slice(1)).toEqual(
-        sideSlots(before, 'A').filter((id) => id !== 'A-bulwark-1'),
-      );
+      // Trajector, Strikers, Bulwark, Breakers: the keeper's slot is right
+      // before the side's first Breaker, and nobody else changes order.
+      expect(sideSlots(after, 'A')).toEqual(inRelaunchOrder(before, sideSlots(before, 'A')));
+      const roles = sideRoles(after, 'A');
+      expect(roles.indexOf('bulwark')).toBe(roles.indexOf('breaker') - 1);
+      expect(roles.indexOf('bulwark')).toBeGreaterThan(roles.lastIndexOf('striker'));
+      expect(roles.indexOf('trajector')).toBe(0);
+
       // B's own block and the cursor are untouched, ranks renumbered.
       expect(sideSlots(after, 'B')).toEqual(sideSlots(before, 'B'));
       expect(after.turnIndex).toBe(before.turnIndex);
@@ -242,7 +258,7 @@ describe('the keeper’s relaunch, écart 54', () => {
     throw new Error('no seed put B before A');
   });
 
-  it('opens the next round with the keeper when the conceding side has already played', () => {
+  it('opens the next round in relaunch order when the conceding side has already played', () => {
     for (let seed = 1; seed < 40; seed++) {
       const probe = parked(seed);
       if (firstIndexOf(probe, 'A') > firstIndexOf(probe, 'B')) continue;
@@ -266,7 +282,12 @@ describe('the keeper’s relaunch, écart 54', () => {
         state = r.state;
       }
       expect(state.round).toBe(after.round + 1);
-      expect(sideSlots(state, 'A')[0]).toBe('A-bulwark-1');
+      const roles = sideRoles(state, 'A');
+      const expectedRoles = RELAUNCH_ORDER.flatMap((role) =>
+        state.units.filter((u) => u.team === 'A' && u.status === 'active' && u.role === role).map(() => role),
+      );
+      expect(roles).toEqual(expectedRoles);
+      expect(roles.indexOf('bulwark')).toBe(roles.indexOf('breaker') - 1);
       expect(state.relaunch).toBeNull();
 
       // And only that once: the round after, the keeper is back at the tail.

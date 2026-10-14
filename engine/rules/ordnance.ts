@@ -29,6 +29,7 @@ import {
   CRACKER_MOVE_CELLS,
   CRACKER_PARRY_ARC_HALF_WIDTH,
   SPARK_MOVE_CELLS,
+  SPARK_RETURN_DISTANCE,
   SPARK_SPAWN_MIN_DISTANCE,
   SPARK_SPAWN_THIRD,
 } from '../constants.js';
@@ -392,14 +393,72 @@ export function sparkEntryCell(arena: Arena, state: MatchState, rng: Rng): Point
 }
 
 /**
- * Count 10. Six cells along the heading it already had, in the plane of the
- * pitch, **bouncing** off obstacles and the edge and spending the rest of the
- * move on the new heading (écart 36).
- *
- * No dice. The d8 is rolled once, when it drops in; after that the Spark is a
- * ball on a table and the only thing that turns it is something solid. That is
- * what a player is meant to read off the board and cut across, and it is why
- * this function takes no rng.
+ * Where the Spark comes back after a catch (écart 60, 2H.13, Jérôme): a cell
+ * `SPARK_RETURN_DISTANCE` from each active Trajector, the same distance for
+ * both so that neither is favoured. When no cell is exactly that, the cells
+ * whose two distances stray least from it, the dice splitting ties. The
+ * middle third no longer matters; the clearance from every unit (écart 36)
+ * still does, and gives way as it does at entry when nothing is clear. One
+ * Trajector on the field: that distance from it. None: the entry rule.
+ */
+export function sparkReturnCell(arena: Arena, state: MatchState, rng: Rng): Point {
+  const units = activeUnits(state);
+  const trajectors = units.filter((u) => u.role === 'trajector');
+  if (trajectors.length === 0) return sparkEntryCell(arena, state, rng);
+
+  const all = [...arena.occupiableCells()];
+  const clearance = (c: Point): number => Math.min(...units.map((u) => distance(c, u)));
+  const clear = all.filter((c) => clearance(c) >= SPARK_SPAWN_MIN_DISTANCE);
+  const cells = clear.length > 0 ? clear : all.filter((c) => clearance(c) > 0);
+  if (cells.length === 0) throw new Error('the arena has no open cell for the Spark to return to');
+
+  const stray = (c: Point): number =>
+    Math.max(...trajectors.map((t) => Math.abs(distance(c, t) - SPARK_RETURN_DISTANCE)));
+  const best = Math.min(...cells.map(stray));
+  return rng.pick(cells.filter((c) => stray(c) === best));
+}
+
+/**
+ * The face the Spark drifts on this round (écart 59, 2H.13, Jérôme): a d8
+ * among the faces that do not take it towards a Trajector. A face is barred
+ * when its first cell, bounce included, lies nearer to any active Trajector
+ * than the cell it stands on; with every face barred it takes the face whose
+ * whole run ends furthest from the nearest Trajector, lowest face on a tie,
+ * no dice. The Spark no longer keeps a heading from round to round: the one
+ * rolled at entry (écart 36) is gone, and the bounces inside a run stay.
+ */
+export function sparkDriftFace(arena: Arena, state: MatchState, rng: Rng): number {
+  const from = { x: state.spark.x, y: state.spark.y };
+  const trajectors = activeUnits(state).filter((u) => u.role === 'trajector');
+  const faces = [1, 2, 3, 4, 5, 6, 7, 8];
+  if (trajectors.length === 0) return rng.die(8);
+
+  const towards = (face: number): boolean => {
+    const first = sparkRun(arena, from, face).path[0] ?? from;
+    return trajectors.some((t) => distance(first, t) < distance(from, t));
+  };
+  const allowed = faces.filter((face) => !towards(face));
+  if (allowed.length > 0) return rng.pick(allowed);
+
+  const nearest = (p: Point): number => Math.min(...trajectors.map((t) => distance(p, t)));
+  let bestFace = 1;
+  let bestGap = -1;
+  for (const face of faces) {
+    const gap = nearest(sparkRun(arena, from, face).landing);
+    if (gap > bestGap) {
+      bestGap = gap;
+      bestFace = face;
+    }
+  }
+  return bestFace;
+}
+
+/**
+ * Count 10. Six cells along a heading, in the plane of the pitch,
+ * **bouncing** off obstacles and the edge and spending the rest of the move
+ * on the new heading (écart 36). Pure: the face is chosen by
+ * `sparkDriftFace` (écart 59, a d8 each round away from the Trajectors), and
+ * this only walks it.
  *
  * Nothing it crosses matters. The Spark is not a projectile and hits nobody:
  * the only thing that ever happens to it is being caught.

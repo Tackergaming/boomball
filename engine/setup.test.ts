@@ -364,15 +364,30 @@ describe('the initiative ladder (écart 51)', () => {
     }
   });
 
-  it('keeps the relaunching keeper at the head of its side even when it is the human (écart 54 over 55)', () => {
+  it('puts the relaunching keeper after the Strikers and before the Breakers, even when it is the human (écart 62 over 55)', () => {
     const state = createMatch({
       ...base,
       humans: [{ humanId: 'jerome', role: 'bulwark' }],
     });
     const conceded = { ...state, relaunch: 'A' as const };
     const order = buildTurnOrder(arena, conceded);
-    const firstA = order.find((s) => s.team === 'A')!;
-    expect(firstA.actor.kind === 'unit' && roleOf(state, firstA.actor.unitId)).toBe('bulwark');
+    const roles = order
+      .filter((s) => s.team === 'A')
+      .map((s) => (s.actor.kind === 'unit' ? roleOf(state, s.actor.unitId) : null));
+    expect(roles).toEqual([
+      'trajector',
+      'striker',
+      'striker',
+      'striker',
+      'bulwark',
+      'breaker',
+      'breaker',
+    ]);
+    // The side that did not concede keeps the ordinary ladder.
+    const rolesB = order
+      .filter((s) => s.team === 'B')
+      .map((s) => (s.actor.kind === 'unit' ? roleOf(state, s.actor.unitId) : null));
+    expect(rolesB.at(-1)).toBe('bulwark');
   });
 
   it('orders two humans of the same role by their kick-off d20, never tied', () => {

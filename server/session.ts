@@ -343,5 +343,13 @@ function deadlineFor(
  */
 function clockKey(state: MatchState): string | null {
   if (!state.turn) return null;
-  return state.turn.placing != null ? `${state.turn.unitId}#place` : state.turn.unitId;
+  // The round and the cursor are part of the key (2H.13). With the unit alone,
+  // a Trajector or a Bulwark, which has no place to choose, read as "the same
+  // turn carrying on" round after round and kept its round 1 deadline for the
+  // whole match: once two minutes had passed, every later turn expired on the
+  // first click. Jérôme saw it at round 4 or 5 as Trajector, round 8 as
+  // Bulwark. A Striker or Breaker escaped it only because the place prompt
+  // changed the key twice a round.
+  const turn = `${state.turn.unitId}@${state.round}:${state.turnIndex}`;
+  return state.turn.placing != null ? `${turn}#place` : turn;
 }

@@ -189,7 +189,21 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   const step: SessionStep = served.step;
   const fromSeq = snapshot.seq + 1;
-  await persist(db, matchId, snapshot.seq, step, step.events, orders);
+  // A call for the ball lasts until the caller's next turn opens (2H.13,
+  // `00` C15 point 6, Jérôme on 2026-10-14). It stood for the whole match
+  // before, pulling throws towards a player who had called in round 2. The
+  // AI that just played read it; what is written back drops every call whose
+  // receiver's turn started in this batch, except one given in this very
+  // request, which is meant for the turns to come.
+  const opened = new Set(
+    step.events
+      .filter((event) => (event as { kind: string }).kind === 'turnStarted')
+      .map((event) => (event as { unitId: string }).unitId),
+  );
+  const standingOrders = orders.filter(
+    (order) => !(order.kind === 'callForPass' && opened.has(order.receiverId) && !added.includes(order)),
+  );
+  await persist(db, matchId, snapshot.seq, step, step.events, standingOrders);
   await recordResult(db, match.team_id as string, state, step.session.state);
 
   // Realtime carries the same batch the caller gets back, so the other two

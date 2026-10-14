@@ -7,6 +7,7 @@ import {
   BULWARK_BLOCK_BONUS,
   FURNACE_AC,
   GOAL_POINTS,
+  MOVE_SPEED_FEET,
   SUBSTITUTE_DELAY_ROUNDS,
 } from './constants.js';
 import type { MatchEvent } from './events.js';
@@ -257,47 +258,38 @@ describe('shoving', () => {
     return events.find((e): e is Extract<MatchEvent, { kind: 'shoved' }> => e.kind === 'shoved')!;
   }
 
-  it('takes the ball off a carrier, leaves it standing there, and rolls the ball a cell away', () => {
+  it('takes the ball off a carrier straight into the shover’s hands, and moves nobody (écart 61)', () => {
     const { state, events, victimId } = shoveWon({
       shover: { x: 7, y: 22 },
       victim: { x: 8, y: 22 },
       victimExtra: { holdingPayload: true },
     });
 
-    // Stripping the carrier and moving it in the same action undid the whole
-    // trip towards a Furnace and made scoring impossible. Only the strip is left.
-    expect(events.some((e) => e.kind === 'payloadDropped')).toBe(true);
-    expect(shoveEvent(events).pushedTo).toBeNull();
-    expect(state.payload.carriedBy).toBeNull();
+    // Since 2H.13 the ball no longer rolls loose beside the carrier (écart 42
+    // still rules an evacuated one): it is in the shover's hands at once.
+    expect(shoveEvent(events)).toMatchObject({ success: true, pushedTo: null, tookPayload: true });
+    expect(events.some((e) => e.kind === 'payloadDropped')).toBe(false);
+    expect(events.some((e) => e.kind === 'payloadScattered')).toBe(false);
 
     const stripped = state.units.find((u) => u.id === victimId)!;
     expect({ x: stripped.x, y: stripped.y }).toEqual({ x: 8, y: 22 });
     expect(stripped.holdingPayload).toBe(false);
 
-    // Écart 42: the ball no longer stays under the carrier's feet, where only
-    // the carrier could pick it up again. It rolls one cell, to a free one,
-    // and never onto the shover: a Shove still has to go and fetch it.
-    const ball = { x: state.payload.x, y: state.payload.y };
-    expect(ball).not.toEqual({ x: 8, y: 22 });
-    expect(ball).not.toEqual({ x: 7, y: 22 });
-    expect(distance(ball, { x: 8, y: 22 })).toBe(1);
-    expect(arena.isOccupiable(ball)).toBe(true);
-    expect(state.units.some((u) => u.status === 'active' && u.x === ball.x && u.y === ball.y)).toBe(false);
+    const shover = state.units.find((u) => u.x === 7 && u.y === 22)!;
+    expect(shover.holdingPayload).toBe(true);
+    expect(state.payload).toEqual({ carriedBy: shover.id, x: 7, y: 22 });
+    expect(state.units.filter((u) => u.holdingPayload)).toHaveLength(1);
 
-    const rolled = events.find((e) => e.kind === 'payloadScattered');
-    expect(rolled).toMatchObject({ to: ball, cells: 1 });
-    expect((rolled as { direction: number }).direction).toBeGreaterThanOrEqual(1);
-    expect((rolled as { direction: number }).direction).toBeLessThanOrEqual(8);
-    // The drop is logged before the roll, so a reader sees hands then floor.
-    expect(events.findIndex((e) => e.kind === 'payloadDropped')).toBeLessThan(
-      events.findIndex((e) => e.kind === 'payloadScattered'),
-    );
+    // The Action is spent, the walk that is left is kept.
+    expect(state.turn!.actionUsed).toBe(true);
+    expect(state.turn!.movementFeetRemaining).toBe(MOVE_SPEED_FEET);
   });
 
-  it('never rolls the dropped ball into an obstacle, off the pitch, or under a player', () => {
+  it('puts the ball in the shover’s hands even with the carrier’s back to the edge (écart 61)', () => {
     // The carrier stands beside the edge pillar at (0, 22) with the edge of
-    // the pitch behind it, and the shover beside it: whatever the d8 says, the
-    // ball lands on a free cell beside the carrier.
+    // the pitch behind it, which used to bound where the ball could roll to.
+    // Nothing rolls any more: whatever the seed, the ball goes to the shover.
+    let checked = 0;
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
       let found: { state: MatchState; victimId: UnitId } | null = null;
       try {
@@ -305,15 +297,16 @@ describe('shoving', () => {
       } catch {
         continue;
       }
-      const { state } = found;
-      const ball = { x: state.payload.x, y: state.payload.y };
-      expect(state.payload.carriedBy).toBeNull();
-      expect(distance(ball, { x: 1, y: 22 })).toBe(1);
-      expect(arena.isOccupiable(ball)).toBe(true);
-      expect(ball).not.toEqual({ x: 0, y: 22 });
-      expect(ball).not.toEqual({ x: 1, y: 21 });
-      expect(state.units.some((u) => u.status === 'active' && u.x === ball.x && u.y === ball.y)).toBe(false);
+      const { state, victimId } = found;
+      const shover = state.units.find((u) => u.x === 1 && u.y === 21)!;
+      expect(shover.holdingPayload).toBe(true);
+      expect(state.payload).toEqual({ carriedBy: shover.id, x: 1, y: 21 });
+      const stripped = state.units.find((u) => u.id === victimId)!;
+      expect(stripped.holdingPayload).toBe(false);
+      expect({ x: stripped.x, y: stripped.y }).toEqual({ x: 1, y: 22 });
+      checked++;
     }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it('pushes anyone who is not carrying one cell straight away', () => {

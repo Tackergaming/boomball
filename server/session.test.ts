@@ -136,6 +136,51 @@ describe('the clock belongs to the turn, not to the request', () => {
       expect(ended.step.session.turnDeadline).toBeGreaterThan(opened);
     }
   });
+
+  // 2H.13: the key used to be the unit alone. A role with no place to choose
+  // (Trajector, Bulwark) read as "the same turn carrying on" round after
+  // round and kept the round 1 deadline all match, so once two minutes had
+  // passed every later turn expired on the first click.
+  it.each(['trajector', 'bulwark'] as const)(
+    'gives a lone human %s a fresh deadline every round, never the one of round 1',
+    (role) => {
+      const session = settle(open([{ humanId: 'jerome', role, name: 'Solo' }]).session);
+      const unitId = session.state.turn!.unitId;
+      expect(session.state.round).toBe(1);
+      expect(session.state.turn!.placing ?? null).toBeNull();
+      expect(session.turnDeadline).toBe(T0 + TURN_TIMER_SECONDS * 1000);
+
+      // Round 1 is played inside its clock, a hundred seconds in.
+      const t1 = T0 + 100_000;
+      const ended = submitAction(arena, session, { humanId: 'jerome', unitId, action: { kind: 'endTurn' } }, t1);
+      expect(ended.ok).toBe(true);
+      if (!ended.ok) return;
+      const next = ended.step.session;
+
+      // The step ends on the same unit's turn again, one round later.
+      expect(next.state.phase).not.toBe('finished');
+      expect(next.state.round).toBe(2);
+      expect(next.state.turn!.unitId).toBe(unitId);
+      expect(next.state.turn!.placing ?? null).toBeNull();
+
+      // A fresh clock made at the time of that request, not round 1's.
+      expect(next.turnDeadline).toBe(t1 + TURN_TIMER_SECONDS * 1000);
+      expect(next.turnDeadline).not.toBe(session.turnDeadline);
+
+      // A hundred and thirty seconds after the match opened, the old deadline
+      // is long gone and the new one is not: the first click of round 2 plays.
+      const t2 = T0 + 130_000;
+      expect(isExpired(session, t2)).toBe(true);
+      expect(isExpired(next, t2)).toBe(false);
+      const served = serveAction(arena, next, { humanId: 'jerome', unitId, action: { kind: 'dodge' } }, t2);
+      expect(served.ok).toBe(true);
+      if (!served.ok) return;
+      expect(served.expired).toBe(false);
+      // And the turn in progress keeps the deadline it was given (not restarted).
+      expect(served.step.session.state.turn!.unitId).toBe(unitId);
+      expect(served.step.session.turnDeadline).toBe(next.turnDeadline);
+    },
+  );
 });
 
 describe('who may move what', () => {

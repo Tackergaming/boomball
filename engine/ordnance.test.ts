@@ -15,6 +15,7 @@ import {
   SPARK_ENTRY_ROUND,
   SPARK_MOVE_CELLS,
   SPARK_POINTS,
+  SPARK_RETURN_DISTANCE,
   SPARK_SPAWN_MIN_DISTANCE,
   SPARK_SPAWN_THIRD,
 } from './constants.js';
@@ -143,6 +144,23 @@ function until(start: MatchState, reached: (s: MatchState) => boolean, limit = 4
   }
   if (!reached(state)) throw new Error('the match never reached the wanted point');
   return state;
+}
+
+/** `until`, keeping every event that went by on the way. */
+function untilLogged(
+  start: MatchState,
+  reached: (s: MatchState) => boolean,
+  limit = 4000,
+): { state: MatchState; events: readonly MatchEvent[] } {
+  let state = start;
+  const events: MatchEvent[] = [];
+  for (let i = 0; i < limit && !reached(state) && state.phase !== 'finished'; i++) {
+    const step = must(state, { kind: 'endTurn' });
+    state = step.state;
+    events.push(...step.events);
+  }
+  if (!reached(state)) throw new Error('the match never reached the wanted point');
+  return { state, events };
 }
 
 /** A cleared board with one player put somewhere on purpose. */
@@ -1182,13 +1200,23 @@ describe('the Spark in a match', () => {
     expect(before.turnOrder.some((slot) => slot.actor.kind === 'spark')).toBe(false);
   });
 
-  it('arrives at the top of round 6 and takes the first rung', () => {
-    const arrived = until(opened().state, (s) => s.round === SPARK_ENTRY_ROUND);
+  it('arrives at the top of round 6 in the middle third, with no heading rolled, and takes the first rung', () => {
+    const { state: arrived, events } = untilLogged(opened().state, (s) => s.round === SPARK_ENTRY_ROUND);
 
+    const entered = events.find((e) => e.kind === 'sparkEntered');
+    expect(entered).toBeDefined();
+    if (!entered || entered.kind !== 'sparkEntered') throw new Error('unreachable');
+    // The round 6 entry is unchanged by écart 60: the middle third, off the obstacles.
+    expect(thirdOf(entered.at)).toBe(SPARK_SPAWN_THIRD);
+    expect(arena.isOccupiable(entered.at)).toBe(true);
+
+    // Écart 59 (2H.13): nothing is rolled at entry, the first dart rolls its
+    // own face, so the Spark is already on its first run when the round opens.
+    const first = events.find((e) => e.kind === 'sparkMoved');
+    expect(first).toMatchObject({ cause: 'drift', from: entered.at });
     expect(arrived.spark.state).toBe('live');
     expect(arrived.spark.heading).toBeGreaterThanOrEqual(1);
     expect(arrived.spark.heading).toBeLessThanOrEqual(8);
-    expect(thirdOf(arrived.spark)).toBe(SPARK_SPAWN_THIRD);
     expect(arena.isOccupiable(arrived.spark)).toBe(true);
     expect(arrived.turnOrder[0]!.actor.kind).toBe('spark');
   });
@@ -1207,22 +1235,26 @@ describe('the Spark in a match', () => {
     expect({ x: state.spark.x, y: state.spark.y }).toEqual((moved as { to: Point }).to);
   });
 
-  it('carries its heading from one dart to the next unless a wall turns it', () => {
+  it('rolls a fresh face for every dart, and keeps the last run’s heading for show (écart 59)', () => {
     let state = until(opened().state, (s) => s.round === SPARK_ENTRY_ROUND);
-    const darts: { direction: number; headingAfter: number }[] = [];
+    const darts: { from: Point; direction: number; headingAfter: number | null }[] = [];
 
     for (let i = 0; i < 4000 && darts.length < 3; i++) {
       const step = must(state, { kind: 'endTurn' });
       state = step.state;
-      const moved = step.events.find((e) => e.kind === 'sparkMoved');
-      if (moved) darts.push({ direction: moved.direction, headingAfter: state.spark.heading! });
+      const moved = step.events.find((e) => e.kind === 'sparkMoved' && e.cause === 'drift');
+      if (moved && moved.kind === 'sparkMoved') {
+        darts.push({ from: moved.from, direction: moved.direction, headingAfter: state.spark.heading });
+      }
     }
 
     expect(darts).toHaveLength(3);
-    // Every dart leaves on the heading the next one travels on. A reroll every
-    // round is exactly what this rules out.
-    expect(darts[1]!.direction).toBe(darts[0]!.headingAfter);
-    expect(darts[2]!.direction).toBe(darts[1]!.headingAfter);
+    for (const dart of darts) {
+      expect(dart.direction).toBeGreaterThanOrEqual(1);
+      expect(dart.direction).toBeLessThanOrEqual(8);
+      // Informational only: it is what the run ended on after any bounce.
+      expect(dart.headingAfter).toBe(sparkRun(arena, dart.from, dart.direction).heading);
+    }
   });
 });
 
@@ -1297,9 +1329,16 @@ describe('catching the Spark', () => {
 
       // Off the field and off the ladder for the rest of this round.
       expect(after.spark.state).toBe('pending');
-      const rest = until(after, (s) => s.round === after.round + 1);
+      const { state: rest, events: gone } = untilLogged(after, (s) => s.round === after.round + 1);
       expect(rest.spark.state).toBe('live');
-      expect(thirdOf(rest.spark)).toBe(SPARK_SPAWN_THIRD);
+      // Écart 60 (2H.13): nine cells from each Trajector, not the middle third.
+      // Every unit stands in the corner here, so nine from the corner it is.
+      const back = gone.find((e) => e.kind === 'sparkEntered');
+      expect(back).toBeDefined();
+      if (!back || back.kind !== 'sparkEntered') throw new Error('unreachable');
+      for (const t of rest.units.filter((u) => u.role === 'trajector')) {
+        expect(distance(back.at, t)).toBe(SPARK_RETURN_DISTANCE);
+      }
       expect(rest.turnOrder[0]!.actor.kind).toBe('spark');
 
       // And a second catch scores again: the prize is not a once-only.

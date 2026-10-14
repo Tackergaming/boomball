@@ -393,6 +393,12 @@
             const a = at.get(e.shoverId), b = at.get(e.targetId);
             if (a && b) el('line', { x1: sx(a), y1: sy(a), x2: sx(b), y2: sy(b), stroke: e.success ? '#fff' : '#9aa2ab', 'stroke-width': 2.5, 'stroke-dasharray': '2 2' }, gTop);
             if (e.success && e.pushedTo && b) { polyline(gTop, [b, e.pushedTo], '#ffffff', { width: 2, dash: '4 3' }); at.set(e.targetId, e.pushedTo); }
+            if (e.tookPayload && a) { ball = a; el('circle', { cx: sx(a), cy: sy(a), r: 15, fill: 'none', stroke: 'var(--ball)', 'stroke-width': 2 }, gTop); }
+            break;
+          }
+          case 'recoilBlocked': {
+            const a = at.get(e.unitId);
+            if (a) { el('line', { x1: sx(a) - 5, y1: sy(a) - 5, x2: sx(a) + 5, y2: sy(a) + 5, stroke: '#9aa2ab', 'stroke-width': 2 }, gTop); el('line', { x1: sx(a) - 5, y1: sy(a) + 5, x2: sx(a) + 5, y2: sy(a) - 5, stroke: '#9aa2ab', 'stroke-width': 2 }, gTop); }
             break;
           }
           case 'attacked':

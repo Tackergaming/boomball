@@ -7,7 +7,7 @@ import { distance, lineTo, type Point } from '../engine/geometry.js';
 import type { Action } from '../engine/actions.js';
 import type { MatchEvent } from '../engine/events.js';
 import { openMatch, reduce } from '../engine/reduce.js';
-import { battedCrackerRun, sparkRun } from '../engine/rules/ordnance.js';
+import { battedCrackerRun } from '../engine/rules/ordnance.js';
 import { provokedAlong } from '../engine/rules/reactions.js';
 import { rangeToFurnace } from '../engine/rules/payload.js';
 import { createMatch } from '../engine/setup.js';
@@ -87,6 +87,7 @@ function giveTurnTo(state: MatchState, unitId: UnitId): MatchState {
       objectInteractionUsed: false,
       disengaged: false,
       placing: null,
+      shot: false,
     },
   };
 }
@@ -242,13 +243,16 @@ describe('the priority tables', () => {
   it('pockets the loose Payload and the Spark in the one turn, both being on offer', () => {
     // They never competed: the ball costs the object interaction and the Spark
     // costs the Action. Which one the ranking names first decides nothing, so
-    // what is worth asserting is that the turn ends with both done.
+    // what is worth asserting is that the turn ends with both done. A team
+    // has already carried the ball (`lastCarrierTeam`): the kick-off ball is
+    // a Striker's and the Trajector leaves it alone (2H.13, `00` C15 point 1).
     const trajector = 'A-trajector-7';
     const start = giveTurnTo(put(board(), trajector, { x: 7, y: 22 }), trajector);
     const state: MatchState = {
       ...start,
       spark: { state: 'live', x: 7, y: 22, heading: 1 },
       payload: { carriedBy: null, x: 7, y: 22 },
+      lastCarrierTeam: 'B',
     };
 
     const done = playOutTurn(state, trajector);
@@ -890,7 +894,22 @@ describe("Jérôme's second pass on the roles, 2H.8", () => {
     expect(distance(at, carrier)).toBe(1);
   });
 
-  it('the keeper throws the fresh ball out at once, interceptors or not, rather than dig in', () => {
+  it('the keeper with a clean lane throws the fresh ball out at once rather than dig in', () => {
+    const keeper = 'A-bulwark-1';
+    let state = carrying(put(board(), keeper, { x: 7, y: 1 }), keeper);
+    state = put(state, 'A-striker-2', { x: 7, y: 8 });
+    state = put(state, 'B-striker-2', { x: 2, y: 5 });
+    state = put(state, 'B-striker-3', { x: 12, y: 6 });
+    state = giveTurnTo(state, keeper);
+
+    const legal = legalActions(arena, state)!;
+    expect(legal.pass.map((o) => o.unitId)).toEqual(['A-striker-2']);
+    const best = rankActions(arena, state, keeper)[0]!;
+    expect(best.action).toEqual({ kind: 'pass', targetId: 'A-striker-2' });
+    expect(chooseAction(arena, state, keeper)).toEqual({ kind: 'pass', targetId: 'A-striker-2' });
+  });
+
+  it('the keeper with interceptors on the only lane does not throw from where it stands (2H.13)', () => {
     const keeper = 'A-bulwark-1';
     let state = carrying(put(board(), keeper, { x: 7, y: 1 }), keeper);
     state = put(state, 'A-striker-2', { x: 7, y: 8 });
@@ -900,8 +919,11 @@ describe("Jérôme's second pass on the roles, 2H.8", () => {
 
     const legal = legalActions(arena, state)!;
     expect(legal.pass.map((o) => o.unitId)).toEqual(['A-striker-2']);
-    const best = rankActions(arena, state, keeper)[0]!;
-    expect(best.action).toEqual({ kind: 'pass', targetId: 'A-striker-2' });
+    const plans = rankPlans(arena, state, keeper);
+    const thrownFromHere = plans.filter((p) => p.steps.length === 1 && p.steps[0]!.kind === 'pass');
+    expect(thrownFromHere).toHaveLength(0);
+    // It walks for a clean lane or digs in; whichever, the first step is not a throw.
+    expect(['move', 'brace']).toContain(chooseAction(arena, state, keeper).kind);
   });
 
   it('the keeper with nobody in sight steps out, beyond its leash, to find a line and throws', () => {
@@ -1185,16 +1207,17 @@ describe("Jérôme's fourth pass, 2H.10", () => {
     expect(kinds).toContain('sparkCaught');
   });
 
-  it('the hunter out of reach of the Spark heads for where it drifts to, not where it is', () => {
+  it('the hunter out of reach of the Spark heads for the cell it is in (écart 59: the drift is no longer predictable)', () => {
     const now = { x: 7, y: 22 };
-    let staged = sparkAt(put(board(), trajector, { x: 7, y: 6 }), now, 3); // east, six cells
+    let staged = sparkAt(put(board(), trajector, { x: 7, y: 6 }), now, 3); // sixteen cells off
     staged = giveTurnTo(staged, trajector);
-    const landing = sparkRun(arena, now, 3).landing;
-    expect(distance(landing, now)).toBeGreaterThanOrEqual(5);
 
+    const start = unit(staged, trajector);
     const after = playTurnOf(staged, trajector);
     const at = unit(after, trajector);
-    expect(distance(at, landing)).toBeLessThan(distance(at, now));
+    expect(distance(at, now)).toBeLessThan(distance(start, now));
+    // Straight at it, not off to the east where heading 3 would carry it.
+    expect(at.x).toBeLessThanOrEqual(8);
   });
 
   it('walks onto a loose ball, picks it up and throws it in the one turn', () => {

@@ -39,7 +39,7 @@ import {
 } from '../engine/rules/payload.js';
 import { hasPlayedThisRound, sideOrder } from '../engine/initiative.js';
 import { key, reachableCells } from '../engine/rules/movement.js';
-import { crackerRun, sparkRun } from '../engine/rules/ordnance.js';
+import { crackerRun } from '../engine/rules/ordnance.js';
 import { passInterceptors } from '../engine/rules/reactions.js';
 import { hasLineOfSight } from '../engine/rules/sight.js';
 import { statsFor } from '../engine/stats.js';
@@ -107,12 +107,15 @@ export interface Board {
    */
   readonly hunter: boolean;
   /**
-   * Where the Spark will land at the top of the next round (2H.10): its drift
-   * is six cells on a known heading, bounces included, and rolls no die, so
-   * the hunter aims at the cell it is going to, not the cell it is leaving.
-   * Null when the Spark is not on the field.
+   * Whether this unit, having shot this turn and missed, leaves the rebound
+   * alone (2H.13, `00` C15 point 3, Jérôme): true when the ball lies loose
+   * and a team-mate still to play this round reaches its cell with a move,
+   * sixteen cells for a Breaker, which dashes to it. Then the ball's cell is
+   * worth nothing to the shooter and the pickup is not offered, so the next
+   * shot is somebody else's. With nobody to take it, the shooter takes it
+   * back: safer in hand than on the floor.
    */
-  readonly sparkNext: Point | null;
+  readonly shooterYields: boolean;
   /**
    * The threats to this unit as a carrier (2H.10, `carrierSafety`): every
    * opponent who plays again before this unit's next turn, with the cells it
@@ -206,10 +209,22 @@ export function buildBoard(
   const enemies = others.filter((u) => u.team !== unit.team);
   const targetFurnace = arena.targetFurnaceOf(unit.team);
 
-  const sparkNext =
-    sparkIsLive(state.spark) && state.spark.heading !== null
-      ? sparkRun(arena, { x: state.spark.x, y: state.spark.y }, state.spark.heading).landing
-      : null;
+  // The shooter leaves its rebound to a team-mate still to play (2H.13).
+  const shooterYields =
+    state.turn !== null &&
+    state.turn.unitId === unit.id &&
+    state.turn.shot &&
+    carried === null &&
+    mates.some(
+      (mate) =>
+        !hasPlayedThisRound(state, mate.id) &&
+        // Reach, not distance: a crate or a wall of opponents between the
+        // mate and the ball is a ball the mate cannot take. A Breaker dashes
+        // to it (`pickupFirst`), so its reach is two moves.
+        reachableCells(arena, state, mate, (weightsFor(mate.role).pickupFirst > 0 ? 2 : 1) * MOVE_SPEED_FEET).has(
+          key(state.payload),
+        ),
+    );
 
   const threats =
     (unit.holdingPayload || carried === null) && weights.carrierSafety > 0 && weights.relaunch === 0
@@ -234,7 +249,11 @@ export function buildBoard(
   let wardLine: Point[] = [];
   let carrierCanServe = false;
   if (ward) {
-    const played = hasPlayedThisRound(state, ward.id);
+    // A keeper carrying the ball stays on its leash and never runs the line
+    // to the far mouth: its team-mates read it where it stands (2H.13, `00`
+    // C15 point 5), which is what brings them back within a throw of the
+    // relaunch (écart 62).
+    const played = hasPlayedThisRound(state, ward.id) || ward.role === 'bulwark';
     const at = { x: ward.x, y: ward.y };
     wardLine = played ? [at] : [at, ...lineTo(at, carriedForward(ward, targetFurnace))];
     const afterUs = state.turnOrder.some(
@@ -281,7 +300,7 @@ export function buildBoard(
     crackerLines,
     crackerStrikes,
     hunter: sparkIsLive(state.spark) && weights.chaseSpark > 0,
-    sparkNext,
+    shooterYields,
     threats,
     carrierReachable,
     carrierCanServe,
@@ -579,6 +598,19 @@ export function visibleRange(arena: Arena, from: Point, furnace: Furnace): numbe
  * see `BLIND_DISCOUNT`. Inside clean range that is the whole difference between
  * standing behind the crate and standing beside it.
  */
+/**
+ * How far into clean shooting range a cell is, zero at the edge of range or
+ * outside it or out of sight, one at the mouth itself (2H.13, point 2).
+ */
+export function depthInRange(arena: Arena, from: Point, furnace: Furnace): number {
+  const seen = visibleRange(arena, from, furnace);
+  if (seen === null || seen > PAYLOAD_RANGE_CELLS) return 0;
+  return (PAYLOAD_RANGE_CELLS - seen) / PAYLOAD_RANGE_CELLS;
+}
+
+/** The share of `carryToFurnace` the depth inside clean range adds at the mouth (2H.13, point 2). */
+export const DEEP_STEP = 0.15;
+
 export function scoringNearness(arena: Arena, from: Point, furnace: Furnace): number {
   const seen = visibleRange(arena, from, furnace);
   if (seen !== null && seen <= PAYLOAD_RANGE_CELLS) return 1;
@@ -1011,12 +1043,14 @@ export function positionValue(board: Board, cell: Point, actionLeft = true): num
   // is the cell that makes the action legal. The Crackers are still a danger.
   if (board.hunter) {
     const onSpark = cell.x === state.spark.x && cell.y === state.spark.y;
-    // The hunter aims at where the Spark is going (2H.10): the drift plays at
-    // the top of the next round before anybody moves, so a cell beside the
-    // Spark now is seven cells from it then. The cell it is in now is worth
-    // the catch while the Action is there, and a little less than nothing
-    // without it, since the Spark skips away from under a minder (écart 49).
-    const goal = board.sparkNext ?? { x: state.spark.x, y: state.spark.y };
+    // The hunter aims at the cell the Spark is in. It used to aim at where
+    // the drift would carry it (2H.10), the heading being known; since écart
+    // 59 (2H.13) the drift rolls a fresh face every round away from the
+    // Trajectors, so there is nothing to anticipate. The cell it is in now is
+    // worth the catch while the Action is there, and a little less than
+    // nothing without it, since the Spark skips away from under a minder
+    // (écart 49).
+    const goal = { x: state.spark.x, y: state.spark.y };
     let hunt = w.chaseSpark * nearness(cell, goal);
     if (onSpark) {
       // A carrier cannot try (écart 57): with the ball in hand the cell is
@@ -1044,8 +1078,10 @@ export function positionValue(board: Board, cell: Point, actionLeft = true): num
     // kick-off ball, which nobody has carried yet, is a Striker's to take:
     // the Trajector reads `chaseKickoff` zero and keeps itself for the throw.
     const kickoff = state.lastCarrierTeam === null ? w.chaseKickoff : 1;
+    // The shooter leaves its rebound to a team-mate still to play (2H.13,
+    // `00` C15 point 3): nothing about the ball pulls it, not even the cell.
     const share =
-      distance(unit, state.payload) > w.looseBallReach ? 0 : loosePayloadShare(board) * kickoff;
+      distance(unit, state.payload) > w.looseBallReach || board.shooterYields ? 0 : loosePayloadShare(board) * kickoff;
     value += w.chaseLoosePayload * share * nearness(cell, state.payload);
     // The cell the ball is actually lying in is worth the pickup, not one more
     // step of gradient. Without this the last cell gains `chaseLoosePayload/45`,
@@ -1153,6 +1189,13 @@ export function carrierEnd(board: Board, cell: Point, held: boolean): number {
     value += w.carryToFurnace * Math.min(1, nearest / ARENA_HEIGHT);
   } else {
     value += w.carryToFurnace * scoringNearness(board.arena, cell, board.targetFurnace);
+    // Inside clean range every cell used to read the same ground, so a
+    // carrier dashed to the first cell with a clean shot and stopped twelve
+    // cells into sixteen (2H.13, `00` C15 point 2, Jérôme: "un Dash consomme
+    // toutes les cases"). The ground keeps counting to the mouth, a little
+    // per cell: less than one opponent's worth of exposure, so a cell that
+    // is more exposed or out of sight still loses.
+    value += w.carryToFurnace * DEEP_STEP * depthInRange(board.arena, cell, board.targetFurnace);
   }
   // The ball is lost between two turns (2H.10): what the end cell is worth
   // is less by every opponent that can come and shove on it first, and

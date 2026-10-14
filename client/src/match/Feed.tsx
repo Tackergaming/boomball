@@ -135,7 +135,10 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
       return `${name(event.attackerId)} catches ${name(event.targetId)} leaving${event.hit ? '' : ', and misses'}.`;
     case 'recoiled':
       return `${name(event.unitId)} is thrown back by the swing.`;
+    case 'recoilBlocked':
+      return `${name(event.unitId)} swings but cannot recoil.`;
     case 'shoved':
+      if (event.tookPayload) return `${name(event.shoverId)} shoves ${name(event.targetId)} and takes the Payload.`;
       return event.success
         ? `${name(event.shoverId)} shoves ${name(event.targetId)}${event.pushedTo ? ' back a cell' : ' off the line'}.`
         : `${name(event.shoverId)} shoves at ${name(event.targetId)} and it holds.`;
@@ -167,8 +170,8 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
       return `${name(event.fromId)} passes to ${name(event.toId)}${event.caught ? '' : ', and it spills'}.`;
     case 'passIntercepted':
       return event.success
-        ? `${name(event.interceptorId)} picks off the pass from ${name(event.throwerId)}.`
-        : `${name(event.interceptorId)} reaches for the pass from ${name(event.throwerId)} and misses.`;
+        ? `${name(event.interceptorId)} picks off ${name(event.throwerId)}'s pass to ${name(event.toId)}.`
+        : `${name(event.interceptorId)} reaches for ${name(event.throwerId)}'s pass to ${name(event.toId)} and misses.`;
     case 'payloadScattered':
       return event.cells === 1
         ? 'The Payload rolls to the next cell.'

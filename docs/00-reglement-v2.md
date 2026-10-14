@@ -1341,3 +1341,187 @@ Sonnet nommés ci-dessous, pour relire le code contre les mots.
   veteran, star), 57 ramassages de Breaker sur les dix-huit, 1,3 à 1,4 s par match. Smoke et
   playthrough verts sur les fonctions redéployées du moteur 7, **la popup vue au harnais**, capture
   lue, journal en `07` §10.
+
+## C15. Décisions du 2026-10-14 après vingt et un matchs sur le moteur 7, **sous-phase 2H.13**
+
+> Écrites par le fil principal (Fable 5.1) sur les retours de Jérôme après **vingt et un matchs
+> sur le moteur 7** (neuf le 2026-10-12 au soir, neuf le 13, trois le 14 : quatorze en Striker,
+> trois en Trajector, trois en Breaker, un en Bulwark), dont cinq consignés et rejoués sans aucun
+> écart d'événement dans `docs/matches/` (`4f6af883`, `6f956ed1`, `afdea53b` en Trajector,
+> `919c98c0` en Bulwark, `f825ec20` en Striker). Chaque retour a été lu contre les événements en
+> base et les huit plans du visualiseur avant d'être reformulé, puis **tranché par lui point par
+> point en chat le 2026-10-14, avant la première ligne de code**. S'y ajoute la décision du
+> 2026-10-12 au soir sur le coup d'envoi du Trajector (`07` §10, sous 2H.12).
+>
+> Quatre écarts de règle, 59 à 62, un défaut de serveur, trois retours d'écran et une septième
+> passe de l'IA. Le Shove et la dérive du Spark changent ce que les dés produisent, l'état du tour
+> gagne un champ et deux événements changent de forme : **`ENGINE_VERSION` monte à 8**, et un match
+> du moteur 7 ne se rejoue plus avec ce dépôt. Les matchs ouverts du moteur 7 sont archivés au
+> redéploiement.
+
+**Le défaut du chrono, Trajector et Bulwark.** Jérôme : « systématiquement au tour 4 ou 5, l'humain
+qui joue le Trajector ne peut plus rien faire et se fait timeout ; pour le Bulwark c'est vers le tour
+8 ». Lu dans les trois matchs Trajector : chaque tour à partir du round 4 ou 5 finit par
+`dodging, turnEnded`, l'expiration du serveur, et les matchs durent trois minutes, donc les
+expirations sont instantanées. Cause dans `server/session.ts` : depuis 2H.12 la clé du chrono est
+lue avant l'action de l'humain et ne contient que l'identifiant de l'unité ; pour un rôle sans popup
+la clé est la même round après round, le serveur croit que « le même tour continue » et **garde
+l'échéance du round 1 tout le match**. Dès que 120 secondes se sont écoulées depuis le premier
+tour, chaque tour expire au premier clic. Le Striker et le Breaker y échappent parce que la popup
+change la clé deux fois par round. Le match Bulwark, dix rounds en 2 min 36, expire au round 10,
+exactement au seuil. **Correctif** : la clé porte le round et l'index de tour. C'est un défaut du
+serveur, pas une règle ; il est écrit ici parce que c'est le premier retour de la liste.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 59 | Le Spark dérive de 6 cases par round sur un cap d8 **tiré une fois** à l'entrée, et rebondit (écart 36) | **Le cap est tiré au d8 à chaque dérive**, parmi les faces permises : **une face dont le premier pas rapproche le Spark d'un Trajector actif est interdite** ; si les huit faces sont interdites, il prend celle dont la course finit le plus loin du Trajector le plus proche. Les six cases, les rebonds (écart 36b) et le saut d'échappée (écart 49) ne changent pas. Le cap d'entrée n'est plus tiré : la première dérive tire le sien | Jérôme : « le Spark continue à avoir un déplacement random mais tout mouvement vers un Trajector est interdit ; sur un d8 de choix certains angles seront interdits ; il doit chercher à éviter les Trajectors, jamais aller vers eux ». Conséquence dite et acceptée : le chasseur ne peut plus viser la case où le Spark sera (C13 point 2), il vise la case où il est | **Fait en 2H.13**, `sparkDriftFace`, `Board.sparkNext` disparaît |
+| 60 | Attrapé, le Spark revient au round suivant par la règle d'entrée, tiers central à 4 cases ou plus de toute unité (écarts 36 et 50) | **Après une prise, il revient sur une case à 9 cases de chaque Trajector actif**, distance de grille diagonales comprises, la même pour les deux ; s'il n'existe aucune case exacte, celle dont les deux distances s'écartent le moins de 9, égalités au dé ; plus de contrainte de tiers central ; les 4 cases de dégagement de toute unité tiennent ; un seul Trajector sur le terrain, à 9 cases de lui ; aucun, la règle d'entrée. **L'entrée du round 6 ne change pas** | Jérôme : « un Spark ne réapparaît plus après le tour 6 au milieu du terrain ; il doit apparaître à 9 cases d'équidistance des deux Trajectors, égale pour ne pas favoriser l'un ou l'autre » | **Fait en 2H.13**, `sparkReturnCell` dans `rules/ordnance.ts` |
+| 61 | Shove réussi sur un porteur : le ballon roule sur une case voisine au d8, le bousculeur doit marcher dessus (écarts 32 et 42) | **Le ballon est dans les mains du bousculeur à l'instant.** Personne ne bouge, ni le bousculé ni le bousculeur. Le bousculeur a dépensé son Action, il ne passe ni ne tire ce tour, garde son mouvement restant et peut s'éloigner avec le ballon ; au round suivant il joue comme tout porteur. Les quatre rôles, humain ou IA, Bulwark compris quand il sort bousculer dans ses quatre cases. L'évacuation d'un porteur garde l'écart 42 | Jérôme : « quand on réussit un Shove sur un porteur, la balle est immédiatement dans les mains de celui qui a désarmé, et non plus par terre ». Cinq points reformulés et validés un par un | **Fait en 2H.13**, `applyShove` dans `reduce.ts`, `shoved` gagne `tookPayload` |
+| 62 | Après un but, le Bulwark de l'équipe qui a encaissé passe en premier de son équipe (écart 54) | **L'équipe qui a encaissé rejoue dans l'ordre Trajector, Strikers, Bulwark, Breakers.** Si son bloc est encore entièrement devant dans le round du but, il est réordonné ainsi tout de suite ; **si son bloc a déjà commencé, le round se finit normalement** et c'est le round suivant qui prend cet ordre. Le Bulwark lance toujours immédiatement à son tour (C10 Bulwark 2). La surface de réparation (écarts 53 et 53 bis) ne change pas | Jérôme : « cela permet aux alliés de revenir potentiellement à portée de passe pour la relance ». Question tranchée : bloc déjà commencé, « on finit le round normalement » | **Fait en 2H.13**, `promoteBulwark` et `teamSlots` dans `initiative.ts` |
+
+**Trois retours d'écran, sans règle.**
+
+- **Les attaques d'opportunité ne manquent pas, les reculs si.** Règle D&D gardée, tranché par
+  Jérôme : glisser d'une case adjacente à une autre case adjacente du même adversaire ne provoque
+  pas. Vérifié sur 493 pas dans sept matchs consignés : chaque adversaire dont on quitte l'allonge
+  frappe, zéro oubli, le seul cas contraire étant une cible déjà évacuée par le premier coup. Ce
+  qu'il a vu : sur 382 coups portés, **104 sans recul** parce que la case de recul était bloquée
+  par un obstacle, une unité ou le bord, et le moteur n'écrivait rien ; et une Réaction déjà
+  dépensée dans le round (interception, blocage, parade, allonge précédente), visible seulement dans
+  le panneau de l'unité sélectionnée. Décidé : **un marqueur sur le pion dont la Réaction est
+  dépensée**, et **un événement `recoilBlocked`** qui donne la ligne « X swings but cannot recoil ».
+  Mise en garde de Jérôme pour la 2.5D : le marqueur doit survivre au skin des personnages, donc un
+  signe flottant au-dessus de la tête ou au sol, jamais une retouche du pion.
+- **La passe volée nomme son receveur.** Les neuf relances volées de l'IA dans les matchs consignés
+  visaient un allié, mais le fil disait seulement « X cuts the pass out of the air » et Jérôme
+  lisait une passe à l'adversaire. `passIntercepted` gagne `toId`, le fil et le visualiseur disent
+  « X's pass to Y is cut out of the air by Z ».
+- **La popup de place sort du terrain.** Plus de voile sombre : une carte posée dans la colonne de
+  droite au-dessus de la chaîne d'initiative, déplaçable à la souris par son bandeau, position gardée
+  le temps du match ; Échap et « Close, play last » valent toujours la dernière place, le chrono reste
+  affiché. Jérôme : « en dehors du terrain, pour permettre la lecture du terrain pendant le choix ».
+
+**L'IA, septième passe.** Les mots sont ceux de Jérôme, les lectures du code sont du fil principal.
+
+1. **Le Trajector laisse le ballon du coup d'envoi aux Strikers** (C10 Trajector 3 et commune 6,
+   décidé le 2026-10-12 au soir). Lu dans douze matchs d'auto-jeu sur douze et dans `a17c22a5` :
+   le plan « marcher, ramasser, passer » de 2H.10 se note sur `grabPayload` sans le facteur
+   `chaseKickoff`, qui ne pèse que dans `positionValue`. Le facteur s'applique à tout plan qui
+   ramasse le ballon du coup d'envoi.
+2. **Le porteur va au plus près de la bouche parmi les cases qu'il atteint, Dash ou pas.** Lu dans
+   les matchs : au round 2 le Striker porteur dashe et s'arrête à la ligne 35, neuf cases de la
+   bouche, parce que `scoringNearness` plafonne à 1 dès qu'une case voit la bouche à portée propre,
+   et qu'au-delà l'IA ne gagne rien. Il ne s'arrête plus court que si la case plus loin est **plus
+   exposée** (plus d'adversaires peuvent venir le bousculer avant qu'il rejoue) ou **sans vue** sur
+   la bouche. Jérôme : « un Dash consomme toutes les cases, sauf si la situation le justifie
+   vraiment ; il se laissait rattraper au lieu de s'approcher du Bulwark ».
+3. **Le tireur ne reprend pas son propre ballon dans le même tour.** Après un tir manqué, la case
+   du ballon ne vaut rien pour lui (plus la fin de tour de porteur de C13 point 10), **sauf si aucun
+   coéquipier qui n'a pas encore joué ce round n'atteint la case du ballon avec sa marche** (huit
+   cases, seize pour un Breaker qui Dash) : alors il la reprend, « il vaut mieux que la balle soit
+   en sécurité dans ses mains que traîner par terre ». Question tranchée : « seulement ceux qui n'ont
+   pas joué ». L'état du tour porte `shot`, posé par le tir, pour que le plan reconstruit le sache.
+4. **Le Bulwark ne lance jamais dans une allonge.** Remplace « même avec un risque d'interception »
+   de C10 Bulwark 2 : aucune passe avec un adversaire sur la ligne ; il marche pour trouver une
+   ligne propre comme aujourd'hui, sinon il se plante, garde le ballon et retente au tour suivant.
+   Lu dans `afdea53b` : le gardien B a lancé trois fois avec trois adversaires sur la ligne, volé
+   trois fois. Jérôme, option (a) sur question fermée.
+5. **Le relais se juge contre la case du gardien quand c'est lui qui porte.** Lecture du fil
+   principal pour servir l'écart 62 : `carrierStands` lisait sa route de huit cases vers la bouche
+   adverse, que le gardien ne prend jamais ; pour un Bulwark porteur c'est sa case, et ses
+   coéquipiers reviennent à portée de passe et à vue de cette case.
+6. **« Call for the ball » passe outre la chaîne.** Le bouton est câblé et l'IA le lit déjà
+   (`ORDER_PULL`, 60 points sur la passe vers l'appelant), mais la chaîne retirait tout receveur qui
+   a déjà joué ce round ou qui est à plus de huit cases en arrière, donc après une place 1 ou 2
+   l'appel ne pesait plus rien jusqu'au dernier maillon ; et l'appel restait sur le match jusqu'au
+   sifflet. Décidé : un receveur appelé **passe outre les deux filtres de la chaîne**, pas la portée,
+   la vue ni les intercepteurs ; et **l'appel expire quand le tour suivant de l'appelant s'ouvre**,
+   effacé par le serveur.
+7. **Le Shove qui prend le ballon ne change pas les poids** : `stripCarrier` 150 reste, et le plan
+   reconstruit après un Shove réussi voit un porteur ordinaire, `handOff` et l'exception à la chaîne
+   pour un Breaker.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`. `ENGINE_VERSION` 8. Le moteur
+dans `rules/ordnance.ts` (écarts 59 et 60), `reduce.ts` (61, `recoilBlocked`, `turn.shot`),
+`initiative.ts` (62), `events.ts` et `types.ts` ; le serveur dans `session.ts` (le chrono) et la
+fonction `resolve-action` (l'expiration de l'appel) ; l'IA dans `ai/chooseAction.ts` et
+`ai/evaluate.ts` ; l'écran dans `PlacePrompt.tsx`, `Board.tsx`, `replay.ts`, `Feed.tsx`. Les
+fonctions à redéployer sur le feu vert de Jérôme. **Un seul sweep à la fin, si Jérôme le demande**,
+contre `09` §12, en comptant quatorze minutes. Les 549 tests sont le filet, le test des cinquante
+millisecondes fait foi sur la vitesse.
+
+**Comment 2H.13 est codée**, par le fil principal (Fable 5.1) le 2026-10-14, avec quatre
+sous-agents Sonnet nommés ci-dessous, pour relire le code contre les mots. **Codé en 2H.13.**
+
+- **Le chrono.** `clockKey` dans `server/session.ts` vaut `unité@round:index`, plus `#place`
+  pendant le choix : un tour n'est « le même qui continue » que dans le même round au même
+  index. Test `it.each(['trajector', 'bulwark'])` dans `server/session.test.ts`, **sous-agent
+  Sonnet effort élevé** : la deuxième échéance est neuve et un tour pris 130 s après l'ouverture
+  n'expire pas.
+- **Écart 59, `sparkDriftFace` dans `rules/ordnance.ts`.** Le dé choisit parmi les faces permises
+  (`rng.pick`), une face étant interdite quand la première case de sa course, rebond compris, est
+  plus près d'un Trajector actif que la case de départ ; toutes interdites, la face dont la course
+  finit le plus loin du Trajector le plus proche, la plus basse à égalité, sans dé. `resolveSpark`
+  tire son dé sur `rngSeed` ; `enterSpark` ne tire plus de cap, `spark.heading` est nul à l'entrée
+  et garde ensuite le cap de sortie de la dernière course, pour la lecture seule. **IA** :
+  `Board.sparkNext` disparaît, le chasseur vise la case où le Spark est.
+- **Écart 60, `sparkReturnCell`.** Parmi les cases occupables à 4 cases ou plus de toute unité
+  (sinon toute case libre), celles dont le plus grand écart à 9 sur les Trajectors actifs est
+  minimal, départagées au dé ; sans Trajector, `sparkEntryCell`. `enterSpark` choisit par le round :
+  6 est l'entrée, au-delà c'est un retour.
+- **Écart 61, `applyShove` dans `reduce.ts`.** Shove réussi sur un porteur : `shoved` avec
+  `tookPayload`, le bousculé lâche, le bousculeur tient, `payload.carriedBy` passe à lui, personne
+  ne bouge, pas de `payloadDropped` ni `payloadScattered`. **Écran** : `replay.ts` donne le ballon
+  au bousculeur, `motion.ts` fait voler le ballon d'une case, `Feed.tsx`, `dump-match.ts` et le
+  visualiseur disent « and takes the Payload », **sous-agent Sonnet effort moyen**.
+- **Écart 62, `initiative.ts`.** `RELAUNCH_ORDER` = Trajector, Strikers, Bulwark, Breakers ;
+  `teamSlots` le prend quand `relaunch` est posé ; `promoteBulwark` reçoit les unités et, quand le
+  bloc est entièrement devant, place le gardien juste avant le premier Breaker de son camp, sinon
+  rend null et le round se finit tel quel. **IA, point 5** : `wardLine` lit un gardien porteur
+  comme s'il avait joué, donc sur sa case, et `outlet`, `laneCover` et `rejoin` ramènent les
+  coéquipiers à portée et à vue de cette case.
+- **`recoilBlocked`** est écrit par `recoilFrom` quand la case de recul est la case de départ ;
+  **`passIntercepted.toId`** par `resolveInterception`, qui reçoit le receveur ; **`turn.shot`** est
+  posé par `applyShoot`, faux à l'ouverture de tout tour. Le marqueur de Réaction dépensée flotte
+  au coin haut droit du pion dans `Board.tsx`, un cercle barré en `--text-faint`, hors du pion,
+  **sous-agent Sonnet effort moyen**.
+- **La popup** (`PlacePrompt.tsx`, `Match.tsx`), **sous-agent Sonnet effort moyen** : plus de
+  voile, carte de 340 px posée en absolu dans le corps de l'écran, à l'origine sur la colonne de
+  droite au-dessus de la chaîne, bandeau « Round order » qui sert de poignée (pointer capture,
+  bornée pour rester à 60 px dans l'écran), position tenue par `Match.tsx` le temps du match ;
+  anchors `place-prompt`, `data-place`, `place-close` inchangés, le harnais n'a pas bougé.
+- **Point 1, le coup d'envoi.** Dans `Planner.plans` la part du ballon (`share`) porte
+  `chaseKickoff` quand `lastCarrierTeam` est nul, comme `positionValue` le faisait déjà : plus
+  aucun plan de ramassage pour le Trajector au coup d'envoi.
+- **Point 2, le porteur au plus près.** `carrierEnd` ajoute `carryToFurnace × DEEP_STEP (0,15) ×
+  depthInRange`, la profondeur dans la portée propre à vue, 0 au bord de portée, 1 sur la bouche :
+  10,5 points pour un Striker sur neuf cases, 1,2 par case, sous le coût d'un seul adversaire de
+  plus dans `carrierExposure` (`carrierSafety` 60 fois une chance de bousculade). Hors vue, rien.
+- **Point 3, le tireur.** `Board.shooterYields` : `turn.shot`, ballon au sol, et un coéquipier qui
+  n'a pas joué dont `reachableCells` avec 8 cases, 16 pour un Breaker, contient la case du
+  ballon. Alors `share` vaut zéro dans `positionValue` comme dans `plans` : la case du ballon ne
+  vaut rien et le ramassage n'est pas offert. Sans ce coéquipier, la case vaut la fin de tour de
+  porteur, comme avant.
+- **Point 4, le gardien.** `throwPlans` écarte toute passe avec un intercepteur quand `relaunch`
+  est positif ; `cleanPassHere` (une passe sans intercepteur depuis sa case) borne le filtre « il
+  lance sans bouger », sinon les plans « marcher puis passer » n'offrent que des lignes propres,
+  et le plantage reste. Constat du sous-agent des tests IA : une passe d'une case ne s'intercepte
+  jamais (écart 48), donc le gardien peut marcher jusqu'à côté d'un receveur marqué et lui donner le
+  ballon, au-delà de sa laisse, ce que C10 Bulwark 2 permet déjà pour trouver une ligne.
+- **Point 6, l'appel.** `summoned` lève les deux filtres de la chaîne dans `throwPlans`, pas la
+  portée, la vue ni `INTERCEPT_CAUTION`. Dans `resolve-action`, les ordres `callForPass` dont le
+  receveur a un `turnStarted` dans le lot sont retirés avant l'écriture, sauf ceux ajoutés par la
+  requête même.
+- **Tests** : `engine/c15.test.ts`, 42 tests, et huit tests récrits dans `box`, `combat`,
+  `ordnance` et `setup`, **sous-agent Sonnet effort élevé** ; `ai/seventhPass.test.ts`, 18
+  tests, et trois récrits dans `ai.test.ts`, **sous-agent Sonnet effort élevé** ; `replay.test.ts`
+  et `motion.test.ts`, cinq tests, sous-agent de l'écran. **617 tests sur 27 fichiers contre 549
+  sur 25**, typecheck racine, scripts et e2e verts, client typecheck et build verts.
+- **Mesuré** sur dix-huit matchs d'auto-jeu, six graines par Tier, `scripts/control-2h13.ts`, pas
+  un sweep : 1,8 / 2,2 / 2,0 buts de ballon par match (rookie, veteran, star) ; 71 Shove réussis
+  dont 67 prennent le ballon ; 37 relances de gardien, aucune volée ; aucun tireur ne reprend son
+  ballon ; le Trajector ne prend le coup d'envoi dans aucun des dix-huit ; 25 prises de Spark sur
+  38 entrées ; 1,7 s par match, donc un sweep environ seize minutes. Smoke vert en 36 s et
+  playthrough vert en 30 s (21 requêtes humaines, 0 refusée), `ENGINE_VERSION` épinglée à 7 le
+  temps du run puis remise à 8, **la popup vue dans la colonne de droite**, capture lue, le terrain
+  lisible derrière.

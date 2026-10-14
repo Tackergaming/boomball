@@ -54,6 +54,7 @@ describe('what a beat moves', () => {
         shoverRoll: roll,
         targetRoll: roll,
         pushedTo: { x: B.x, y: B.y + 1 },
+        tookPayload: false,
       },
     ]);
     expect(steps).toEqual([
@@ -100,11 +101,27 @@ describe('what a beat moves', () => {
       payload: { carriedBy: B.id, x: B.x, y: B.y },
     };
     const steps = motionOf(carried, [
-      { kind: 'shoved', shoverId: A.id, targetId: B.id, success: true, shoverRoll: roll, targetRoll: roll, pushedTo: null },
+      { kind: 'shoved', shoverId: A.id, targetId: B.id, success: true, shoverRoll: roll, targetRoll: roll, pushedTo: null, tookPayload: false },
       { kind: 'payloadDropped', unitId: B.id, at: { x: B.x, y: B.y } },
       { kind: 'payloadScattered', to: { x: B.x - 1, y: B.y }, cells: 1, direction: 7 },
     ]);
     expect(steps).toEqual([{ kind: 'ball', from: { x: B.x, y: B.y }, to: { x: B.x - 1, y: B.y }, flight: 'scatter' }]);
+  });
+
+  it('flies the ball from the carrier to the shover on a Shove that takes it (écart 61)', () => {
+    const carried: MatchState = {
+      ...base,
+      units: base.units.map((u) => (u.id === B.id ? { ...u, holdingPayload: true } : u)),
+      payload: { carriedBy: B.id, x: B.x, y: B.y },
+    };
+    const steps = motionOf(carried, [
+      { kind: 'shoved', shoverId: A.id, targetId: B.id, success: true, shoverRoll: roll, targetRoll: roll, pushedTo: null, tookPayload: true },
+    ]);
+    expect(steps).toEqual([{ kind: 'ball', from: { x: B.x, y: B.y }, to: { x: A.x, y: A.y }, flight: 'pass' }]);
+  });
+
+  it('moves nothing for a blocked recoil', () => {
+    expect(motionOf(base, [{ kind: 'recoilBlocked', unitId: A.id, at: { x: A.x, y: A.y } }])).toEqual([]);
   });
 
   it('sends a shot at the nearest hatch of the Furnace the shooter attacks', () => {

@@ -155,6 +155,14 @@ export function motionOf(before: MatchState, events: readonly MatchEvent[]): Mot
         break;
       case 'shoved':
         if (event.pushedTo) unitStep(event.targetId, [event.pushedTo], 'push');
+        // Écart 61: the ball goes from where it was to the shover's hands.
+        if (event.tookPayload) {
+          const shover = at.get(event.shoverId);
+          if (shover) {
+            steps.push({ kind: 'ball', from: ball, to: shover, flight: 'pass' });
+            ball = shover;
+          }
+        }
         break;
       case 'substituteEntered':
         // Appears; nothing travels. Recorded so a later push starts from the right cell.

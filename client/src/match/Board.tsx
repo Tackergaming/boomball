@@ -1047,6 +1047,22 @@ function UnitMark({
         stroke={colour}
         strokeWidth={isYou ? 0.13 : selected || onTheClock ? 0.11 : 0.06}
       />
+      {/* Reaction spent this round. Floats outside the token's top-right corner,
+          never on it, so it survives the tokens becoming skinned characters. */}
+      {!unit.reactionAvailable && (
+        <g style={{ pointerEvents: 'none' }} opacity={0.75}>
+          <title>{`${unit.name}: Reaction spent this round`}</title>
+          <circle cx={x + 1.12} cy={row - 0.04} r={0.14} fill="none" stroke="var(--text-faint)" strokeWidth={0.05} />
+          <line
+            x1={x + 1.02}
+            y1={row + 0.06}
+            x2={x + 1.22}
+            y2={row - 0.14}
+            stroke="var(--text-faint)"
+            strokeWidth={0.05}
+          />
+        </g>
+      )}
       {isYou && (
         <polygon
           points={`${x + 0.5},${row - 0.3} ${x + 0.32},${row - 0.02} ${x + 0.68},${row - 0.02}`}

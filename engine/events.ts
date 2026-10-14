@@ -61,6 +61,13 @@ export type MatchEvent =
       readonly hit: boolean;
     }
   | { readonly kind: 'recoiled'; readonly unitId: UnitId; readonly from: Point; readonly to: Point }
+  /**
+   * A swing whose recoil found an obstacle, a unit or the edge behind the
+   * swinger (écart 33), so it stayed where it was. Jérôme read the missing
+   * recoil as a swing that never happened (2H.13, `00` C15): the engine now
+   * says so. Engine version 8.
+   */
+  | { readonly kind: 'recoilBlocked'; readonly unitId: UnitId; readonly at: Point }
   | {
       readonly kind: 'opportunityAttacked';
       readonly attackerId: UnitId;
@@ -72,6 +79,12 @@ export type MatchEvent =
       readonly kind: 'passIntercepted';
       readonly interceptorId: UnitId;
       readonly throwerId: UnitId;
+      /**
+       * Who the pass was meant for. Without it the feed only ever named the
+       * thief, and a relaunch stolen off the keeper's hands read as a pass
+       * thrown to the opponent (2H.13, `00` C15). Engine version 8.
+       */
+      readonly toId: UnitId;
       readonly interceptorRoll: DiceRoll;
       readonly throwerRoll: DiceRoll;
       readonly success: boolean;
@@ -90,6 +103,12 @@ export type MatchEvent =
        * it was an obstacle, a unit or the edge and it did not move.
        */
       readonly pushedTo: Point | null;
+      /**
+       * Écart 61 (2H.13): a Shove that strips a carrier puts the Payload in
+       * the shover's hands at once. True on that success alone; the ball then
+       * neither drops nor scatters. Engine version 8.
+       */
+      readonly tookPayload: boolean;
     }
   | {
       readonly kind: 'crackerMoved';

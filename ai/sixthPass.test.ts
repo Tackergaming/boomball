@@ -65,6 +65,7 @@ function giveTurnTo(state: MatchState, unitId: UnitId): MatchState {
       objectInteractionUsed: false,
       disengaged: false,
       placing: null,
+      shot: false,
     },
   };
 }

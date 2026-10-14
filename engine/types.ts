@@ -174,6 +174,13 @@ export interface TurnState {
    * is `choosePlace`. Null in every turn that is being played.
    */
   readonly placing: number | null;
+  /**
+   * Whether this turn's Action went into a shot at the Furnace (2H.13, `00`
+   * C15 point 3, engine version 8). No rule reads it: the AI uses it so a
+   * shooter does not walk back onto its own rebound while a team-mate still
+   * to play could take it.
+   */
+  readonly shot: boolean;
 }
 
 // -- The match ---------------------------------------------------------------

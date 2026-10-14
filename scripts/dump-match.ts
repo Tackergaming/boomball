@@ -510,12 +510,14 @@ function line(e: MatchEvent): string | null {
       return `${nm(e.attackerId)} swings at ${nm(e.targetId)}: ${e.hit ? 'HIT' : 'miss'} (${roll(e.roll)})`;
     case 'recoiled':
       return `${nm(e.unitId)} recoils to (${e.to.x}, ${e.to.y})`;
+    case 'recoilBlocked':
+      return `${nm(e.unitId)} cannot recoil (stays at (${e.at.x}, ${e.at.y}))`;
     case 'opportunityAttacked':
       return `${nm(e.attackerId)} catches ${nm(e.targetId)} leaving: ${e.hit ? 'HIT' : 'miss'} (${roll(e.roll)})`;
     case 'passIntercepted':
-      return `${nm(e.interceptorId)} grabs at the pass of ${nm(e.throwerId)}: ${e.success ? 'STOLEN' : 'missed'} (${roll(e.interceptorRoll)} vs ${roll(e.throwerRoll)})`;
+      return `${nm(e.interceptorId)} grabs at ${nm(e.throwerId)}'s pass to ${e.toId ? nm(e.toId) : '?'}: ${e.success ? 'STOLEN' : 'missed'} (${roll(e.interceptorRoll)} vs ${roll(e.throwerRoll)})`;
     case 'shoved':
-      return `${nm(e.shoverId)} shoves ${nm(e.targetId)}: ${e.success ? 'SHOVED' : 'held'} (${roll(e.shoverRoll)} vs ${roll(e.targetRoll)})${e.pushedTo ? `, pushed to (${e.pushedTo.x}, ${e.pushedTo.y})` : ''}`;
+      return `${nm(e.shoverId)} shoves ${nm(e.targetId)}: ${e.success ? 'SHOVED' : 'held'} (${roll(e.shoverRoll)} vs ${roll(e.targetRoll)})${e.tookPayload ? ' and takes the Payload' : ''}${e.pushedTo ? `, pushed to (${e.pushedTo.x}, ${e.pushedTo.y})` : ''}`;
     case 'crackerMoved':
       return `${e.crackerId} rolls ${e.path.length} to (${e.to.x}, ${e.to.y})`;
     case 'crackerBatted':

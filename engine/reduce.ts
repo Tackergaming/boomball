@@ -52,7 +52,9 @@ import {
   crackerRespawnCell,
   crackerRun,
   parryDirection,
+  sparkDriftFace,
   sparkEntryCell,
+  sparkReturnCell,
   sparkRun,
   type HazardRun,
 } from './rules/ordnance.js';
@@ -420,7 +422,13 @@ function recoilFrom(ctx: Ctx, state: MatchState, unitId: UnitId, target: Point):
   if (!attacker || attacker.status !== 'active') return state;
 
   const landing = recoilDestination(ctx.arena, state, attacker, target);
-  if (landing.x === attacker.x && landing.y === attacker.y) return state;
+  if (landing.x === attacker.x && landing.y === attacker.y) {
+    // Nothing behind the swinger to recoil into (écart 33). Said out loud
+    // since 2H.13: a hundred and four such swings in seven games read on
+    // screen as swings that never happened (`00` C15).
+    ctx.log.push({ kind: 'recoilBlocked', unitId, at: { x: attacker.x, y: attacker.y } });
+    return state;
+  }
 
   ctx.log.push({
     kind: 'recoiled',
@@ -441,7 +449,7 @@ function applyShove(ctx: TurnCtx, targetId: UnitId): ReduceResult {
   if ('reason' in target) return { ok: false, reason: target.reason };
 
   const contest = resolveShove(ctx.rng, unit, target.unit);
-  const shoved = (pushedTo: Point | null): MatchEvent => ({
+  const shoved = (pushedTo: Point | null, tookPayload = false): MatchEvent => ({
     kind: 'shoved',
     shoverId: unit.id,
     targetId,
@@ -449,6 +457,7 @@ function applyShove(ctx: TurnCtx, targetId: UnitId): ReduceResult {
     shoverRoll: contest.shoverRoll,
     targetRoll: contest.targetRoll,
     pushedTo,
+    tookPayload,
   });
 
   const next: MatchState = { ...state, turn: { ...turn, actionUsed: true } };
@@ -458,19 +467,21 @@ function applyShove(ctx: TurnCtx, targetId: UnitId): ReduceResult {
   }
 
   // A Shove that takes the ball takes the ball and stops there (arbitrage of
-  // 2026-09-01, kept by écart 32): the carrier is not pushed. Since écart 42
-  // the ball does not stay under the carrier's feet either, it rolls to a cell
-  // beside it, never the shover's.
-  //
-  // Stripping the carrier and moving it in the same action did two jobs at
-  // once: it won the ball back, which is good defence, and it undid the trip
-  // towards the Furnace, which made scoring impossible. The sweep measured a
-  // ball changing hands every round and a half and 1.2 shots a match. Only the
-  // second job is removed. In fiction you are grabbing for the Payload, not
-  // throwing somebody across the pitch.
+  // 2026-09-01, kept by écart 32): the carrier is not pushed. **Since écart
+  // 61 (2H.13, Jérôme on 2026-10-14) the Payload goes straight into the
+  // shover's hands**: nobody moves, the shover has spent its Action and
+  // keeps whatever movement it has left, and from the next round on it is a
+  // carrier like any other. It used to roll to a cell beside the carrier
+  // (écart 42, which still rules an evacuated carrier), and the shover had
+  // to walk onto it, which a human reads as a shove that won nothing.
   if (target.unit.holdingPayload) {
-    ctx.log.push(shoved(null));
-    return done(ctx, dropPayload(ctx, next, target.unit.id));
+    ctx.log.push(shoved(null, true));
+    const stripped = replaceUnit(next, { ...target.unit, holdingPayload: false });
+    const shover = stripped.units.find((u) => u.id === unit.id)!;
+    return done(ctx, {
+      ...replaceUnit(stripped, { ...shover, holdingPayload: true }),
+      payload: { carriedBy: shover.id, x: shover.x, y: shover.y },
+    });
   }
 
   // Anyone else is pushed one cell straight away from the shover (écart 32),
@@ -803,10 +814,14 @@ function applyCatchSpark(ctx: TurnCtx): ReduceResult {
  * Spark is being caught, which is why it is worth chasing rather than avoiding.
  */
 function resolveSpark(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState {
-  if (!sparkIsLive(state.spark) || state.spark.heading === null) return state;
+  if (!sparkIsLive(state.spark)) return state;
 
+  // Écart 59 (2H.13): a d8 each round, never towards a Trajector. The face
+  // the run ended on is kept on the state for whoever reads it; nothing
+  // plays from it any more.
+  const rng = new Rng(state.rngSeed);
   const from = { x: state.spark.x, y: state.spark.y };
-  const run = sparkRun(arena, from, state.spark.heading);
+  const run = sparkRun(arena, from, sparkDriftFace(arena, state, rng));
 
   log.push({
     kind: 'sparkMoved',
@@ -820,6 +835,7 @@ function resolveSpark(arena: Arena, state: MatchState, log: MatchEvent[]): Match
   return {
     ...state,
     spark: { ...state.spark, x: run.landing.x, y: run.landing.y, heading: run.heading },
+    rngSeed: rng.seed,
   };
 }
 
@@ -868,8 +884,12 @@ function enterSpark(arena: Arena, state: MatchState, log: MatchEvent[]): MatchSt
   if (state.spark.state !== 'pending' || state.round < SPARK_ENTRY_ROUND) return state;
 
   const rng = new Rng(state.rngSeed);
-  const at = sparkEntryCell(arena, state, rng);
-  const heading = rng.die(8);
+  // Round 6 is the entry, the middle third (écart 36); any later round is a
+  // return after a catch, nine cells from each Trajector (écart 60, 2H.13).
+  // No heading is rolled any more: each drift rolls its own (écart 59).
+  const at =
+    state.round > SPARK_ENTRY_ROUND ? sparkReturnCell(arena, state, rng) : sparkEntryCell(arena, state, rng);
+  const heading = null;
   log.push({ kind: 'sparkEntered', at, round: state.round });
 
   return {
@@ -930,7 +950,7 @@ function applyPass(ctx: TurnCtx, targetId: UnitId): ReduceResult {
 
   // The ball is in the air before anyone catches it, so the lane is contested
   // first. A stolen pass never reaches its team-mate and is never rolled for.
-  const stolen = resolveInterception(ctx, next, unit, lineTo(unit, mate));
+  const stolen = resolveInterception(ctx, next, unit, mate.id, lineTo(unit, mate));
   next = stolen.state;
   if (stolen.thiefId) {
     const thief = next.units.find((u) => u.id === stolen.thiefId)!;
@@ -984,6 +1004,7 @@ function resolveInterception(
   ctx: Ctx,
   state: MatchState,
   thrower: Unit,
+  receiverId: UnitId,
   flight: readonly Point[],
 ): { readonly state: MatchState; readonly thiefId: UnitId | null } {
   let next = state;
@@ -1003,6 +1024,7 @@ function resolveInterception(
       kind: 'passIntercepted',
       interceptorId: thief.id,
       throwerId: thrower.id,
+      toId: receiverId,
       interceptorRoll: contest.challengerRoll,
       throwerRoll: contest.defenderRoll,
       success: contest.success,
@@ -1041,7 +1063,7 @@ function applyShoot(ctx: TurnCtx): ReduceResult {
 
   let next: MatchState = {
     ...replaceUnit(state, { ...unit, holdingPayload: false }),
-    turn: { ...turn, actionUsed: true },
+    turn: { ...turn, actionUsed: true, shot: true },
   };
 
   if (keeper) {
@@ -1135,7 +1157,7 @@ function closeBox(ctx: Ctx, state: MatchState, defender: TeamId): MatchState {
 function scheduleRelaunch(arena: Arena, state: MatchState, defender: TeamId): MatchState {
   const keeper = activeUnitsOf(state, defender).find((u) => u.role === 'bulwark');
   if (!keeper) return state;
-  const promoted = promoteBulwark(state.turnOrder, state.turnIndex, defender, keeper.id);
+  const promoted = promoteBulwark(state.turnOrder, state.turnIndex, defender, keeper.id, state.units);
   if (promoted) return { ...state, turnOrder: promoted };
   return { ...state, relaunch: defender };
 }
@@ -1321,6 +1343,7 @@ function offerPlace(state: MatchState, unitId: UnitId, places: number, log: Matc
       objectInteractionUsed: false,
       disengaged: false,
       placing: places,
+      shot: false,
     },
   };
 }
@@ -1365,6 +1388,7 @@ function beginTurn(state: MatchState, unit: Unit, log: MatchEvent[]): MatchState
       objectInteractionUsed: false,
       disengaged: false,
       placing: null,
+      shot: false,
     },
   };
 }

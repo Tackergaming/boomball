@@ -48,7 +48,7 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * the server stamps it on `matches` and refuses a mismatch, and the client
  * archives what it cannot play.
  */
-export const ENGINE_VERSION = 7;
+export const ENGINE_VERSION = 8;
 
 // -- The penalty box (écart 53) --------------------------------------------
 
@@ -198,6 +198,13 @@ export const SPARK_SPAWN_MIN_DISTANCE = 4;
 
 /** Third of the pitch it enters in: 1 is the middle third (écart 36). */
 export const SPARK_SPAWN_THIRD = 1;
+
+/**
+ * After a catch the Spark comes back this many cells from each Trajector,
+ * the same for both (écart 60, 2H.13, Jérôme on 2026-10-14). The round 6
+ * entry keeps the middle third.
+ */
+export const SPARK_RETURN_DISTANCE = 9;
 
 /**
  * Six, against a player's eight. Twelve made it structurally uncatchable: it

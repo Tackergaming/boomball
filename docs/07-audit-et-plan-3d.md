@@ -1481,3 +1481,26 @@ ses retours, pas avant. Ses trois matchs du moteur 6 de l'après-midi ne se cons
 **Ce qui attend Jérôme** : sa partie sur 2H.12, jouée le 2026-10-12 au soir, à consigner par
 `dump-match.ts` au prochain tour de dev (prévu le 2026-10-17), et un sweep seulement s'il le
 demande.
+
+### Sous-phase 2H.13, « le chrono, le Spark qui fuit les Trajectors, le Shove qui prend le ballon, la relance en quatre temps, la septième passe de l'IA », codée le 2026-10-14, porte ouverte
+
+Par le fil principal (Fable 5.1), avec quatre sous-agents Sonnet nommés ci-dessous, à partir de
+`00` C15 : les retours de Jérôme après vingt et un matchs sur le moteur 7, lus contre les
+événements et les huit plans du visualiseur, reformulés et tranchés point par point en chat avant
+la première ligne de code. **Pas de sweep**, à sa demande.
+
+| Quoi | État |
+|---|---|
+| Les matchs | Vingt et un sur le moteur 7 du 12 au 14 ; cinq consignés et rejoués sans écart (`4f6af883`, `6f956ed1`, `afdea53b` en Trajector, `919c98c0` en Bulwark, `f825ec20` en Striker), gardés dans `docs/matches/` sur sa décision |
+| Le chrono | Cause trouvée dans `session.ts` : la clé lue avant l'action ne portait que l'unité, un rôle sans popup gardait l'échéance du round 1 tout le match. Corrigé, clé `unité@round:index` |
+| Écarts 59 à 62 | Fait, fil principal : `sparkDriftFace`, `sparkReturnCell`, `applyShove` avec `tookPayload`, `RELAUNCH_ORDER` et `promoteBulwark` devant le premier Breaker. **`ENGINE_VERSION` 8** |
+| L'écran | `recoilBlocked`, `passIntercepted.toId`, marqueur de Réaction dépensée hors du pion, popup dockée et déplaçable sans voile, **deux sous-agents Sonnet effort moyen** ; `turn.shot` dans l'état |
+| L'IA, septième passe | Fait, fil principal : le coup d'envoi du Trajector, `depthInRange` pour le porteur, `shooterYields`, le gardien jamais dans une allonge, le relais sur la case du gardien, l'appel qui lève la chaîne et expire au tour suivant (serveur) |
+| Tests | `engine/c15.test.ts`, 42 tests, huit récrits, **sous-agent Sonnet effort élevé** ; `ai/seventhPass.test.ts`, 18 tests, trois récrits, **sous-agent Sonnet effort élevé** ; `replay` et `motion`, cinq tests. **617 tests sur 27 fichiers contre 549 sur 25**, typecheck racine, scripts, e2e et client verts, build vert |
+| Vérification | Dix-huit matchs d'auto-jeu (`scripts/control-2h13.ts`) : 1,8 / 2,2 / 2,0 buts de ballon par match, 67 prises de balle sur 71 Shove réussis, 0 relance volée sur 37, 0 reprise de tireur, Trajector 0/18 au coup d'envoi, 1,7 s par match |
+| Harnais avant la mise en ligne | Smoke vert en 36 s, playthrough vert en 30 s (21 requêtes, 0 refusée), `ENGINE_VERSION` épinglée à 7 puis remise à 8 ; la popup vue dans la colonne de droite, capture lue |
+| Commit | Voir la ligne de mise en ligne ci-dessous |
+
+**Ce qui attend Jérôme** : le feu vert de redéploiement (moteur 8, les matchs ouverts du moteur 7
+archivés, aucune migration), puis sa partie sur 2H.13, à consigner par `dump-match.ts`, et un sweep
+seulement s'il le demande.

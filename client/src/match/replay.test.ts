@@ -265,9 +265,43 @@ describe('every action leaves a line, the house included', () => {
 
   it('says a failed interception, which used to be silent', () => {
     const texts = textsOf([
-      { kind: 'passIntercepted', interceptorId: a.id, throwerId: b.id, interceptorRoll: roll, throwerRoll: roll, success: false },
+      { kind: 'passIntercepted', interceptorId: a.id, throwerId: b.id, toId: b.id, interceptorRoll: roll, throwerRoll: roll, success: false },
     ]);
     expect(texts.some((t) => /MISSED/.test(t) && t.includes(a.name))).toBe(true);
+  });
+
+  it('a Shove that takes the Payload leaves the shover holding it and the target not (écart 61)', () => {
+    const carried: MatchState = {
+      ...state,
+      units: state.units.map((u) => ({ ...u, holdingPayload: u.id === b.id })),
+      payload: { carriedBy: b.id, x: b.x, y: b.y },
+    };
+    const beats = toBeats(
+      carried,
+      [{ kind: 'shoved', shoverId: a.id, targetId: b.id, success: true, shoverRoll: roll, targetRoll: roll, pushedTo: null, tookPayload: true }],
+      'A',
+    );
+    const end = beats[beats.length - 1]!.state;
+    expect(end.payload.carriedBy).toBe(a.id);
+    expect(end.units.find((u) => u.id === a.id)!.holdingPayload).toBe(true);
+    expect(end.units.find((u) => u.id === b.id)!.holdingPayload).toBe(false);
+    expect(beats.flatMap((x) => x.lines.map((l) => l.text)).some((t) => /and takes the Payload/.test(t))).toBe(true);
+  });
+
+  it('names the receiver of an intercepted pass', () => {
+    const c = state.units[2]!;
+    const texts = textsOf([
+      { kind: 'passIntercepted', interceptorId: a.id, throwerId: b.id, toId: c.id, interceptorRoll: roll, throwerRoll: roll, success: true },
+    ]);
+    expect(texts.some((t) => t.includes(`${b.name}'s pass to ${c.name}`))).toBe(true);
+  });
+
+  it('says a blocked recoil as a minor line and moves nobody', () => {
+    const beats = toBeats(state, [{ kind: 'recoilBlocked', unitId: a.id, at: { x: a.x, y: a.y } }], 'A');
+    const lines = beats.flatMap((x) => x.lines);
+    expect(lines.some((l) => /cannot recoil/.test(l.text) && l.minor === true)).toBe(true);
+    const end = beats[beats.length - 1]!.state;
+    expect(end.units.map((u) => [u.x, u.y])).toEqual(state.units.map((u) => [u.x, u.y]));
   });
 
   it('says a recoil when nothing louder shares the beat', () => {
@@ -297,7 +331,7 @@ describe('every action leaves a line, the house included', () => {
       { kind: 'turnStarted', unitId: a.id, round: 1 },
       { kind: 'dashed', unitId: a.id, extraFeet: 40 },
       { kind: 'attacked', attackerId: a.id, targetId: b.id, roll, hit: false },
-      { kind: 'shoved', shoverId: a.id, targetId: b.id, success: false, shoverRoll: roll, targetRoll: roll, pushedTo: null },
+      { kind: 'shoved', shoverId: a.id, targetId: b.id, success: false, shoverRoll: roll, targetRoll: roll, pushedTo: null, tookPayload: false },
       { kind: 'passed', fromId: a.id, toId: b.id, roll, caught: false },
       { kind: 'shotAtFurnace', unitId: a.id, roll, scored: false, blockedBy: null },
       { kind: 'turnEnded', unitId: a.id },
@@ -315,14 +349,14 @@ describe('every action leaves a line, the house included', () => {
         { kind: 'turnStarted', unitId: b.id, round: 1 },
         { kind: 'moved', unitId: b.id, from: { x: 1, y: 1 }, to: { x: 1, y: 2 }, path: [{ x: 1, y: 2 }], costFeet: 5 },
         { kind: 'turnEnded', unitId: b.id },
-        { kind: 'passIntercepted', interceptorId: a.id, throwerId: b.id, interceptorRoll: roll, throwerRoll: roll, success: false },
+        { kind: 'passIntercepted', interceptorId: a.id, throwerId: b.id, toId: b.id, interceptorRoll: roll, throwerRoll: roll, success: false },
       ],
       name,
     ).map((l) => l.line);
     expect(lines).toEqual([
       `${a.name} holds position.`,
       `${b.name} moves 1 cell.`,
-      `${a.name} reaches for the pass from ${b.name} and misses.`,
+      `${a.name} reaches for ${b.name}'s pass to ${b.name} and misses.`,
     ]);
   });
 });

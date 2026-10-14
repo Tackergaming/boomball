@@ -1,0 +1,487 @@
+{
+  "state": {
+    "turn": null,
+    "bench": {
+      "A": 3,
+      "B": 3
+    },
+    "phase": "playing",
+    "round": 1,
+    "score": {
+      "A": 0,
+      "B": 0
+    },
+    "spark": {
+      "x": 7,
+      "y": 22,
+      "state": "pending",
+      "heading": null
+    },
+    "units": [
+      {
+        "x": 7,
+        "y": 1,
+        "hp": 70,
+        "id": "A-bulwark-1",
+        "name": "Tacker",
+        "role": "bulwark",
+        "team": "A",
+        "tier": "star",
+        "maxHp": 70,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "human",
+          "humanId": "6eb5302a-ba82-4f2e-9ae6-a8acbfe469df"
+        },
+        "initiative": 5,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 2,
+        "y": 14,
+        "hp": 50,
+        "id": "A-striker-2",
+        "name": "Petra Sparshot",
+        "role": "striker",
+        "team": "A",
+        "tier": "star",
+        "maxHp": 50,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 4,
+        "y": 14,
+        "hp": 50,
+        "id": "A-striker-3",
+        "name": "Ogga Emberkell",
+        "role": "striker",
+        "team": "A",
+        "tier": "star",
+        "maxHp": 50,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 6,
+        "y": 14,
+        "hp": 50,
+        "id": "A-striker-4",
+        "name": "Dolm Spyre",
+        "role": "striker",
+        "team": "A",
+        "tier": "star",
+        "maxHp": 50,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 8,
+        "y": 14,
+        "hp": 85,
+        "id": "A-breaker-5",
+        "name": "Harrow Sparshot",
+        "role": "breaker",
+        "team": "A",
+        "tier": "star",
+        "maxHp": 85,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 10,
+        "y": 14,
+        "hp": 85,
+        "id": "A-breaker-6",
+        "name": "Vandy Gunwale",
+        "role": "breaker",
+        "team": "A",
+        "tier": "star",
+        "maxHp": 85,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 12,
+        "y": 14,
+        "hp": 45,
+        "id": "A-trajector-7",
+        "name": "Corvo Powderkin",
+        "role": "trajector",
+        "team": "A",
+        "tier": "star",
+        "maxHp": 45,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 7,
+        "y": 43,
+        "hp": 70,
+        "id": "B-bulwark-1",
+        "name": "Brann Oakes",
+        "role": "bulwark",
+        "team": "B",
+        "tier": "star",
+        "maxHp": 70,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 2,
+        "y": 30,
+        "hp": 50,
+        "id": "B-striker-2",
+        "name": "Gullo Capstan",
+        "role": "striker",
+        "team": "B",
+        "tier": "star",
+        "maxHp": 50,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 4,
+        "y": 30,
+        "hp": 50,
+        "id": "B-striker-3",
+        "name": "Renk Gunwale",
+        "role": "striker",
+        "team": "B",
+        "tier": "star",
+        "maxHp": 50,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 6,
+        "y": 30,
+        "hp": 50,
+        "id": "B-striker-4",
+        "name": "Renk Flintlock",
+        "role": "striker",
+        "team": "B",
+        "tier": "star",
+        "maxHp": 50,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 8,
+        "y": 30,
+        "hp": 85,
+        "id": "B-breaker-5",
+        "name": "Nib Thack",
+        "role": "breaker",
+        "team": "B",
+        "tier": "star",
+        "maxHp": 85,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 10,
+        "y": 30,
+        "hp": 85,
+        "id": "B-breaker-6",
+        "name": "Quill Rivet",
+        "role": "breaker",
+        "team": "B",
+        "tier": "star",
+        "maxHp": 85,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      },
+      {
+        "x": 12,
+        "y": 30,
+        "hp": 45,
+        "id": "B-trajector-7",
+        "name": "Gullo Rossel",
+        "role": "trajector",
+        "team": "B",
+        "tier": "star",
+        "maxHp": 45,
+        "braced": false,
+        "status": "active",
+        "dodging": false,
+        "controller": {
+          "kind": "ai"
+        },
+        "initiative": null,
+        "holdingPayload": false,
+        "evacuatedOnRound": null,
+        "reactionAvailable": true
+      }
+    ],
+    "result": null,
+    "arenaId": "kill-silo",
+    "payload": {
+      "x": 7,
+      "y": 22,
+      "carriedBy": null
+    },
+    "rngSeed": 2766940615,
+    "crackers": [
+      {
+        "x": 1,
+        "y": 22,
+        "id": "cracker-1",
+        "state": "live",
+        "respawnOnRound": null
+      },
+      {
+        "x": 13,
+        "y": 21,
+        "id": "cracker-2",
+        "state": "live",
+        "respawnOnRound": null
+      }
+    ],
+    "relaunch": null,
+    "turnIndex": 0,
+    "turnOrder": [
+      {
+        "rank": 1,
+        "team": "A",
+        "actor": {
+          "kind": "unit",
+          "unitId": "A-trajector-7"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 2,
+        "team": "A",
+        "actor": {
+          "kind": "unit",
+          "unitId": "A-striker-2"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 3,
+        "team": "A",
+        "actor": {
+          "kind": "unit",
+          "unitId": "A-striker-3"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 4,
+        "team": "A",
+        "actor": {
+          "kind": "unit",
+          "unitId": "A-striker-4"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 5,
+        "team": "A",
+        "actor": {
+          "kind": "unit",
+          "unitId": "A-breaker-5"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 6,
+        "team": "A",
+        "actor": {
+          "kind": "unit",
+          "unitId": "A-breaker-6"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 7,
+        "team": "A",
+        "actor": {
+          "kind": "unit",
+          "unitId": "A-bulwark-1"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 8,
+        "team": "B",
+        "actor": {
+          "kind": "unit",
+          "unitId": "B-trajector-7"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 9,
+        "team": "B",
+        "actor": {
+          "kind": "unit",
+          "unitId": "B-striker-2"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 10,
+        "team": "B",
+        "actor": {
+          "kind": "unit",
+          "unitId": "B-striker-3"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 11,
+        "team": "B",
+        "actor": {
+          "kind": "unit",
+          "unitId": "B-striker-4"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 12,
+        "team": "B",
+        "actor": {
+          "kind": "unit",
+          "unitId": "B-breaker-5"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 13,
+        "team": "B",
+        "actor": {
+          "kind": "unit",
+          "unitId": "B-breaker-6"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 14,
+        "team": "B",
+        "actor": {
+          "kind": "unit",
+          "unitId": "B-bulwark-1"
+        },
+        "blockId": null
+      },
+      {
+        "rank": 15,
+        "team": null,
+        "actor": {
+          "kind": "crackers"
+        },
+        "blockId": null
+      }
+    ],
+    "penaltyBox": {
+      "A": null,
+      "B": null
+    },
+    "initiativeNonce": 0,
+    "lastCarrierTeam": null
+  },
+  "lastSeq": 25
+}

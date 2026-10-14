@@ -349,7 +349,18 @@ class Planner {
       }
     }
     this.ballFirst = ballFirst;
+
+    // The keeper's relaunch never goes into an interceptor (2H.13, `00` C15
+    // point 4): whether a clean lane exists from the cell it stands on.
+    this.cleanPassHere =
+      w.relaunch > 0 &&
+      unit.holdingPayload &&
+      legal.pass.some((option) => {
+        const mate = unitOf(state, option.unitId);
+        return passInterceptors(arena, state, unit, lineTo(this.here, mate)).length === 0;
+      });
   }
+  private readonly cleanPassHere: boolean;
 
   plans(): Plan[] {
     const { legal, unit, weights: w, state, arena } = this.board;
@@ -381,7 +392,13 @@ class Planner {
     // The pickup is free and the plan is rebuilt once the ball is in hand.
     // Left to a keener team-mate who has not played, it is not picked up at
     // all, nor picked up and thrown (C12 commune 6).
-    const share = keenerMateNear(this.board) ? 1 - w.yieldToKeener : 1;
+    // The kick-off ball is a Striker's (C10 commune 6, Trajector 3): the
+    // factor `chaseKickoff` only weighed on the cell before 2H.13, and the
+    // plan "walk, pick up, pass" took it in twelve games out of twelve
+    // (`00` C15 point 1). And a shooter leaves its rebound to a team-mate
+    // still to play (point 3).
+    const kickoff = state.lastCarrierTeam === null ? w.chaseKickoff : 1;
+    const share = this.board.shooterYields ? 0 : (keenerMateNear(this.board) ? 1 - w.yieldToKeener : 1) * kickoff;
     if (legal.canGrabPayload && share > 0) {
       out.push({
         steps: [{ kind: 'grabPayload' }],
@@ -479,9 +496,10 @@ class Planner {
       const left = state.turn!.movementFeetRemaining - reachable.costFeet;
       for (const priced of this.actionsAt(cell, options, this.here, there)) {
         if (isThrow(priced.action)) {
-          // The keeper throws at once, interceptors or not (écart 54): it only
-          // steps out when no line exists from where it stands.
-          if (w.relaunch > 0 && (legal.pass.length > 0 || legal.shoot)) continue;
+          // The keeper throws at once when a clean lane exists from where it
+          // stands (écart 54; since 2H.13 never into an interceptor, `00`
+          // C15 point 4): it only steps out when no clean line exists there.
+          if (w.relaunch > 0 && this.cleanPassHere) continue;
           // A throw is priced on the throw: the ground it gains is read from
           // where the turn started, so walking first only pays when the
           // throw itself gets better, and every cell walked costs a little,
@@ -978,9 +996,16 @@ class Planner {
 
       const played = hasPlayedThisRound(state, mate.id);
       const risk = passInterceptors(arena, state, thrower, lineTo(at, mate)).length;
+      // The keeper never throws into a lane with an opponent on it (2H.13,
+      // `00` C15 point 4, Jérôme): it walks for a clean one or digs in.
+      if (w.relaunch > 0 && risk > 0) continue;
       const ahead = rangeToFurnace(mate, this.board.targetFurnace) < rangeToFurnace(origin, this.board.targetFurnace);
       const exception = w.chainException > 0 && mate.role === 'striker' && ahead && risk === 0;
-      if (played && !lastLink && !unload && !exception) continue;
+      // "Call for the ball" (2H.13, point 6): the player who called is thrown
+      // to whether or not it has played or stands behind; range, sight and the
+      // interceptors still rule.
+      const summoned = called?.receiverId === mate.id;
+      if (played && !lastLink && !unload && !exception && !summoned) continue;
 
       // A receiver still to play may be a whole move behind (2H.11, point
       // 9), whether or not it is the next to play: its own run carries the
@@ -988,7 +1013,7 @@ class Planner {
       // even after the run, and a receiver that has played carries nothing.
       const gained =
         rangeToFurnace(origin, this.board.targetFurnace) - rangeToFurnace(mate, this.board.targetFurnace);
-      if (gained < 0 && !lastLink && !unload && !exception && (played || -gained > moveCells)) continue;
+      if (gained < 0 && !lastLink && !unload && !exception && !summoned && (played || -gained > moveCells)) continue;
 
       // The receiver's exposure where the ball arrives (2H.11, point 14), and
       // the possession (point 17): only to somebody less exposed than the

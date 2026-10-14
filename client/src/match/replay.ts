@@ -166,6 +166,8 @@ function project(base: MatchState, events: readonly MatchEvent[]): MatchState {
         break;
       case 'shoved':
         if (event.pushedTo) moveUnit(event.targetId, event.pushedTo);
+        // Écart 61: the shover has the ball in hand at once, no drop, no scatter.
+        if (event.tookPayload) hold(event.shoverId);
         break;
       case 'damaged': {
         const unit = units.get(event.unitId);
@@ -345,6 +347,9 @@ function describe(
         // A consequence of a swing, not a choice: background to the swing.
         lines.push({ text: `${name(event.unitId)} is thrown back by the swing`, minor: true });
         break;
+      case 'recoilBlocked':
+        lines.push({ text: `${name(event.unitId)} swings but cannot recoil`, minor: true });
+        break;
       case 'attacked':
       case 'opportunityAttacked':
         lines.push({
@@ -358,7 +363,7 @@ function describe(
       case 'shoved':
         lines.push({
           text: `${name(event.shoverId)} shoves ${name(event.targetId)}${
-            event.pushedTo ? ' back a cell' : ''
+            event.tookPayload ? ' and takes the Payload' : event.pushedTo ? ' back a cell' : ''
           } · ${event.success ? 'SHOVED' : 'HELD'}`,
           roll: event.shoverRoll,
           outcome: forMe(event.success, mine(event.shoverId)),
@@ -404,12 +409,12 @@ function describe(
         lines.push(
           event.success
             ? {
-                text: `${name(event.interceptorId)} cuts the pass out of the air`,
+                text: `${name(event.interceptorId)} cuts ${name(event.throwerId)}'s pass to ${name(event.toId)} out of the air`,
                 roll: event.interceptorRoll,
                 outcome: mine(event.interceptorId) ? 'good' : 'bad',
               }
             : {
-                text: `${name(event.interceptorId)} reaches for the pass from ${name(event.throwerId)} · MISSED`,
+                text: `${name(event.interceptorId)} reaches for ${name(event.throwerId)}'s pass to ${name(event.toId)} · MISSED`,
                 roll: event.interceptorRoll,
                 outcome: forMe(false, mine(event.interceptorId)),
               },

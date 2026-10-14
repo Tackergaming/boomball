@@ -16,7 +16,7 @@
  * than no timer at all.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
@@ -266,6 +266,19 @@ export function Match({
    * given again.
    */
   const [called, setCalled] = useState(false);
+
+  // The place popup floats over the top of the right column, outside the pitch,
+  // and the player can drag it (2026-10-14). The parent owns the position so it
+  // survives the popup unmounting between rounds: kept for the whole match.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [placePos, setPlacePos] = useState<{ x: number; y: number } | null>(null);
+  const placeShown = placing !== null && !briefing;
+  useLayoutEffect(() => {
+    if (!placeShown || placePos !== null) return;
+    const rect = bodyRef.current?.getBoundingClientRect();
+    setPlacePos(rect && rect.width > 0 ? { x: Math.max(0, rect.width - 340), y: 0 } : { x: 0, y: 0 });
+  }, [placeShown, placePos]);
+
   const postOrders = match.order;
   const callForBall = useCallback(async () => {
     if (!state || !onClock) return;
@@ -368,7 +381,24 @@ export function Match({
         </div>
       </header>
 
-      <div style={S.body}>
+      <div style={S.body} ref={bodyRef}>
+        {placing !== null && onClock && !briefing && placePos !== null && (
+          <PlacePrompt
+            name={onClock.name}
+            role={onClock.role === 'breaker' ? 'breaker' : 'striker'}
+            places={placing}
+            secondsLeft={left}
+            busy={match.busy}
+            position={placePos}
+            onMove={setPlacePos}
+            onChoose={(place) => act({ kind: 'choosePlace', place })}
+            // Closing without a choice is the last place, as under écart 55.
+            onClose={() => {
+              if (!match.busy) act({ kind: 'choosePlace', place: placing });
+            }}
+          />
+        )}
+
         <div style={S.left}>
           {/* The chain of turns, read left to right: who is up, who is next,
               then next. Jérôme could not tell from the side ladder alone. */}
@@ -398,21 +428,6 @@ export function Match({
                 progress={match.progress}
                 onSkip={match.skip}
                 onDismiss={match.dismissBeat}
-              />
-            )}
-
-            {placing !== null && onClock && !briefing && (
-              <PlacePrompt
-                name={onClock.name}
-                role={onClock.role === 'breaker' ? 'breaker' : 'striker'}
-                places={placing}
-                secondsLeft={left}
-                busy={match.busy}
-                onChoose={(place) => act({ kind: 'choosePlace', place })}
-                // Closing without a choice is the last place, as under écart 55.
-                onClose={() => {
-                  if (!match.busy) act({ kind: 'choosePlace', place: placing });
-                }}
               />
             )}
 
@@ -570,6 +585,7 @@ const S: Record<string, React.CSSProperties> = {
   // in both places a player might be looking: the card and the scoreboard.
   tally: { display: 'inline-block', animation: 'bb-struck .7s ease-out' },
   body: {
+    position: 'relative',
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) 340px',
     gap: 10,
