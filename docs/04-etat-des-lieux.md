@@ -3,7 +3,7 @@
 > Historique du projet Boomball : ce qui a été construit et pourquoi, jusqu'au 2026-09-02. Depuis le
 > 2026-10-10 le point d'entrée est `08-plan-terrain-horizontal.md`, et `07-audit-et-plan-3d.md`
 > porte l'audit et le journal des phases. **Bandeau tenu à jour pour `check_drift.py` : au
-> 2026-10-12, après les sous-phases 2H.1 à 2H.12, le moteur 7 joue le terrain horizontal, les
+> 2026-10-14, après les sous-phases 2H.1 à 2H.13, le moteur 8 joue le terrain horizontal, les
 > Crackers roulent vers le ballon et le Breaker les pare, l'initiative est un ordre sans comptes
 > où un humain Striker ou Breaker choisit sa place dans son rôle par une popup (écart 58), le Spark s'échappe et revient, la surface de
 > réparation protège la relance du gardien, l'IA des quatre rôles suit les listes de Jérôme, note
@@ -11,13 +11,18 @@
 > porteur, les places prises, ramasser puis lancer, les routes qui évitent les allonges ; puis la
 > cinquième : un porteur ne tente jamais le Spark, le Dash d'approche, le porteur ne recule
 > jamais, le dernier round lit le score, la proie à la chance d'évacuer, une parade jamais sur le
-> pareur ; puis la sixième : le Breaker ramasse d'abord), **549 tests**, et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et
+> pareur ; puis la sixième : le Breaker ramasse d'abord ; puis la septième : le Trajector laisse
+> le coup d'envoi, le porteur au plus près de la bouche, le tireur laisse son rebond, le gardien
+> jamais dans une allonge, l'appel qui lève la chaîne, et avec elle le Spark qui fuit les
+> Trajectors et revient à 9 cases des deux, le Shove qui prend le ballon, la relance Trajector,
+> Strikers, Bulwark, Breakers, le chrono d'un rôle sans popup réparé), **617 tests**, et après la campagne 2H.3, les arbitrages de Jérôme et les écarts de 2H.6 et
 > 2H.7, Crackers à 8, portée 9/12, Spark 20, le sweep donne 1,46 à 1,80 buts par match (`09` §12),
-> équilibrage re-clos par Jérôme sur ce tableau le 2026-10-10, pas de sweep depuis. **Le moteur 7
-> est le jeu en ligne** : `resolve-action` v18 et `create-match` v16 déployées le 2026-10-12 avec
-> son feu vert pour 2H.12 (`00` C14), les matchs du moteur 6 archivés ; sa partie du 2026-10-12 sur le moteur 6 est
-> consignée et rejouée dans `docs/matches/` par `scripts/dump-match.ts`, lue round par round sur
-> le visualiseur `viewer.html`, et ses décisions sont `00` C13, écrites avant le code.
+> équilibrage re-clos par Jérôme sur ce tableau le 2026-10-10, pas de sweep depuis. **Le moteur 8
+> est le jeu en ligne** : `resolve-action` v19 et `create-match` v17 déployées le 2026-10-14 avec
+> son feu vert pour 2H.13 (`00` C15), les matchs du moteur 7 archivés ; ses matchs sont consignés
+> et rejoués dans `docs/matches/` par `scripts/dump-match.ts`, lus sur le visualiseur
+> `viewer.html` ou contre les événements, et ses décisions sont `00` C13 à C15, écrites avant le
+> code.
 > Tout ce qui suit décrit le terrain vertical, dépassé par la décision D11.
 > Dernière mise à jour du corps : 2026-09-02, après cinq tests en local de Jérôme et les deux
 > arbitrages qui suivaient le passage au terrain vertical.
