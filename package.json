@@ -11,8 +11,9 @@
     "sweep": "vitest run --config vitest.sweep.config.ts",
     "build:function": "node scripts/build-edge-function.mjs",
     "deploy:function": "node scripts/deploy-edge-function.mjs",
-    "e2e": "playwright test -c e2e/playwright.config.ts --grep-invert @playthrough",
-    "e2e:playthrough": "playwright test -c e2e/playwright.config.ts --grep @playthrough"
+    "e2e": "playwright test -c e2e/playwright.config.ts --grep-invert \"@playthrough|@board3d\"",
+    "e2e:playthrough": "playwright test -c e2e/playwright.config.ts --grep @playthrough",
+    "e2e:board3d": "playwright test -c e2e/playwright.config.ts --grep @board3d"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

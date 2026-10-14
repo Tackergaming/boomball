@@ -1,94 +1,75 @@
 # Reprise du chat suivant, Boomball
 
-> Écrit par le fil principal (Fable 5.1) le 2026-10-14, à la fin du chat qui a consigné les trois
-> matchs de Jérôme sur le moteur 8, écrit `00` C16 sur ses retours et codé 2H.14 (la passe
-> gratuite après le Shove, le relais du Trajector au coup d'envoi, trois retours d'écran). À coller
-> tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`. La ligne « Où on
-> en est » dit si la mise en ligne a eu lieu.
+> Écrit par le fil principal (Fable 5.1) le 2026-10-14, à la fin du chat qui a consigné la partie
+> de Jérôme sur le moteur 9, écrit `00` C17 sur son retour et codé 2H.15 : les cases orange
+> retirées et la scène 2.5D construite en un seul bloc derrière l'interrupteur 2D / 3D. À coller
+> tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.14
-est la dernière sous-phase codée, §9 la parallélisation.
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.15
+est la dernière sous-phase codée (les phases 3, 4 et 5 y sont faites d'un coup), §9 la
+parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 63, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 la quatrième passe, C13 la cinquième, C14 l'écart 58 (ma place dans
 mon rôle, par une popup) et la sixième passe, C15 le lot du 2026-10-14 (le chrono, les écarts 59
-à 62, la septième passe), C16 le lot du 2026-10-14 au soir : l'écart 63, la passe gratuite après
-le Shove qui prend le ballon, la huitième passe (le relais du Trajector au coup d'envoi, la passe
-gratuite dans le plan de tour) et trois retours d'écran. Chaque passe finit par « comment ...
-est codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de C12 à C16.
-07 §10 porte le journal, dont l'entrée 2H.14. 09 §12 est le dernier sweep, tranché « rien ne
-bouge » ; il n'y a pas de sweep de 2H.8 à 2H.14. 04 est l'histoire, à lire seulement quand une
-décision d'ingénierie te surprend.
+à 62, la septième passe), C16 le lot du 2026-10-14 au soir (l'écart 63, la passe gratuite après
+le Shove qui prend le ballon, la huitième passe, trois retours d'écran), C17 le lot de la nuit
+du 2026-10-14 : mon retour sur les cases orange, retirées, et UN FAIT À TRANCHER PAR MOI, la
+passe gratuite d'un Breaker vers son gardien treize cases derrière lui (match e2e 7d631b71,
+consigné), avec les trois options écrites. Chaque passe finit par « comment ... est codée »,
+poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de C12 à C17.
+07 §10 porte le journal, dont l'entrée 2H.15, qui dit fichier par fichier ce que la 2.5D
+contient. 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8
+à 2H.15. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.14 est CODÉE, COMMITÉE (e8c0fee puis les commits de contexte) et EN LIGNE
-depuis le 2026-10-14 au soir sur mon feu vert : resolve-action v20, create-match v18,
-ENGINE_VERSION 9, aucune migration, les matchs ouverts du moteur 8 archivés. 643 tests verts
-sur 29 fichiers (617 avant), typecheck racine, scripts, e2e et client verts, build du client
-vert, smoke (40 s) et playthrough (37 s, 20 requêtes humaines, 0 refusée) verts sur les fonctions
-redéployées, le match e2e du moteur 9 (7d631b71) rejoué sans écart, la popup vue en haut à
-gauche, les carrés orange vus autour de chaque adversaire, plus de ligne de tiers. Pas de sweep,
-pas demandé. Les textures CC0 de la phase 3 sont choisies et téléchargées dans
-context/import/textures-ambientcg/ : MetalPlates013 le sol, 011 les parois, 014 les caisses.
-Je veux les pions version 2 (modèles 3D) mais Meshy et Tripo exigent un abonnement pour
-télécharger : la voie gratuite reste à trouver, la phase 3 démarre avec la version 1 en code.
-Dix-huit matchs d'auto-jeu de contrôle (scripts/control-2h14.ts) : 1,7 / 1,8 / 1,8 buts de
-ballon par match (rookie, veteran, star), 92 prises de balle sur 93 Shove réussis, 87 passes
-gratuites jouées derrière dont 4 volées, le Trajector ne prend jamais le coup d'envoi et ne
-recule jamais au round 1 (0 sur 36), 36 sur 36 finissent à portée de passe du ballon.
+Où on en est : 2H.15 est CODÉE le 2026-10-14 dans la nuit, ENGINE_VERSION toujours 9, rien à
+redéployer côté fonctions, le client en ligne PAS redéployé (mon feu vert). Les fonctions en
+ligne restent resolve-action v20 et create-match v18, moteur 9. 652 tests verts sur 30 fichiers
+(643 avant), typecheck racine, scripts, e2e et client verts, build du client vert (three dans un
+chunk chargé en lazy, le 2D ne le télécharge pas). Le harnais 3D, npm run e2e:board3d, est vert
+en 1,4 minute sur un Vite dédié (5174) : bascule en 3D, silo entier capturé, cellToScreen par la
+caméra, clic à la souris sur la case qu'il désigne et le pion arrive, zoom rapproché, tour de
+l'équipe adverse, retour 2D, zéro erreur console. Le smoke 2D (npm run e2e) est à relancer au
+début du chat si la ligne « Smoke 2D » du journal 2H.15 dans 07 §10 ne dit pas vert. Ma partie
+sur le moteur 9 (ab27b827, Striker, 50-0) et le match e2e 7d631b71 sont consignés et rejoués
+sans écart dans docs/matches/.
 
-Ce que 2H.14 a changé, en quatre phrases. Écart 63 : un Shove réussi sur un porteur met le
-ballon dans les mains du bousculeur et lui laisse une passe sans Action pour le reste du tour,
-n'importe quand, depuis la case du Shove ou après avoir marché, à tout coéquipier à portée et
-en vue qu'il ait joué ou non, interceptable, jamais un tir (turn.freePass, moteur 9). Le
-Trajector lit le ballon du coup d'envoi comme déjà porté par un Striker qui n'a pas joué, debout
-sur la case du ballon, et finit en relais devant lui, jamais plus près de sa propre bouche que sa
-case de départ (kickoffRelay, kickoffMayEnd). La passe gratuite est un plan de tour, « passer »
-ou « marcher puis passer », les deux filtres de la chaîne levés comme pour un appel. L'écran :
-la popup naît en haut à gauche, toute case adjacente à un adversaire porte le carré orange à
-chaque tour (data-reach), les pointillés des tiers ont disparu.
+Ce que 2H.15 contient, en cinq phrases. Les carrés orange de 2H.14 sont retirés de Board.tsx,
+la route sous le curseur reste orange quand elle provoque et l'étiquette compte les allonges.
+React 19 (A20) et three, fiber, drei sont installés ; tout client/src/board3d/ est nouveau :
+layoutGeometry.ts (pur, testé), Silo.tsx (sol, tube couché, caisses, piliers, deux bouches qui
+flambent au but, mes trois textures en WebP 1K dans board3d/textures/), Camera.tsx (trois quarts
+fixe, deux zooms, elle publie la projection de cellToScreen), Tokens.tsx (socle, anneaux, MON
+GLB de Giff dans client/public/models/, capsule en repli), Overlay.tsx (tuiles, routes, ligne de
+vue, tir), Labels.tsx (plaques en DOM, jamais Html de drei qui fait hurler React 19),
+Ordnance.tsx, Minimap.tsx, Board3D.tsx. L'animation lit match/pose.ts, sorti de Board.tsx sans
+changement et partagé par les deux plateaux, dans une seule useFrame : marche, poussée, recul,
+Crackers, Spark, passe et tir en arc. L'interrupteur est le bouton « See it in 3D » de l'écran de
+match, choix gardé dans localStorage, et le crochet publie view. Dette connue de la 2.5D :
+l'orientation du modèle (MODEL_YAW dans Tokens.tsx, à vérifier sur mes captures), pas de sprite
+d'impact ni d'explosion (Effects.tsx reste à faire, phase 6), le noir sous la lèvre avant en vue
+large, les pions tous du même maillage sans couleur d'équipe sur l'armure (le socle et les
+plaques la portent).
 
 Les quatre fichiers du vault modifiés hors de nos sessions (Sapphire Hammer.md, la PREP de la
 scène 1.2 Ilthavax, sa battlemap et les prompts de battlemap de la scène 1.3) et les deux
 fichiers non suivis MARGO.md et theodo.md ne sont pas à nous : ne les commite pas sans mon feu
-vert.
+vert. Les archives de textures (19 Mo) dans context/import/textures-ambientcg/ et le glb source
+dans context/import/ ne sont pas commités non plus ; la copie du glb dans client/public/models/
+et les WebP le sont.
 
 LA TÂCHE.
-1. Vérifier git status avant toute chose ; tout est commité au 2026-10-14 au soir.
-2. Mes parties sur 2H.14 : les retrouver par dump-match.ts --list (horaires en UTC) et
-   consigner celles que je nomme. Un match du moteur 8 ne se rejoue plus avec le dépôt du
-   moteur 9. Pas de lecture round par round sauf si je la demande ou si tu la proposes avec
-   une raison. Un fait à relire avec moi : en ligne, un Breaker a joué sa passe gratuite vers
-   son gardien treize cases derrière lui, les trois receveurs à portée étant tous derrière.
-3. Mes retours s'il y en a, en chat, puis C17 dans 00 avant toute ligne de code.
-4. Puis la 2.5D, EN UN SEUL BLOC et pas en trois phases : Jérôme l'a dit le 2026-10-14 au soir,
-   il ne veut plus entendre parler de phase 3, 4 et 5 ni de pions version 1 ou 2. Construire d'un
-   coup, derrière l'interrupteur 2D / 3D, la scène (sol, parois courbes, caisses, deux bouches
-   depuis le layout, ses trois textures), le jeu (survol, clic, cases atteignables, ligne de vue)
-   et l'animation (marche, poussée, recul, Crackers, Spark, passe, tir), puis lui montrer des
-   captures et le laisser jouer. Les pions sont des capsules en code, comme dans toutes les démos
-   de jeux 3D en un prompt ; son glb de Giff les remplace dès qu'il existe. Le contenu de 08 §5
-   phases 3 à 5 et 07 §5 reste la liste de ce qu'il y a à faire, pas un calendrier. Dans l'ordre
-   technique, A20 (React 19) est le premier pas :
-   dépendances three, fiber, drei (07 §4.3), layoutGeometry.ts, Silo.tsx, Camera.tsx en trois
-   quarts fixe avec deux zooms et sans rotation (J4), les pions version 1 de 07 §5 (socle
-   hexagonal, capsule, glyphe de rôle, plaque Html), l'interrupteur 2D / 3D, le crochet
-   cellToScreen sur la caméra 3D. Ce que Jérôme prépare : deux ou trois textures CC0 d'ambientCG
-   (sol riveté, paroi courbe rouillée, caisse ou pilier), à convertir en WebP 1K ; il a généré un
-   Giff 3D : SON GLB EST LÀ, context/import/giff-boomball.glb, sorti d'un Space Hugging Face
-   (TRELLIS, générateur trimesh), vérifié le 2026-10-14 au soir par le fil principal : glTF 2.0,
-   un maillage de 20 848 sommets et 27 239 triangles, POSITION et TEXCOORD_0 sans normales (à
-   recalculer au chargement), un matériau PBR avec une texture PNG embarquée, pas de rig ni
-   d'animation, boîte d'environ 0,8 x 1,0 x 0,94 centrée à l'origine, Y vers le haut, 2 Mo. À
-   charger par useGLTF de drei, mettre à l'échelle d'une case, orienter vers la bouche attaquée,
-   et instancier pour les quatorze pions (environ 380 000 triangles au total, à décimer si le
-   GPU intégré souffre). L'image source est context/import/Giff-boomball-2d.jpg, un Giff en
-   armure à la batte sur fond noir, la référence de style pour tout le reste. Les trois archives de textures (19 Mo)
-   sont dans context/import/textures-ambientcg/, non commitées.
-5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
+1. Vérifier git status avant toute chose ; tout est commité au 2026-10-14 dans la nuit.
+2. Ma partie en 3D : je l'ai jouée ou je la joue, en local (npm run dev dans boomball/client,
+   « See it in 3D »). Mes retours en chat, puis C18 dans 00 avant toute ligne de code. Ma
+   décision sur la passe gratuite au gardien (C17) si je la donne.
+3. Si je demande le client en ligne : le build est vert, le déploiement passe par mon feu vert
+   explicite, jamais le dépôt GitHub sur Vercel.
+4. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -120,7 +101,9 @@ Ce qu'il faut savoir tout de suite.
    intercepteur, un receveur appelé passe outre les filtres de la chaîne. Depuis 2H.14 : le
    Trajector au coup d'envoi lit le ballon comme porté (kickoffRelay, relayValue) et ne finit
    jamais plus près de sa bouche que sa case de départ (kickoffMayEnd) ; la passe gratuite
-   (freeThrow dans plans, free dans throwsAt) lève les deux filtres de la chaîne.
+   (freeThrow dans plans, free dans throwsAt) lève les deux filtres de la chaîne, et c'est elle
+   qui a servi le gardien treize cases derrière : le receveur n'avait pas joué, exposition zéro,
+   personne sur la ligne, BACKWARD_STEP un demi-point par case, relief rendu au lanceur.
 
 4. Le plan de tour, en trois phrases : chooseAction renvoie la première action du meilleur plan
    et l'appelant rappelle après chaque action, donc l'IA se juge sur rankPlans (le plan entier et
@@ -141,35 +124,37 @@ Ce qu'il faut savoir tout de suite.
    volée est dans l'événement (toId), mais le dump retient encore la première passe qui produit
    les mêmes jets. Pour publier le viewer en artefact privé, l'outil Artifact sur viewer.html ;
    pour lire les plans d'une décision sans ouvrir le navigateur, le JSON est dans la balise
-   match-data du viewer. Les dossiers de docs/matches/ du 11 au 14 octobre avant 20edbca9 sont
-   des matchs des moteurs 5 à 7 : ils ne se rejouent plus ; les trois du 14 au soir sont du
-   moteur 8 et ne se rejoueront plus avec le dépôt du moteur 9.
+   match-data du viewer. Les dossiers de docs/matches/ d'avant 20edbca9 sont des matchs des
+   moteurs 5 à 7, les trois du 14 au soir du moteur 8 : ils ne se rejouent plus avec le dépôt du
+   moteur 9 ; ab27b827 et 7d631b71 sont du moteur 9 et se rejouent.
 
 6. Toute migration passe par moi via /supabase-migrate, tout redéploiement par mon feu vert
    explicite. Chaque match porte engine_version ; une fonction qui lit une autre version refuse
    en 409, le client archive.
 
-7. Le harnais d'écran : npm run e2e en 25 à 55 s, npm run e2e:playthrough en 15 à 70 s, le
-   crochet window.__boomball. waitForPlayableTurn dans e2e/harness.ts répond à la popup par un
-   clic à l'écran (data-place, place-close) et capture la première vue ; le smoke clique 1, puis
-   Close, puis 2, le playthrough une place différente à chaque round. Le siège humain du
-   playthrough est piloté par chooseAction du dépôt depuis Node. Le smoke suppose une case de
-   destination au tour 1 et au tour 3, un clic simple sur une case qui envoie la route la plus
-   courte, et un pion cliquable au tour 2. Il échoue si le match e2e en cours atteint le round 10
-   pendant ses trois tours : lancer npm run e2e:playthrough pour le finir. Juste après un
-   déploiement, la connexion de global-setup.ts peut expirer une fois : relancer. Si le npm run
-   dev de Jérôme occupe 5173 sans le crochet, le smoke échoue sur « hook absent » : lancer un
-   second Vite depuis boomball/client en arrière-plan, VITE_BOOMBALL_HOOK=1 VITE_BOOMBALL_PATIENT=1
-   npx vite --port 5174 --strictPort, puis BASE_URL=http://localhost:5174 npm run e2e, et le tuer
-   après (netstat -ano, taskkill). Vus au harnais : la zone violette (data-box), le marqueur de
-   Réaction dépensée, la popup en haut à gauche, les carrés orange (data-reach) ; pas encore vus
-   à l'écran : « is moved out of the penalty box », « cannot recoil », « and takes the Payload »
-   (ces deux dernières sont dans le fil du playthrough, capture 03 du 2026-10-14T18-47-01).
+7. Le harnais d'écran : npm run e2e en 25 à 55 s, npm run e2e:playthrough en 15 à 70 s, npm run
+   e2e:board3d en 1,4 min, le crochet window.__boomball. waitForPlayableTurn dans e2e/harness.ts
+   répond à la popup par un clic à l'écran (data-place, place-close) et capture la première vue ;
+   le smoke clique 1, puis Close, puis 2, le playthrough une place différente à chaque round, le
+   spec 3D la place 2. Le siège humain du playthrough est piloté par chooseAction du dépôt depuis
+   Node. Le smoke suppose une case de destination au tour 1 et au tour 3, un clic simple sur une
+   case qui envoie la route la plus courte, et un pion cliquable au tour 2. Il échoue si le match
+   e2e en cours atteint le round 10 pendant ses trois tours : lancer npm run e2e:playthrough pour
+   le finir. Juste après un déploiement, la connexion de global-setup.ts peut expirer une fois :
+   relancer. Si le npm run dev de Jérôme occupe 5173 sans le crochet, le smoke échoue sur « hook
+   absent » : lancer un second Vite depuis boomball/client en arrière-plan,
+   VITE_BOOMBALL_HOOK=1 VITE_BOOMBALL_PATIENT=1 npx vite --port 5174 --strictPort, puis
+   BASE_URL=http://localhost:5174 npm run e2e, et le tuer après (netstat -ano, taskkill). En 3D
+   il n'y a ni data-cell ni data-unit : le spec clique à la souris là où cellToScreen projette, et
+   les plaques portent data-plate. Le spec 3D admet deux avertissements console qui ne sont pas à
+   nous (THREE.Clock déprécié par three 0.186 mais construit par fiber 9, et les messages de
+   performance du GL logiciel de Chromium headless) ; toute autre ligne le fait échouer.
 
 8. useMatch.load porte un compteur de génération : React StrictMode monte l'effet initial deux
    fois en dev. Ne l'enlève pas. Le bash de l'outil casse sur les accents graves dans un heredoc :
    pour une série de remplacements, un script Python écrit par l'outil d'écriture, puis lancé
-   avec python -I.
+   avec python -I. Jamais Html de drei : React 19 signale son démontage synchrone en erreur
+   console, les étiquettes passent par Labels.tsx et link.project.
 
 9. L'initiative (écart 51) est un ordre sans comptes ; un humain Trajector ou Bulwark joue en
    dernier de son rôle (écart 55), un humain Striker ou Breaker choisit sa place (écart 58) ;
@@ -186,8 +171,8 @@ Ce qu'il faut savoir tout de suite.
     dans un commit. Le règlement de table du vault est figé. Ne lis jamais design/Boomball
     Interface.html en entier.
 
-11. Les commandes. Depuis boomball/ : npm test (643), npm run typecheck, npm run sweep (environ
-    16 minutes), npm run e2e, npm run e2e:playthrough, node scripts/run-ts.mjs
+11. Les commandes. Depuis boomball/ : npm test (652), npm run typecheck, npm run sweep (environ
+    16 minutes), npm run e2e, npm run e2e:playthrough, npm run e2e:board3d, node scripts/run-ts.mjs
     scripts/control-2h14.ts (dix-huit matchs de contrôle, pas un sweep). Depuis boomball/client/ :
     npm run dev sur http://localhost:5173, jamais 127.0.0.1, npm run build, npm run typecheck.
     Depuis la racine du workspace : python boomball/supabase/checks/rls-check.py et
@@ -195,22 +180,22 @@ Ce qu'il faut savoir tout de suite.
     réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 12. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 63 de 00 partie
-    C, et C11 à C16 en entier. Dette connue : arenas.art et le champ art du spec nomment trois
-    JPEG retirés ; substituteEntry et substitute_entry restent et ne sont plus lus ; A20 (React 19)
-    reste le premier pas de la phase 3 ; le choix de direction d'un Breaker humain à la parade est
-    automatique ; la route proposée au clic reste la ligne droite alors que l'IA prend la route
-    sûre ; le fil garde 120 événements (FEED_LIMIT) ; le Spark peut rebondir plusieurs rounds dans
-    une poche du terrain ; le test du point 5 dans fifthPass.test.ts fait varier idleSwing en
-    place et le remet ; le bandeau « The clock ran out » dit « Your Giff took cover » même quand
-    c'est la popup qui a expiré ; plusieurs humains d'un même rôle (coop) n'ont pas de popup, à
-    relire en phase 7 ; la popup n'est pas rebornée quand la fenêtre rétrécit, la déplacer
-    suffit ; le bouton « Call for the ball » reste actif pendant la popup ; un gardien peut
-    marcher au-delà de sa laisse jusqu'à côté d'un receveur marqué pour une passe d'une case,
-    qu'aucune allonge n'intercepte (écart 48) ; le Shove d'un Bulwark n'est borné que par
-    l'adjacence, pas par sa laisse ; le fil ne dit pas qu'une passe était gratuite ; le temps par
-    match d'auto-jeu se mesure entre 1,4 et 2,7 s selon la charge de la machine, à relire sur une
-    machine calme avant de conclure à une régression ; les quatre fichiers du vault modifiés hors
-    de nos sessions, à moi de décider.
+    C, et C11 à C17 en entier. Dette connue : arenas.art et le champ art du spec nomment trois
+    JPEG retirés ; substituteEntry et substitute_entry restent et ne sont plus lus ; le choix de
+    direction d'un Breaker humain à la parade est automatique ; la route proposée au clic reste la
+    ligne droite alors que l'IA prend la route sûre ; le fil garde 120 événements (FEED_LIMIT) ; le
+    Spark peut rebondir plusieurs rounds dans une poche du terrain ; le test du point 5 dans
+    fifthPass.test.ts fait varier idleSwing en place et le remet ; le bandeau « The clock ran out »
+    dit « Your Giff took cover » même quand c'est la popup qui a expiré ; plusieurs humains d'un
+    même rôle (coop) n'ont pas de popup, à relire en phase 7 ; la popup n'est pas rebornée quand
+    la fenêtre rétrécit, la déplacer suffit ; le bouton « Call for the ball » reste actif pendant
+    la popup ; un gardien peut marcher au-delà de sa laisse jusqu'à côté d'un receveur marqué pour
+    une passe d'une case, qu'aucune allonge n'intercepte (écart 48) ; le Shove d'un Bulwark n'est
+    borné que par l'adjacence, pas par sa laisse ; le fil ne dit pas qu'une passe était gratuite ;
+    le temps par match d'auto-jeu se mesure entre 1,4 et 2,7 s selon la charge de la machine ; la
+    passe gratuite peut viser le gardien loin derrière (C17, à trancher) ; en 3D, l'orientation
+    du modèle, les sprites d'effets, le noir sous la lèvre avant ; les quatre fichiers du vault
+    modifiés hors de nos sessions, à moi de décider.
 
 13. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte, après
     avoir récrit ce fichier.

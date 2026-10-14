@@ -159,7 +159,12 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   );
   await shots.take('turn-2-dodged');
 
-  await page.getByRole('button', { name: 'End turn', exact: true }).click();
+  // A Dodge with no movement left empties the turn, and an empty turn passes
+  // itself on after a beat (`Match.tsx`): the button may already be gone,
+  // and the next round's place popup up in its stead. Click it if it is
+  // still there; either way the turn ends.
+  const endTwo = page.getByRole('button', { name: 'End turn', exact: true });
+  if (await endTwo.isVisible({ timeout: 2_000 }).catch(() => false)) await endTwo.click();
   expect(await myTurn()).toBe('turn');
   const afterTwo = await view(page);
   expect(afterTwo.seq).toBeGreaterThan(afterOne.seq);

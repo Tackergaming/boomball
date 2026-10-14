@@ -228,7 +228,7 @@ mobile.**
 
 **Deux plateaux, derrière un interrupteur.** *(Décision de Jérôme du 2026-10-09, voir
 `07-audit-et-plan-3d.md` §3.)* Le plateau SVG, une grille posée sur l'image de fond de la zone
-active, reste dans le code et sert de repli quand WebGL échoue. Depuis D11 (2026-10-10) le terrain se voit de dessus, et le plateau SVG bascule sur une vue du terrain entier en plongée dans la sous-phase 2H.4 de `08-plan-terrain-horizontal.md`. Le plateau 2.5D, une scène Three.js
+active, reste dans le code et sert de repli quand WebGL échoue. **Depuis 2H.15 (2026-10-14) les deux plateaux existent** : « See it in 3D » sur l'écran de match, choix gardé dans `localStorage`, le 2.5D chargé en lazy, et le crochet de test projette `cellToScreen` par la caméra quand la vue est en 3D. Depuis D11 (2026-10-10) le terrain se voit de dessus, et le plateau SVG bascule sur une vue du terrain entier en plongée dans la sous-phase 2H.4 de `08-plan-terrain-horizontal.md`. Le plateau 2.5D, une scène Three.js
 via react-three-fiber dans `client/src/board3d/`, construit sa géométrie **depuis `arena.layout`** :
 chaque cellule solide du layout produit un solide, et un test le tient. Dans les deux cas le terrain
 jouable est le layout, jamais une image. Le plateau 2.5D lit le moteur exactement comme le plateau

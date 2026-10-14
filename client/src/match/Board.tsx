@@ -14,9 +14,10 @@
  * the stage element, so a script clicks where this file drew.
  *
  * The thirds are not drawn (Jérôme, 2026-10-14, 2H.14): they carry no rule
- * and the two dotted lines only cluttered the floor. The cells beside an
- * opponent are marked in amber on every turn, the player's and the house's
- * alike, because leaving one is what draws the opportunity attack.
+ * and the two dotted lines only cluttered the floor. Nor are the cells beside
+ * an opponent (2H.15, Jérôme: "enlève les cases orange, c'est trop"): the
+ * route under the cursor still turns amber when it draws a swing, and the
+ * label beside it still counts them, which is the moment it matters.
  *
  * **Things move.** The board is handed the beat's final `state` and, beside it,
  * a `Motion`: the list of things that travelled during the beat. The state says
@@ -38,7 +39,8 @@ import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
 import { ARENA_HEIGHT, ARENA_WIDTH, arena, spec } from '../lib/arena.js';
 import type { Pending } from './ActionBar.js';
-import type { Motion, MotionStep } from './motion.js';
+import type { Motion } from './motion.js';
+import { planOf, poseAt, type BallPose } from './pose.js';
 
 /** Columns on screen, which is the pitch's length. */
 const COLS = ARENA_HEIGHT;
@@ -131,189 +133,6 @@ interface Track {
   readonly elapsed: number;
 }
 
-/** What the steps have done to the pieces at a given instant. */
-interface Pose {
-  /**
-   * Fractional engine coordinates of every piece the beat moves and has not
-   * finished moving, keyed `u:<id>`, `c:<id>` or `s`. A piece absent here is
-   * drawn where `state` has it.
-   */
-  readonly moving: ReadonlyMap<string, Point>;
-  /** Null once the ball is back to being whatever `state` says it is. */
-  readonly ball: BallPose | null;
-}
-
-type BallPose =
-  /** Waiting for its flight: in a hand, or lying where it will hop from. */
-  | { readonly kind: 'rest'; readonly at: Point; readonly held: boolean }
-  | {
-      readonly kind: 'air';
-      readonly at: Point;
-      readonly flight: 'pass' | 'shot' | 'scatter';
-      /** 1 on the ground, up to the apex of the flight. */
-      readonly scale: number;
-      /** 0 on the ground, 1 at the apex. */
-      readonly height: number;
-    };
-
-/** A step with the instants it begins and ends, so a frame can find its place without a search. */
-interface Plan {
-  readonly motion: Motion;
-  readonly starts: readonly number[];
-  /** Steps that are the last one of their piece: once over, the piece goes back to `state`. */
-  readonly last: ReadonlySet<number>;
-  readonly firstBall: number;
-  readonly lastBall: number;
-  /** The unit carrying the ball into its first flight, when it walked there during the beat. */
-  readonly bearer: UnitId | null;
-}
-
-function pieceKey(step: MotionStep): string | null {
-  switch (step.kind) {
-    case 'unit':
-      return `u:${step.unitId}`;
-    case 'cracker':
-      return `c:${step.crackerId}`;
-    case 'spark':
-      return 's';
-    case 'ball':
-      return null;
-  }
-}
-
-function planOf(motion: Motion): Plan {
-  const starts: number[] = [];
-  const last = new Set<number>();
-  const seen = new Set<string>();
-  let clock = 0;
-  for (const timed of motion.steps) {
-    starts.push(clock);
-    clock += timed.ms;
-  }
-  // Walked backwards so the first sighting of a piece is its final step.
-  for (let i = motion.steps.length - 1; i >= 0; i--) {
-    const key = pieceKey(motion.steps[i]!.step);
-    if (key === null || seen.has(key)) continue;
-    seen.add(key);
-    last.add(i);
-  }
-  const balls = motion.steps.flatMap((timed, i) => (timed.step.kind === 'ball' ? [i] : []));
-  const firstBall = balls[0] ?? -1;
-  const lastBall = balls[balls.length - 1] ?? -1;
-
-  // A thrower who walked before throwing carries the ball along the way: the
-  // ball's launch cell is the end of that walk.
-  let bearer: UnitId | null = null;
-  const launch = firstBall >= 0 ? motion.steps[firstBall]!.step : null;
-  if (launch && launch.kind === 'ball') {
-    for (let i = 0; i < firstBall; i++) {
-      const step = motion.steps[i]!.step;
-      if (step.kind !== 'unit') continue;
-      const end = step.path[step.path.length - 1];
-      if (end && end.x === launch.from.x && end.y === launch.from.y) bearer = step.unitId;
-    }
-  }
-  return { motion, starts, last, firstBall, lastBall, bearer };
-}
-
-const easeOut = (u: number): number => 1 - (1 - u) ** 3;
-const lerp = (a: Point, b: Point, u: number): Point => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
-
-/** A point part of the way along `from` then every cell of `path`, equal time per cell. */
-function along(from: Point, path: readonly Point[], u: number): Point {
-  const n = path.length;
-  if (n === 0) return from;
-  const scaled = Math.min(Math.max(u, 0), 1) * n;
-  const i = Math.min(Math.floor(scaled), n - 1);
-  return lerp(i === 0 ? from : path[i - 1]!, path[i]!, scaled - i);
-}
-
-function glide(step: MotionStep, u: number): Point {
-  switch (step.kind) {
-    case 'unit':
-      // A push is one sharp cell; a walk is even, so a long one reads as a stride.
-      return step.gait === 'push' ? lerp(step.from, step.path[0]!, easeOut(u)) : along(step.from, step.path, u);
-    case 'cracker':
-    case 'spark':
-      return along(step.from, step.path, u);
-    case 'ball':
-      return step.from;
-  }
-}
-
-function endOf(step: MotionStep): Point {
-  return step.kind === 'ball' ? step.to : step.path[step.path.length - 1]!;
-}
-
-/** Everything the steps have done at instant `t` into the beat. */
-function poseAt(plan: Plan, t: number): Pose {
-  const { steps } = plan.motion;
-  const moving = new Map<string, Point>();
-
-  for (let i = 0; i < steps.length; i++) {
-    const { step, ms } = steps[i]!;
-    const key = pieceKey(step);
-    if (key === null) continue;
-    const start = plan.starts[i]!;
-    if (t < start) {
-      // Not its turn yet: it stays where the board last showed it.
-      if (!moving.has(key)) moving.set(key, step.from);
-    } else if (t >= start + ms) {
-      // Done. The piece's last step hands it back to `state`; an earlier one
-      // leaves it at the end of its route for the next step to pick up.
-      if (plan.last.has(i)) moving.delete(key);
-      else moving.set(key, endOf(step));
-    } else {
-      moving.set(key, glide(step, (t - start) / ms));
-    }
-  }
-
-  return { moving, ball: ballAt(plan, t, moving) };
-}
-
-function ballAt(plan: Plan, t: number, moving: ReadonlyMap<string, Point>): BallPose | null {
-  if (plan.firstBall < 0) return null;
-  const { steps } = plan.motion;
-  const { starts } = plan;
-  const finish = starts[plan.lastBall]! + steps[plan.lastBall]!.ms;
-  if (t >= finish) return null;
-
-  const first = steps[plan.firstBall]!.step;
-  if (first.kind !== 'ball') return null;
-  // A ball in a hand is drawn as one; a ball that is about to hop lies on the floor.
-  const heldBefore = (index: number): boolean => {
-    for (let i = index; i < steps.length; i++) {
-      const step = steps[i]!.step;
-      if (step.kind === 'ball') return step.flight !== 'scatter';
-    }
-    return true;
-  };
-
-  if (t < starts[plan.firstBall]!) {
-    const at = (plan.bearer && moving.get(`u:${plan.bearer}`)) || first.from;
-    return { kind: 'rest', at, held: heldBefore(plan.firstBall) };
-  }
-
-  let landed: { at: Point; next: number } | null = null;
-  for (let i = plan.firstBall; i <= plan.lastBall; i++) {
-    const { step, ms } = steps[i]!;
-    if (step.kind !== 'ball') continue;
-    const start = starts[i]!;
-    if (t >= start + ms) {
-      landed = { at: step.to, next: i + 1 };
-      continue;
-    }
-    if (t < start) break;
-    const u = ms > 0 ? (t - start) / ms : 1;
-    const arc = Math.sin(Math.PI * u);
-    return step.flight === 'scatter'
-      ? { kind: 'air', at: lerp(step.from, step.to, easeOut(u)), flight: 'scatter', scale: 1 + 0.2 * arc, height: arc }
-      : { kind: 'air', at: lerp(step.from, step.to, u), flight: step.flight, scale: 1 + 0.6 * arc, height: arc };
-  }
-  // Between two flights it waits where the last one set it down.
-  return landed ? { kind: 'rest', at: landed.at, held: heldBefore(landed.next) } : null;
-}
-
 // -- The board ----------------------------------------------------------------
 
 export function Board({
@@ -358,32 +177,6 @@ export function Board({
     const there: MatchState = { ...state, units: state.units.map((u) => (u.id === mover.id ? moved : u)) };
     return reachableCells(arena, there, moved, (state.turn?.movementFeetRemaining ?? 0) - spent);
   }, [legal, canMove, mover, planned, state]);
-
-  /**
-   * The cells under an opponent's reach (2H.14, Jérôme on 2026-10-14): every
-   * open cell beside an active opponent of the player's side, marked on every
-   * turn, the player's and the house's alike. Leaving one of them is what
-   * draws the swing; the route under the cursor turns amber when it does.
-   * Before 2H.14 a cell was marked during the player's turn only, and only
-   * when the shortest route in drew a swing, which is why the marks came and
-   * went: that reading is still what `swingsTo` prices on the route itself.
-   */
-  const watched = useMemo(() => {
-    const out = new Set<string>();
-    for (const foe of units) {
-      if (foe.team === own) continue;
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          if (dx === 0 && dy === 0) continue;
-          const cell = { x: foe.x + dx, y: foe.y + dy };
-          if (cell.x < 0 || cell.y < 0 || cell.x >= ARENA_WIDTH || cell.y >= ARENA_HEIGHT) continue;
-          if (arena.isSolid(cell)) continue;
-          out.add(`${cell.x},${cell.y}`);
-        }
-      }
-    }
-    return out;
-  }, [units, own]);
 
   const origin: Point | null = mover ? { x: mover.x, y: mover.y } : null;
   const ahead = hover && reachable && mover ? swingsTo(state, mover, planned, reachable, hover) : null;
@@ -561,27 +354,6 @@ export function Board({
                 }}
               />
             ))}
-
-          {/* 6b. Cells under an opponent's reach, in amber inside the cell, on
-              every turn (2H.14). Painted over the cyan and deaf to the mouse. */}
-          {[...watched].map((key) => {
-              const [cx, cy] = key.split(',').map(Number) as [number, number];
-              return (
-                <rect
-                  key={`w${key}`}
-                  data-reach={key}
-                  x={cy + 0.2}
-                  y={cx + 0.2}
-                  width={0.6}
-                  height={0.6}
-                  fill="none"
-                  stroke="#ff8a3d"
-                  strokeWidth={0.07}
-                  opacity={0.9}
-                  style={{ pointerEvents: 'none' }}
-                />
-              );
-            })}
 
           {/* 6c. Routes. The plotted one is solid; the one under the cursor is
               dotted and carries on from the last waypoint (or from the unit). */}

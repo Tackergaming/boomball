@@ -16,7 +16,7 @@
  * than no timer at all.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
@@ -29,6 +29,9 @@ import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
 import { ActionBar, type Pending } from '../match/ActionBar.js';
 import { Announce } from '../match/Announce.js';
 import { Board } from '../match/Board.js';
+// The 2.5D board and the whole three.js stack come down only when asked for.
+const Board3D = lazy(() => import('../board3d/Board3D.js').then((m) => ({ default: m.Board3D })));
+import { projectCell } from '../board3d/projection.js';
 import { Briefing, hasBeenBriefed } from '../match/Briefing.js';
 import { PlacePrompt } from '../match/PlacePrompt.js';
 import { Feed } from '../match/Feed.js';
@@ -75,6 +78,28 @@ export function Match({
   const [route, setRoute] = useState<readonly Point[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [briefing, setBriefing] = useState(() => !hasBeenBriefed());
+
+  /**
+   * The 2D / 3D switch (2H.15). The SVG board stays the default and the
+   * harness's view; the 2.5D board is the same match in three quarters, and
+   * the choice is kept on this browser.
+   */
+  const [view, setView] = useState<'2d' | '3d'>(() => {
+    try {
+      return localStorage.getItem('boomball.view') === '3d' ? '3d' : '2d';
+    } catch {
+      return '2d';
+    }
+  });
+  const toggleView = () => {
+    const next = view === '2d' ? '3d' : '2d';
+    setView(next);
+    try {
+      localStorage.setItem('boomball.view', next);
+    } catch {
+      /* a private window has no say */
+    }
+  };
 
   const state = match.state;
   const replaying = match.replaying;
@@ -225,7 +250,7 @@ export function Match({
       state,
       legal,
       seq: match.seq,
-      view: '2d',
+      view,
       yours: canAct,
       replaying,
       busy: match.busy,
@@ -233,7 +258,7 @@ export function Match({
       refusal: match.refusal,
       legalSummary: () => summarise(legal),
       setSpeed: match.setSpeed,
-      cellToScreen,
+      cellToScreen: view === '3d' ? projectCell : cellToScreen,
       clickCell: (x, y) => {
         if (!canAct || !legal) return false;
         const route = pathTo(legal.destinations, { x, y });
@@ -405,7 +430,8 @@ export function Match({
           <TurnStrip state={state} own={own} yoursId={mineId} onSelect={setSelected} />
 
           <div style={S.boardWrap}>
-            <Board
+            <BoardOf
+              view={view}
               state={state}
               legal={legal}
               own={own}
@@ -509,6 +535,15 @@ export function Match({
               <button className="ghost" style={S.speed} onClick={() => setBriefing(true)}>
                 Rules
               </button>
+              <button
+                className="ghost"
+                style={{ ...S.speed, color: 'var(--brass)', borderColor: 'var(--brass-dim)' }}
+                data-testid="view-toggle"
+                onClick={toggleView}
+                title="The same match, flat from above or in three quarters"
+              >
+                {view === '2d' ? 'See it in 3D' : 'Back to 2D'}
+              </button>
             </div>
           </div>
 
@@ -543,6 +578,24 @@ export function Match({
         </aside>
       </div>
     </div>
+  );
+}
+
+/** One of the two boards, same props. */
+function BoardOf({ view, ...props }: { view: '2d' | '3d' } & Parameters<typeof Board>[0]) {
+  if (view === '2d') return <Board {...props} />;
+  return (
+    <Suspense
+      fallback={
+        <div style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
+          <p className="label" style={{ animation: 'bb-tick 1.4s infinite' }}>
+            Lighting the silo
+          </p>
+        </div>
+      }
+    >
+      <Board3D {...props} />
+    </Suspense>
   );
 }
 

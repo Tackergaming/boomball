@@ -1642,3 +1642,45 @@ sous-agents Sonnet nommés ci-dessous, pour relire le code contre les mots. **Co
   humaines, 0 refusée), `ENGINE_VERSION` épinglée à 8 le temps du run, sur un Vite dédié avec le
   crochet sur 5174 ; captures lues : la popup en haut à gauche, les carrés orange autour de
   chaque adversaire pendant la popup comme pendant le tour, plus de ligne de tiers.
+
+## C17. Décisions du 2026-10-14 après sa partie sur le moteur 9, **sous-phase 2H.15**
+
+> Écrites par le fil principal (Fable 5.1) sur le retour de Jérôme après **sa partie sur le moteur
+> 9** le 2026-10-14 au soir (star, Striker, équipe Shrapnel oath, 50 à 0, match `ab27b827`,
+> 21 h 20 heure de Paris), consignée et rejouée sans aucun écart d'événement dans
+> `docs/matches/2026-10-14-ab27b827/` (465 décisions). Un seul retour, d'écran. **Aucun écart de
+> règle, rien dans l'IA, aucune constante de `00` ne bouge : `ENGINE_VERSION` reste 9, les
+> fonctions ne sont pas à redéployer.** La sous-phase 2H.15 porte ce retour et, derrière lui, la
+> scène 2.5D construite en un seul bloc (`07` §10, `08` §5), client seul.
+
+**Le retour, ses mots : « enlève les cases orange, c'est trop. »** Les carrés orange de 2H.14
+(toute case adjacente à un adversaire, marquée à chaque tour, `data-reach`) **sont retirés du
+plateau**, sans retour au marquage d'avant 2H.14, qui allait et venait. Ce qui reste dit la même
+chose au moment où ça compte : la route sous le curseur passe à l'orange quand elle provoque une
+allonge, cyan sinon, et l'étiquette « N swings on the way » compte toujours les allonges de la
+route entière. Lecture du fil principal, à corriger par Jérôme s'il voulait aussi retirer la
+couleur de la route.
+
+**Un fait à relire, pas une décision.** Dans le match e2e du moteur 9 (`7d631b71`, consigné
+dans `docs/matches/2026-10-14-7d631b71/`), au round 2, Harrow Slagborn, Breaker B, bouscule le
+porteur en (5, 34), prend le ballon, et joue sa passe gratuite **vers son gardien Voss Halyard en
+(7, 43), treize cases derrière lui**, à 144,7 points, devant Thessa Gunwale à six cases derrière
+(74,3 : deux adversaires sur la ligne, 0,6 d'exposition à l'arrivée) et Renk Bellows à cinq cases
+derrière (49,1 : 1,2 d'exposition à l'arrivée). Les trois receveurs à portée et en vue étaient
+tous derrière. Lu dans `throwsAt` : le gardien n'avait pas encore joué ce round, donc son
+exposition à l'arrivée vaut zéro et personne n'est sur sa ligne ; le terrain perdu ne coûte que
+`BACKWARD_STEP`, un demi-point par case, soit 6,5 points ; et la passe gratuite, comme toute
+passe, rend au lanceur `relief`, l'exposition de la case de départ, qui en (5, 34), au milieu de
+l'équipe A, est lourde. La passe au gardien est donc « se débarrasser du ballon vers le seul
+receveur que personne ne peut atteindre », et elle a réussi : le gardien a relancé de huit
+cases au tour suivant. Dans la partie de Jérôme (`ab27b827`), aucune passe gratuite n'a visé un
+gardien : Derro Bellows, Breaker A, a refusé une passe à sept cases en arrière (moins 17,5) et
+gardé le ballon, Bexley Cannonade, Breaker B, a passé à un Striker sur sa ligne. **À trancher par
+Jérôme** : laisser (le gardien est un refuge légitime), ou borner la passe gratuite en arrière à
+huit cases comme un receveur ordinaire (C13 point 9), ou écarter le gardien quand un autre
+receveur existe. Rien n'est codé en attendant.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. L'écran dans `client/src/match/Board.tsx` (les carrés retirés). La 2.5D est un bloc
+client derrière l'interrupteur 2D / 3D : `client/src/board3d/`, `screens/Match.tsx` pour
+l'interrupteur et le crochet, `e2e/board3d.spec.ts` pour les captures. Pas de sweep.

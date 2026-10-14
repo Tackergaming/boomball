@@ -1,0 +1,487 @@
+/**
+ * The 2.5D board: the same match as `match/Board.tsx`, seen in three quarters.
+ *
+ * Same props, same contract. The board is handed the beat's final `state` and
+ * the `Motion` that led to it, it asks the engine what the unit on the clock
+ * may do, and it sends the same actions a click on the SVG board sends. It
+ * resolves nothing and rolls nothing (D1 to D10, `07` §4.1): `board3d/` reads
+ * `engine/` and nothing else.
+ *
+ * **How things move.** The reading of a motion is `match/pose.ts`, shared
+ * with the SVG board. Here it is read inside one `useFrame`: every piece that
+ * can travel registered its group with the scene link (`scene.ts`), and the
+ * loop sets each group's position from the pose, or from `state` when the
+ * piece is not travelling. Nothing goes through React once a frame; the words
+ * over the scene (`Labels.tsx`) follow the pieces the same way, in the DOM.
+ *
+ * **Taking in a beat** happens in the render, as on the SVG board: a motion
+ * is told apart from the last by identity, and the same motion with another
+ * `state` is the snapshot being read again, which stops the glide where it
+ * is. At `instant` a motion has no length and the loop draws `state` at once.
+ */
+
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { MathUtils, type Object3D } from 'three';
+
+import type { Point } from '../../../engine/geometry.js';
+import { pathCostFeet, pathTo, reachableCells, type Reachable } from '../../../engine/rules/movement.js';
+import { provokedAlong } from '../../../engine/rules/reactions.js';
+import { hasLineOfSight } from '../../../engine/rules/sight.js';
+import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
+import { arena, spec } from '../lib/arena.js';
+import type { BoardProps } from '../match/Board.js';
+import type { Motion } from '../match/motion.js';
+import { planOf, poseAt, type Plan, type Pose } from '../match/pose.js';
+import { Rig, type Zoom } from './Camera.js';
+import { Labels, Tag, type Label } from './Labels.js';
+import { cellCentre } from './layoutGeometry.js';
+import { Minimap } from './Minimap.js';
+import { Ball, Cracker, Spark } from './Ordnance.js';
+import { Overlay, type Sight } from './Overlay.js';
+import { BRASS, newSceneLink, type SceneLink } from './scene.js';
+import { Silo } from './Silo.js';
+import { GIFF_HEIGHT, Plate, Token } from './Tokens.js';
+
+const NO_ROUTE: readonly Point[] = [];
+
+function unitAt(unit: Unit, cell: Point): Unit {
+  return { ...unit, x: cell.x, y: cell.y };
+}
+
+const swingsText = (n: number): string => (n === 0 ? 'clean' : `${n} swing${n === 1 ? '' : 's'} on the way`);
+
+/** The beat being played, if any, and when it began. Compared by identity. */
+interface Track {
+  readonly motion: Motion | null;
+  readonly state: MatchState;
+  readonly plan: Plan | null;
+  readonly began: number;
+}
+
+export function Board3D({
+  state,
+  legal,
+  own,
+  onMove,
+  onSelectUnit,
+  selected,
+  yoursId = null,
+  spotlight = null,
+  motion = null,
+  pending = null,
+  onAct = null,
+  plot = null,
+  onPlotStep = null,
+}: BoardProps) {
+  const units = activeUnits(state);
+  const link = useMemo(() => newSceneLink(), []);
+  const [zoom, setZoom] = useState<Zoom>(() => {
+    try {
+      return localStorage.getItem('boomball.zoom') === 'close' ? 'close' : 'wide';
+    } catch {
+      return 'wide';
+    }
+  });
+  const [hoverUnit, setHoverUnit] = useState<UnitId | null>(null);
+  const [hover, setHover] = useState<Point | null>(null);
+
+  // -- Routes, as on the SVG board: the engine answers, this file asks ----------
+  const canMove = onMove !== null;
+  const mover = legal ? (state.units.find((u) => u.id === legal.unitId) ?? null) : null;
+  const plotting = plot?.on ?? false;
+  const planned = plotting && plot ? plot.route : NO_ROUTE;
+  const reachable = useMemo((): ReadonlyMap<string, Reachable> | null => {
+    if (!legal || !canMove || !mover) return null;
+    if (planned.length === 0) return legal.destinations;
+    const waypoint = planned[planned.length - 1]!;
+    const spent = pathCostFeet({ x: mover.x, y: mover.y }, planned);
+    const moved = unitAt(mover, waypoint);
+    const there: MatchState = { ...state, units: state.units.map((u) => (u.id === mover.id ? moved : u)) };
+    return reachableCells(arena, there, moved, (state.turn?.movementFeetRemaining ?? 0) - spent);
+  }, [legal, canMove, mover, planned, state]);
+
+  const origin: Point | null = mover && canMove ? { x: mover.x, y: mover.y } : null;
+  const ahead = useMemo(() => {
+    if (!hover || !reachable || !mover) return null;
+    const segment = pathTo(reachable, hover);
+    if (!segment) return null;
+    return { segment, swings: provokedAlong(state, mover, [...planned, ...segment]).length };
+  }, [hover, reachable, mover, planned, state]);
+  const plannedSwings = planned.length > 0 && mover ? provokedAlong(state, mover, planned).length : 0;
+
+  // The line of sight from the mover to the token under the cursor, and the
+  // shot it has, so a player sees why a target is or is not on offer.
+  const sight = useMemo((): Sight | null => {
+    if (!mover || !canMove || !hoverUnit || hoverUnit === mover.id) return null;
+    const target = state.units.find((u) => u.id === hoverUnit);
+    if (!target || target.status !== 'active') return null;
+    const from = { x: mover.x, y: mover.y };
+    const to = { x: target.x, y: target.y };
+    return { from, to, clear: hasLineOfSight(arena, from, to) };
+  }, [mover, canMove, hoverUnit, state]);
+  const shot = useMemo(() => {
+    if (!mover || !canMove || !legal?.shoot) return null;
+    const furnace = spec.furnaces.find((f) => f.defendedBy !== mover.team);
+    if (!furnace) return null;
+    const from = { x: mover.x, y: mover.y };
+    const hatch = [...furnace.cells].sort(
+      (a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y),
+    )[0]!;
+    return { from, to: hatch, clean: legal.shoot.mode === 'normal' };
+  }, [mover, canMove, legal]);
+
+  const onCellClick = (cell: Point) => {
+    if (!reachable) return;
+    const route = pathTo(reachable, cell);
+    if (!route) return;
+    if (plotting) {
+      setHover(null);
+      onPlotStep?.(route);
+    } else onMove?.(route);
+  };
+
+  // -- Tokens as targets, from the same three lists the action bar reads ---------
+  const targetKind = pending === 'attack' || pending === 'shove' || pending === 'pass' ? pending : null;
+  const targets =
+    legal && onAct
+      ? {
+          attack: new Set<string>(legal.attack.map((t) => t.unitId)),
+          shove: new Set<string>(legal.shove.map((t) => t.unitId)),
+          pass: new Set<string>(legal.pass.map((t) => t.unitId)),
+        }
+      : null;
+  const ringFor = (id: UnitId): 'hot' | 'faint' | null => {
+    if (!targets) return null;
+    if (targetKind) return targets[targetKind].has(id) ? 'hot' : null;
+    return targets.attack.has(id) || targets.shove.has(id) || targets.pass.has(id) ? 'faint' : null;
+  };
+  const answer = (id: UnitId): boolean => {
+    if (!onAct || !targets || !targetKind || !targets[targetKind].has(id)) return false;
+    onAct(
+      targetKind === 'attack'
+        ? { kind: 'attack', targetId: id }
+        : targetKind === 'shove'
+          ? { kind: 'shove', targetId: id }
+          : { kind: 'pass', targetId: id },
+    );
+    return true;
+  };
+
+  // -- The beat ------------------------------------------------------------------
+  const trackRef = useRef<Track>({ motion: null, state, plan: null, began: 0 });
+  if (motion !== trackRef.current.motion) {
+    trackRef.current = {
+      motion,
+      state,
+      plan: motion && motion.totalMs > 0 ? planOf(motion) : null,
+      began: performance.now(),
+    };
+  } else if (state !== trackRef.current.state) {
+    trackRef.current = { motion, state, plan: null, began: 0 };
+  }
+
+  // -- Goals: the mouth that took one flares for a second ------------------------
+  const scoreRef = useRef(state.score);
+  const [flash, setFlash] = useState<Record<'A' | 'B', number>>({ A: 0, B: 0 });
+  useEffect(() => {
+    const before = scoreRef.current;
+    scoreRef.current = state.score;
+    if (state.score.A > before.A) setFlash((f) => ({ ...f, B: performance.now() }));
+    if (state.score.B > before.B) setFlash((f) => ({ ...f, A: performance.now() }));
+  }, [state.score]);
+
+  const toggleZoom = () => {
+    const next: Zoom = zoom === 'wide' ? 'close' : 'wide';
+    setZoom(next);
+    try {
+      localStorage.setItem('boomball.zoom', next);
+    } catch {
+      /* a private window has no say */
+    }
+  };
+
+  const motionCrackers = new Set(
+    (motion?.steps ?? []).flatMap((t) => (t.step.kind === 'cracker' ? [t.step.crackerId] : [])),
+  );
+  const crackers = state.crackers.filter((c) => c.state === 'live' || motionCrackers.has(c.id));
+  const sparkSeen = sparkIsLive(state.spark) || (motion?.steps ?? []).some((t) => t.step.kind === 'spark');
+
+  // -- The words over the scene ---------------------------------------------------
+  const above = (key: string, height: number) => (): { x: number; y: number; z: number } | null => {
+    const node = link.pieces.get(key);
+    if (!node || !node.visible) return null;
+    return { x: node.position.x, y: node.position.y + height, z: node.position.z };
+  };
+  const atCell = (cell: Point, height: number) => {
+    const c = cellCentre(cell);
+    return () => ({ x: c.x, y: height, z: c.z });
+  };
+  const labels: Label[] = [
+    ...units.map(
+      (unit): Label => ({
+        key: `plate:${unit.id}`,
+        anchor: above(`u:${unit.id}`, GIFF_HEIGHT + 0.55),
+        node: (
+          <Plate
+            unit={unit}
+            own={own}
+            isYou={yoursId === unit.id}
+            selected={selected === unit.id}
+            onTheClock={state.turn?.unitId === unit.id}
+          />
+        ),
+      }),
+    ),
+    {
+      key: 'payload',
+      anchor: above('b:loose', 1.1),
+      node: (
+        <span
+          style={{
+            font: `700 9px 'IBM Plex Mono', monospace`,
+            letterSpacing: '.08em',
+            color: BRASS,
+            background: 'rgba(5,7,10,.8)',
+            padding: '1px 4px',
+          }}
+        >
+          PAYLOAD
+        </span>
+      ),
+    },
+  ];
+  if (hover && ahead) {
+    labels.push({ key: 'route', anchor: atCell(hover, 1.2), node: <Tag text={swingsText(ahead.swings)} bad={ahead.swings > 0} /> });
+  } else if (planned.length > 0) {
+    labels.push({
+      key: 'route',
+      anchor: atCell(planned[planned.length - 1]!, 1.2),
+      node: <Tag text={swingsText(plannedSwings)} bad={plannedSwings > 0} />,
+    });
+  }
+  if (sight) {
+    labels.push({ key: 'sight', anchor: atCell(sight.to, 2.6), node: <Tag text={sight.clear ? 'in sight' : 'no line of sight'} bad={!sight.clear} /> });
+  }
+
+  return (
+    <div style={S.frame} data-board3d data-zoom={zoom}>
+      <Canvas
+        shadows="percentage"
+        dpr={[1, 1.5]}
+        camera={{ fov: 36, near: 1, far: 160, position: [0, 34, 26] }}
+        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        onPointerMissed={() => setHoverUnit(null)}
+        style={{ position: 'absolute', inset: 0 }}
+      >
+        <color attach="background" args={['#05070a']} />
+        <fog attach="fog" args={['#05070a', 70, 130]} />
+        <ambientLight intensity={0.35} />
+        <hemisphereLight args={['#9fb3bf', '#2a241c', 1.1]} />
+        <directionalLight
+          position={[8, 26, 12]}
+          intensity={2.2}
+          castShadow
+          shadow-mapSize={[2048, 2048]}
+          shadow-camera-left={-28}
+          shadow-camera-right={28}
+          shadow-camera-top={16}
+          shadow-camera-bottom={-16}
+          shadow-camera-near={1}
+          shadow-camera-far={80}
+          shadow-bias={-0.0004}
+        />
+        <directionalLight position={[-14, 18, -10]} intensity={0.7} color="#bcd3e0" />
+
+        <Rig zoom={zoom} link={link} />
+
+        <Suspense fallback={null}>
+          <Silo own={own} flash={flash} />
+        </Suspense>
+
+        <Overlay
+          state={state}
+          reachable={reachable}
+          origin={origin}
+          planned={planned}
+          ahead={ahead}
+          sight={sight}
+          shot={shot}
+          hover={hover}
+          onHover={setHover}
+          onCellClick={onCellClick}
+        />
+
+        {units.map((unit) => (
+          <Token
+            key={unit.id}
+            unit={unit}
+            own={own}
+            isYou={yoursId === unit.id}
+            selected={selected === unit.id}
+            onTheClock={state.turn?.unitId === unit.id}
+            spotlit={spotlight === unit.id}
+            ring={ringFor(unit.id)}
+            ringKind={targetKind ?? (targets?.pass.has(unit.id) ? 'pass' : 'attack')}
+            link={link}
+            onClick={() => {
+              if (answer(unit.id)) return;
+              onSelectUnit(selected === unit.id ? null : unit.id);
+            }}
+            onHover={setHoverUnit}
+          />
+        ))}
+
+        {crackers.map((cracker) => (
+          <Cracker key={cracker.id} id={cracker.id} link={link} />
+        ))}
+        {sparkSeen && <Spark link={link} />}
+        <Ball link={link} />
+
+        {/* Last, so it runs after everything above has registered and the
+            rig has placed the camera: it places the pieces, then the labels. */}
+        <Mover link={link} track={trackRef.current} state={state} spotlight={spotlight} />
+      </Canvas>
+
+      <Labels link={link} labels={labels} />
+
+      <div style={S.hud}>
+        <button className="ghost" style={S.zoomButton} data-testid="zoom-toggle" onClick={toggleZoom} title="Two zooms: the whole silo, or close on the play">
+          {zoom === 'wide' ? 'Close in' : 'Whole silo'}
+        </button>
+        <Minimap state={state} own={own} yoursId={yoursId} width={225} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The frame loop. Reads the pose of the beat being played and sets every
+ * registered group where it belongs this frame, the camera's focus too, then
+ * lets the label layer follow.
+ */
+function Mover({ link, track, state, spotlight }: { link: SceneLink; track: Track; state: MatchState; spotlight: UnitId | null }) {
+  const facing = useRef(new Map<string, number>());
+
+  useFrame(() => {
+    const now = performance.now();
+    const elapsed = now - track.began;
+    const pose: Pose | null =
+      track.plan && elapsed < track.plan.motion.totalMs ? poseAt(track.plan, elapsed) : null;
+
+    const place = (node: Object3D, p: Point, y = 0) => {
+      const c = cellCentre(p);
+      node.position.set(c.x, y, c.z);
+    };
+
+    // Units: where the pose has them, else where `state` has them. A unit
+    // faces the way it walks, else the Furnace it attacks.
+    for (const unit of state.units) {
+      const key = `u:${unit.id}`;
+      const node = link.pieces.get(key);
+      if (!node) continue;
+      const at = pose?.moving.get(key) ?? unit;
+      const c = cellCentre(at);
+      const last = link.lastAt.get(key);
+      const home = unit.team === 'A' ? Math.PI / 2 : -Math.PI / 2;
+      let yaw = facing.current.get(key) ?? home;
+      if (last && (Math.abs(c.x - last.x) > 0.002 || Math.abs(c.z - last.z) > 0.002)) {
+        yaw = Math.atan2(c.x - last.x, c.z - last.z);
+      } else if (!pose?.moving.has(key)) {
+        // Back to facing the mouth it attacks, by the short way round.
+        const turn = MathUtils.euclideanModulo(home - yaw + Math.PI, Math.PI * 2) - Math.PI;
+        yaw += turn * 0.12;
+      }
+      facing.current.set(key, yaw);
+      node.rotation.y = yaw;
+      node.position.set(c.x, 0, c.z);
+      node.visible = unit.status === 'active' || pose?.moving.has(key) === true;
+      link.lastAt.set(key, { x: c.x, z: c.z });
+    }
+
+    // Crackers: drawn until their roll is over, even when the beat destroys them.
+    for (const cracker of state.crackers) {
+      const key = `c:${cracker.id}`;
+      const node = link.pieces.get(key);
+      if (!node) continue;
+      const moving = pose?.moving.get(key);
+      node.visible = cracker.state === 'live' || moving !== undefined;
+      place(node, moving ?? cracker);
+    }
+
+    // The Spark.
+    const spark = link.pieces.get('s');
+    if (spark) {
+      const moving = pose?.moving.get('s');
+      spark.visible = sparkIsLive(state.spark) || moving !== undefined;
+      place(spark, moving ?? state.spark);
+    }
+
+    // The ball: in flight, waiting for its flight, in a hand, or on the floor.
+    const ball = link.pieces.get('b');
+    const loose = link.pieces.get('b:loose');
+    if (ball) {
+      const bp = pose?.ball ?? null;
+      if (bp?.kind === 'air') {
+        const lift = bp.flight === 'scatter' ? 0.25 + 0.5 * bp.height : 0.6 + 2.4 * bp.height;
+        place(ball, bp.at, lift);
+        if (loose) loose.visible = false;
+      } else if (bp?.kind === 'rest') {
+        place(ball, bp.at, bp.held ? 1.15 : 0.22);
+        if (loose) {
+          loose.visible = !bp.held;
+          place(loose, bp.at);
+        }
+      } else if (state.payload.carriedBy) {
+        const carrier = link.pieces.get(`u:${state.payload.carriedBy}`);
+        if (carrier) ball.position.set(carrier.position.x + 0.3, 1.15, carrier.position.z + 0.25);
+        if (loose) loose.visible = false;
+      } else {
+        place(ball, state.payload, 0.22);
+        if (loose) {
+          loose.visible = true;
+          place(loose, state.payload);
+        }
+      }
+      ball.visible = true;
+    }
+
+    // What the camera follows: the beat's unit, else the unit on the clock,
+    // else the ball.
+    const star = spotlight ?? state.turn?.unitId ?? null;
+    const starNode = star ? link.pieces.get(`u:${star}`) : undefined;
+    if (starNode && starNode.visible) {
+      link.focus = { x: starNode.position.x, z: starNode.position.z };
+    } else if (ball) {
+      link.focus = { x: ball.position.x, z: ball.position.z };
+    }
+
+    for (const listener of link.listeners) listener();
+  });
+
+  return null;
+}
+
+const S: Record<string, React.CSSProperties> = {
+  frame: {
+    flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    width: '100%',
+    position: 'relative',
+    background: '#05070a',
+    boxShadow: '0 0 0 1px var(--line)',
+    overflow: 'hidden',
+  },
+  hud: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 6,
+    pointerEvents: 'none',
+  },
+  zoomButton: { fontSize: 10, padding: '4px 9px', pointerEvents: 'auto', background: 'rgba(5,7,10,.8)' },
+};
