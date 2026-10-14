@@ -1499,8 +1499,17 @@ la première ligne de code. **Pas de sweep**, à sa demande.
 | Tests | `engine/c15.test.ts`, 42 tests, huit récrits, **sous-agent Sonnet effort élevé** ; `ai/seventhPass.test.ts`, 18 tests, trois récrits, **sous-agent Sonnet effort élevé** ; `replay` et `motion`, cinq tests. **617 tests sur 27 fichiers contre 549 sur 25**, typecheck racine, scripts, e2e et client verts, build vert |
 | Vérification | Dix-huit matchs d'auto-jeu (`scripts/control-2h13.ts`) : 1,8 / 2,2 / 2,0 buts de ballon par match, 67 prises de balle sur 71 Shove réussis, 0 relance volée sur 37, 0 reprise de tireur, Trajector 0/18 au coup d'envoi, 1,7 s par match |
 | Harnais avant la mise en ligne | Smoke vert en 36 s, playthrough vert en 30 s (21 requêtes, 0 refusée), `ENGINE_VERSION` épinglée à 7 puis remise à 8 ; la popup vue dans la colonne de droite, capture lue |
-| Commit | Voir la ligne de mise en ligne ci-dessous |
+| Commit | `57b647c` |
 
-**Ce qui attend Jérôme** : le feu vert de redéploiement (moteur 8, les matchs ouverts du moteur 7
-archivés, aucune migration), puis sa partie sur 2H.13, à consigner par `dump-match.ts`, et un sweep
+**La mise en ligne, le 2026-10-14 dans le même chat**, sur le feu vert de Jérôme (question fermée,
+« Oui, redéploie ») :
+
+| Quoi | État |
+|---|---|
+| Redéploiement | `resolve-action` v19 et `create-match` v17, **moteur 8**, les matchs ouverts du moteur 7 archivés, aucune migration |
+| Smoke | Vert en 37 s au premier essai, trois tours joués |
+| Playthrough | Vert en 28 s, 16 requêtes humaines, 0 refusée, 40 à 0 ; la popup répondue à l'écran à chaque round, capture lue : dockée sur la colonne de droite, le terrain lisible derrière. **La zone violette de la surface de réparation (`data-box`) est vue au harnais pour la première fois**, capture du round 7 |
+| Consigné par `dump-match.ts` | Match `67fecefa`, 428 décisions rejouées, 0 écart d'événement, 0 DIFFERS. Le premier passage en montrait deux : une marche coupée par une allonge dont le recul était bloqué n'était plus recousue, `recoilBlocked` manquant à `reactionTo` du dump. Corrigé dans ce commit. Dossier non gardé |
+
+**Ce qui attend Jérôme** : sa partie sur 2H.13, à consigner par `dump-match.ts`, et un sweep
 seulement s'il le demande.

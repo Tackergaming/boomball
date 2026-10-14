@@ -22,13 +22,14 @@ C12 à C15. 07 §10 porte le journal, dont l'entrée 2H.13. 09 §12 est le derni
 « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.13. 04 est l'histoire, à lire seulement
 quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.13 est CODÉE et COMMITÉE le 2026-10-14 ; la mise en ligne (moteur 8,
-resolve-action et create-match à redéployer, aucune migration, les matchs ouverts du moteur 7
-archivés) se fait sur mon feu vert explicite et se lit dans 07 §10 sous 2H.13 : si la ligne
-« mise en ligne » y manque, les fonctions en ligne sont encore du moteur 7 et le harnais se lance
-avec ENGINE_VERSION épinglée à 7. 617 tests verts sur 27 fichiers (549 avant), typecheck racine,
-scripts, e2e et client verts, build du client vert, smoke et playthrough verts (21 requêtes
-humaines, 0 refusée), la popup vue dans la colonne de droite. Pas de sweep, à ma demande.
+Où on en est : 2H.13 est CODÉE, COMMITÉE (57b647c puis le commit de mise en ligne) et EN LIGNE
+depuis le 2026-10-14 sur mon feu vert : resolve-action v19, create-match v17, ENGINE_VERSION 8,
+aucune migration, les matchs ouverts du moteur 7 archivés. 617 tests verts sur 27 fichiers (549
+avant), typecheck racine, scripts, e2e et client verts, build du client vert, smoke et
+playthrough verts sur les fonctions redéployées (16 requêtes humaines, 0 refusée), le match e2e
+du moteur 8 rejoué par dump-match.ts sans écart ni DIFFERS, la popup vue dans la colonne de
+droite, la zone violette de la surface de réparation vue au harnais. Pas de sweep, à ma
+demande.
 Dix-huit matchs d'auto-jeu de contrôle (scripts/control-2h13.ts) : 1,8 / 2,2 / 2,0 buts de
 ballon par match (rookie, veteran, star), 67 prises de balle sur 71 Shove réussis, aucune
 relance volée, le Trajector ne prend jamais le coup d'envoi, 1,7 s par match.
@@ -53,11 +54,7 @@ fichiers non suivis MARGO.md et theodo.md ne sont pas à nous : ne les commite p
 vert.
 
 LA TÂCHE.
-1. Si la mise en ligne n'a pas eu lieu : la faire sur mon feu vert explicite (npm run
-   deploy:function pour resolve-action et create-match, depuis boomball/ en bash après
-   set -a && . ../.env && set +a), puis smoke et playthrough sur les fonctions redéployées,
-   puis un match du compte e2e consigné par dump-match.ts pour vérifier qu'un match du moteur
-   8 se rejoue sans écart, puis la ligne de mise en ligne dans 07 §10 et le commit.
+1. Vérifier git status avant toute chose ; tout est commité au 2026-10-14 au soir.
 2. Mes parties sur 2H.13 : les retrouver par dump-match.ts --list (horaires en UTC) et
    consigner celles que je nomme. Un match du moteur 7 ne se rejoue plus avec le dépôt du
    moteur 8. Pas de lecture round par round sauf si je la demande ou si tu la proposes avec
@@ -130,9 +127,10 @@ Ce qu'il faut savoir tout de suite.
    courte, et un pion cliquable au tour 2. Il échoue si le match e2e en cours atteint le round 10
    pendant ses trois tours : lancer npm run e2e:playthrough pour le finir. Juste après un
    déploiement, la connexion de global-setup.ts peut expirer une fois : relancer. La zone
-   violette (data-box) et la ligne « is moved out of the penalty box » n'ont pas encore été vues
-   au harnais ni par moi ; le marqueur de Réaction dépensée est vu au harnais, la ligne
-   « cannot recoil » et « and takes the Payload » pas encore.
+   violette (data-box) est vue au harnais depuis le 2026-10-14 ; la ligne « is moved out of the
+   penalty box » pas encore ; le marqueur de Réaction dépensée est vu au harnais, les lignes
+   « cannot recoil » et « and takes the Payload » sont dans le dump du match e2e, pas encore vues
+   à l'écran.
 
 8. useMatch.load porte un compteur de génération : React StrictMode monte l'effet initial deux
    fois en dev. Ne l'enlève pas. Le bash de l'outil casse sur les accents graves dans un heredoc :

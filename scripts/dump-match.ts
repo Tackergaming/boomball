@@ -284,6 +284,7 @@ function reactionTo(e: MatchEvent, mover: UnitId): boolean {
     case 'evacuated':
       return e.unitId === mover;
     case 'recoiled':
+    case 'recoilBlocked':
       return true;
     default:
       return false;
