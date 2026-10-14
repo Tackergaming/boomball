@@ -64,14 +64,24 @@ LA TÂCHE.
    une raison. Un fait à relire avec moi : en ligne, un Breaker a joué sa passe gratuite vers
    son gardien treize cases derrière lui, les trois receveurs à portée étant tous derrière.
 3. Mes retours s'il y en a, en chat, puis C17 dans 00 avant toute ligne de code.
-4. Puis la phase 3 de 08 §5, la scène 2.5D statique, dont A20 (React 19) est le premier pas :
+4. Puis la 2.5D, EN UN SEUL BLOC et pas en trois phases : Jérôme l'a dit le 2026-10-14 au soir,
+   il ne veut plus entendre parler de phase 3, 4 et 5 ni de pions version 1 ou 2. Construire d'un
+   coup, derrière l'interrupteur 2D / 3D, la scène (sol, parois courbes, caisses, deux bouches
+   depuis le layout, ses trois textures), le jeu (survol, clic, cases atteignables, ligne de vue)
+   et l'animation (marche, poussée, recul, Crackers, Spark, passe, tir), puis lui montrer des
+   captures et le laisser jouer. Les pions sont des capsules en code, comme dans toutes les démos
+   de jeux 3D en un prompt ; son glb de Giff les remplace dès qu'il existe. Le contenu de 08 §5
+   phases 3 à 5 et 07 §5 reste la liste de ce qu'il y a à faire, pas un calendrier. Dans l'ordre
+   technique, A20 (React 19) est le premier pas :
    dépendances three, fiber, drei (07 §4.3), layoutGeometry.ts, Silo.tsx, Camera.tsx en trois
    quarts fixe avec deux zooms et sans rotation (J4), les pions version 1 de 07 §5 (socle
    hexagonal, capsule, glyphe de rôle, plaque Html), l'interrupteur 2D / 3D, le crochet
    cellToScreen sur la caméra 3D. Ce que Jérôme prépare : deux ou trois textures CC0 d'ambientCG
    (sol riveté, paroi courbe rouillée, caisse ou pilier), à convertir en WebP 1K ; il a généré un
-   Giff 3D avec Meshy mais ne peut pas le télécharger sans abonnement ; il veut la version 2 des
-   pions, à intégrer dès qu'un glb existe dans context/import/, licence à créditer.
+   Giff 3D avec Meshy mais ne peut pas le télécharger sans abonnement ; voie gratuite proposée,
+   TRELLIS en local sur sa RTX 4060 ou un Space Hugging Face ; son glb remplace la capsule dès
+   qu'il existe dans context/import/, licence à créditer. Les trois archives de textures (19 Mo)
+   sont dans context/import/textures-ambientcg/, non commitées.
 5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
 
 Ce qu'il faut savoir tout de suite.
