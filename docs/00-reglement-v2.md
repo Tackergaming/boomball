@@ -2041,3 +2041,130 @@ sous-agents Sonnet nommés ci-dessous, pour relire le code contre les dix lignes
   étincelles, de l'anneau, des braises, du flash et de l'affaissement sont des images figées
   sous le GL logiciel** : les effets sont dans la scène (le DOM des mots et l'explosion le
   prouvent), mais ces cinq-là restent à voir chez Jérôme à 45 images par seconde.
+
+## C24. Décisions du 2026-10-15 après sa partie sur 2H.21, **sous-phase 2H.22, le jeu vivant, deuxième passe**
+
+> Écrites par le fil principal (Fable 5.1) sur les sept retours de Jérôme en chat après sa partie
+> sur 2H.21 (en 3D et en 2D), reformulés et **validés par lui le 2026-10-15** avec ses réponses :
+> BAT et DODGE en plus des sept mots, le texte du bandeau de but, la barre visée est celle de la
+> carte de beat, le son synthétisé pour l'instant, le pantin en attendant le rig. **Aucun écart
+> de règle, rien dans l'IA, aucune constante de `00` ne bouge :** `ENGINE_VERSION` reste 9, les
+> fonctions ne sont pas à redéployer. La caméra de C18 à C22 n'est pas touchée. Client seul.
+
+1. **Les mots au-dessus des têtes, deux fois plus gros.** Ses mots : « je veux que les fonts de
+   ce qui popup au-dessus des têtes des joueurs soient doublées en taille ». 28 px en 3D
+   (`Floaters.tsx`, 14 avant), 26 unités en 2D (`Board.tsx`, 13 avant), le contour noir épaissi
+   d'autant.
+2. **Toutes les actions montent au-dessus de l'acteur.** Ses mots : « toutes les actions
+   apparaissent en popup au-dessus des têtes : SWING, PASS, ATCK OP, SHOVE, SHOOT, DISENGAGE,
+   DASH », plus BAT et DODGE sur sa réponse. Nouveau repère `action` dans `motion.ts`, posé sur la
+   case de l'acteur à l'instant de l'événement, dans la couleur de son maillot, dans les deux
+   plateaux : SWING (`attacked`), ATCK OP (`opportunityAttacked`), SHOVE (`shoved`), SHOOT
+   (`shotAtFurnace`), PASS (`passed`), DISENGAGE (`disengaged`), DASH (`dashed`), BAT
+   (`crackerBatted`), DODGE (`dodging`). Le chiffre des dégâts reste sur la cible, « miss » et
+   « held » aussi.
+3. **Le but, plus visible.** Ses mots : « quand il y a un but la popup soit plus visible et font
+   augmentée ». Le bandeau de but devient une sorte à part (`goal` dans `Banner.tsx`) : 40 px,
+   cœur blanc, halo dans la couleur de l'équipe, tenu 2,5 s en normal et 4 s en slow. Son texte,
+   sur sa demande : « Goal · Your Team » et « Goal · The other Team ». Le fil (« Your battery »,
+   « The house ») et l'étiquette The House du bandeau de score ne changent pas.
+4. **Les mots tenus deux fois plus longtemps.** Ses mots : « les popups au-dessus des têtes
+   restent 2 fois plus longtemps en mode normal (les dégâts, les miss, les actions, ... tous) ».
+   2 s en normal, 3 s en slow, 1 s avant quelle que soit la vitesse, la montée ralentie d'autant.
+   Tous : dégâts, miss, held et les neuf actions.
+5. **La barre de temps de la carte de beat est retirée.** Ses mots : « enlève la barre de
+   défilement dans la boîte du bas, c'est stressant pour lire », avec la capture de la carte de
+   beat et sa barre cuivre en bas (ligne 9 de C23). Le reste de la carte reste : nom en couleur,
+   verdict à droite, dé dessous.
+6. **Le son, synthétisé.** Sa question : « est-il possible de mettre du son au jeu ? si oui j'en
+   veux ». Oui, par Web Audio, sans fichier : `client/src/match/sound.ts`, un son par repère
+   (coup qui touche, coup manqué, Shove et Shove tenu, explosion, but, entrée et prise du Spark,
+   évacuation, retour) et par action (le sifflement d'une batte, le lancer, le tir, le Dash),
+   plus le sifflet au début de round et le sifflet long à la fin du match, tirés au même instant
+   que les effets, dans les deux plateaux, depuis `Match.tsx` et pas depuis un plateau. Un bouton
+   son allumé / coupé à côté de « See it in 3D », choix gardé dans `localStorage`, allumé par
+   défaut. Silence au rejeu instant. Le contexte audio ne se crée qu'au premier geste du joueur,
+   parce que Chrome refuse de le démarrer avant et le dit en console, et le harnais échoue sur
+   toute ligne console. Des échantillons CC0 plus tard si le synthétique déçoit, à son choix.
+7. **Le pantin, en attendant un modèle riggé.** Sa question : « sera-t-il possible d'avoir les
+   animations des joueurs qui courent et des coups de batte ? ». Pas avec le modèle actuel : son
+   GLB est un seul maillage sans squelette ni clip d'animation (export trimesh, deux nœuds). Les
+   vrais clips demandent un modèle riggé (Mixamo sur le maillage en pose neutre, bras écartés,
+   puis export GLB ; ou Blender) et sont une sous-phase à part qui attend ce modèle. En
+   attendant, la boucle de `Board3D` anime le maillage entier : balancement et inclinaison vers
+   l'avant en marche, torsion rapide du corps au coup (SWING, ATCK OP, BAT), poussée en avant au
+   SHOVE, recul de la cible poussée, sans toucher ni bras ni jambes. Sur sa réponse : oui.
+
+**Les règles du lot.** Celles de C23 : un effet par événement, rien au rejeu instant, rien ne
+clignote, la caméra n'est pas touchée, le fil reste la source. Un son par repère, jamais deux
+pour le même instant sauf le sifflement de la batte avant son impact.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. `client/src/match/motion.ts` (le repère `action`, les durées des mots), `scene.ts`
+(la durée passée au mot), `Floaters.tsx`, `Board.tsx`, `Banner.tsx`, `Announce.tsx`,
+`Match.tsx` (le bandeau de but, le son, le bouton), `Board3D.tsx` (le pantin, les actions),
+`sound.ts` nouveau, `fxBridge.ts` et `testHook.ts` (un bandeau à la demande pour le harnais),
+`e2e/board3d.spec.ts`. Le smoke 2D relancé. Pas de sweep.
+
+**Comment 2H.22 est codée**, par le fil principal (Fable 5.1) le 2026-10-15 au soir, avec quatre
+sous-agents nommés ci-dessous. **Codé en 2H.22.**
+
+- **Le repère `action`, `match/motion.ts`**, fil principal. `ACTION_WORDS` donne le mot par sorte
+  d'événement (neuf), `action()` le pose sur la case de l'acteur telle qu'elle est suivie à cet
+  instant (DASH avant la marche, DISENGAGE après, là où elle a fini), avec `toward`, la case
+  visée quand il y en a une (la cible du coup, du Shove ou de l'attaque d'opportunité, le
+  receveur de la passe, la trappe du tir, le Cracker batté). Sur un coup, le mot de l'attaquant
+  précède `hit` ou `miss` sur la cible. `FLOAT_MS` : 3000 en slow, 2000 en normal, 0 en instant.
+  Trois tests de plus dans `motion.test.ts`, les anciens filtrent les `action`.
+- **Les mots, `board3d/Floaters.tsx`** (sous-agent Sonnet, effort moyen) : `link.float(text,
+  colour, at, lifeMs)`, 28 px, contour épaissi, `bb-rise` de la durée du mot, retiré 100 ms
+  après ; **`match/Board.tsx`** (Sonnet, élevé) : le repère `action` dans la couleur du maillot
+  de l'acteur, `px(26)`, trait `px(5)`, montée d'une case et demie, vie `FLOAT_MS[speed]` fois le
+  `stretch` ; `bb-rise` dans `theme.css` monte de 64 px et tient 70 % de sa durée pleine.
+- **Le bandeau de but, `match/Banner.tsx`** (Sonnet, moyen) : la sorte `goal`, 2 500 ms en
+  normal et 4 000 en slow, 40 px, blanc, bordure et halo dans la couleur de l'équipe
+  (`data-banner="goal"`) ; **`screens/Match.tsx`**, fil principal : « Goal · Your Team » et
+  « Goal · The other Team », et `fxBridge.announce` en développement pour que le harnais dise un
+  bandeau sans but (`fx({ kind: 'banner', banner, text, tone })`).
+- **La carte, `match/Announce.tsx`**, fil principal : la barre `bb-drain` et la propriété `hold`
+  retirées, `useMatch.hold` retiré avec elles, la keyframe aussi.
+- **Le son, `match/sound.ts` nouveau** (sous-agent Opus 5.5, effort élevé, sur le brief fermé du
+  fil principal) : `createSounds()`, `play(kind)`, `enabled`, `setEnabled`, `dispose` ; seize
+  recettes (`swing`, `hit`, `miss`, `push`, `held`, `blast`, `goal`, `sparkIn`, `sparkCaught`,
+  `exit`, `enter`, `throw`, `shoot`, `dash`, `whistle`, `fullTime`), un buffer de bruit blanc,
+  oscillateurs et filtres, enveloppes jamais à zéro, compresseur puis master à 0,5, douze voix au
+  plus. Le contexte audio ne naît que dans un gestionnaire `pointerdown`, `pointerup`, `keydown`
+  ou `touchend` sur `window`, et seulement si `navigator.userActivation.isActive` le confirme :
+  avant, chaque `play` est jeté sans un mot. Clé `boomball.sound`, allumé par défaut. Quatre
+  tests sur la lecture et l'écriture du choix, aucun test audio. **`Match.tsx`** crée l'instance
+  au montage, la ferme au démontage, programme un son par repère à son instant (`soundOf` :
+  SWING, ATCK OP et BAT sifflent, PASS lance, SHOOT tire, DASH court ; SHOVE, DISENGAGE et DODGE
+  n'ont pas de son propre, le Shove sonne par `push` ou `held` ; `damage` se tait, le coup a déjà
+  claqué), le sifflet sur `roundStarted` et le long sur `matchEnded`, rien à `instant` ; le
+  bouton « ♪ Sound on / Sound off », `data-testid="sound-toggle"`, `data-sound`.
+- **Le pantin, `board3d/Board3D.tsx`**, fil principal. `scene.ts` porte `link.gestures` (`swing`,
+  `lunge`, `flinch`, `throw`, avec `toward`). `fire` pose un `swing` sur l'acteur de SWING, ATCK
+  OP et BAT, un `lunge` sur celui de SHOVE, un `throw` sur celui de PASS et SHOOT, et un `flinch`
+  sur la cible d'un `hit` ou d'un `push`. La boucle : en marche, le corps monte de `BOB` 0,07 une
+  fois par case (`STRIDE`) et penche de `LEAN` 0,14 rad vers l'avant, lissé ; le `swing` tourne
+  le Giff vers sa cible, le recule de 0,7 rad puis le fait passer à +1 rad et revenir en 420 ms ;
+  le `lunge` le pousse de `LUNGE` 0,35 case vers la cible en 320 ms ; le `flinch` le penche en
+  arrière de 0,3 rad en 300 ms ; le `throw` l'incline de 0,2 rad. L'ordre d'Euler du pion passe
+  en `YXZ` pour que la pente suive le cap. Ni bras ni jambes : le maillage est entier.
+- **Le fil, `match/Feed.tsx`**, fil principal, un défaut de 2H.21 trouvé par le harnais : les
+  lignes neuves étaient jugées par la taille du fil, aveugle dès que la fenêtre de 120 est pleine
+  (un lot entre, autant sort devant, la taille ne bouge pas). Le dernier événement du rendu
+  précédent est retenu par son contenu, tout ce qui suit sa copie la plus récente est neuf.
+- **Tests** : **683 sur 32 fichiers contre 676**, typecheck racine, scripts, e2e et client verts,
+  build vert (chunk `Board3D` 1,06 Mo, lazy).
+- **Harnais** : `e2e/board3d.spec.ts` tire aussi `action` SWING sur le Giff suivi (le mot vérifié
+  dans le DOM), dit le bandeau de but par le crochet et le capture, lit le bouton son (`on`,
+  clic, `off`, clic, `on`). **Vert en 5,6 min** sur le Vite 5174 chauffé, zéro erreur console ;
+  **smoke 2D vert en 18,3 s**. Captures lues : « SWING » en 28 px magenta sur Grim avec son « 47 »
+  et « −7 » en gros ; « GOAL · YOUR TEAM » blanc à halo cyan au-dessus du silo ; la carte
+  « Harrow Cannonade reaches for the Spark · MISSED » sans barre ; « ♪ SOUND ON » dans la barre
+  de rejeu. Le pantin et le son ne se capturent pas : à voir et à entendre chez Jérôme.
+- **Deux faits du harnais, sans décision.** Un `resolve-action` a répondu 404 « no such match »
+  une fois, au tour suivi après trois minutes d'effets, sur un match que la base montrait bien
+  en cours ; la relance a passé. Et quand le match e2e atteint le sifflet pendant le smoke, le
+  smoke suivant en ouvre un nouveau de lui-même.

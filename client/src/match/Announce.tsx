@@ -14,9 +14,9 @@
  * **2H.21, the card rebuilt.** The verdict (HIT, MISS, CAUGHT...) is split off
  * the end of the sentence and set large on the right, because Jérôme reads the
  * result before he reads the sentence. The roll drops under the text. The
- * actor's name takes their shirt colour. A thin bar drains along the foot of
- * the card for as long as it will stay, because he could not tell how long a
- * card would stay.
+ * actor's name takes their shirt colour. 2H.21 also drained a thin bar along
+ * the foot of the card for as long as it stayed; Jérôme found it stressful to
+ * read against and had it removed (2H.22, `00` C24 line 5).
  */
 
 import type { DiceRoll } from '../../../engine/events.js';
@@ -32,7 +32,6 @@ export function Announce({
   beat,
   actorName,
   actorColour,
-  hold,
   progress,
   onSkip,
   onDismiss,
@@ -42,8 +41,6 @@ export function Announce({
   actorName: string | null;
   /** The actor's shirt colour; null when there is no actor (a round's hazards). */
   actorColour: string | null;
-  /** How long this card stays; null or 0 for the card left standing after the replay. */
-  hold: { readonly ms: number; readonly key: number } | null;
   progress: { at: number; of: number } | null;
   onSkip: () => void;
   onDismiss: () => void;
@@ -90,13 +87,6 @@ export function Announce({
       {beat.lines.map((line, i) => (
         <Line key={i} line={line} />
       ))}
-
-      {hold && hold.ms > 0 && (
-        <div
-          key={hold.key}
-          style={{ ...S.bar, animation: `bb-drain ${hold.ms}ms linear forwards` }}
-        />
-      )}
     </div>
   );
 }
@@ -178,15 +168,6 @@ const S: Record<string, React.CSSProperties> = {
     fontWeight: 800,
     fontSize: 15,
     letterSpacing: '.08em',
-  },
-  bar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 2,
-    background: 'var(--brass)',
-    transformOrigin: 'left',
   },
   roll: {
     fontFamily: 'var(--mono)',

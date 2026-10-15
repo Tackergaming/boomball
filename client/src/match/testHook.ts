@@ -21,12 +21,18 @@ import type { LegalActions } from '../../../engine/legalActions.js';
 import type { MatchState } from '../../../engine/types.js';
 import type { CueKind } from './motion.js';
 
-/** An effect a script asks for, by kind and cell (2H.21). The words and the team are optional. */
+/**
+ * An effect a script asks for, by kind and cell (2H.21). The words and the
+ * team are optional. `banner` (2H.22) says a banner over the board instead:
+ * `banner` is its kind, `text` its words, `tone` its colour; the cell is ignored.
+ */
 export interface FxRequest {
-  kind: CueKind;
+  kind: CueKind | 'banner';
   x: number;
   y: number;
   text?: string;
+  banner?: 'loud' | 'goal' | 'round' | 'turn';
+  tone?: 'own' | 'foe' | 'neutral';
   unitId?: string;
   team?: 'A' | 'B';
   /** How many times slower the effect runs, for a capture under software GL. 1 by default. */

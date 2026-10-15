@@ -1,11 +1,13 @@
 /**
- * The words that rise over the pitch: a wound's number, "miss", "held"
- * (2H.21, `00` C23, the living game).
+ * The words that rise over the pitch: a wound's number, "miss", "held", and
+ * the action words like "SWING" (2H.21, `00` C23, the living game; 2H.22,
+ * `00` C24, bigger and longer).
  *
  * Plain DOM over the canvas, like `Labels.tsx`, and for the same reason: not
  * drei's `Html`, which mounts a React root per element and unmounts it
  * synchronously, and React 19 reports that as an error on every unmount.
- * It is also imperative on purpose. A floater lives one second; creating it
+ * It is also imperative on purpose. A floater lives the time the caller gives it (two seconds at
+ * normal, three at slow, see `FLOAT_MS` in `match/motion.ts`); creating it
  * through React state would re-render per word and per frame. Here the
  * elements are made by hand, moved once a frame by the scene's projection
  * (`link.project`) and dropped when their time is up.
@@ -17,12 +19,11 @@
 
 import { useEffect, useRef } from 'react';
 
-import { fxBridge } from '../match/fxBridge.js';
 import { cellCentre } from './layoutGeometry.js';
 import type { SceneLink } from './scene.js';
 
-/** How long a floater stays in the DOM, a little over the 1 s of `bb-rise`. */
-const LIFETIME_MS = 1100;
+/** How long a floater stays in the DOM past the end of `bb-rise`. */
+const MARGIN_MS = 100;
 /** World height of the anchor: just above a Giff's head (1.5 high plus its plate). */
 const ANCHOR_HEIGHT = 2.4;
 
@@ -30,7 +31,7 @@ interface Floater {
   readonly el: HTMLDivElement;
   readonly world: { x: number; y: number; z: number };
   readonly born: number;
-  /** How long it lives, `LIFETIME_MS` times the stretch it was born with. */
+  /** How long it lives: the `lifeMs` it was born with, plus `MARGIN_MS`. */
   readonly life: number;
 }
 
@@ -43,26 +44,25 @@ export function Floaters({ link }: { link: SceneLink }) {
     let floaters: Floater[] = [];
     let counter = 0;
 
-    link.float = (text, colour, at) => {
-      const stretch = fxBridge.stretch;
+    link.float = (text, colour, at, lifeMs) => {
       const outer = document.createElement('div');
       outer.setAttribute('data-floater', text);
       outer.style.cssText = 'position:absolute;left:0;top:0;will-change:transform;visibility:hidden;';
       const inner = document.createElement('span');
       inner.textContent = text;
       inner.style.cssText =
-        "font:800 14px 'IBM Plex Mono', monospace;letter-spacing:.04em;" +
-        'text-shadow:0 0 2px #05070a,0 0 6px #05070a,0 1px 0 #05070a;' +
-        `animation:bb-rise ${stretch}s ease-out forwards;display:inline-block;white-space:nowrap;`;
+        "font:800 28px 'IBM Plex Mono', monospace;letter-spacing:.04em;" +
+        'text-shadow:0 0 3px #05070a,0 0 10px #05070a,0 2px 0 #05070a,0 -2px 0 #05070a;' +
+        `animation:bb-rise ${lifeMs}ms ease-out forwards;display:inline-block;white-space:nowrap;`;
       inner.style.color = colour;
       outer.appendChild(inner);
       host.appendChild(outer);
-      // Words on the same cell must not stack exactly: spread them -10, 0, +10 px.
-      const jitter = ((counter % 3) - 1) * 10;
+      // Words on the same cell must not stack exactly: spread them -18, 0, +18 px.
+      const jitter = ((counter % 3) - 1) * 18;
       counter += 1;
       inner.style.marginLeft = `${jitter}px`;
       const c = cellCentre(at);
-      floaters.push({ el: outer, world: { x: c.x, y: ANCHOR_HEIGHT, z: c.z }, born: performance.now(), life: LIFETIME_MS * stretch });
+      floaters.push({ el: outer, world: { x: c.x, y: ANCHOR_HEIGHT, z: c.z }, born: performance.now(), life: lifeMs + MARGIN_MS });
     };
 
     const tick = () => {

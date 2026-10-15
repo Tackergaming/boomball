@@ -1732,3 +1732,32 @@ redéployé. La caméra de C18 à C22 n'est pas touchée. **Pas de sweep.**
 de code (le jeu est-il vivant sans surcharge, les durées, ce qui manque ou ce qui est de trop),
 `/commit`, et son feu vert pour le client en ligne s'il le veut. Un sweep seulement s'il le
 demande.
+
+### Sous-phase 2H.22, « le jeu vivant, deuxième passe », codée le 2026-10-15, porte ouverte
+
+Par le fil principal (Fable 5.1), avec trois sous-agents Sonnet et un Opus 5.5, à partir de `00`
+C24 : les sept retours de Jérôme après sa partie sur 2H.21, reformulés en chat, ses réponses, et
+le texte de C24 validé par lui (« GO ») avant la première ligne de code. **Aucun écart de règle,
+rien dans `ai/`, `ENGINE_VERSION` reste 9**, rien à redéployer, le client en ligne n'est pas
+redéployé. La caméra n'est pas touchée. **Pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| Les mots | Deux fois plus gros (28 px en 3D, 26 en 2D) et tenus deux fois plus longtemps (`FLOAT_MS`, 2 s en normal, 3 s en slow) ; `Floaters.tsx` (Sonnet, moyen), `Board.tsx` (Sonnet, élevé), `theme.css` |
+| Les actions | Le repère `action` de `motion.ts` : SWING, ATCK OP, SHOVE, SHOOT, PASS, DISENGAGE, DASH, BAT, DODGE au-dessus de l'acteur, dans sa couleur, avec la case visée (`toward`) ; 3 tests |
+| Le but | `Banner.tsx` (Sonnet, moyen) : la sorte `goal`, 40 px, blanc à halo d'équipe, 2,5 s / 4 s ; « Goal · Your Team », « Goal · The other Team » dans `Match.tsx` |
+| La carte | `Announce.tsx` : la barre de temps retirée, `useMatch.hold` et `bb-drain` avec elle |
+| Le son | `sound.ts` nouveau (Opus 5.5, élevé) : seize recettes Web Audio, contexte ouvert au premier geste confirmé, douze voix, clé `boomball.sound` ; `Match.tsx` joue un son par repère à son instant et le sifflet par round, bouton « ♪ Sound on » ; 4 tests |
+| Le pantin | `Board3D.tsx` et `scene.ts` (`link.gestures`) : bob et pente en marche, torsion vers la cible au coup, poussée au Shove, recul de la cible, inclinaison au lancer ; le maillage entier, en attendant un modèle riggé |
+| Le fil | `Feed.tsx` : les lignes neuves jugées par le dernier événement et plus par la taille, défaut de 2H.21 vu par le harnais sur une fenêtre pleine |
+| Le crochet | `fx({ kind: 'banner', banner, text, tone })` dit un bandeau par `fxBridge.announce`, développement seulement |
+| Tests | **683 sur 32 fichiers contre 676** ; typecheck racine, scripts, e2e et client verts ; build vert |
+| Harnais | `e2e:board3d` **vert en 5,6 min** sur le Vite 5174 chauffé, avec « SWING », le bandeau de but et le bouton son en plus ; **smoke 2D vert en 18,3 s** |
+| Captures lues | « SWING » et « −7 » en gros sur Grim ; « GOAL · YOUR TEAM » blanc à halo cyan ; la carte « MISSED » sans barre ; « ♪ SOUND ON ». Le pantin et le son restent à voir et à entendre chez Jérôme |
+| Ses parties sur 2H.21 | Consignées : `c3867408` (40-50, rejouée sans écart) et `2e30f587` (20-10, **la relecture s'arrête au round 2** : « the engine refused the rebuilt action of A-breaker-6 at seq 161: (4, 16) is already occupied », 669 événements non atteints, à lire si Jérôme veut l'analyse) |
+| Dette | Celle de 2H.21, plus : le pantin ne bouge ni bras ni jambes (modèle sans squelette, Mixamo ou Blender pour un vrai rig) ; le son est synthétique (des échantillons CC0 à son choix) ; un 404 « no such match » vu une fois au harnais, sans cause trouvée, la relance a passé |
+| Commit | Pas encore : 2H.21 est dans l'index (`git add` précis, pas de commit), 2H.22 dans la copie de travail, c'est Jérôme qui tape `/commit`, et il fera deux commits |
+
+**Ce qui attend Jérôme** : `/commit` (deux commits, 2H.21 puis 2H.22), sa partie en 3D et en 2D
+avec le son, ses retours en `00` C25 avant toute ligne de code, et son feu vert pour le client en
+ligne s'il le veut. Un sweep seulement s'il le demande.

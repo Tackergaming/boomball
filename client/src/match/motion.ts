@@ -69,6 +69,8 @@ export interface TimedStep {
  * the impact comes before the recoil it causes.
  */
 export type CueKind =
+  /** `unitId` did something: the word (`text`, one of `ACTION_WORDS`) rises over it, both boards (2H.22, `00` C24). */
+  | 'action'
   /** A bat landed on `unitId`: sparks, 3D only. The number is the `damage` cue. */
   | 'hit'
   /** `unitId` took `text` hit points: the number rises, in both boards. */
@@ -98,13 +100,38 @@ export interface Cue {
   readonly at: Point;
   /** The unit it concerns, when one does. */
   readonly unitId?: UnitId | undefined;
-  /** The words that rise over the cell, for `damage`, `miss` and `held`. */
+  /** The words that rise over the cell, for `damage`, `miss`, `held` and `action`. */
   readonly text?: string | undefined;
+  /** For an action aimed at something: the cell it is aimed at, so the 3D Giff can turn to it (2H.22). */
+  readonly toward?: Point | undefined;
   /** For a goal: the team whose Furnace took it, so the embers wear its colour. */
   readonly team?: TeamId | undefined;
   /** How many of the beat's steps precede it. It fires once they are done. */
   readonly after: number;
 }
+
+/**
+ * The word an action raises over its actor (2H.22, `00` C24 line 2): Jérôme's
+ * seven, plus BAT and DODGE on his answer. The key is the event's kind.
+ */
+export const ACTION_WORDS = {
+  attacked: 'SWING',
+  opportunityAttacked: 'ATCK OP',
+  shoved: 'SHOVE',
+  shotAtFurnace: 'SHOOT',
+  passed: 'PASS',
+  disengaged: 'DISENGAGE',
+  dashed: 'DASH',
+  crackerBatted: 'BAT',
+  dodging: 'DODGE',
+} as const;
+
+/**
+ * How long a word stays up over a head, by replay speed (2H.22, `00` C24
+ * line 4): Jérôme asked for twice the second of 2H.21 at normal. Zero at
+ * `instant`, where nothing rises. The rise animation lasts the same time.
+ */
+export const FLOAT_MS: Readonly<Record<ReplaySpeed, number>> = { slow: 3000, normal: 2000, instant: 0 };
 
 /** A cue with the instant into the beat, in milliseconds, at which it fires. Zero at `instant`. */
 export interface TimedCue {
@@ -241,6 +268,11 @@ export function motionAndCues(
     const where = at.get(unitId);
     if (where) cues.push({ kind, at: where, unitId, text, after: steps.length });
   };
+  /** The word of an action over its actor, where it stands, aimed at `toward` when it is aimed at anything. */
+  const action = (unitId: UnitId, word: keyof typeof ACTION_WORDS, toward?: Point): void => {
+    const where = at.get(unitId);
+    if (where) cues.push({ kind: 'action', at: where, unitId, text: ACTION_WORDS[word], toward, after: steps.length });
+  };
 
   for (const event of events) {
     switch (event.kind) {
@@ -252,8 +284,18 @@ export function motionAndCues(
         break;
       case 'attacked':
       case 'opportunityAttacked':
+        // The word over the attacker first, then what the bat did to the target.
+        action(event.attackerId, event.kind, at.get(event.targetId));
         if (event.hit) cueOn('hit', event.targetId);
         else cueOn('miss', event.targetId, 'miss');
+        break;
+      case 'dashed':
+      case 'disengaged':
+      case 'dodging':
+        action(event.unitId, event.kind);
+        break;
+      case 'crackerBatted':
+        action(event.unitId, 'crackerBatted', crackers.get(event.crackerId));
         break;
       case 'damaged':
         cueOn('damage', event.unitId, `\u2212${event.amount}`);
@@ -262,6 +304,7 @@ export function motionAndCues(
         cueOn('exit', event.unitId);
         break;
       case 'shoved':
+        action(event.shoverId, 'shoved', at.get(event.targetId));
         // The ring is under the target where it stood when the Shove landed,
         // before the push; a Shove that holds says so in a word instead.
         if (event.success) cueOn('push', event.targetId);
@@ -319,6 +362,7 @@ export function motionAndCues(
         break;
       case 'passed': {
         const to = at.get(event.toId);
+        action(event.fromId, 'passed', to);
         if (to) steps.push({ kind: 'ball', from: ball, to, flight: 'pass' });
         // A dropped pass scatters from the receiver's cell, which is where the
         // engine measures the scatter from; the scatter event supplies the rest.
@@ -337,6 +381,7 @@ export function motionAndCues(
       case 'shotAtFurnace': {
         const shooter = at.get(event.unitId) ?? ball;
         const hatch = nearestHatch(shooter, before.units.find((u) => u.id === event.unitId)?.team ?? 'A');
+        action(event.unitId, 'shotAtFurnace', hatch);
         steps.push({ kind: 'ball', from: shooter, to: hatch, flight: 'shot' });
         // A miss comes back off the hatch; `payloadScattered` says where to.
         ball = hatch;

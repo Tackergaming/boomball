@@ -205,19 +205,23 @@ a {
 
 /* -- 2H.21, the living game. Nothing below blinks: each is one fade or one rise. -- */
 
-/* A word rising over a Giff: a wound's number, "miss", "held". On the inner
-   element, so the outer one can be placed by the scene's projection. */
+/* A word rising over a Giff: a wound's number, "miss", "held", the word of an
+   action (2H.22). On the inner element, so the outer one can be placed by the
+   scene's projection. Its duration is the word's life. */
 @keyframes bb-rise {
   0% {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
   }
-  15% {
+  10% {
+    opacity: 1;
+  }
+  70% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translateY(-36px);
+    transform: translateY(-64px);
   }
 }
 
@@ -236,16 +240,6 @@ a {
   }
   100% {
     opacity: 0;
-  }
-}
-
-/* The beat card's time bar, draining left to right over the card's hold. */
-@keyframes bb-drain {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
   }
 }
 

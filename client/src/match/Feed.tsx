@@ -29,16 +29,22 @@ import { label } from './replay.js';
 
 export function Feed({ feed, state, own }: { feed: MatchEvent[]; state: MatchState; own: 'A' | 'B' }) {
   const box = useRef<HTMLDivElement>(null);
-  // Fresh means "not there at the previous render", judged by count because the
-  // window trims its front. The first render marks nothing.
-  const seenRef = useRef<number | null>(null);
+  // Fresh means "not there at the previous render". 2H.21 judged it by count,
+  // which went blind once the window was full (`FEED_LIMIT`): a batch that
+  // arrives then trims as many lines off the front as it adds, and the count
+  // does not move. The 3D harness caught it on a match three rounds old
+  // (2H.22). So the last event of the previous render is remembered by its
+  // content, and everything after its latest copy is fresh; if it is gone
+  // from the window, everything is. The first render marks nothing.
+  const lastKeyRef = useRef<string | null | undefined>(undefined);
   const freshFromRef = useRef<number>(Infinity);
-  if (seenRef.current !== null && feed.length > seenRef.current) {
-    freshFromRef.current = seenRef.current;
-  } else if (seenRef.current !== null && feed.length < seenRef.current) {
-    freshFromRef.current = Infinity;
+  const lastKey = feed.length > 0 ? JSON.stringify(feed[feed.length - 1]) : null;
+  if (lastKeyRef.current !== undefined && lastKey !== lastKeyRef.current) {
+    let i = feed.length - 1;
+    while (i >= 0 && JSON.stringify(feed[i]) !== lastKeyRef.current) i -= 1;
+    freshFromRef.current = i + 1;
   }
-  seenRef.current = feed.length;
+  lastKeyRef.current = lastKey;
   const freshFrom = freshFromRef.current;
 
   useEffect(() => {

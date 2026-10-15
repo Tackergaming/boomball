@@ -31,6 +31,8 @@ import { Announce } from '../match/Announce.js';
 import { Banner, type Announcement } from '../match/Banner.js';
 import { Board } from '../match/Board.js';
 import { fxBridge } from '../match/fxBridge.js';
+import { FLOAT_MS } from '../match/motion.js';
+import { createSounds, type SoundKind } from '../match/sound.js';
 // The 2.5D board and the whole three.js stack come down only when asked for.
 const Board3D = lazy(() => import('../board3d/Board3D.js').then((m) => ({ default: m.Board3D })));
 import { projectCell } from '../board3d/projection.js';
@@ -102,6 +104,30 @@ export function Match({
       /* a private window has no say */
     }
   };
+
+  /**
+   * The sound (2H.22, `00` C24 line 6): synthesized, one per cue, played from
+   * here rather than from a board so both boards sound the same. The module
+   * only opens the audio context on the player's first gesture. Nothing at
+   * `instant`, like the effects.
+   */
+  const [sounds] = useState(() => createSounds());
+  useEffect(() => () => sounds.dispose(), [sounds]);
+  const [soundOn, setSoundOn] = useState(() => sounds.enabled);
+  const toggleSound = () => {
+    const next = !soundOn;
+    sounds.setEnabled(next);
+    setSoundOn(next);
+  };
+  const motionForSound = match.motion;
+  useEffect(() => {
+    if (!motionForSound || motionForSound.speed === 'instant') return;
+    const timers = motionForSound.cues.flatMap((timed) => {
+      const kind = soundOf(timed.cue.kind, timed.cue.text);
+      return kind ? [setTimeout(() => sounds.play(kind), timed.t)] : [];
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [motionForSound, sounds]);
 
   const state = match.state;
   const replaying = match.replaying;
@@ -275,6 +301,11 @@ export function Match({
       // purpose. The mounted board set `fxBridge.fire`; nothing else moves.
       fx: (request) => {
         if (!fxBridge.fire) return false;
+        if (request.kind === 'banner') {
+          if (!fxBridge.announce) return false;
+          fxBridge.announce(request.banner ?? 'loud', request.text ?? '', request.tone ?? 'neutral');
+          return true;
+        }
         fxBridge.stretch = request.stretch ?? 1;
         fxBridge.fire({
           kind: request.kind,
@@ -364,10 +395,24 @@ export function Match({
     if (items.length === 0) return;
     setBanners((old) => [...old, ...items.map((item) => ({ ...item, id: ++bannerId.current }))].slice(-12));
   }, []);
+  // 2H.22: a banner on demand for the harness, which cannot order a goal.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    fxBridge.announce = (kind, text, tone) => announce([{ kind, text, tone }]);
+    return () => {
+      fxBridge.announce = null;
+    };
+  }, [announce]);
   const beat = match.beat;
   const speed = match.speed;
   useEffect(() => {
     if (!beat || speed === 'instant') return;
+    // The whistles (2H.22): the round opens, the match ends. Both at the
+    // beat's start, before anything travels.
+    for (const event of beat.events) {
+      if (event.kind === 'roundStarted') sounds.play('whistle');
+      else if (event.kind === 'matchEnded') sounds.play('fullTime');
+    }
     const name = (id: string) => beat.state.units.find((u) => u.id === id)?.name ?? id;
     const side = (team: 'A' | 'B'): Announcement['tone'] => (team === own ? 'own' : 'foe');
     const sideOf = (id: string): Announcement['tone'] => {
@@ -386,8 +431,10 @@ export function Match({
           break;
         case 'scored':
           // A Spark's points are announced by the catch, one banner per event.
+          // 2H.22 (`00` C24 line 3): its own kind, bigger and whiter, and
+          // Jérôme's words for the two sides.
           if (event.source === 'payload') {
-            items.push({ kind: 'loud', text: `Goal · ${event.team === own ? 'Your battery' : 'The House'}`, tone: side(event.team) });
+            items.push({ kind: 'goal', text: `Goal · ${event.team === own ? 'Your Team' : 'The other Team'}`, tone: side(event.team) });
           }
           break;
         case 'evacuated':
@@ -407,7 +454,7 @@ export function Match({
       }
     }
     announce(items);
-  }, [beat, speed, own, announce]);
+  }, [beat, speed, own, announce, sounds]);
   // Once the turn is playable, not while the place popup is up: the popup is
   // its own announcement, and the deadline may not move between the two.
   const turnBanner = yours && !replaying && onClock && placing === null ? `${onClock.id}@${match.deadline}` : null;
@@ -549,7 +596,6 @@ export function Match({
                 actorName={beatActor}
                 actorColour={beatColour}
                 progress={match.progress}
-                hold={match.hold.ms > 0 ? match.hold : null}
                 onSkip={match.skip}
                 onDismiss={match.dismissBeat}
               />
@@ -646,6 +692,16 @@ export function Match({
               >
                 {view === '2d' ? 'See it in 3D' : 'Back to 2D'}
               </button>
+              <button
+                className="ghost"
+                style={S.speed}
+                data-testid="sound-toggle"
+                data-sound={soundOn ? 'on' : 'off'}
+                onClick={toggleSound}
+                title="The bats, the blasts, the whistle. Synthesized, nothing to download."
+              >
+                {soundOn ? '♪ Sound on' : 'Sound off'}
+              </button>
             </div>
           </div>
 
@@ -699,6 +755,35 @@ function BoardOf({ view, ...props }: { view: '2d' | '3d' } & Parameters<typeof B
       <Board3D {...props} />
     </Suspense>
   );
+}
+
+/**
+ * Which sound a cue makes (2H.22). A wound makes none: the bat that caused it
+ * already cracked. Shove, Disengage and Dodge have no sound of their own
+ * either: the Shove's thud is the `push` or `held` cue that follows.
+ */
+function soundOf(kind: string, text: string | undefined): SoundKind | null {
+  switch (kind) {
+    case 'action':
+      if (text === 'SWING' || text === 'ATCK OP' || text === 'BAT') return 'swing';
+      if (text === 'PASS') return 'throw';
+      if (text === 'SHOOT') return 'shoot';
+      if (text === 'DASH') return 'dash';
+      return null;
+    case 'hit':
+    case 'miss':
+    case 'push':
+    case 'held':
+    case 'blast':
+    case 'goal':
+    case 'sparkIn':
+    case 'sparkCaught':
+    case 'exit':
+    case 'enter':
+      return kind;
+    default:
+      return null;
+  }
 }
 
 function initials(name: string): string {

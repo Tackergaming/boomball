@@ -47,10 +47,20 @@ export interface SceneLink {
    */
   fx: ((cue: Cue) => void) | null;
   /**
-   * Raises a word over a cell, in `colour`, for about a second (2H.21): a
-   * wound's number, "miss", "held". Set by `Floaters.tsx` while mounted.
+   * Raises a word over a cell, in `colour`, for `lifeMs` (2H.21, 2H.22): a
+   * wound's number, "miss", "held", the word of an action. Set by
+   * `Floaters.tsx` while mounted. `lifeMs` is `FLOAT_MS` at the replay speed,
+   * already multiplied by the development stretch.
    */
-  float: ((text: string, colour: string, at: Point) => void) | null;
+  float: ((text: string, colour: string, at: Point, lifeMs: number) => void) | null;
+  /**
+   * The puppet (2H.22, `00` C24 line 7): a gesture of a whole Giff by pose
+   * key, with when it began. `swing` twists the body at `toward`, `lunge`
+   * pushes it forward at `toward`, `flinch` rocks it back, `throw` nods it
+   * forward. Written by `fire`, read and placed by the frame loop, which
+   * forgets each once it is over.
+   */
+  readonly gestures: Map<string, { kind: 'swing' | 'lunge' | 'flinch' | 'throw'; since: number; stretch: number; toward: { x: number; z: number } | null }>;
   /**
    * Pieces part of the way into or out of the pitch, by pose key, with when
    * they began (2H.21): an evacuated Giff sinks (`exit`), a substitute rises
@@ -73,6 +83,7 @@ export function newSceneLink(): SceneLink {
     fx: null,
     float: null,
     transitions: new Map(),
+    gestures: new Map(),
   };
 }
 

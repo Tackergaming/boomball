@@ -170,12 +170,15 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
     { name: 'fx-spark-in', request: { kind: 'sparkIn', x: mid.x, y: mid.y }, after: 200 },
     { name: 'fx-spark-caught', request: { kind: 'sparkCaught', x: mid.x, y: mid.y }, after: 120 },
     { name: 'fx-goal', request: { kind: 'goal', x: 7, y: 44, team: 'B' }, after: 350 },
+    // 2H.22: the word of an action over its actor, twice as big, aimed at the
+    // middle line so the puppet turns to it.
+    { name: 'fx-action', request: { kind: 'action', x: stand.x, y: stand.y, text: 'SWING', unitId: stand.id }, after: 500 },
   ];
   for (const effect of effects) {
     expect(await fx({ ...effect.request, stretch: STRETCH }), `${effect.name} found a board`).toBe(true);
     // The word is in the DOM at once; checked before the capture, which under
     // software GL can take longer than the word lives.
-    if (effect.request.kind === 'damage' || effect.request.kind === 'miss') {
+    if (effect.request.kind === 'damage' || effect.request.kind === 'miss' || effect.request.kind === 'action') {
       await expect(page.locator(`[data-floaters] [data-floater="${effect.request.text}"]`)).toBeAttached();
     }
     await page.waitForTimeout(effect.after * STRETCH);
@@ -193,6 +196,24 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   await page.waitForTimeout(250 * STRETCH);
   await shots.take('fx-enter');
   await page.waitForTimeout(450 * STRETCH);
+
+  // -- 2H.22: the goal banner on demand, and the sound switch ---------------------
+  // A goal cannot be ordered from the dice, so the hook says the banner itself.
+  expect(await fx({ kind: 'banner', banner: 'goal', text: 'Goal · Your Team', tone: 'own', x: 0, y: 0 })).toBe(true);
+  const goalBanner = page.locator('[data-testid="banner"][data-banner="goal"]');
+  await expect(goalBanner).toBeVisible();
+  await expect(goalBanner).toHaveText(/Goal · Your Team/i);
+  await shots.take('banner-goal');
+  // Sound is on by default, the switch turns it off and back on, and nothing
+  // is heard here: headless Chromium has no speaker and the test only reads the switch.
+  const soundToggle = page.locator('[data-testid="sound-toggle"]');
+  await expect(soundToggle).toHaveAttribute('data-sound', 'on');
+  await soundToggle.click();
+  await expect(soundToggle).toHaveAttribute('data-sound', 'off');
+  await soundToggle.click();
+  await expect(soundToggle).toHaveAttribute('data-sound', 'on');
+  // Wait the goal banner out (2.5 s, four times longer under PATIENT) before the house's round.
+  await goalBanner.waitFor({ state: 'detached', timeout: 15_000 });
 
   // -- The house plays, watched close and slow -------------------------------------
   // At `slow` the beats are held, so a banner and a verdict the dice produced

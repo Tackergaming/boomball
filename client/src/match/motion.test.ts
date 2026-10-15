@@ -19,7 +19,7 @@ import { createMatch } from '../../../engine/setup.js';
 import { isHuman, type MatchState } from '../../../engine/types.js';
 import { chooseAction } from '../../../ai/chooseAction.js';
 import { openSession, submitAction } from '../../../server/session.js';
-import { motionAndCues, motionOf, stepDuration, timeMotion } from './motion.js';
+import { ACTION_WORDS, FLOAT_MS, motionAndCues, motionOf, stepDuration, timeMotion } from './motion.js';
 import { toBeats } from './replay.js';
 
 const arena = new Arena(KILL_SILO);
@@ -254,11 +254,46 @@ describe('what a beat flashes (2H.21)', () => {
       { kind: 'attacked', attackerId: A2.id, targetId: B.id, roll, hit: false },
     ]);
     expect(steps.map((s) => s.kind)).toEqual(['unit']);
-    expect(cues).toEqual([
+    expect(cues.filter((c) => c.kind !== 'action')).toEqual([
       { kind: 'hit', at: { x: B.x, y: B.y }, unitId: B.id, text: undefined, after: 0 },
       { kind: 'damage', at: { x: B.x, y: B.y }, unitId: B.id, text: '\u22127', after: 0 },
       { kind: 'miss', at: { x: B.x, y: B.y }, unitId: B.id, text: 'miss', after: 1 },
     ]);
+  });
+
+  it('raises the word of a swing over the attacker, aimed at the target, before what the bat did (2H.22)', () => {
+    const { cues } = motionAndCues(base, [
+      { kind: 'attacked', attackerId: A.id, targetId: B.id, roll: hit, hit: true },
+      { kind: 'damaged', unitId: B.id, amount: 7, hpAfter: 5, source: 'bat' },
+      { kind: 'opportunityAttacked', attackerId: A2.id, targetId: B.id, roll, hit: false },
+    ]);
+    expect(cues.map((c) => c.kind)).toEqual(['action', 'hit', 'damage', 'action', 'miss']);
+    expect(cues[0]).toEqual({ kind: 'action', at: { x: A.x, y: A.y }, unitId: A.id, text: 'SWING', toward: { x: B.x, y: B.y }, after: 0 });
+    expect(cues[3]).toMatchObject({ kind: 'action', unitId: A2.id, text: 'ATCK OP', toward: { x: B.x, y: B.y } });
+  });
+
+  it('raises a word for every action Jérôme listed, where the actor stands at that moment (2H.22)', () => {
+    const path = [{ x: A.x, y: A.y + 1 }];
+    const { cues } = motionAndCues(base, [
+      { kind: 'dashed', unitId: A.id, extraFeet: 30 },
+      { kind: 'moved', unitId: A.id, from: { x: A.x, y: A.y }, to: path[0]!, path, costFeet: 5 },
+      { kind: 'disengaged', unitId: A.id },
+      { kind: 'dodging', unitId: A2.id },
+      { kind: 'shoved', shoverId: A2.id, targetId: B.id, success: false, shoverRoll: roll, targetRoll: roll, pushedTo: null, tookPayload: false },
+      { kind: 'crackerBatted', unitId: A2.id, crackerId: base.crackers[0]!.id, roll, hit: true, direction: 1 },
+    ]);
+    const words = cues.filter((c) => c.kind === 'action');
+    expect(words.map((c) => c.text)).toEqual(['DASH', 'DISENGAGE', 'DODGE', 'SHOVE', 'BAT']);
+    // DASH before the walk, DISENGAGE after it, where the walk ended.
+    expect(words[0]).toMatchObject({ at: { x: A.x, y: A.y }, after: 0 });
+    expect(words[1]).toMatchObject({ at: path[0], after: 1 });
+    expect(words[3]).toMatchObject({ unitId: A2.id, toward: { x: B.x, y: B.y } });
+    expect(words[4]).toMatchObject({ unitId: A2.id, toward: { x: base.crackers[0]!.x, y: base.crackers[0]!.y } });
+    expect(Object.values(ACTION_WORDS)).toHaveLength(9);
+  });
+
+  it('keeps a word up twice as long at normal as 2H.21 did, longer at slow, not at all at instant (2H.22)', () => {
+    expect(FLOAT_MS).toEqual({ slow: 3000, normal: 2000, instant: 0 });
   });
 
   it('waits for the walk that came before the swing', () => {
@@ -267,7 +302,8 @@ describe('what a beat flashes (2H.21)', () => {
       { kind: 'moved', unitId: A.id, from: { x: A.x, y: A.y }, to: path[0]!, path, costFeet: 5 },
       { kind: 'attacked', attackerId: A.id, targetId: B.id, roll: hit, hit: true },
     ]);
-    expect(cues).toEqual([{ kind: 'hit', at: { x: B.x, y: B.y }, unitId: B.id, text: undefined, after: 1 }]);
+    expect(cues.filter((c) => c.kind !== 'action')).toEqual([{ kind: 'hit', at: { x: B.x, y: B.y }, unitId: B.id, text: undefined, after: 1 }]);
+    expect(cues[0]).toMatchObject({ kind: 'action', text: 'SWING', at: path[0], after: 1 });
   });
 
   it('rings the floor under a shoved unit where it stood, and says held when it did not move', () => {
@@ -276,7 +312,7 @@ describe('what a beat flashes (2H.21)', () => {
       { kind: 'shoved', shoverId: A2.id, targetId: B.id, success: false, shoverRoll: roll, targetRoll: roll, pushedTo: null, tookPayload: false },
     ]);
     expect(steps).toHaveLength(1);
-    expect(cues).toEqual([
+    expect(cues.filter((c) => c.kind !== 'action')).toEqual([
       { kind: 'push', at: { x: B.x, y: B.y }, unitId: B.id, text: undefined, after: 0 },
       { kind: 'held', at: { x: B.x, y: B.y + 1 }, unitId: B.id, text: 'held', after: 1 },
     ]);
@@ -305,7 +341,8 @@ describe('what a beat flashes (2H.21)', () => {
       { kind: 'shotAtFurnace', unitId: A.id, roll: hit, scored: true, blockedBy: null },
       { kind: 'scored', team: 'A', points: 10, source: 'payload' },
     ]);
-    expect(cues).toEqual([{ kind: 'goal', at: { x: 6, y: 44 }, team: 'B', after: 1 }]);
+    expect(cues[0]).toMatchObject({ kind: 'action', text: 'SHOOT', unitId: A.id, at: { x: 6, y: 36 }, toward: { x: 6, y: 44 }, after: 0 });
+    expect(cues[1]).toEqual({ kind: 'goal', at: { x: 6, y: 44 }, team: 'B', after: 1 });
   });
 
   it('marks the Spark coming down and being caught, a Giff carried off and one coming on', () => {

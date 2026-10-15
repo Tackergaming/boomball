@@ -3,10 +3,12 @@
  *
  * Why (2H.21, `00` C23): Jérôme asked for the announcements to make the game
  * feel alive without overload. So there is a single banner on screen, never a
- * stack. A goal, a knockout, the Spark and full time are loud; a round opening
- * and "your turn" are quiet. The queue is drained in id order, each item held
- * for its own time, and the banner fades in and out, never blinks. The feed
- * stays the record: nothing said here is lost if it was missed.
+ * stack. A knockout, the Spark and full time are loud; a round opening and
+ * "your turn" are quiet. A goal has its own banner, bigger and whiter than the
+ * loud one, held longer (2H.22, `00` C24, Jérôme: "quand il y a un but la popup
+ * soit plus visible et font augmentée"). The queue is drained in id order, each
+ * item held for its own time, and the banner fades in and out, never blinks.
+ * The feed stays the record: nothing said here is lost if it was missed.
  *
  * The keyframe `bb-banner` already carries `translate(-50%, 0)`, so the element
  * is placed with `left: 50%` and has no transform of its own.
@@ -17,8 +19,8 @@ import { useEffect, useRef, useState } from 'react';
 export interface Announcement {
   /** Increasing, unique within the match screen. */
   readonly id: number;
-  /** `loud` is a goal, a knockout, the Spark, full time; `round` opens a round; `turn` says it is the player's turn. */
-  readonly kind: 'loud' | 'round' | 'turn';
+  /** `goal` is a goal, bigger and whiter than `loud` (2H.22, Jérôme's request); `loud` is a knockout, the Spark, full time; `round` opens a round; `turn` says it is the player's turn. */
+  readonly kind: 'goal' | 'loud' | 'round' | 'turn';
   readonly text: string;
   readonly tone: 'own' | 'foe' | 'neutral';
 }
@@ -29,6 +31,7 @@ type Speed = 'slow' | 'normal' | 'instant';
 /** How long a banner is held, fades included. `instant` reads as normal. */
 export function bannerHoldMs(kind: Kind, speed: Speed): number {
   const slow = speed === 'slow';
+  if (kind === 'goal') return slow ? 4000 : 2500;
   if (kind === 'loud') return slow ? 2500 : 1500;
   return slow ? 1800 : 1200;
 }
@@ -68,9 +71,16 @@ export function Banner({
   const hold = bannerHoldMs(current.kind, speed) * stretch;
   const colour = TONE[current.tone];
   const look =
-    current.kind === 'loud'
-      ? { ...S.loud, color: colour, borderColor: colour }
-      : { ...S.quiet, color: colour };
+    current.kind === 'goal'
+      ? {
+          ...S.goal,
+          borderColor: colour,
+          textShadow: `0 0 24px ${colour}, 0 0 60px ${colour}`,
+          boxShadow: `0 0 0 1px ${colour}, 0 0 40px ${colour}, 0 12px 40px rgba(0,0,0,.65)`,
+        }
+      : current.kind === 'loud'
+        ? { ...S.loud, color: colour, borderColor: colour }
+        : { ...S.quiet, color: colour };
 
   return (
     <div
@@ -112,6 +122,15 @@ const S: Record<string, React.CSSProperties> = {
     background: 'rgba(5,7,10,.92)',
     boxShadow: '0 8px 30px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04)',
     textShadow: '0 0 18px currentColor',
+  },
+  goal: {
+    fontFamily: 'var(--display)',
+    fontWeight: 800,
+    fontSize: 40,
+    letterSpacing: '.14em',
+    padding: '14px 34px',
+    background: 'rgba(5,7,10,.92)',
+    color: '#f4f7f8',
   },
   quiet: {
     fontFamily: 'var(--mono)',

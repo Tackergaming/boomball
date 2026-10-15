@@ -32,7 +32,7 @@ import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } fro
 import { arena, spec } from '../lib/arena.js';
 import type { BoardProps } from '../match/Board.js';
 import { fxBridge } from '../match/fxBridge.js';
-import type { Cue, Motion, TimedCue } from '../match/motion.js';
+import { FLOAT_MS, type Cue, type Motion, type TimedCue } from '../match/motion.js';
 import { planOf, poseAt, type Plan, type Pose } from '../match/pose.js';
 import { Rig, type Zoom } from './Camera.js';
 import { Effects } from './Effects.js';
@@ -72,6 +72,18 @@ interface Track {
 /** How long a Giff takes to sink when carried off, or to rise when it comes on; the Spark's drop. */
 const EXIT_MS = 600;
 const DROP_MS = 500;
+/**
+ * The puppet (2H.22, `00` C24 line 7): until the Giff is rigged, the whole
+ * mesh moves. A walk bobs it `BOB` high once per `STRIDE` cells and leans it
+ * `LEAN` radians forward; a swing winds the body back then round at its
+ * target, a lunge pushes it `LUNGE` cells at its target, a flinch rocks a
+ * struck Giff back, a throw nods it forward. Each lasts its `GESTURE_MS`.
+ */
+const BOB = 0.07;
+const STRIDE = 1.0;
+const LEAN = 0.14;
+const LUNGE = 0.35;
+const GESTURE_MS: Readonly<Record<'swing' | 'lunge' | 'flinch' | 'throw', number>> = { swing: 420, lunge: 320, flinch: 300, throw: 320 };
 /** How far below the floor a Giff sinks to, in cells. */
 const SINK = 1.9;
 /** From how high the Spark comes down, in cells. */
@@ -218,16 +230,37 @@ export function Board3D({
   const fire = useCallback(
     (cue: Cue) => {
       const now = performance.now();
+      // A word lives `FLOAT_MS` at the beat's speed (2H.22); the development
+      // trigger has no beat and reads as normal.
+      const life = FLOAT_MS[trackRef.current.motion?.speed ?? 'normal'] * fxBridge.stretch;
+      const gesture = (key: string, kind: 'swing' | 'lunge' | 'flinch' | 'throw') => {
+        const aim = cue.toward ? cellCentre(cue.toward) : null;
+        link.gestures.set(key, { kind, since: now, stretch: fxBridge.stretch, toward: aim ? { x: aim.x, z: aim.z } : null });
+      };
       switch (cue.kind) {
-        case 'damage': {
+        case 'damage':
+        case 'action': {
           const unit = cue.unitId ? state.units.find((u) => u.id === cue.unitId) : undefined;
           const colour = unit ? shirt(unit.team, own, unit.id === yoursId) : FAINT;
-          link.float?.(cue.text ?? '', colour, cue.at);
+          link.float?.(cue.text ?? '', colour, cue.at, life);
+          // The puppet's gesture for the word (2H.22, `00` C24 line 7).
+          if (cue.kind === 'action' && cue.unitId) {
+            const word = cue.text;
+            if (word === 'SWING' || word === 'ATCK OP' || word === 'BAT') gesture(`u:${cue.unitId}`, 'swing');
+            else if (word === 'SHOVE') gesture(`u:${cue.unitId}`, 'lunge');
+            else if (word === 'PASS' || word === 'SHOOT') gesture(`u:${cue.unitId}`, 'throw');
+          }
           break;
         }
         case 'miss':
         case 'held':
-          link.float?.(cue.text ?? cue.kind, FAINT, cue.at);
+          link.float?.(cue.text ?? cue.kind, FAINT, cue.at, life);
+          break;
+        case 'hit':
+        case 'push':
+          // The struck or shoved Giff rocks back; the sparks or the ring too.
+          if (cue.unitId) gesture(`u:${cue.unitId}`, 'flinch');
+          link.fx?.(cue);
           break;
         case 'exit':
         case 'enter':
@@ -466,6 +499,8 @@ function Mover({
   fire: (cue: Cue) => void;
 }) {
   const facing = useRef(new Map<string, number>());
+  /** The puppet's walk, per unit: where in its stride it is, and how far it leans (2H.22). */
+  const gait = useRef(new Map<string, { phase: number; lean: number }>());
   /** How many of the track's cues have fired, and which track that count is for. */
   const fired = useRef<{ track: Track | null; n: number }>({ track: null, n: 0 });
 
@@ -526,8 +561,52 @@ function Mover({
         const turn = MathUtils.euclideanModulo(home - yaw + Math.PI, Math.PI * 2) - Math.PI;
         yaw += turn * 0.12;
       }
+      // The puppet (2H.22): the walk's bob and lean, then the gesture of the
+      // moment, which may turn the Giff at what it is doing it to.
+      const stride = gait.current.get(key) ?? { phase: 0, lean: 0 };
+      const moved = last ? Math.hypot(c.x - last.x, c.z - last.z) : 0;
+      const walking = moved > 0.002 && pose?.moving.has(key) === true;
+      stride.phase = walking ? stride.phase + (moved * Math.PI) / STRIDE : 0;
+      stride.lean += ((walking ? LEAN : 0) - stride.lean) * 0.2;
+      gait.current.set(key, stride);
+      let bob = walking ? BOB * Math.abs(Math.sin(stride.phase)) : 0;
+      let pitch = stride.lean;
+      let twist = 0;
+      let push = { x: 0, z: 0 };
+      const g = link.gestures.get(key);
+      if (g) {
+        const u = (now - g.since) / (GESTURE_MS[g.kind] * g.stretch);
+        if (u >= 1) {
+          link.gestures.delete(key);
+        } else {
+          const aim = g.toward ? Math.atan2(g.toward.x - c.x, g.toward.z - c.z) : yaw;
+          const arc = Math.sin(u * Math.PI);
+          switch (g.kind) {
+            case 'swing':
+              // Wind back, strike round, come back.
+              yaw = aim;
+              twist = u < 0.3 ? -0.7 * (u / 0.3) : u < 0.55 ? -0.7 + 1.7 * ((u - 0.3) / 0.25) : 1.0 * (1 - (u - 0.55) / 0.45);
+              pitch += 0.15 * arc;
+              break;
+            case 'lunge':
+              yaw = aim;
+              push = { x: Math.sin(aim) * LUNGE * arc, z: Math.cos(aim) * LUNGE * arc };
+              pitch += 0.25 * arc;
+              break;
+            case 'flinch':
+              pitch -= 0.3 * arc;
+              bob += 0.05 * arc;
+              break;
+            case 'throw':
+              yaw = aim;
+              pitch += 0.2 * arc;
+              break;
+          }
+        }
+      }
       facing.current.set(key, yaw);
-      node.rotation.y = yaw;
+      // Yaw first, then the lean about the Giff's own sideways axis.
+      node.rotation.set(pitch, yaw + twist, 0, 'YXZ');
       let y = 0;
       let visible = unit.status === 'active' || pose?.moving.has(key) === true;
       const sinking = transition(key, 'exit', EXIT_MS);
@@ -543,7 +622,7 @@ function Mover({
       } else if (unit.status === 'active' && pending('enter', unit.id)) {
         visible = false;
       }
-      node.position.set(c.x, y, c.z);
+      node.position.set(c.x + push.x, y + bob, c.z + push.z);
       node.visible = visible;
       link.lastAt.set(key, { x: c.x, z: c.z });
     }

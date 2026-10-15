@@ -13,10 +13,16 @@ import type { Cue } from './motion.js';
 export const fxBridge: {
   fire: ((cue: Cue) => void) | null;
   /**
+   * Says a banner over the board on request (2H.22), so the harness can
+   * capture the goal banner without a goal. Set by the match screen while
+   * mounted, in development only.
+   */
+  announce: ((kind: 'loud' | 'goal' | 'round' | 'turn', text: string, tone: 'own' | 'foe' | 'neutral') => void) | null;
+  /**
    * How many times slower the next effects run. 1 in play. The harness asks
    * for more, because headless Chromium's software GL draws three frames a
    * second and a screenshot takes longer than a bat's sparks last; the hook
    * sets it for one request and puts it back.
    */
   stretch: number;
-} = { fire: null, stretch: 1 };
+} = { fire: null, announce: null, stretch: 1 };

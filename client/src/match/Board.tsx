@@ -40,8 +40,9 @@ import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } fro
 import { ARENA_HEIGHT, ARENA_WIDTH, arena, spec } from '../lib/arena.js';
 import type { Pending } from './ActionBar.js';
 import { fxBridge } from './fxBridge.js';
-import type { Cue, Motion } from './motion.js';
+import { FLOAT_MS, type Cue, type Motion } from './motion.js';
 import { planOf, poseAt, type BallPose } from './pose.js';
+import type { ReplaySpeed } from './testHook.js';
 
 /** Columns on screen, which is the pitch's length. */
 const COLS = ARENA_HEIGHT;
@@ -134,20 +135,21 @@ interface Track {
   readonly elapsed: number;
 }
 
-/** A word that rises over a cell: a wound's number, a miss, a Shove that held. */
+/** A word that rises over a cell: an action's word, a wound's number, a miss, a Shove that held. */
 interface Floater {
   readonly id: number;
   readonly at: Point;
   readonly text: string;
   readonly colour: string;
+  /** How long it stays up, in milliseconds: its rise and its removal both last this long. */
+  readonly life: number;
 }
 
-/** How long a floater stays in the SVG; its own rise lasts a second. */
-const FLOATER_MS = 1100;
 /** The grey of the words that are not a wound: miss, held. */
 const FLOATER_GREY = '#9aa7ad';
 
-const isFloaterCue = (cue: Cue): boolean => cue.kind === 'damage' || cue.kind === 'miss' || cue.kind === 'held';
+const isFloaterCue = (cue: Cue): boolean =>
+  cue.kind === 'action' || cue.kind === 'damage' || cue.kind === 'miss' || cue.kind === 'held';
 
 // -- The board ----------------------------------------------------------------
 
@@ -275,7 +277,9 @@ export function Board({
 
   // -- Words that rise ---------------------------------------------------------
   // Jérôme asked for the wound's number on this board too (2H.21, "dégâts aussi
-  // en 2D"). They are SMIL `<animate>`s because the board is SVG and already
+  // en 2D"), then for the word of each action beside it, twice as big and up
+  // twice as long (2H.22): they last `FLOAT_MS`, two seconds at normal and three
+  // at slow. They are SMIL `<animate>`s because the board is SVG and already
   // uses them for the loose ball, and they are timers rather than part of the
   // frame loop because a word is not a piece: it needs no position per frame,
   // only a birth and an end. The 3D board reads the same cues.
@@ -288,38 +292,42 @@ export function Board({
     seen.current = { state, own, yoursId };
   });
 
-  const floatCue = useRef((cue: Cue): void => {
+  // `speed` is the one the beat was timed at; the development trigger has no
+  // beat and gets the normal life.
+  const floatCue = useRef((cue: Cue, speed: ReplaySpeed = 'normal'): void => {
     if (!isFloaterCue(cue)) return;
     const { state: now, own: mine, yoursId: yours } = seen.current;
+    const life = FLOAT_MS[speed] * fxBridge.stretch;
     let colour = FLOATER_GREY;
-    if (cue.kind === 'damage') {
+    // An action's word wears its actor's shirt, as a wound's number does.
+    if (cue.kind === 'damage' || cue.kind === 'action') {
       const unit = now.units.find((u) => u.id === cue.unitId);
       colour = !unit ? FLOATER_GREY : unit.id === yours ? '#ffc14d' : unit.team === mine ? '#3ce0f0' : '#ff56dc';
     }
     const id = nextFloater.current++;
-    setFloaters((all) => [...all, { id, at: cue.at, text: cue.text ?? '', colour }]);
+    setFloaters((all) => [...all, { id, at: cue.at, text: cue.text ?? '', colour, life }]);
     const gone = setTimeout(() => {
       removals.current.delete(gone);
       setFloaters((all) => all.filter((f) => f.id !== id));
-    }, FLOATER_MS);
+    }, life);
     removals.current.add(gone);
   });
 
   // A beat's cues, each at its instant. Leaving the beat (a new one, a skip, the
   // screen closing) cancels those not yet fired; the floaters already up may
-  // outlive the beat and finish their second.
+  // outlive the beat and finish their rise.
   useEffect(() => {
     if (!motion || motion.speed === 'instant') return;
     const pending = motion.cues
       .filter((c) => isFloaterCue(c.cue))
-      .map((c) => setTimeout(() => floatCue.current(c.cue), c.t));
+      .map((c) => setTimeout(() => floatCue.current(c.cue, motion.speed), c.t));
     return () => pending.forEach(clearTimeout);
   }, [motion]);
 
   // The development trigger: `window.__boomball.fx` fires a cue as if a beat had.
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    fxBridge.fire = (cue) => floatCue.current(cue);
+    fxBridge.fire = (cue) => floatCue.current(cue, 'normal');
     return () => {
       fxBridge.fire = null;
     };
@@ -581,32 +589,38 @@ export function Board({
           )}
 
           {/* 13. The words that rise, after everything so nothing hides them.
-              Several born on one cell within a second are spread sideways. */}
+              Several born on one cell within their life are spread sideways. */}
           {floaters.map((f) => (
             <text
               key={f.id}
               data-floater={f.text}
-              x={f.at.y + 0.5 + ((f.id % 3) - 1) * 0.35}
+              x={f.at.y + 0.5 + ((f.id % 3) - 1) * 0.5}
               y={f.at.x + 0.1}
               textAnchor="middle"
               fill={f.colour}
               stroke="#05070a"
-              strokeWidth={px(3)}
+              strokeWidth={px(5)}
               paintOrder="stroke"
               opacity={0}
-              style={{ pointerEvents: 'none', font: `800 ${px(13)}px 'IBM Plex Mono', monospace` }}
+              style={{ pointerEvents: 'none', font: `800 ${px(26)}px 'IBM Plex Mono', monospace` }}
             >
               {f.text}
               <animate
                 attributeName="y"
                 from={f.at.x + 0.1}
-                to={f.at.x - 1.1}
-                dur="1s"
+                to={f.at.x - 1.5}
+                dur={`${f.life / 1000}s`}
                 fill="freeze"
                 calcMode="spline"
                 keySplines="0.2 0.8 0.3 1"
               />
-              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.6;1" dur="1s" fill="freeze" />
+              <animate
+                attributeName="opacity"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.6;1"
+                dur={`${f.life / 1000}s`}
+                fill="freeze"
+              />
             </text>
           ))}
         </svg>
