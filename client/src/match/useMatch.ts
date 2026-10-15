@@ -456,7 +456,12 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         // before sending it again the match's head is read: moved on, the
         // action got through and only the reply was lost, so the board is
         // read again instead; still where it was, one more try.
-        if (!reply.accepted && reply.unreachable) {
+        // 2H.22: the function has twice answered 404 "no such match" on a
+        // match the database held, both times on the first request after
+        // three idle minutes, under the screen harness. Treated like a lost
+        // reply: the head is read through the REST path (which finds the
+        // match), then one more try.
+        if (!reply.accepted && (reply.unreachable || reply.reason === 'no such match')) {
           await wait(RETRY_AFTER_MS);
           const head = await headSeq(matchId);
           if (head !== null && head > seqRef.current) {

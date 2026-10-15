@@ -1,12 +1,13 @@
 # Reprise du chat suivant, Boomball
 
 > Écrit par le fil principal (Fable 5.1) le 2026-10-15 au soir, à la fin du chat qui a reformulé
-> les sept retours de Jérôme sur 2H.21, écrit `00` C24, et codé 2H.22, le jeu vivant en deuxième
-> passe : les mots plus gros et plus longs, toutes les actions en mot, le bandeau de but, la
-> barre de la carte retirée, le son, le pantin. Rien n'est commité : 2H.21 est dans l'index,
-> 2H.22 dans la copie de travail, Jérôme tape `/commit`. Sa partie sur 2H.22 est la porte
-> suivante. À coller tel quel comme premier message du chat suivant, dans le workspace
-> `jarvis-jdr`.
+> les sept retours de Jérôme sur 2H.21, écrit `00` C24, codé 2H.22, le jeu vivant en deuxième
+> passe (les mots plus gros et plus longs, toutes les actions en mot, le bandeau de but, la
+> barre de la carte retirée, le son, le pantin), commité 2H.21 et 2H.22, puis corrigé le son
+> que StrictMode tuait, prouvé le pantin par une sonde, pris ses trois enregistrements et
+> déplacé les sources d'assets. La correction n'est pas commitée : Jérôme tape `/commit`. Sa
+> partie sur 2H.22 corrigée est la porte suivante. À coller tel quel comme premier message du
+> chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
@@ -63,14 +64,16 @@ dans docs/matches/. Mes deux parties sur 2H.21 sont consignées le 2026-10-15 au
 c3867408 (40-50, rejouée sans écart) et 2e30f587 (20-10) dont LA RELECTURE S'ARRÊTE AU ROUND 2
 (« the engine refused the rebuilt action of A-breaker-6 at seq 161: (4, 16) is already
 occupied », 669 événements non atteints) : personne n'a cherché pourquoi, c'est à moi de
-demander l'analyse. 2H.16 à 2H.20 sont commitées et poussées (fd85266, 46341a0, 2f3096d). 2H.21
-N'EST PAS COMMITÉE MAIS ELLE EST DANS L'INDEX (git add précis de ses vingt-deux fichiers, sans
-commit), et 2H.22 EST DANS LA COPIE DE TRAVAIL : au /commit, faire DEUX commits, d'abord l'index
-tel quel (2H.21, 00 C23, 08, 07, 05 de l'époque), puis les fichiers restants (2H.22, 00 C24,
-docs/matches/2026-10-15-c3867408 et 2e30f587, client/src/match/sound.ts et sound.test.ts).
-Vérifier git status et git diff --cached --stat en premier et me le dire. Mes trois JPEG de
-context/import/ (le gradin cyan, le gradin magenta, la rambarde) ne se commitent pas, leurs WebP
-dans board3d/textures/ oui.
+demander l'analyse. 2H.16 à 2H.20 sont commitées et poussées (fd85266, 46341a0, 2f3096d), 2H.21
+(54cd99f) et 2H.22 (2bcc46e) commitées en local le 15 au soir. LA CORRECTION QUI A SUIVI MA
+PARTIE N'EST PAS COMMITÉE, c'est moi qui tape /commit : vérifier git status en premier et me le
+dire. Elle contient : le son que StrictMode tuait (Match.tsx, l'instance dans un seul effet,
+sound.ts expose state, le crochet audio()), la sonde probe(unitId) du crochet (fxBridge.probe,
+Board3D) et le spec 3D qui lit le pantin par elle, les amplitudes du pantin doublées, mes trois
+WAV en MP3 dans client/public/sounds/ (SAMPLES dans sound.ts : swing, goal, blast), le fil des
+sources d'assets déplacé de context/import/ vers boomball/assets/source/ (36 Mo, images,
+models, sounds, textures, README) : à moi de dire au /commit si ces sources entrent dans git ;
+les dérivés (WebP, MP3, le GLB de public/models/) y entrent.
 
 Ce que 2H.22 contient, en sept phrases, détail en 00 C24 « comment 2H.22 est codée ». Les mots
 au-dessus des têtes font 28 px en 3D et 26 en 2D et vivent FLOAT_MS (2 s en normal, 3 s en slow,
@@ -187,15 +190,18 @@ l'azimut zéro, la roulette en vue large qui grossit le centre sans suivre le je
 Les quatre fichiers du vault modifiés hors de nos sessions (Sapphire Hammer.md, la PREP de la
 scène 1.2 Ilthavax, sa battlemap et les prompts de battlemap de la scène 1.3) et les deux
 fichiers non suivis MARGO.md et theodo.md ne sont pas à nous : ne les commite pas sans mon feu
-vert. Les archives de textures (19 Mo) dans context/import/textures-ambientcg/ et le glb source
-dans context/import/ ne sont pas commités non plus ; la copie du glb dans client/public/models/
-et les WebP le sont.
+vert. Les sources d'assets vivent dans boomball/assets/source/ depuis le 15 au soir (README dedans)
+et ne sont pas commitées sauf ma décision ; la copie du glb dans client/public/models/, les
+WebP et les MP3 le sont.
 
-LA TÂCHE : MA PARTIE SUR 2H.22, PUIS C25.
-Je joue en 3D et en 2D sur 2H.22, avec le son, et je dis ce que j'entends et ce que je vois : les
-mots et leur taille, les actions, le bandeau de but, le son recette par recette (ce qui sonne
-juste, ce qui est de trop, ce qui manque), le pantin (la marche, le coup, le Shove). La caméra de
-2H.16 à 2H.20 est close.
+LA TÂCHE : MA PARTIE SUR 2H.22 CORRIGÉE, PUIS C25.
+Ma première partie sur 2H.22 n'a rien donné à entendre (le son était mort au montage) et je
+n'ai pas vu le pantin (il tournait, mais trop peu). Je rejoue en 3D et en 2D, son allumé, après
+un premier clic n'importe où, et je dis ce que j'entends et ce que je vois : les mots et leur
+taille, les actions, le bandeau de but, chaque son (mes trois enregistrements et les treize
+recettes synthétisées : ce qui sonne juste, ce qui est de trop, ce qui manque, et quels autres
+enregistrements je dépose dans boomball/assets/source/sounds/), le pantin (la marche, le coup
+vers la cible, le Shove, le recul du touché). La caméra de 2H.16 à 2H.20 est close.
 1. Vérifier git status et git diff --cached --stat avant toute chose ; 2H.21 (l'index) et 2H.22
    (la copie de travail) doivent avoir été commitées en deux commits par mon /commit après le
    chat précédent ; sinon me le dire en premier, c'est moi qui le tape.
@@ -280,8 +286,12 @@ Ce qu'il faut savoir tout de suite.
    en 409, le client archive.
 
 7. Le harnais d'écran : npm run e2e en 18 à 55 s, npm run e2e:playthrough en 15 à 70 s, npm run
-   e2e:board3d en 5,6 min, le crochet window.__boomball, dont fx() tire un effet à la demande
-   (développement seulement, stretch pour ralentir, kind 'banner' pour dire un bandeau).
+   e2e:board3d en 6 à 7 min, le crochet window.__boomball, dont fx() tire un effet à la demande
+   (développement seulement, stretch pour ralentir, kind 'banner' pour dire un bandeau),
+   audio() dit où en est le son (running après un clic), probe(unitId) lit la rotation, la
+   hauteur et le geste d'un pion en 3D : c'est par elle que le spec juge le pantin, parce que
+   deux captures à une seconde d'écart sous le GL logiciel reviennent identiques alors que la
+   scène a tourné.
    waitForPlayableTurn dans e2e/harness.ts répond à la popup par un clic à l'écran (data-place,
    place-close) et capture la première vue ; le smoke clique 1, puis Close, puis 2, le playthrough
    une place différente à chaque round, le spec 3D la place 2. Le siège humain du playthrough est
@@ -303,8 +313,10 @@ Ce qu'il faut savoir tout de suite.
    compris l'avertissement de Chrome sur un AudioContext créé hors geste : c'est pourquoi
    sound.ts n'ouvre le contexte que dans un gestionnaire de geste confirmé. Le spec 3D dure plus
    que les 120 s du chrono : le tour expire pendant les effets (bandeau « The clock ran out »),
-   c'est attendu, et un resolve-action a répondu 404 « no such match » une fois à ce moment-là,
-   sans cause trouvée, la relance a passé. Pour lire ce que le harnais a vraiment envoyé, la
+   c'est attendu, et un resolve-action a répondu 404 « no such match » deux fois à ce moment-là
+   (la première requête après trois minutes sans action), sans cause serveur trouvée ;
+   useMatch.send traite ce 404 comme une réponse perdue et renvoie une fois après avoir lu la
+   tête du match par REST. Pour lire ce que le harnais a vraiment envoyé, la
    trace Playwright de e2e/test-results/ se lit avec un script Python sur trace.zip (les
    entrées resource-snapshot du .network).
 

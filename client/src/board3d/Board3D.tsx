@@ -79,11 +79,13 @@ const DROP_MS = 500;
  * target, a lunge pushes it `LUNGE` cells at its target, a flinch rocks a
  * struck Giff back, a throw nods it forward. Each lasts its `GESTURE_MS`.
  */
-const BOB = 0.07;
+const BOB = 0.12;
 const STRIDE = 1.0;
-const LEAN = 0.14;
-const LUNGE = 0.35;
-const GESTURE_MS: Readonly<Record<'swing' | 'lunge' | 'flinch' | 'throw', number>> = { swing: 420, lunge: 320, flinch: 300, throw: 320 };
+const LEAN = 0.22;
+/** The sideways roll of a walking Giff, radians, once per stride. */
+const SWAY = 0.08;
+const LUNGE = 0.5;
+const GESTURE_MS: Readonly<Record<'swing' | 'lunge' | 'flinch' | 'throw', number>> = { swing: 650, lunge: 450, flinch: 400, throw: 450 };
 /** How far below the floor a Giff sinks to, in cells. */
 const SINK = 1.9;
 /** From how high the Spark comes down, in cells. */
@@ -279,10 +281,22 @@ export function Board3D({
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     fxBridge.fire = fire;
+    fxBridge.probe = (unitId) => {
+      const node = link.pieces.get(`u:${unitId}`);
+      if (!node) return null;
+      return {
+        yaw: node.rotation.y,
+        pitch: node.rotation.x,
+        roll: node.rotation.z,
+        y: node.position.y,
+        gesture: link.gestures.get(`u:${unitId}`)?.kind ?? null,
+      };
+    };
     return () => {
       fxBridge.fire = null;
+      fxBridge.probe = null;
     };
-  }, [fire]);
+  }, [fire, link]);
 
   // -- Goals: the mouth that took one flares for a second ------------------------
   const scoreRef = useRef(state.score);
@@ -571,6 +585,7 @@ function Mover({
       gait.current.set(key, stride);
       let bob = walking ? BOB * Math.abs(Math.sin(stride.phase)) : 0;
       let pitch = stride.lean;
+      let roll = walking ? SWAY * Math.sin(stride.phase) : 0;
       let twist = 0;
       let push = { x: 0, z: 0 };
       const g = link.gestures.get(key);
@@ -583,30 +598,32 @@ function Mover({
           const arc = Math.sin(u * Math.PI);
           switch (g.kind) {
             case 'swing':
-              // Wind back, strike round, come back.
+              // Wind back a third of the way, strike round in a quarter, come back.
               yaw = aim;
-              twist = u < 0.3 ? -0.7 * (u / 0.3) : u < 0.55 ? -0.7 + 1.7 * ((u - 0.3) / 0.25) : 1.0 * (1 - (u - 0.55) / 0.45);
-              pitch += 0.15 * arc;
+              twist = u < 0.3 ? -1.0 * (u / 0.3) : u < 0.55 ? -1.0 + 2.4 * ((u - 0.3) / 0.25) : 1.4 * (1 - (u - 0.55) / 0.45);
+              pitch += 0.25 * arc;
+              bob += 0.06 * arc;
               break;
             case 'lunge':
               yaw = aim;
               push = { x: Math.sin(aim) * LUNGE * arc, z: Math.cos(aim) * LUNGE * arc };
-              pitch += 0.25 * arc;
+              pitch += 0.35 * arc;
               break;
             case 'flinch':
-              pitch -= 0.3 * arc;
-              bob += 0.05 * arc;
+              pitch -= 0.45 * arc;
+              bob += 0.1 * arc;
               break;
             case 'throw':
               yaw = aim;
-              pitch += 0.2 * arc;
+              pitch += 0.3 * arc;
+              bob += 0.08 * arc;
               break;
           }
         }
       }
       facing.current.set(key, yaw);
-      // Yaw first, then the lean about the Giff's own sideways axis.
-      node.rotation.set(pitch, yaw + twist, 0, 'YXZ');
+      // Yaw first, then the lean about the Giff's own sideways axis, then the roll.
+      node.rotation.set(pitch, yaw + twist, roll, 'YXZ');
       let y = 0;
       let visible = unit.status === 'active' || pose?.moving.has(key) === true;
       const sinking = transition(key, 'exit', EXIT_MS);

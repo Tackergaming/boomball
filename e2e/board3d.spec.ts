@@ -172,7 +172,7 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
     { name: 'fx-goal', request: { kind: 'goal', x: 7, y: 44, team: 'B' }, after: 350 },
     // 2H.22: the word of an action over its actor, twice as big, aimed at the
     // middle line so the puppet turns to it.
-    { name: 'fx-action', request: { kind: 'action', x: stand.x, y: stand.y, text: 'SWING', unitId: stand.id }, after: 500 },
+    { name: 'fx-action', request: { kind: 'action', x: stand.x, y: stand.y, text: 'SWING', unitId: stand.id }, after: 110 },
   ];
   for (const effect of effects) {
     expect(await fx({ ...effect.request, stretch: STRETCH }), `${effect.name} found a board`).toBe(true);
@@ -183,6 +183,36 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
     }
     await page.waitForTimeout(effect.after * STRETCH);
     await shots.take(effect.name);
+    if (effect.request.kind === 'action') {
+      // The puppet (2H.22): the swing winds the Giff back then round at its
+      // target. Under software GL a capture cannot catch it (two captures a
+      // second apart came back identical while the scene had turned), so the
+      // probe reads the piece itself: a gesture is on it and it has turned.
+      // Fired again, slower still, because under software GL the capture
+      // above alone outlasts the first one; then waited out, since the Giff
+      // carried off below is this one.
+      expect(await fx({ ...effect.request, stretch: 15 })).toBe(true);
+      const turned = await page.evaluate(
+        async (id) => {
+          const h = window.__boomball!;
+          const rest = h.probe(id);
+          let best = 0;
+          let seen = false;
+          for (let i = 0; i < 40; i++) {
+            await new Promise((r) => setTimeout(r, 100));
+            const p = h.probe(id);
+            if (!p || !rest) continue;
+            if (p.gesture === 'swing') seen = true;
+            best = Math.max(best, Math.abs(p.yaw - rest.yaw), Math.abs(p.pitch));
+          }
+          return { seen, best };
+        },
+        effect.request.unitId!,
+      );
+      expect(turned.seen, 'a swing gesture was on the Giff').toBe(true);
+      expect(turned.best, 'the Giff turned or leaned').toBeGreaterThan(0.15);
+      await page.waitForTimeout(6_000);
+    }
     // The next effect takes a slot of its own; what is left of this one may overlap.
     await page.waitForTimeout(1_500);
   }
@@ -212,6 +242,10 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   await expect(soundToggle).toHaveAttribute('data-sound', 'off');
   await soundToggle.click();
   await expect(soundToggle).toHaveAttribute('data-sound', 'on');
+  // The clicks above were gestures, so the audio context must be running by
+  // now: Jérôme heard nothing on his first game because StrictMode's effect
+  // rehearsal had disposed the instance, and the switch alone could not say.
+  await page.waitForFunction(() => window.__boomball?.audio() === 'running', undefined, { timeout: 5_000 });
   // Wait the goal banner out (2.5 s, four times longer under PATIENT) before the house's round.
   await goalBanner.waitFor({ state: 'detached', timeout: 15_000 });
 

@@ -32,7 +32,7 @@ import { Banner, type Announcement } from '../match/Banner.js';
 import { Board } from '../match/Board.js';
 import { fxBridge } from '../match/fxBridge.js';
 import { FLOAT_MS } from '../match/motion.js';
-import { createSounds, type SoundKind } from '../match/sound.js';
+import { createSounds, readSoundEnabled, type SoundKind, type Sounds } from '../match/sound.js';
 // The 2.5D board and the whole three.js stack come down only when asked for.
 const Board3D = lazy(() => import('../board3d/Board3D.js').then((m) => ({ default: m.Board3D })));
 import { projectCell } from '../board3d/projection.js';
@@ -110,13 +110,27 @@ export function Match({
    * here rather than from a board so both boards sound the same. The module
    * only opens the audio context on the player's first gesture. Nothing at
    * `instant`, like the effects.
+   *
+   * The instance is made and disposed by one effect, not kept in state with a
+   * separate disposing effect: React StrictMode runs every effect twice in
+   * development (mount, clean up, mount), and the first version disposed the
+   * instance for good on that rehearsal, so Jérôme heard nothing on his dev
+   * server while the harness saw the switch. `enabled` is read from storage
+   * for the first render, before the instance exists.
    */
-  const [sounds] = useState(() => createSounds());
-  useEffect(() => () => sounds.dispose(), [sounds]);
-  const [soundOn, setSoundOn] = useState(() => sounds.enabled);
+  const soundsRef = useRef<Sounds | null>(null);
+  const [soundOn, setSoundOn] = useState(() => readSoundEnabled());
+  useEffect(() => {
+    const sounds = createSounds();
+    soundsRef.current = sounds;
+    return () => {
+      soundsRef.current = null;
+      sounds.dispose();
+    };
+  }, []);
   const toggleSound = () => {
     const next = !soundOn;
-    sounds.setEnabled(next);
+    soundsRef.current?.setEnabled(next);
     setSoundOn(next);
   };
   const motionForSound = match.motion;
@@ -124,10 +138,10 @@ export function Match({
     if (!motionForSound || motionForSound.speed === 'instant') return;
     const timers = motionForSound.cues.flatMap((timed) => {
       const kind = soundOf(timed.cue.kind, timed.cue.text);
-      return kind ? [setTimeout(() => sounds.play(kind), timed.t)] : [];
+      return kind ? [setTimeout(() => soundsRef.current?.play(kind), timed.t)] : [];
     });
     return () => timers.forEach(clearTimeout);
-  }, [motionForSound, sounds]);
+  }, [motionForSound]);
 
   const state = match.state;
   const replaying = match.replaying;
@@ -297,6 +311,9 @@ export function Match({
       act: (action) => (canAct ? send(action) : Promise.resolve()),
       skipReplay: match.skip,
       dismissBeat: match.dismissBeat,
+      // 2H.22: where the audio stands, since the harness cannot hear.
+      audio: () => soundsRef.current?.state ?? 'none',
+      probe: (unitId) => fxBridge.probe?.(unitId) ?? null,
       // 2H.21: an effect on demand, so the harness captures each one on
       // purpose. The mounted board set `fxBridge.fire`; nothing else moves.
       fx: (request) => {
@@ -410,8 +427,8 @@ export function Match({
     // The whistles (2H.22): the round opens, the match ends. Both at the
     // beat's start, before anything travels.
     for (const event of beat.events) {
-      if (event.kind === 'roundStarted') sounds.play('whistle');
-      else if (event.kind === 'matchEnded') sounds.play('fullTime');
+      if (event.kind === 'roundStarted') soundsRef.current?.play('whistle');
+      else if (event.kind === 'matchEnded') soundsRef.current?.play('fullTime');
     }
     const name = (id: string) => beat.state.units.find((u) => u.id === id)?.name ?? id;
     const side = (team: 'A' | 'B'): Announcement['tone'] => (team === own ? 'own' : 'foe');
@@ -454,7 +471,7 @@ export function Match({
       }
     }
     announce(items);
-  }, [beat, speed, own, announce, sounds]);
+  }, [beat, speed, own, announce]);
   // Once the turn is playable, not while the place popup is up: the popup is
   // its own announcement, and the deadline may not move between the two.
   const turnBanner = yours && !replaying && onClock && placing === null ? `${onClock.id}@${match.deadline}` : null;

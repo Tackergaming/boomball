@@ -83,6 +83,10 @@ export interface BoomballHook {
   act(action: Action): Promise<void>;
   skipReplay(): void;
   dismissBeat(): void;
+  /** Where the audio stands (2H.22): `waiting` before the first gesture, `running` after, `none` before the screen made it. */
+  audio(): 'silent' | 'waiting' | 'running' | 'disposed' | 'none';
+  /** A Giff of the 3D scene (2H.22): its rotation, its height and the gesture on it; null in 2D or when unknown. */
+  probe(unitId: string): { yaw: number; pitch: number; roll: number; y: number; gesture: string | null } | null;
   /**
    * Fires one visual effect on the mounted board as if its beat had, so a
    * capture can be taken of each on purpose (2H.21). False when no board is

@@ -19,10 +19,17 @@ export const fxBridge: {
    */
   announce: ((kind: 'loud' | 'goal' | 'round' | 'turn', text: string, tone: 'own' | 'foe' | 'neutral') => void) | null;
   /**
+   * Reads a piece of the 3D scene (2H.22): its rotation and height, and
+   * whether a puppet gesture is on it. Set by the 3D board while mounted, in
+   * development only, so the harness can tell a Giff turned when a capture
+   * under software GL cannot.
+   */
+  probe: ((unitId: string) => { yaw: number; pitch: number; roll: number; y: number; gesture: string | null } | null) | null;
+  /**
    * How many times slower the next effects run. 1 in play. The harness asks
    * for more, because headless Chromium's software GL draws three frames a
    * second and a screenshot takes longer than a bat's sparks last; the hook
    * sets it for one request and puts it back.
    */
   stretch: number;
-} = { fire: null, announce: null, stretch: 1 };
+} = { fire: null, announce: null, probe: null, stretch: 1 };

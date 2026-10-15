@@ -2168,3 +2168,37 @@ sous-agents nommés ci-dessous. **Codé en 2H.22.**
   une fois, au tour suivi après trois minutes d'effets, sur un match que la base montrait bien
   en cours ; la relance a passé. Et quand le match e2e atteint le sifflet pendant le smoke, le
   smoke suivant en ouvre un nouveau de lui-même.
+
+**Le soir même, après sa partie sur 2H.22 : « je n'ai entendu aucun son, même après avoir
+activé le sound on, et je n'ai pas vu d'animation de pantin, vérifie ton travail ».** Vérifié
+par le fil principal, trois faits.
+
+- **Le son ne jouait pas, et c'était un défaut.** `Match.tsx` gardait l'instance de son dans un
+  état React et la fermait par un effet à part ; React StrictMode répète chaque effet en
+  développement (montage, nettoyage, montage), donc `dispose()` partait à la répétition et
+  l'instance était morte avant le premier clic. Le harnais voyait le bouton et rien d'autre.
+  Corrigé : l'instance naît et meurt dans un seul effet, lue par une référence ; le module
+  expose `state` (`waiting`, `running`, `disposed`) et le crochet `audio()`, et le spec 3D
+  affirme `running` après les clics sur le bouton. **Le pantin, lui, marchait** : le crochet
+  `probe(unitId)` (développement seulement, `fxBridge.probe`) lit la rotation et la hauteur du
+  pion, et pendant un SWING le cap passe de 1,57 à 0,60 puis 2,60 rad avec une pente de 0,2 et
+  un bob de 0,05 ; deux captures à une seconde d'écart étaient pourtant identiques, le GL
+  logiciel ne les prend pas au bon moment. Le spec 3D lit donc le pantin par la sonde et plus
+  par une capture. Les amplitudes ont été doublées pour qu'il se voie à 45 images par seconde :
+  bob 0,12, pente 0,22, roulis 0,08 en marche ; le coup en 650 ms, recul 1 rad et frappe 1,4
+  rad ; le Shove 0,5 case en 450 ms ; le recul de la cible 0,45 rad.
+- **Ses trois sons.** Il a déposé `swing.wav`, `goal.wav` et `explosion cracker.wav` ; convertis
+  par ffmpeg en MP3 dans `client/public/sounds/` (`swing`, `goal`, `blast`), la table `SAMPLES`
+  de `sound.ts` les nomme avec un gain (0,7 pour le but et l'explosion, masterisés à 0 dB), ils
+  sont décodés une fois le contexte lancé et jouent à la place de la recette de leur sorte ; les
+  treize autres restent synthétisées jusqu'à ce qu'il en dépose d'autres.
+- **Le 404 revu, et rattrapé côté client.** Le même « no such match » est revenu au harnais sur
+  la première requête après trois minutes sans action, sur un match que la base montrait en
+  cours ; la lecture REST du même match passe. Cause serveur non trouvée (la fonction répond
+  404 quand sa double lecture `match_state` et `matches` par `.single()` échoue). `useMatch.send`
+  traite désormais cette réponse comme une réponse perdue (C21) : attente, lecture de la tête
+  par REST, renvoi une fois.
+- **Les sources des assets** (les trois JPEG des gradins et de la rambarde, le JPEG du Giff en
+  2D, le GLB source, les trois WAV, les trois archives ambientCG) sont déplacées de
+  `context/import/` vers `boomball/assets/source/`, avec un README qui dit le dérivé de chacune.
+  36 Mo, non commités sauf sa décision.

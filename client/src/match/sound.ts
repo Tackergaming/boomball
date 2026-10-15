@@ -53,6 +53,12 @@ export interface Sounds {
   /** Whether sound is on. Persisted under localStorage key 'boomball.sound' ('on' | 'off'); on when the key is absent or storage throws. */
   readonly enabled: boolean;
   setEnabled(on: boolean): void;
+  /**
+   * Where the audio stands: `silent` without Web Audio, `waiting` for the
+   * first gesture, `running` once the context runs, `disposed` after
+   * `dispose()`. Read by the screen harness, which cannot hear.
+   */
+  readonly state: 'silent' | 'waiting' | 'running' | 'disposed';
   /** Removes the window listeners and closes the context, for unmount. */
   dispose(): void;
 }
@@ -73,6 +79,19 @@ const MASTER_GAIN = 0.5;
 const NOISE_SECONDS = 1.5;
 /** The floor of every envelope: exponential ramps cannot reach 0. */
 const SILENT = 0.0001;
+
+/**
+ * Jérôme's own recordings (2H.22, the evening of the 15th), by kind: WAV in
+ * `boomball/assets/source/sounds/`, served as MP3 from `public/sounds/`. They
+ * are fetched and decoded once the context runs; until then, and for every
+ * kind without a file, the recipe below plays. `gain` evens them out against
+ * the synthesis: the goal and the blast were mastered to 0 dB.
+ */
+const SAMPLES: Partial<Record<SoundKind, { readonly file: string; readonly gain: number }>> = {
+  swing: { file: 'swing.mp3', gain: 1 },
+  goal: { file: 'goal.mp3', gain: 0.7 },
+  blast: { file: 'blast.mp3', gain: 0.7 },
+};
 
 // ---------------------------------------------------------------------------
 // The remembered toggle. Pure, and tested in `sound.test.ts`.
@@ -365,6 +384,28 @@ interface Engine {
   readonly ctx: AudioContext;
   readonly bus: AudioNode;
   readonly noise: AudioBuffer;
+  /** The recordings, by kind, once decoded. */
+  readonly samples: Map<SoundKind, AudioBuffer>;
+}
+
+/**
+ * Fetches and decodes the recordings into `engine.samples`. Each failure is
+ * silent: that kind simply keeps its recipe. Called once the context runs,
+ * never before, so no decode is attempted on a suspended context.
+ */
+function loadSamples(engine: Engine): void {
+  const base = (import.meta.env?.BASE_URL as string | undefined) ?? '/';
+  for (const [kind, sample] of Object.entries(SAMPLES) as [SoundKind, { file: string; gain: number }][]) {
+    fetch(`${base}sounds/${sample.file}`)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((bytes) => engine.ctx.decodeAudioData(bytes))
+      .then((buffer) => {
+        engine.samples.set(kind, buffer);
+      })
+      .catch(() => {
+        // The recipe stays.
+      });
+  }
 }
 
 type AudioContextCtor = new () => AudioContext;
@@ -401,7 +442,7 @@ function buildEngine(Ctor: AudioContextCtor): Engine {
   const data = buffer.getChannelData(0);
   for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
 
-  return { ctx, bus: compressor, noise: buffer };
+  return { ctx, bus: compressor, noise: buffer, samples: new Map() };
 }
 
 const GESTURES = ['pointerdown', 'pointerup', 'keydown', 'touchend'] as const;
@@ -417,6 +458,9 @@ function silentSounds(storage: SoundStorage | null): Sounds {
     setEnabled(on) {
       enabled = on;
       writeSoundEnabled(on, storage);
+    },
+    get state() {
+      return 'silent' as const;
     },
     dispose() {},
   };
@@ -451,11 +495,16 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
       const { ctx } = engine;
       if (ctx.state === 'running') {
         unlisten();
+        loadSamples(engine);
         return;
       }
+      const made = engine;
       ctx.resume().then(
         () => {
-          if (ctx.state === 'running') unlisten();
+          if (ctx.state === 'running') {
+            unlisten();
+            loadSamples(made);
+          }
         },
         () => {
           // Refused: the listeners stay, the next gesture tries again.
@@ -481,7 +530,20 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
       try {
         const out = ctx.createGain();
         out.connect(bus);
-        const length = RECIPES[kind]({ ctx, out, at: ctx.currentTime + 0.005, noise: buffer });
+        const at = ctx.currentTime + 0.005;
+        const sample = engine.samples.get(kind);
+        let length: number;
+        if (sample) {
+          // Jérôme's recording for this kind, at its own level.
+          const src = ctx.createBufferSource();
+          src.buffer = sample;
+          out.gain.setValueAtTime(SAMPLES[kind]?.gain ?? 1, at);
+          src.connect(out);
+          src.start(at);
+          length = sample.duration;
+        } else {
+          length = RECIPES[kind]({ ctx, out, at, noise: buffer });
+        }
         voices++;
         // Every source stops itself at its own end; this lets the voice go and frees its slot.
         setTimeout(() => {
@@ -502,6 +564,10 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
     setEnabled(on) {
       enabled = on;
       writeSoundEnabled(on, storage);
+    },
+    get state() {
+      if (disposed) return 'disposed' as const;
+      return engine && engine.ctx.state === 'running' ? ('running' as const) : ('waiting' as const);
     },
     dispose() {
       if (disposed) return;
