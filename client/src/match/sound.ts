@@ -91,7 +91,18 @@ const SAMPLES: Partial<Record<SoundKind, { readonly file: string; readonly gain:
   swing: { file: 'swing.mp3', gain: 1 },
   goal: { file: 'goal.mp3', gain: 0.7 },
   blast: { file: 'blast.mp3', gain: 0.7 },
+  // The Giff wear jetpacks in Jérôme's head: a Dash is a burst of one. The
+  // second burst of his jetpack1 recording, 1.6 s, faded out.
+  dash: { file: 'dash.mp3', gain: 0.8 },
 };
+
+/**
+ * The crowd (2H.22, the night of the 15th): Jérôme's crowd2 recording, thirty
+ * seconds cut from a steady stretch and crossfaded over themselves into a
+ * loop, played low under everything while sound is on. `trim` keeps the loop
+ * points clear of the MP3 encoder's padding at either end, which would click.
+ */
+const AMBIENCE = { file: 'crowd.mp3', gain: 0.16, trim: 0.06 } as const;
 
 // ---------------------------------------------------------------------------
 // The remembered toggle. Pure, and tested in `sound.test.ts`.
@@ -386,6 +397,44 @@ interface Engine {
   readonly noise: AudioBuffer;
   /** The recordings, by kind, once decoded. */
   readonly samples: Map<SoundKind, AudioBuffer>;
+  /** The crowd's loop once decoded, and its playing source while it plays. */
+  ambience: { buffer: AudioBuffer | null; source: AudioBufferSourceNode | null };
+}
+
+/** Starts the crowd under everything, if it is decoded and not already playing. */
+function startAmbience(engine: Engine): void {
+  const { ambience, ctx, bus } = engine;
+  if (!ambience.buffer || ambience.source) return;
+  try {
+    const buffer = ambience.buffer;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    src.loopStart = AMBIENCE.trim;
+    src.loopEnd = Math.max(AMBIENCE.trim + 1, buffer.duration - AMBIENCE.trim);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(SILENT, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(AMBIENCE.gain, ctx.currentTime + 1.5);
+    src.connect(gain);
+    gain.connect(bus);
+    src.start(0, AMBIENCE.trim);
+    ambience.source = src;
+  } catch {
+    // No crowd, then.
+  }
+}
+
+/** Stops the crowd, if it plays. The buffer stays for the next start. */
+function stopAmbience(engine: Engine): void {
+  const { ambience } = engine;
+  if (!ambience.source) return;
+  try {
+    ambience.source.stop();
+    ambience.source.disconnect();
+  } catch {
+    // Already stopped.
+  }
+  ambience.source = null;
 }
 
 /**
@@ -393,8 +442,18 @@ interface Engine {
  * silent: that kind simply keeps its recipe. Called once the context runs,
  * never before, so no decode is attempted on a suspended context.
  */
-function loadSamples(engine: Engine): void {
+function loadSamples(engine: Engine, onAmbience: () => void): void {
   const base = (import.meta.env?.BASE_URL as string | undefined) ?? '/';
+  fetch(`${base}sounds/${AMBIENCE.file}`)
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+    .then((bytes) => engine.ctx.decodeAudioData(bytes))
+    .then((buffer) => {
+      engine.ambience.buffer = buffer;
+      onAmbience();
+    })
+    .catch(() => {
+      // Silence under the game, then.
+    });
   for (const [kind, sample] of Object.entries(SAMPLES) as [SoundKind, { file: string; gain: number }][]) {
     fetch(`${base}sounds/${sample.file}`)
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
@@ -442,7 +501,7 @@ function buildEngine(Ctor: AudioContextCtor): Engine {
   const data = buffer.getChannelData(0);
   for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
 
-  return { ctx, bus: compressor, noise: buffer, samples: new Map() };
+  return { ctx, bus: compressor, noise: buffer, samples: new Map(), ambience: { buffer: null, source: null } };
 }
 
 const GESTURES = ['pointerdown', 'pointerup', 'keydown', 'touchend'] as const;
@@ -493,17 +552,20 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
     try {
       if (!engine) engine = buildEngine(ctor);
       const { ctx } = engine;
+      const made = engine;
+      const crowd = () => {
+        if (enabled && !disposed) startAmbience(made);
+      };
       if (ctx.state === 'running') {
         unlisten();
-        loadSamples(engine);
+        loadSamples(made, crowd);
         return;
       }
-      const made = engine;
       ctx.resume().then(
         () => {
           if (ctx.state === 'running') {
             unlisten();
-            loadSamples(made);
+            loadSamples(made, crowd);
           }
         },
         () => {
@@ -564,6 +626,11 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
     setEnabled(on) {
       enabled = on;
       writeSoundEnabled(on, storage);
+      // The crowd follows the switch at once; the effects follow it at their next play.
+      if (engine) {
+        if (on) startAmbience(engine);
+        else stopAmbience(engine);
+      }
     },
     get state() {
       if (disposed) return 'disposed' as const;
@@ -574,6 +641,7 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
       disposed = true;
       unlisten();
       if (engine) {
+        stopAmbience(engine);
         engine.ctx.close().catch(() => {});
         engine = null;
       }

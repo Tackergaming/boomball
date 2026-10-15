@@ -2198,6 +2198,17 @@ par le fil principal, trois faits.
   404 quand sa double lecture `match_state` et `matches` par `.single()` échoue). `useMatch.send`
   traite désormais cette réponse comme une réponse perdue (C21) : attente, lecture de la tête
   par REST, renvoi une fois.
+- **Quatre sons de plus, la nuit du 15.** Ses mots : « le jetpack 1 et 2 c'est pour le dash, car
+  dans ma tête les Giff ont des jetpacks et donc quand ils accélèrent on entend le burst du
+  jetpack ; pour les sons de crowd, elles ne sont pas des loops parfaites, donc à manipuler, je te
+  laisse choisir ». Fait : le Dash joue le deuxième des trois bursts de `jetpack1.aiff` (4,00 à
+  5,60 s, fondu de sortie 300 ms, `dash.mp3`, gain 0,8) ; `jetpack2.wav` est un jet continu sans
+  burst, gardé pour plus tard. La foule : `crowd2.wav` retenu (61 s au niveau stable, −17 dB
+  partout) contre `crowd1.wav` (4 min, des vagues de −13 à −66 dB, matière pour des réactions,
+  pas pour un fond) ; trente secondes découpées et la fin fondue sur le début en 1,5 s, boucle
+  sans couture (`crowd.mp3`), jouée en fond à 0,16 dès que le contexte tourne et que le son est
+  allumé (`AMBIENCE` dans `sound.ts`, `loopStart` et `loopEnd` à 60 ms des bords pour éviter le
+  clic du remplissage MP3), coupée et reprise par le bouton son.
 - **Les sources des assets** (les trois JPEG des gradins et de la rambarde, le JPEG du Giff en
   2D, le GLB source, les trois WAV, les trois archives ambientCG) sont déplacées de
   `context/import/` vers `boomball/assets/source/`, avec un README qui dit le dérivé de chacune.

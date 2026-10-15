@@ -70,7 +70,9 @@ PARTIE N'EST PAS COMMITÉE, c'est moi qui tape /commit : vérifier git status en
 dire. Elle contient : le son que StrictMode tuait (Match.tsx, l'instance dans un seul effet,
 sound.ts expose state, le crochet audio()), la sonde probe(unitId) du crochet (fxBridge.probe,
 Board3D) et le spec 3D qui lit le pantin par elle, les amplitudes du pantin doublées, mes trois
-WAV en MP3 dans client/public/sounds/ (SAMPLES dans sound.ts : swing, goal, blast), le fil des
+WAV en MP3 dans client/public/sounds/ (SAMPLES dans sound.ts : swing, goal, blast, puis dash
+depuis le deuxième burst de son jetpack1, et la foule crowd2 en boucle de 30 s jouée en fond par
+AMBIENCE, coupée par le bouton son), le fil des
 sources d'assets déplacé de context/import/ vers boomball/assets/source/ (36 Mo, images,
 models, sounds, textures, README) : à moi de dire au /commit si ces sources entrent dans git ;
 les dérivés (WebP, MP3, le GLB de public/models/) y entrent.
