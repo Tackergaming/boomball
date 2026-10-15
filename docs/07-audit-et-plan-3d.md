@@ -1581,7 +1581,7 @@ lendemain. **Ce qui attend Jérôme** : ses parties en 3D (« See it in 3D » su
 choix est gardé), ses retours en `00` C18, et l'option de `00` C17 sur la passe gratuite au gardien. Un sweep
 seulement s'il le demande.
 
-### Sous-phase 2H.16, « la caméra en main », codée le 2026-10-15, porte ouverte
+### Sous-phase 2H.16, « la caméra en main », codée le 2026-10-15, porte franchie le même jour
 
 Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C18 : les deux retours de
 Jérôme après **sa première partie en 3D**, tous deux de caméra, reformulés en chat et tranchés
@@ -1603,5 +1603,28 @@ côté fonctions ; le client en ligne n'est pas redéployé, c'est son feu vert.
 | Dette | L'orbite se remet à la vue fixe quand on passe par le 2D et revient (le plateau 3D est remonté) ; la borne de suivi aux bouts du silo est calculée pour l'azimut zéro, approximative quand la caméra est tournée ; en vue large la roulette grossit le centre sans suivre le jeu ; en vue large le bas de l'image reste vide sur un cadre très large |
 
 **Ce qui attend Jérôme** : sa partie en 3D avec la caméra en main, ses retours en `00` C19 avant
+toute ligne de code, et son feu vert pour le client en ligne s'il le veut. Un sweep seulement
+s'il le demande.
+
+### Sous-phase 2H.17, « la caméra décrochée », codée le 2026-10-15, porte ouverte
+
+Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C19 : le retour de Jérôme
+après **sa partie sur 2H.16**, pouvoir décrocher la caméra du joueur en cours et naviguer le
+terrain comme dans Baldur's Gate 3 ou Blood Bowl, reformulé en chat et tranché par deux
+arbitrages (les flèches et Ctrl plus la souris, rien au bouton du milieu ni au bord de l'écran ;
+la caméra revient d'elle-même quand c'est son tour). **Aucun écart de règle, `ENGINE_VERSION`
+reste 9**, rien à redéployer ; le client en ligne n'est pas redéployé. **Pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| `framing.ts` | `clampPan` borne le point visé au terrain plus quatre cases (`PAN_MARGIN`) ; `viewAxes` donne l'avant et la droite de l'image à plat selon l'azimut, pour que « haut » soit toujours le loin de l'image quelle que soit la rotation. **13 tests** (deux de plus) |
+| `Camera.tsx` | Le pan : les **flèches** glissent le point visé à `KEY_PAN_RATE` fois la distance de la caméra par seconde, dans les axes de l'image ; **Ctrl enfoncé plus la souris** sur la scène tire le sol avec elle, un pixel valant la largeur de l'image sur la hauteur du canevas, allongé par l'inclinaison dans le sens de la vue. Tout pan appelle `onUnhook` une fois ; accrochée, la caméra recopie sa cible dans le point de pan à chaque image pour que le décrochage parte de là, sans saut. Les touches sont ignorées dans un champ de saisie, lâchées au `blur` |
+| `Board3D.tsx` | `hooked` en état React : faux au premier pan, vrai quand le pion de Jérôme (`yoursId`) arrive sur l'horloge, au clic sur **« Follow the play »** (`data-testid="follow-play"`, visible seulement décrochée) et au choix d'un cadrage. `data-camera="following"` ou `"free"` sur le cadre |
+| Tests | **665 sur 31 fichiers contre 663** ; typecheck racine, scripts, e2e et client verts ; build du client vert |
+| Harnais | `e2e/board3d.spec.ts` gagne un pas : flèche droite tenue sept dixièmes, le cadre passe à `free`, capture `board3d-panned`, la case suivie se projette à plus de quarante pixels, « Follow the play » la ramène à moins de douze. **Vert en 2,0 min** sur un Vite dédié, zéro erreur console |
+| Captures lues | Panoramique : le terrain a glissé d'environ huit cases vers la droite, le bouton « Follow the play » sous « Whole silo », le Spark et le ballon dans l'image, les caisses et les piliers de biais |
+| Dette | Le pan à la souris ne passe pas par les plaques en DOM (`Labels.tsx`), qui sont en `pointer-events: none`, mais s'interrompt au-dessus de la minicarte et des boutons ; les flèches font défiler la page quand le plateau 3D n'est pas monté, ce qui est leur rôle |
+
+**Ce qui attend Jérôme** : sa partie en 3D avec la caméra libre, ses retours en `00` C20 avant
 toute ligne de code, et son feu vert pour le client en ligne s'il le veut. Un sweep seulement
 s'il le demande.

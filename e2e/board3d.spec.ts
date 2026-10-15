@@ -117,6 +117,23 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   expect(back).not.toBeNull();
   expect(Math.abs(back!.x - steady!.x) + Math.abs(back!.y - steady!.y), 'the preset frames as before').toBeLessThan(12);
 
+  // -- Letting go of the play (C19): the arrow keys pan, the button comes back --
+  await expect(page.locator('[data-board3d][data-camera="following"]')).toBeVisible();
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('ArrowRight');
+  await expect(page.locator('[data-board3d][data-camera="free"]')).toBeVisible();
+  await page.waitForTimeout(800);
+  await shots.take('board3d-panned');
+  const panned = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
+  expect(panned, 'the cell followed slid out of the centre').not.toBeNull();
+  expect(Math.abs(panned!.x - back!.x), 'the arrow key moved the camera across').toBeGreaterThan(40);
+  await page.getByTestId('follow-play').click();
+  await expect(page.locator('[data-board3d][data-camera="following"]')).toBeVisible();
+  await page.waitForTimeout(1_200);
+  const followed = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
+  expect(Math.abs(followed!.x - back!.x) + Math.abs(followed!.y - back!.y), 'back on the play').toBeLessThan(12);
+
   // -- The house plays, watched close ---------------------------------------------
   await act(page, { kind: 'endTurn' });
   expect(await myTurn()).toBe('turn');

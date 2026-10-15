@@ -83,6 +83,28 @@ export function presetDistance(zoom: Zoom, aspect: number, fov: number, tilt: nu
   return Math.max(distanceForSpan(PITCH_LENGTH + 2, aspect, fov), width);
 }
 
+/** How far past the pitch's edges the camera may be panned (C19). */
+export const PAN_MARGIN = 4;
+
+/** Keeps a pan target on the pitch and its surroundings. */
+export function clampPan(p: { x: number; z: number }): { x: number; z: number } {
+  const lx = PITCH_LENGTH / 2 + PAN_MARGIN;
+  const lz = PITCH_WIDTH / 2 + PAN_MARGIN;
+  return { x: Math.max(-lx, Math.min(lx, p.x)), z: Math.max(-lz, Math.min(lz, p.z)) };
+}
+
+/**
+ * The flat directions of a camera at `yaw`: `forward` is away from the camera
+ * along the floor, `right` is the frame's right. A pan reads the keys and the
+ * mouse in these, so "up" is always away whichever way the camera is turned.
+ */
+export function viewAxes(yaw: number): { forward: { x: number; z: number }; right: { x: number; z: number } } {
+  return {
+    forward: { x: -Math.sin(yaw), z: -Math.cos(yaw) },
+    right: { x: Math.cos(yaw), z: -Math.sin(yaw) },
+  };
+}
+
 /** Where a camera orbiting `lookAt` sits. */
 export function orbitPosition(
   lookAt: { x: number; z: number },

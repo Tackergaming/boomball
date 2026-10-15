@@ -11,7 +11,9 @@ import {
   MAX_ZOOM,
   MIN_TILT,
   MIN_ZOOM,
+  PAN_MARGIN,
   PRESET_TILT,
+  clampPan,
   clampTilt,
   clampZoom,
   distanceForDepth,
@@ -21,6 +23,7 @@ import {
   orbitPosition,
   presetDistance,
   presetOrbit,
+  viewAxes,
 } from './framing.js';
 import { PITCH_LENGTH, PITCH_WIDTH } from './layoutGeometry.js';
 
@@ -76,6 +79,32 @@ describe('presets', () => {
     const tall = presetDistance('wide', 0.5, FOV, PRESET_TILT);
     expect(tall).toBeGreaterThanOrEqual(presetDistance('close', 0.5, FOV, PRESET_TILT));
     expect(landscape).toBeGreaterThan(presetDistance('close', 16 / 9, FOV, PRESET_TILT));
+  });
+});
+
+describe('the pan (C19)', () => {
+  it('stays on the pitch and its surroundings', () => {
+    expect(clampPan({ x: 0, z: 0 })).toEqual({ x: 0, z: 0 });
+    const far = clampPan({ x: 999, z: -999 });
+    expect(far.x).toBe(PITCH_LENGTH / 2 + PAN_MARGIN);
+    expect(far.z).toBe(-(PITCH_WIDTH / 2 + PAN_MARGIN));
+  });
+
+  it('reads up as away from the camera and right as the frame’s right, whichever way it is turned', () => {
+    const a = viewAxes(0);
+    // At yaw 0 the camera sits at +Z looking toward -Z, with +X on its right.
+    expect(a.forward.x).toBeCloseTo(0, 9);
+    expect(a.forward.z).toBeCloseTo(-1, 9);
+    expect(a.right.x).toBeCloseTo(1, 9);
+    expect(a.right.z).toBeCloseTo(0, 9);
+    const b = viewAxes(Math.PI / 2);
+    expect(b.forward.x).toBeCloseTo(-1, 9);
+    expect(b.right.z).toBeCloseTo(-1, 9);
+    // Forward and right stay perpendicular, both flat.
+    for (const yaw of [0.3, 1.9, 4.2]) {
+      const v = viewAxes(yaw);
+      expect(v.forward.x * v.right.x + v.forward.z * v.right.z).toBeCloseTo(0, 9);
+    }
   });
 });
 

@@ -1724,3 +1724,36 @@ cadrage large reste le silo entier, et il tient aussi la largeur quand la fenêt
 pure et testée, dans `client/src/board3d/framing.ts` ; le bouton de zoom dans `Board3D.tsx` ;
 `e2e/board3d.spec.ts` pour une capture après rotation et roulette. J4 de `08` §7 est annoté comme
 tombé. Pas de sweep.
+
+## C19. Décisions du 2026-10-15 après sa partie avec la caméra en main, **sous-phase 2H.17**
+
+> Écrites par le fil principal (Fable 5.1) sur le retour de Jérôme après **sa partie sur 2H.16**
+> le 2026-10-15, en local. Un retour, de caméra, reformulé en chat et confirmé par lui avec deux
+> arbitrages. **Aucun écart de règle, rien dans l'IA, aucune constante de `00` ne bouge :**
+> `ENGINE_VERSION` reste 9, les fonctions ne sont pas à redéployer. La sous-phase 2H.17 porte ce
+> retour, client seul.
+
+**Le retour, ses mots : « je voudrais quand même que l'on puisse décrocher la caméra du joueur
+en cours si on le souhaite et naviguer le terrain avec la caméra comme on le souhaite, similaire
+à ce qu'on peut faire dans Baldur's Gate 3 ou Blood Bowl. »** La caméra de C18 tourne et zoome,
+mais autour du pion qu'elle suit, et on ne peut pas s'en éloigner. **Elle se déplace désormais
+librement sur le terrain**, bornée au silo et à ses abords, et le suivi du jeu reste le
+comportement par défaut.
+
+**Comment elle se déplace.** Tranché par Jérôme : **les flèches du clavier**, et **Ctrl enfoncé
+plus le mouvement de la souris**, comme il s'en souvient de Baldur's Gate 3. Pas de glisser au
+bouton du milieu, pas de défilement au bord de l'écran. Le déplacement se lit par rapport à la
+caméra, flèche du haut vers le loin de l'image quelle que soit la rotation ; sous Ctrl la souris
+tire le sol avec elle. La vitesse au clavier grandit avec la distance de la caméra. Le bouton
+droit, la roulette et les deux cadrages de C18 ne changent pas.
+
+**Quand elle revient sur le jeu.** Tout déplacement la décroche. Tranché par Jérôme, option (c) :
+**elle se raccroche d'elle-même quand c'est son tour**, le pion qu'il pilote arrivant sur
+l'horloge ; les tours de l'IA la laissent là où il l'a mise. En plus, un bouton **« Follow the
+play »**, visible seulement quand elle est décrochée, la ramène sur demande, et choisir un
+cadrage par « Close in / Whole silo » la ramène aussi, avec l'orbite remise.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. `client/src/board3d/Camera.tsx` et `framing.ts` pour le déplacement et ses bornes,
+`Board3D.tsx` pour le bouton et le raccrochage à son tour, `e2e/board3d.spec.ts` pour un pas aux
+flèches. Pas de sweep.

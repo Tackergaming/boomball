@@ -1,15 +1,15 @@
 # Reprise du chat suivant, Boomball
 
 > Écrit par le fil principal (Fable 5.1) le 2026-10-15, à la fin du chat qui a pris les retours
-> de Jérôme sur sa première partie en 3D, écrit `00` C18, consigné sa décision sur C17 et codé
-> 2H.16 : la caméra en main. À coller tel quel comme premier message du chat suivant, dans le
+> de Jérôme sur ses deux premières parties en 3D, écrit `00` C18 et C19, consigné sa décision
+> sur C17 et codé 2H.16 puis 2H.17 : la caméra en main, puis décrochée. À coller tel quel comme premier message du chat suivant, dans le
 > workspace `jarvis-jdr`.
 
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.16
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.17
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15), §9 la
 parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 63, plus 40 bis,
@@ -21,26 +21,38 @@ le Shove qui prend le ballon, la huitième passe, trois retours d'écran), C17 l
 du 2026-10-14 : mon retour sur les cases orange, retirées, et la passe gratuite d'un Breaker vers
 son gardien treize cases derrière lui, TRANCHÉE le 2026-10-15 : elle reste autorisée, rien ne
 change. C18 le lot du 2026-10-15 : mes deux retours de caméra après ma première partie en 3D, et
-J4 qui tombe. Chaque passe finit par « comment ... est codée », poids par poids, À LIRE avant de
-toucher à ai/. Ne rediscute rien de C12 à C18.
+J4 qui tombe. C19 le second lot du 2026-10-15 : la caméra décrochée du jeu, mon retour après ma
+partie sur 2H.16. Chaque passe finit par « comment ... est codée », poids par poids, À LIRE avant
+de toucher à ai/. Ne rediscute rien de C12 à C19.
 07 §10 porte le journal, dont l'entrée 2H.15, qui dit fichier par fichier ce que la 2.5D
-contient, et l'entrée 2H.16, la caméra. 09 §12 est le dernier sweep, tranché « rien ne bouge » ;
-il n'y a pas de sweep de 2H.8 à 2H.16. 04 est l'histoire, à lire seulement quand une décision
+contient, et les entrées 2H.16 et 2H.17, la caméra. 09 §12 est le dernier sweep, tranché « rien
+ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.17. 04 est l'histoire, à lire seulement quand une décision
 d'ingénierie te surprend.
 
-Où on en est : 2H.16 est CODÉE le 2026-10-15, ENGINE_VERSION toujours 9, rien à redéployer côté
-fonctions, le client en ligne PAS redéployé depuis 2H.14 (mon feu vert). Les fonctions en ligne
-restent resolve-action v20 et create-match v18, moteur 9. 663 tests verts sur 31 fichiers (652
-avant), typecheck racine, scripts, e2e et client verts, build du client vert (three dans un chunk
-chargé en lazy, le 2D ne le télécharge pas). Le harnais 3D, npm run e2e:board3d, est vert en 1,7
-minute sur un Vite dédié (5174) : bascule en 3D, silo entier capturé, cellToScreen par la caméra,
+Où on en est : 2H.16 et 2H.17 sont CODÉES le 2026-10-15, ENGINE_VERSION toujours 9, rien à
+redéployer côté fonctions, le client en ligne PAS redéployé depuis 2H.14 (mon feu vert). Les
+fonctions en ligne restent resolve-action v20 et create-match v18, moteur 9. 665 tests verts sur
+31 fichiers (652 avant 2H.16), typecheck racine, scripts, e2e et client verts, build du client vert (three dans un chunk
+chargé en lazy, le 2D ne le télécharge pas). Le harnais 3D, npm run e2e:board3d, est vert en 2,0
+minutes sur un Vite dédié (5174) : bascule en 3D, silo entier capturé, cellToScreen par la caméra,
 clic à la souris sur la case qu'il désigne et le pion arrive, cadrage rapproché, glisser au
 bouton droit puis roulette, la case suivie se projette ailleurs, le bouton de cadrage la ramène,
-tour de l'équipe adverse, retour 2D, zéro erreur console. Le smoke 2D (npm run e2e) n'a pas été
-relancé en 2H.16, rien de 2D n'a bougé ; la ligne « Smoke 2D » du journal 2H.15 dans 07 §10 dit
+flèche droite tenue, le cadre passe en data-camera="free", « Follow the play » la ramène, tour de
+l'équipe adverse, retour 2D, zéro erreur console. Le smoke 2D (npm run e2e) n'a pas été relancé
+en 2H.16 ni 2H.17, rien de 2D n'a bougé ; la ligne « Smoke 2D » du journal 2H.15 dans 07 §10 dit
 vert. Ma partie sur le moteur 9 (ab27b827, Striker, 50-0) et le match e2e 7d631b71 sont
-consignés et rejoués sans écart dans docs/matches/. Le commit de 2H.16 : à vérifier par git log,
-c'est moi qui le tape.
+consignés et rejoués sans écart dans docs/matches/. 2H.16 est commitée et poussée (fd85266) ; le
+commit de 2H.17 : à vérifier par git log, c'est moi qui le tape.
+
+Ce que 2H.17 contient, en trois phrases. La caméra se décroche du jeu dès qu'on la déplace :
+aux flèches (KEY_PAN_RATE fois la distance par seconde, dans les axes de l'image donnés par
+viewAxes, donc « haut » est toujours le loin de l'image), ou Ctrl enfoncé plus la souris sur la
+scène, qui tire le sol avec elle ; le point visé est borné par clampPan au terrain plus quatre
+cases. Elle se raccroche d'elle-même quand mon pion (yoursId) arrive sur l'horloge, au clic sur
+« Follow the play » (visible seulement décrochée, data-testid follow-play), et au choix d'un
+cadrage ; hooked est un état React de Board3D.tsx passé au Rig, qui appelle onUnhook une fois au
+premier pan, et le cadre porte data-camera="following" ou "free". Accrochée, la caméra recopie sa
+cible dans le point de pan à chaque image pour que le décrochage parte de là, sans saut.
 
 Ce que 2H.16 contient, en quatre phrases. client/src/board3d/framing.ts est nouveau et pur : la
 profondeur de sol que la hauteur de l'image couvre selon l'inclinaison (groundDepthPerUnit), le
@@ -84,9 +96,10 @@ et les WebP le sont.
 LA TÂCHE.
 1. Vérifier git status avant toute chose ; 2H.16 doit être commitée (par /commit ou /save, tapés
    par moi) ; si elle ne l'est pas, me le dire en premier.
-2. Ma partie en 3D avec la caméra en main : je l'ai jouée ou je la joue, en local (npm run dev
-   dans boomball/client, « See it in 3D », bouton droit pour tourner, roulette pour zoomer). Mes
-   retours en chat, puis C19 dans 00 avant toute ligne de code.
+2. Ma partie en 3D avec la caméra libre : je l'ai jouée ou je la joue, en local (npm run dev
+   dans boomball/client, « See it in 3D », bouton droit pour tourner, roulette pour zoomer,
+   flèches ou Ctrl plus souris pour me déplacer, « Follow the play » pour revenir). Mes retours
+   en chat, puis C20 dans 00 avant toute ligne de code.
 3. Si je demande le client en ligne : le build est vert, le déploiement passe par mon feu vert
    explicite, jamais le dépôt GitHub sur Vercel.
 4. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
@@ -166,7 +179,7 @@ Ce qu'il faut savoir tout de suite.
    BASE_URL=http://localhost:5174 npm run e2e, et le tuer après (netstat -ano, taskkill). En 3D
    il n'y a ni data-cell ni data-unit : le spec clique à la souris là où cellToScreen projette, et
    les plaques portent data-plate. Le spec 3D tourne la caméra avec page.mouse.down({ button:
-   'right' }) puis page.mouse.wheel. Il admet deux avertissements console qui ne sont pas à nous
+   'right' }) puis page.mouse.wheel, et la déplace avec page.keyboard.down('ArrowRight'). Il admet deux avertissements console qui ne sont pas à nous
    (THREE.Clock déprécié par three 0.186 mais construit par fiber 9, et les messages de
    performance du GL logiciel de Chromium headless) ; toute autre ligne le fait échouer.
 
@@ -202,7 +215,7 @@ Ce qu'il faut savoir tout de suite.
     réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 12. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 63 de 00 partie
-    C, et C11 à C18 en entier ; J4 de 08 §7 est tombé en C18. Dette connue : arenas.art et le
+    C, et C11 à C19 en entier ; J4 de 08 §7 est tombé en C18. Dette connue : arenas.art et le
     champ art du spec nomment trois JPEG retirés ; substituteEntry et substitute_entry restent et
     ne sont plus lus ; le choix de direction d'un Breaker humain à la parade est automatique ; la
     route proposée au clic reste la ligne droite alors que l'IA prend la route sûre ; le fil garde
@@ -218,7 +231,8 @@ Ce qu'il faut savoir tout de suite.
     mesure entre 1,4 et 2,7 s selon la charge de la machine ; en 3D, l'orientation du modèle, les
     sprites d'effets, le noir sous la lèvre avant, l'orbite remise à la vue fixe au retour du 2D,
     la borne de suivi calculée pour l'azimut zéro, la roulette en vue large qui ne suit pas le
-    jeu ; les quatre fichiers du vault modifiés hors de nos sessions, à moi de décider.
+    jeu, le pan sous Ctrl qui s'interrompt au-dessus de la minicarte et des boutons ; les quatre
+    fichiers du vault modifiés hors de nos sessions, à moi de décider.
 
 13. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte, après
     avoir récrit ce fichier.

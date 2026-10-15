@@ -85,6 +85,13 @@ export function Board3D({
   });
   const [hoverUnit, setHoverUnit] = useState<UnitId | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
+  // Whether the camera follows the play (C19): a pan lets go of it, and it
+  // takes hold again when the player's own Giff comes on the clock.
+  const [hooked, setHooked] = useState(true);
+  const onTheClock = state.turn?.unitId ?? null;
+  useEffect(() => {
+    if (onTheClock !== null && onTheClock === yoursId) setHooked(true);
+  }, [onTheClock, yoursId]);
 
   // -- Routes, as on the SVG board: the engine answers, this file asks ----------
   const canMove = onMove !== null;
@@ -194,6 +201,7 @@ export function Board3D({
   const toggleZoom = () => {
     const next: Zoom = zoom === 'wide' ? 'close' : 'wide';
     setZoom(next);
+    setHooked(true);
     try {
       localStorage.setItem('boomball.zoom', next);
     } catch {
@@ -265,7 +273,7 @@ export function Board3D({
   }
 
   return (
-    <div style={S.frame} data-board3d data-zoom={zoom}>
+    <div style={S.frame} data-board3d data-zoom={zoom} data-camera={hooked ? 'following' : 'free'}>
       <Canvas
         shadows="percentage"
         dpr={[1, 1.5]}
@@ -293,7 +301,7 @@ export function Board3D({
         />
         <directionalLight position={[-14, 18, -10]} intensity={0.7} color="#bcd3e0" />
 
-        <Rig zoom={zoom} link={link} />
+        <Rig zoom={zoom} link={link} hooked={hooked} onUnhook={() => setHooked(false)} />
 
         <Suspense fallback={null}>
           <Silo own={own} flash={flash} />
@@ -351,10 +359,21 @@ export function Board3D({
           style={S.zoomButton}
           data-testid="zoom-toggle"
           onClick={toggleZoom}
-          title="Two framings: the whole silo, or the pitch's width around the play. Right-drag turns the camera, the wheel zooms; this button sets it back."
+          title="Two framings: the whole silo, or the pitch's width around the play. Right-drag turns the camera, the wheel zooms, the arrow keys or Ctrl with the mouse move it; this button sets it back."
         >
           {zoom === 'wide' ? 'Close in' : 'Whole silo'}
         </button>
+        {!hooked && (
+          <button
+            className="ghost"
+            style={S.zoomButton}
+            data-testid="follow-play"
+            onClick={() => setHooked(true)}
+            title="Back on the play. The camera follows it again by itself when your Giff comes on the clock."
+          >
+            Follow the play
+          </button>
+        )}
         <Minimap state={state} own={own} yoursId={yoursId} width={225} />
       </div>
     </div>
