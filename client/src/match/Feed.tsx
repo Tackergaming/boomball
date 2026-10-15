@@ -13,6 +13,11 @@
  * feed saying so: walks, a failed interception and an idle turn were all
  * silent. Only bookkeeping stays quiet: `diceRolled`, `turnStarted`, a Spark
  * drift and a Payload coordinate change carry no action of anybody's.
+ *
+ * 2H.21: Jérôme wanted to see what is new in the feed without reading it all.
+ * The lines that arrived since the last render carry a brass edge that fades in
+ * three seconds, a goal opens with a diamond and a knockout with a cross in
+ * bold. Nothing is removed or reworded: the feed stays the record.
  */
 
 import { useEffect, useRef } from 'react';
@@ -24,6 +29,17 @@ import { label } from './replay.js';
 
 export function Feed({ feed, state, own }: { feed: MatchEvent[]; state: MatchState; own: 'A' | 'B' }) {
   const box = useRef<HTMLDivElement>(null);
+  // Fresh means "not there at the previous render", judged by count because the
+  // window trims its front. The first render marks nothing.
+  const seenRef = useRef<number | null>(null);
+  const freshFromRef = useRef<number>(Infinity);
+  if (seenRef.current !== null && feed.length > seenRef.current) {
+    freshFromRef.current = seenRef.current;
+  } else if (seenRef.current !== null && feed.length < seenRef.current) {
+    freshFromRef.current = Infinity;
+  }
+  seenRef.current = feed.length;
+  const freshFrom = freshFromRef.current;
 
   useEffect(() => {
     box.current?.scrollTo({ top: box.current.scrollHeight });
@@ -39,11 +55,25 @@ export function Feed({ feed, state, own }: { feed: MatchEvent[]; state: MatchSta
         <span className="label">The call</span>
       </div>
       <div ref={box} style={S.list}>
-        {feedLines(feed, name).map(({ event, line }, i) => (
-          <p key={i} style={{ ...S.line, ...toneOf(event, side) }}>
-            {line}
-          </p>
-        ))}
+        {feedLines(feed, name).map(({ event, line, index }, i) => {
+          const fresh = index >= freshFrom;
+          return (
+            <p
+              key={i}
+              {...(fresh ? { 'data-fresh': '' } : {})}
+              style={{
+                ...S.line,
+                ...toneOf(event, side),
+                borderLeft: '2px solid transparent',
+                paddingLeft: 6,
+                marginLeft: -8,
+                ...(fresh ? { animation: 'bb-fresh 3s ease-out forwards' } : {}),
+              }}
+            >
+              {line}
+            </p>
+          );
+        })}
       </div>
     </div>
   );
@@ -74,10 +104,10 @@ const ACTIONS: ReadonlySet<MatchEvent['kind']> = new Set<MatchEvent['kind']>([
 export function feedLines(
   feed: readonly MatchEvent[],
   name: (id: string) => string,
-): { event: MatchEvent; line: string }[] {
-  const out: { event: MatchEvent; line: string }[] = [];
+): { event: MatchEvent; line: string; index: number }[] {
+  const out: { event: MatchEvent; line: string; index: number }[] = [];
   let acted = true;
-  for (const event of feed) {
+  for (const [index, event] of feed.entries()) {
     if (event.kind === 'turnStarted') acted = false;
     else if (ACTIONS.has(event.kind)) acted = true;
     const line =
@@ -86,7 +116,7 @@ export function feedLines(
           ? null
           : `${name(event.unitId)} holds position.`
         : describe(event, name);
-    if (line) out.push({ event, line });
+    if (line) out.push({ event, line, index });
     if (event.kind === 'turnEnded') acted = true;
   }
   return out;
@@ -98,6 +128,9 @@ function toneOf(
 ): React.CSSProperties {
   if (event.kind === 'scored') {
     return { color: 'var(--brass)', fontWeight: 600 };
+  }
+  if (event.kind === 'evacuated') {
+    return { color: side(event.unitId) === 'own' ? 'var(--team-own)' : 'var(--team-foe)', fontWeight: 600 };
   }
   if (event.kind === 'roundStarted' || event.kind === 'matchEnded') {
     return { color: 'var(--text)', borderTop: '1px solid var(--line)', paddingTop: 7, marginTop: 7 };
@@ -128,7 +161,7 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'damaged':
       return `${name(event.unitId)} takes ${event.amount}.`;
     case 'evacuated':
-      return `${name(event.unitId)} is knocked out and carried off. A substitute comes on in ${SUBSTITUTE_DELAY_ROUNDS} rounds.`;
+      return `✕ ${name(event.unitId)} is knocked out and carried off. A substitute comes on in ${SUBSTITUTE_DELAY_ROUNDS} rounds.`;
     case 'attacked':
       return `${name(event.attackerId)} swings at ${name(event.targetId)}${event.hit ? '' : ' and misses'}.`;
     case 'opportunityAttacked':
@@ -193,7 +226,7 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'substituteEntered':
       return `${name(event.unitId)} comes on.`;
     case 'scored':
-      return `${event.team === 'A' ? 'Your battery' : 'The house'} scores ${event.points}.`;
+      return `◆ ${event.team === 'A' ? 'Your battery' : 'The house'} scores ${event.points}.`;
     case 'matchEnded':
       return event.result.winner === 'draw'
         ? 'Full time. Drawn.'

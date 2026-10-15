@@ -202,3 +202,61 @@ a {
     opacity: 0.25;
   }
 }
+
+/* -- 2H.21, the living game. Nothing below blinks: each is one fade or one rise. -- */
+
+/* A word rising over a Giff: a wound's number, "miss", "held". On the inner
+   element, so the outer one can be placed by the scene's projection. */
+@keyframes bb-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-36px);
+  }
+}
+
+/* A banner over the board: in, held, out. Its duration is the hold. */
+@keyframes bb-banner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The beat card's time bar, draining left to right over the card's hold. */
+@keyframes bb-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* A fresh line in the feed: a brass edge that fades over three seconds. */
+@keyframes bb-fresh {
+  from {
+    border-left-color: var(--brass);
+    background: rgb(201 180 137 / 10%);
+  }
+  to {
+    border-left-color: transparent;
+    background: transparent;
+  }
+}

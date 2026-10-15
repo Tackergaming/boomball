@@ -1892,3 +1892,152 @@ devenir un tir, ou que le Breaker tire à portée propre, ce serait un écart à
 **Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
 `engine/`. `client/src/board3d/framing.ts` (`confine`, les bornes), `layoutGeometry.ts` (les
 dimensions du silo partagées avec `Silo.tsx`), `Camera.tsx`. Pas de sweep.
+
+## C23. Décisions du 2026-10-15 au soir après 2H.20, **sous-phase 2H.21, le jeu vivant**
+
+> Écrites par le fil principal (Fable 5.1) sur la demande de Jérôme à la fin du chat de 2H.20
+> (« on a une bonne version pour l'instant, on peaufinera peut-être des détails plus tard.
+> Maintenant on passe à la version suivante : les animations, et j'aimerais aussi qu'on améliore
+> les annonces à l'écran, les popups d'événements. Bref, rendre le jeu plus visuellement
+> interactif et vivant, sans surcharge »), puis sur le lot de dix lignes proposé en chat et
+> **validé par lui le 2026-10-15** avec deux réponses : les chiffres de dégâts aussi en 2D, et les
+> durées de bandeau telles que proposées. **Aucun écart de règle, rien dans l'IA, aucune constante
+> de `00` ne bouge :** `ENGINE_VERSION` reste 9, les fonctions ne sont pas à redéployer. La caméra
+> de C18 à C22 n'est pas touchée. Client seul.
+
+**L'inventaire avant de proposer**, lu dans le code. Les animations de 2H.15 couvrent la marche,
+la poussée, le recul, le roulement des Crackers et du Spark et le vol du ballon (`match/pose.ts`
+lu par la boucle de `Board3D`), l'éclat de la bouche au but (`Silo.tsx`, 1,2 s), la lueur de
+mèche des Crackers, le halo du Spark, l'anneau du ballon au sol. Un Giff évacué disparaissait
+d'un coup, un Cracker qui détonne s'évaporait à la fin du beat, un coup de batte ne se voyait
+pas du tout. Les annonces : la carte de beat (`Announce.tsx`, « The silo » pour un round sans
+acteur), le score qui gonfle au but, les bandeaux « The clock ran out » et de refus, le fil
+« The call », la popup de place. Rien n'annonçait le début d'un round, le tour du joueur ni
+l'entrée du Spark autrement que par une ligne de carte.
+
+**Le lot, dix lignes, tel que validé.**
+
+Animations, en 3D seulement sauf la ligne 1, `board3d/Effects.tsx` nouveau plus la boucle de
+`Board3D` :
+
+1. **Le coup de batte.** À l'instant du coup, un éclat d'étincelles ambre sur la cible touchée, et
+   le chiffre des dégâts (« −7 ») qui monte au-dessus d'elle et s'efface en une seconde. Sur un
+   coup manqué, un « miss » gris qui monte, rien d'autre. **Les chiffres et les mots qui montent
+   existent aussi en 2D** (Jérôme, question 1), l'éclat d'étincelles non.
+2. **Le Cracker qui détonne.** Au bout de sa course, une explosion sur sa case : boule de feu qui
+   gonfle, fumée, éclair de lumière une demi-seconde. Le Cracker disparaît dans l'explosion au
+   lieu de s'évaporer à la fin du beat.
+3. **Le Shove.** Une onde au sol sous la cible au moment où elle est poussée. Sur un Shove tenu,
+   « held » monte au-dessus d'elle, même système que la ligne 1.
+4. **Le but.** Quand le ballon entre dans la bouche, des braises jaillissent avec l'éclat déjà en
+   place.
+5. **Le Spark.** À son entrée, il descend du haut du tube dans un faisceau de lumière. À la prise,
+   un flash blanc sur le preneur et le Spark s'éteint.
+6. **Évacuation et retour.** Le Giff évacué s'affaisse dans le sol en une demi-seconde. Le
+   remplaçant monte du sol dans un anneau de sa couleur.
+
+Annonces, dans les deux plateaux, `screens/Match.tsx` et les composants partagés :
+
+7. **Un bandeau d'événement** en haut du plateau, un seul à la fois, en fondu : « GOAL · Your
+   battery », « KNOCKOUT · Nib Oakes », « THE SPARK IS LOOSE », « SPARK CAUGHT · Nib Oakes »,
+   « FULL TIME ». **1,5 s en normal, 2,5 s en slow** (Jérôme, question 2), jamais en rejeu
+   instant, où il s'empilerait.
+8. **Un bandeau de round et de tour**, plus fin, même système : « ROUND 4 of 10 » au début de
+   chaque round, « SUDDEN DEATH », et « YOUR TURN · Nib Oakes » quand le pion du joueur arrive sur
+   l'horloge.
+9. **La carte de beat refaite.** Le nom de l'acteur dans la couleur de son maillot, le verdict
+   (HIT, MISS, SHOVED, HELD, IN, NO, CAUGHT, DROPPED, CLEAN, MISSED) en gros et coloré à droite de
+   la ligne, le dé en petit dessous, une barre fine qui dit combien de temps la carte reste.
+10. **Le fil.** Les lignes du dernier lot portent une barre cuivre à gauche qui s'efface en trois
+    secondes, pour voir ce qui est neuf. But et KO en gras avec un pictogramme. Le fil reste la
+    source, rien ne lui est retiré.
+
+**Les règles du lot.** Un effet par événement ; aucun effet ni bandeau au rejeu instant ; rien ne
+clignote, tout est un fondu ou un éclat unique ; la caméra n'est pas touchée ; le fil reste la
+source. Les repères (quel effet, sur quelle case, à quel instant du beat) sont lus des événements
+et des pas de `motion.ts`, jamais inventés : un effet se place après tous les pas produits par les
+événements qui le précèdent dans le beat, donc l'explosion au bout du roulement du Cracker, les
+braises au bout du vol du tir, l'impact avant le recul.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. `client/src/match/motion.ts` (les repères), `replay.ts` (le beat les porte),
+`useMatch.ts` (la durée de la carte exposée), `screens/Match.tsx` (les bandeaux, la carte, le
+déclencheur de développement du crochet), `match/Banner.tsx` nouveau, `Announce.tsx`, `Feed.tsx`,
+`Board.tsx` (les mots qui montent en 2D), `board3d/Effects.tsx` et `Floaters.tsx` nouveaux,
+`Board3D.tsx`, `scene.ts`, `e2e/board3d.spec.ts` pour une capture par effet, le smoke 2D relancé
+parce que `Match.tsx`, `Feed.tsx` et `Board.tsx` sont partagés. Pas de sweep.
+
+**Comment 2H.21 est codée**, par le fil principal (Fable 5.1) le 2026-10-15, avec six
+sous-agents Sonnet nommés ci-dessous, pour relire le code contre les dix lignes. **Codé en 2H.21.**
+
+- **Les repères (`Cue`), `match/motion.ts`**, fil principal. `motionAndCues` fait la marche des
+  événements qui produisait déjà les pas et en tire, au même passage, les repères : `hit` et
+  `miss` sur la cible d'un coup (`attacked`, `opportunityAttacked`), `damage` avec le chiffre
+  (`damaged`, « −7 »), `push` sous la cible d'un Shove réussi là où elle se tenait avant la
+  poussée, `held` sur un Shove tenu, `blast` sur la case de `crackerDetonated`, `goal` sur la
+  case de bouche où le vol du tir a posé le ballon (`scored`, `team` = l'équipe qui défend la
+  bouche), `sparkIn` (`sparkEntered`), `sparkCaught`, `exit` (`evacuated`), `enter`
+  (`substituteEntered`). Chaque repère porte `after`, le nombre de pas déjà produits ;
+  `timeMotion` le date à la somme de ces pas, zéro à `instant`, et `Motion` porte `speed` et
+  `cues`. `Beat` (`replay.ts`) porte les repères non datés. Sept tests dans `motion.test.ts`.
+- **La boucle de `Board3D.tsx`**, fil principal : la piste du beat porte ses repères datés, vides
+  à `instant` et vides quand le même mouvement revient avec un autre état ; à chaque image les
+  repères dont l'instant est passé sont tirés une fois, dans l'ordre, par `fire`. Sparks, anneau,
+  explosion, braises, faisceau et flash vont à `link.fx` (`Effects.tsx`) ; les mots à
+  `link.float` (`Floaters.tsx`), dans le maillot du Giff concerné, gris (`FAINT`) pour « miss » et
+  « held » ; `exit`, `enter` et la descente du Spark sont des transitions de `link.transitions`
+  que la boucle place : un évacué reste debout jusqu'à son repère puis s'enfonce de 1,9 case en
+  0,6 s, un remplaçant est caché jusqu'au sien puis monte, le Spark descend de six cases en
+  0,5 s. `scene.ts` porte `fx`, `float`, `transitions`, `MAGENTA`, `FAINT`.
+- **`board3d/Effects.tsx`**, nouveau, **sous-agent Sonnet effort élevé** : huit emplacements
+  pré-construits (flash, anneau, boule de feu, faisceau, quatre fumées, quatorze étincelles,
+  vingt-quatre braises) et trois lumières prêtées à tour de rôle, une texture radiale procédurale
+  pour tous les sprites, une seule `useFrame`, aucun état React ; `hit` 0,45 s, `push` 0,4 s,
+  `blast` 0,6 s de boule de feu et 1,2 s de fumée, `goal` 1 s, `sparkIn` 0,6 s, `sparkCaught`
+  0,4 s. Rien ne clignote.
+- **`board3d/Floaters.tsx`**, nouveau, **sous-agent Sonnet effort moyen** : la couche DOM des
+  mots qui montent, sur le modèle de `Labels.tsx`, impérative, projetée par `link.project` à
+  chaque image, `bb-rise` 1 s, retirée à 1,1 s. Jamais `Html` de drei.
+- **`match/Board.tsx`**, 2D, **sous-agent Sonnet effort élevé** : les repères `damage`, `miss`,
+  `held` du mouvement reçu sont programmés à leur instant par `setTimeout`, rien à `instant`, et
+  dessinés en `<text>` SVG avec deux `<animate>` SMIL (montée d'une case, fondu), dernier calque
+  du plateau. C'est la réponse à sa question 1.
+- **`match/Banner.tsx`**, nouveau, **sous-agent Sonnet effort moyen** : une file append-only
+  d'annonces, une seule à l'écran, `bannerHoldMs` 1,5 s / 2,5 s en slow pour `loud`, 1,2 s /
+  1,8 s pour `round` et `turn`, `bb-banner`, `data-testid="banner"`, `data-banner`. **`screens/
+  Match.tsx`**, fil principal, les dérive du beat affiché (jamais à `instant`) : « Round n of
+  10 » ou « Sudden death », « Goal · Your battery / The House » (ballon seulement, la prise du
+  Spark a sa bannière), « Knockout · nom », « The Spark is loose », « Spark caught · nom »,
+  « Full time » ; et « Your turn · nom » quand le tour devient jouable (pas pendant la popup de
+  place), qui remplace ce que la file avait encore à dire.
+- **`match/Announce.tsx`**, **sous-agent Sonnet effort moyen** : `actorColour` (le maillot,
+  calculé par `Match.tsx`, ambre pour le pion du joueur), le verdict détaché de la ligne quand
+  sa queue après « · » est un mot en capitales, en gros à droite, le dé dessous, une barre
+  `bb-drain` de la durée de la carte (`hold` exposé par `useMatch.ts`, zéro quand la carte reste
+  après le rejeu), « ⚠ The silo » pour un beat sans acteur, `data-testid="beat-card"`,
+  `data-verdict`.
+- **`match/Feed.tsx`**, **sous-agent Sonnet effort moyen** : les lignes du dernier lot portent
+  `data-fresh` et `bb-fresh` 3 s (comptées par la taille du fil, rien au premier rendu),
+  « ◆ » devant un but, « ✕ » et gras devant un KO ; `feedLines` rend aussi l'index de
+  l'événement.
+- **Le déclencheur de développement**, fil principal : `window.__boomball.fx({ kind, x, y,
+  text?, unitId?, team?, stretch? })` passe par `match/fxBridge.ts`, que chaque plateau arme
+  pendant qu'il est monté (`import.meta.env.DEV`), et tire un repère comme le beat l'aurait fait ;
+  `stretch` ralentit cet effet d'autant, parce que le GL logiciel de Chromium headless dessine
+  trois images par seconde et qu'une capture dure plus qu'un éclat ; sous `VITE_BOOMBALL_PATIENT`
+  les bandeaux sont tenus quatre fois plus longtemps pour la même raison.
+- **Tests** : **676 sur 31 fichiers contre 669**, typecheck racine, scripts, e2e et client verts,
+  build du client vert (three dans le chunk `Board3D`, 1,06 Mo, chargé en lazy).
+- **Harnais** : `e2e/board3d.spec.ts` tire chaque effet par `fx` à `stretch` 6 sur une case du
+  milieu du terrain (le mot vérifié dans le DOM avant la capture), puis joue un round de l'IA en
+  slow sans attendre la réponse, capture le premier bandeau de round ou d'événement et le verdict
+  de la carte, repasse en instant, et vérifie le bandeau « Your turn » et une ligne fraîche du fil
+  au retour de son tour ; il tolère la fin du match pendant ce round. **Vert en 5,5 min** sur le
+  Vite 5174, zéro erreur console, le temps du test porté à neuf minutes. **Smoke 2D vert en
+  18,6 s.** Captures lues : le bandeau « ROUND 3 OF 10 » au-dessus du plateau avec la carte et
+  sa barre de temps ; la carte « Yarrow Oakes reaches for the Spark · CAUGHT » avec le dé dessous
+  et le verdict en magenta ; « ✕ Vandy Grapple is knocked out » en gras dans le fil ; en vue
+  large, l'explosion orange sur la case et le faisceau blanc du Spark. **Les captures des
+  étincelles, de l'anneau, des braises, du flash et de l'affaissement sont des images figées
+  sous le GL logiciel** : les effets sont dans la scène (le DOM des mots et l'explosion le
+  prouvent), mais ces cinq-là restent à voir chez Jérôme à 45 images par seconde.

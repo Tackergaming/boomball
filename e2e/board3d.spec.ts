@@ -9,14 +9,22 @@
  * engine's route agree; then it closes the zoom in and captures again. The
  * captures are the deliverable: they are read, not just taken.
  *
+ * Since 2H.21 it also captures the living game: each effect fired on purpose
+ * through the hook's development trigger (`fx`), the words that rise, the
+ * turn banner, and then one round of the house watched at `slow` for a
+ * banner and a verdict the dice actually produced.
+ *
  *     npm run e2e:board3d
  */
 
 import { expect, test } from '@playwright/test';
 
-import { Shots, act, farthest, report, stamp, summary, unitAt, view, waitForArrival, waitForHook, waitForPlayableTurn, watch } from './harness.js';
+import { Shots, act, farthest, report, stamp, state, summary, unitAt, view, waitForArrival, waitForHook, waitForPlayableTurn, watch } from './harness.js';
 
 test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({ page }, info) => {
+  // The effects and a slow round of the house come on top of the 2.5 minutes
+  // the board itself takes under software GL.
+  test.setTimeout(540_000);
   const shots = new Shots(page, info, stamp());
   const seen = watch(page);
   const myTurn = () => waitForPlayableTurn(page, (places) => Math.min(2, places), shots);
@@ -134,12 +142,92 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   const followed = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
   expect(Math.abs(followed!.x - back!.x) + Math.abs(followed!.y - back!.y), 'back on the play').toBeLessThan(12);
 
-  // -- The house plays, watched close ---------------------------------------------
-  await act(page, { kind: 'endTurn' });
-  expect(await myTurn()).toBe('turn');
+  // -- The living game (2H.21): each effect fired on purpose, and captured ------
+  // The hook's development trigger fires a cue on the mounted board exactly as
+  // the beat would, so each effect is captured whatever the dice did. The
+  // cell is the one the unit walked to, which the close framing follows.
+  const fx = (request: Parameters<NonNullable<Window['__boomball']>['fx']>[0]) =>
+    page.evaluate((r) => window.__boomball!.fx(r), request);
+  // Under software GL the page draws about three frames a second and a
+  // screenshot takes longer than a bat's sparks last, so each effect is
+  // asked for `STRETCH` times slower and captured part of the way through.
+  const STRETCH = 6;
+  // On the middle line of the pitch's width, level with the unit the close
+  // framing follows: a cell on a touchline would sit at the frame's edge and
+  // the words over it above the canvas. The Giff carried off and back is the
+  // active unit standing nearest that line, so it is seen whole.
+  const mid = { x: 7, y: to.y };
+  const board = await state(page);
+  const stand = [...board.units]
+    .filter((u) => u.status === 'active')
+    .sort((a, b) => Math.abs(a.x - 7) + Math.abs(a.y - to.y) / 4 - (Math.abs(b.x - 7) + Math.abs(b.y - to.y) / 4))[0]!;
+  const effects: { name: string; request: Parameters<typeof fx>[0]; after: number }[] = [
+    { name: 'fx-hit', request: { kind: 'hit', x: mid.x, y: mid.y }, after: 120 },
+    { name: 'fx-damage', request: { kind: 'damage', x: stand.x, y: stand.y, text: '\u22127', unitId: stand.id }, after: 350 },
+    { name: 'fx-miss', request: { kind: 'miss', x: mid.x, y: mid.y, text: 'miss' }, after: 350 },
+    { name: 'fx-push', request: { kind: 'push', x: mid.x, y: mid.y }, after: 150 },
+    { name: 'fx-blast', request: { kind: 'blast', x: mid.x, y: mid.y }, after: 250 },
+    { name: 'fx-spark-in', request: { kind: 'sparkIn', x: mid.x, y: mid.y }, after: 200 },
+    { name: 'fx-spark-caught', request: { kind: 'sparkCaught', x: mid.x, y: mid.y }, after: 120 },
+    { name: 'fx-goal', request: { kind: 'goal', x: 7, y: 44, team: 'B' }, after: 350 },
+  ];
+  for (const effect of effects) {
+    expect(await fx({ ...effect.request, stretch: STRETCH }), `${effect.name} found a board`).toBe(true);
+    // The word is in the DOM at once; checked before the capture, which under
+    // software GL can take longer than the word lives.
+    if (effect.request.kind === 'damage' || effect.request.kind === 'miss') {
+      await expect(page.locator(`[data-floaters] [data-floater="${effect.request.text}"]`)).toBeAttached();
+    }
+    await page.waitForTimeout(effect.after * STRETCH);
+    await shots.take(effect.name);
+    // The next effect takes a slot of its own; what is left of this one may overlap.
+    await page.waitForTimeout(1_500);
+  }
+  // A Giff carried off sinks into the floor; one coming on rises out of it.
+  // The unit is active, so it stands again once each transition is over.
+  expect(await fx({ kind: 'exit', x: stand.x, y: stand.y, unitId: stand.id, stretch: STRETCH })).toBe(true);
+  await page.waitForTimeout(300 * STRETCH);
+  await shots.take('fx-exit');
+  await page.waitForTimeout(400 * STRETCH);
+  expect(await fx({ kind: 'enter', x: stand.x, y: stand.y, unitId: stand.id, stretch: STRETCH })).toBe(true);
+  await page.waitForTimeout(250 * STRETCH);
+  await shots.take('fx-enter');
+  await page.waitForTimeout(450 * STRETCH);
+
+  // -- The house plays, watched close and slow -------------------------------------
+  // At `slow` the beats are held, so a banner and a verdict the dice produced
+  // can be caught: the round opening is certain within the house's round, a
+  // swing nearly so. Back to `instant` once seen, so the rest stays quick.
+  await page.getByRole('button', { name: 'slow', exact: true }).click();
+  // Not awaited: `act` resolves once the whole reply has been replayed, and
+  // the banners live inside that replay.
+  const acting = act(page, { kind: 'endTurn' });
+  const banner = page.locator('[data-testid="banner"]:is([data-banner="round"], [data-banner="loud"])');
+  await banner.first().waitFor({ state: 'visible', timeout: 90_000 });
+  await shots.take('banner');
+  const verdict = page.locator('[data-testid="beat-card"] [data-verdict]');
+  if (await verdict.first().waitFor({ state: 'visible', timeout: 30_000 }).then(() => true, () => false)) {
+    await shots.take('beat-card-verdict');
+  }
+  await page.getByRole('button', { name: 'instant', exact: true }).click();
+  await acting;
+  // The house's round may have been the match's last: then the results sheet
+  // is up, the match screen is gone, and there is nothing left to look at.
+  if ((await myTurn()) === 'finished') {
+    await shots.take('full-time');
+    await info.attach('console-and-network', { body: report(seen), contentType: 'text/plain' });
+    expect(seen.errors, 'console errors and page errors').toEqual([]);
+    return;
+  }
   expect((await view(page)).seq).toBeGreaterThan(at.seq);
-  await page.waitForTimeout(800);
+  // The turn banner (2H.21) is up for 1.2 s from the moment the clock came
+  // back to this player. Checked here and not at the first turn, which a
+  // resumed match may have been standing on since before the page loaded.
+  // Behind at most the banner that was up when the turn came.
+  await expect(page.locator('[data-testid="banner"][data-banner="turn"]')).toBeVisible({ timeout: 6_000 });
+  await page.waitForTimeout(300);
   await shots.take('board3d-house-played');
+  await expect(page.locator('[data-fresh]').first()).toBeAttached();
 
   // -- Back to the whole silo, then back to 2D ------------------------------------
   await page.getByTestId('zoom-toggle').click();

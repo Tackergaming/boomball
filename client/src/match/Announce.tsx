@@ -10,6 +10,13 @@
  * **The dice are shown as dice.** `18 vs 12` reads as a thing that was earned
  * or not; `SUCCESS` alone reads as a decree. The engine already carries the
  * whole roll on the event, so there is nothing to compute here, only to show.
+ *
+ * **2H.21, the card rebuilt.** The verdict (HIT, MISS, CAUGHT...) is split off
+ * the end of the sentence and set large on the right, because Jérôme reads the
+ * result before he reads the sentence. The roll drops under the text. The
+ * actor's name takes their shirt colour. A thin bar drains along the foot of
+ * the card for as long as it will stay, because he could not tell how long a
+ * card would stay.
  */
 
 import type { DiceRoll } from '../../../engine/events.js';
@@ -24,6 +31,8 @@ const MODE_MARK: Record<DiceRoll['mode'], string> = {
 export function Announce({
   beat,
   actorName,
+  actorColour,
+  hold,
   progress,
   onSkip,
   onDismiss,
@@ -31,6 +40,10 @@ export function Announce({
   beat: Beat;
   /** Whose beat it is, already resolved to a name by the caller. */
   actorName: string | null;
+  /** The actor's shirt colour; null when there is no actor (a round's hazards). */
+  actorColour: string | null;
+  /** How long this card stays; null or 0 for the card left standing after the replay. */
+  hold: { readonly ms: number; readonly key: number } | null;
   progress: { at: number; of: number } | null;
   onSkip: () => void;
   onDismiss: () => void;
@@ -40,11 +53,21 @@ export function Announce({
   const loud = beat.weight === 'loud';
 
   return (
-    <div style={{ ...S.card, ...(loud ? S.loud : null) }}>
+    <div data-testid="beat-card" style={{ ...S.card, ...(loud ? S.loud : null) }}>
       <div style={S.head}>
-        <span className="label" style={{ color: loud ? 'var(--brass)' : 'var(--text-dim)' }}>
-          {actorName ?? 'The silo'}
-        </span>
+        {actorName !== null && actorColour !== null ? (
+          <span className="label" style={{ color: actorColour }}>
+            {actorName}
+          </span>
+        ) : actorName !== null ? (
+          <span className="label" style={{ color: loud ? 'var(--brass)' : 'var(--text-dim)' }}>
+            {actorName}
+          </span>
+        ) : (
+          <span className="label" style={{ color: 'var(--brass)' }}>
+            ⚠ The silo
+          </span>
+        )}
         {progress && progress.of > 1 && (
           <span style={S.progress}>
             {progress.at} / {progress.of}
@@ -67,8 +90,24 @@ export function Announce({
       {beat.lines.map((line, i) => (
         <Line key={i} line={line} />
       ))}
+
+      {hold && hold.ms > 0 && (
+        <div
+          key={hold.key}
+          style={{ ...S.bar, animation: `bb-drain ${hold.ms}ms linear forwards` }}
+        />
+      )}
     </div>
   );
+}
+
+/** The lines end ` · VERDICT`; anything else after the last ` · ` stays in the text. */
+function splitVerdict(text: string): { body: string; verdict: string | null } {
+  const at = text.lastIndexOf(' · ');
+  if (at < 0) return { body: text, verdict: null };
+  const tail = text.slice(at + 3);
+  if (!/^[A-Z]+$/.test(tail)) return { body: text, verdict: null };
+  return { body: text.slice(0, at), verdict: tail };
 }
 
 function Line({ line }: { line: BeatLine }) {
@@ -79,19 +118,28 @@ function Line({ line }: { line: BeatLine }) {
         ? '#ff8fa0'
         : 'var(--text)';
 
+  const { body, verdict } = splitVerdict(line.text);
+
   return (
-    <p style={{ ...S.line, color: colour }}>
-      {line.text}
+    <div style={{ ...S.line, color: colour }}>
+      <div style={S.row}>
+        <span style={S.text}>{body}</span>
+        {verdict !== null && (
+          <span data-verdict={verdict} style={{ ...S.verdict, color: colour }}>
+            {verdict}
+          </span>
+        )}
+      </div>
       {line.roll && (
-        <span style={S.roll}>
+        <div style={S.roll}>
           d{line.roll.die} {line.roll.rolled}
           {line.roll.bonus >= 0 ? '+' : ''}
           {line.roll.bonus} = <strong style={S.total}>{line.roll.total}</strong>
           {line.roll.against !== null && ` vs ${line.roll.against}`}
           {MODE_MARK[line.roll.mode]}
-        </span>
+        </div>
       )}
-    </p>
+    </div>
   );
 }
 
@@ -123,8 +171,24 @@ const S: Record<string, React.CSSProperties> = {
   },
   skip: { fontSize: 10, padding: '3px 8px' },
   line: { margin: '3px 0', fontSize: 13, lineHeight: 1.45 },
+  row: { display: 'flex', alignItems: 'baseline', gap: 12 },
+  text: { flex: 1 },
+  verdict: {
+    fontFamily: 'var(--display)',
+    fontWeight: 800,
+    fontSize: 15,
+    letterSpacing: '.08em',
+  },
+  bar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 2,
+    background: 'var(--brass)',
+    transformOrigin: 'left',
+  },
   roll: {
-    marginLeft: 8,
     fontFamily: 'var(--mono)',
     fontSize: 11,
     letterSpacing: '.04em',

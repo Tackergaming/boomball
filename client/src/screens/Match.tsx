@@ -28,7 +28,9 @@ import { arena } from '../lib/arena.js';
 import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
 import { ActionBar, type Pending } from '../match/ActionBar.js';
 import { Announce } from '../match/Announce.js';
+import { Banner, type Announcement } from '../match/Banner.js';
 import { Board } from '../match/Board.js';
+import { fxBridge } from '../match/fxBridge.js';
 // The 2.5D board and the whole three.js stack come down only when asked for.
 const Board3D = lazy(() => import('../board3d/Board3D.js').then((m) => ({ default: m.Board3D })));
 import { projectCell } from '../board3d/projection.js';
@@ -269,6 +271,22 @@ export function Match({
       act: (action) => (canAct ? send(action) : Promise.resolve()),
       skipReplay: match.skip,
       dismissBeat: match.dismissBeat,
+      // 2H.21: an effect on demand, so the harness captures each one on
+      // purpose. The mounted board set `fxBridge.fire`; nothing else moves.
+      fx: (request) => {
+        if (!fxBridge.fire) return false;
+        fxBridge.stretch = request.stretch ?? 1;
+        fxBridge.fire({
+          kind: request.kind,
+          at: { x: request.x, y: request.y },
+          text: request.text,
+          unitId: request.unitId,
+          team: request.team,
+          after: 0,
+        });
+        fxBridge.stretch = 1;
+        return true;
+      },
     });
   });
   useEffect(() => {
@@ -331,6 +349,77 @@ export function Match({
     void send(action);
   };
 
+  /**
+   * The banners (2H.21, `00` C23 lines 7 and 8): what a beat announces over
+   * the board, one at a time, and "your turn" when the clock comes to this
+   * player. Derived from the beat's own events, never from the state, so a
+   * banner says what the card says. Nothing at `instant`, where thirteen
+   * beats go by in a frame and the banners would only pile up; the turn
+   * banner does not come from a beat and shows at every speed. The queue is
+   * append-only for `Banner`, trimmed from the front so it never grows.
+   */
+  const [banners, setBanners] = useState<readonly Announcement[]>([]);
+  const bannerId = useRef(0);
+  const announce = useCallback((items: readonly Omit<Announcement, 'id'>[]) => {
+    if (items.length === 0) return;
+    setBanners((old) => [...old, ...items.map((item) => ({ ...item, id: ++bannerId.current }))].slice(-12));
+  }, []);
+  const beat = match.beat;
+  const speed = match.speed;
+  useEffect(() => {
+    if (!beat || speed === 'instant') return;
+    const name = (id: string) => beat.state.units.find((u) => u.id === id)?.name ?? id;
+    const side = (team: 'A' | 'B'): Announcement['tone'] => (team === own ? 'own' : 'foe');
+    const sideOf = (id: string): Announcement['tone'] => {
+      const team = beat.state.units.find((u) => u.id === id)?.team;
+      return team ? side(team) : 'neutral';
+    };
+    const items: Omit<Announcement, 'id'>[] = [];
+    for (const event of beat.events) {
+      switch (event.kind) {
+        case 'roundStarted':
+          items.push({
+            kind: 'round',
+            text: event.round > MATCH_ROUNDS ? 'Sudden death' : `Round ${event.round} of ${MATCH_ROUNDS}`,
+            tone: 'neutral',
+          });
+          break;
+        case 'scored':
+          // A Spark's points are announced by the catch, one banner per event.
+          if (event.source === 'payload') {
+            items.push({ kind: 'loud', text: `Goal · ${event.team === own ? 'Your battery' : 'The House'}`, tone: side(event.team) });
+          }
+          break;
+        case 'evacuated':
+          items.push({ kind: 'loud', text: `Knockout · ${name(event.unitId)}`, tone: sideOf(event.unitId) });
+          break;
+        case 'sparkEntered':
+          items.push({ kind: 'loud', text: 'The Spark is loose', tone: 'neutral' });
+          break;
+        case 'sparkCaught':
+          if (event.caught) items.push({ kind: 'loud', text: `Spark caught · ${name(event.unitId)}`, tone: sideOf(event.unitId) });
+          break;
+        case 'matchEnded':
+          items.push({ kind: 'loud', text: 'Full time', tone: 'neutral' });
+          break;
+        default:
+          break;
+      }
+    }
+    announce(items);
+  }, [beat, speed, own, announce]);
+  // Once the turn is playable, not while the place popup is up: the popup is
+  // its own announcement, and the deadline may not move between the two.
+  const turnBanner = yours && !replaying && onClock && placing === null ? `${onClock.id}@${match.deadline}` : null;
+  const turnBannerShown = useRef<string | null>(null);
+  useEffect(() => {
+    if (!turnBanner || !onClock || turnBannerShown.current === turnBanner) return;
+    turnBannerShown.current = turnBanner;
+    // What the replay still had to announce gives way: the board is the
+    // player's now, and a queue of old news in front of "your turn" is noise.
+    setBanners([{ kind: 'turn', text: `Your turn · ${onClock.name}`, tone: 'own', id: ++bannerId.current }]);
+  }, [turnBanner, onClock]);
+
   if (!state) {
     return (
       <div style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
@@ -354,8 +443,15 @@ export function Match({
           Math.max(0, TURN_TIMER_SECONDS - Math.floor((now - tookControl.current) / 1000)),
         )
       : null;
-  const beatActor = match.beat?.unitId
-    ? state.units.find((u) => u.id === match.beat!.unitId)?.name ?? null
+  const beatUnit = match.beat?.unitId ? state.units.find((u) => u.id === match.beat!.unitId) ?? null : null;
+  const beatActor = beatUnit?.name ?? null;
+  // The actor's shirt, as the boards paint it: amber for this player's Giff.
+  const beatColour = beatUnit
+    ? beatUnit.id === mineId
+      ? '#ffc14d'
+      : beatUnit.team === own
+        ? 'var(--team-own)'
+        : 'var(--team-foe)'
     : null;
 
   return (
@@ -451,11 +547,17 @@ export function Match({
               <Announce
                 beat={match.beat}
                 actorName={beatActor}
+                actorColour={beatColour}
                 progress={match.progress}
+                hold={match.hold.ms > 0 ? match.hold : null}
                 onSkip={match.skip}
                 onDismiss={match.dismissBeat}
               />
             )}
+
+            {/* Held longer under the harness flag: headless Chromium's software GL
+                takes longer to screenshot than a banner lasts. */}
+            <Banner queue={banners} speed={match.speed} stretch={PATIENT ? 4 : 1} />
 
             {briefing && <Briefing onClose={() => setBriefing(false)} />}
           </div>

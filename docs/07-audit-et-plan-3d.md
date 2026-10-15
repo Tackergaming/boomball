@@ -1702,3 +1702,33 @@ sweep.**
 et son feu vert pour le client en ligne s'il le veut. S'il veut que la passe gratuite puisse
 devenir un tir, ou que le Breaker tire à portée propre, c'est un écart à écrire. Un sweep
 seulement s'il le demande.
+
+### Sous-phase 2H.21, « le jeu vivant », codée le 2026-10-15, porte ouverte
+
+Par le fil principal (Fable 5.1), avec six sous-agents Sonnet, à partir de `00` C23 : la demande
+de Jérôme à la fin du chat de 2H.20 (« rendre le jeu plus visuellement interactif et vivant, sans
+surcharge »), l'inventaire de ce qui existait, un lot de dix lignes proposé en chat et validé par
+lui (les chiffres de dégâts aussi en 2D, les durées de bandeau acceptées). **Aucun écart de règle,
+rien dans `ai/`, `ENGINE_VERSION` reste 9**, rien à redéployer ; le client en ligne n'est pas
+redéployé. La caméra de C18 à C22 n'est pas touchée. **Pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| Les repères | `motion.ts` : `motionAndCues`, les onze sortes de `Cue`, `after` et leur datation dans `timeMotion` ; `Motion.speed` et `Motion.cues` ; `Beat.cues`. 7 tests |
+| Les effets 3D | `Effects.tsx` nouveau (Sonnet, élevé) : étincelles du coup, anneau du Shove, explosion du Cracker, braises du but, faisceau et flash du Spark, pool de huit, trois lumières, texture procédurale, une `useFrame` |
+| Les mots qui montent | `Floaters.tsx` nouveau (Sonnet, moyen) en 3D, DOM projeté ; `Board.tsx` (Sonnet, élevé) en 2D, SVG et SMIL ; le chiffre dans le maillot du Giff touché, « miss » et « held » en gris |
+| Les transitions | `Board3D.tsx` : l'évacué s'enfonce après son repère, le remplaçant monte, le Spark descend de six cases à son entrée ; `link.transitions` |
+| Les bandeaux | `Banner.tsx` nouveau (Sonnet, moyen), un à la fois ; `Match.tsx` les tire du beat affiché, jamais à `instant` ; « Your turn » au tour jouable, qui vide la file |
+| La carte | `Announce.tsx` (Sonnet, moyen) : nom dans le maillot, verdict en gros, dé dessous, barre de temps (`useMatch.hold`) |
+| Le fil | `Feed.tsx` (Sonnet, moyen) : barre cuivre trois secondes sur les lignes neuves, « ◆ » au but, « ✕ » gras au KO |
+| Le crochet | `fx(request)` et `match/fxBridge.ts`, développement seulement, avec `stretch` pour les captures ; bandeaux tenus quatre fois plus longtemps sous `PATIENT` |
+| Tests | **676 sur 31 fichiers contre 669** ; typecheck racine, scripts, e2e et client verts ; build vert |
+| Harnais | `e2e/board3d.spec.ts` : une capture par effet à `stretch` 6, un round de l'IA en slow pour un bandeau et un verdict, « Your turn » et une ligne fraîche au retour du tour, fin de match tolérée. **Vert en 5,5 min** sur le Vite 5174 chauffé, zéro erreur console. **Smoke 2D vert en 18,6 s** (`Match.tsx`, `Feed.tsx` et `Board.tsx` sont partagés) |
+| Captures lues | Le bandeau « ROUND 3 OF 10 », la carte avec son verdict « CAUGHT » et sa barre, le KO en gras dans le fil, l'explosion et le faisceau en vue large. Les étincelles, l'anneau, les braises, le flash et l'affaissement n'apparaissent pas sur les captures du GL logiciel, qui rend des images figées pendant un effet court : à voir par Jérôme |
+| Dette | Les captures des effets courts sous le GL logiciel ; le ballon n'est pas vu disparaître dans la bouche (il saute dans les mains du gardien, comme avant) ; en 2D seuls les mots montent, pas d'étincelles ; une seule opacité par nuage de points, donc pas d'étalement des étincelles ; le bandeau de la popup de place n'existe pas (la popup est son annonce) |
+| Commit | Pas encore : c'est Jérôme qui tape `/commit` |
+
+**Ce qui attend Jérôme** : sa partie en 3D et en 2D, ses retours en `00` C24 avant toute ligne
+de code (le jeu est-il vivant sans surcharge, les durées, ce qui manque ou ce qui est de trop),
+`/commit`, et son feu vert pour le client en ligne s'il le veut. Un sweep seulement s'il le
+demande.

@@ -1,11 +1,10 @@
 # Reprise du chat suivant, Boomball
 
-> Écrit par le fil principal (Fable 5.1) le 2026-10-15, à la fin du chat qui a pris les retours
-> de Jérôme sur ses cinq premières parties en 3D, écrit `00` C18 à C22, consigné sa décision
-> sur C17 et codé 2H.16 à 2H.20 : la caméra en main, décrochée, stable, les gradins et la
-> nouvelle tentative réseau, puis la caméra retenue dans le silo. Jérôme a clos ce lot (« on a
-> une bonne version pour l'instant ») et ouvert le suivant, le jeu vivant. À coller tel quel
-> comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
+> Écrit par le fil principal (Fable 5.1) le 2026-10-15 au soir, à la fin du chat qui a proposé,
+> fait valider et codé 2H.21, le jeu vivant (`00` C23) : les effets, les mots qui montent, les
+> bandeaux, la carte refaite, le fil marqué. Rien n'est commité : Jérôme tape `/commit`. Sa
+> partie sur 2H.21 est la porte suivante. À coller tel quel comme premier message du chat
+> suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
@@ -36,25 +35,44 @@ contient, les entrées 2H.16, 2H.17, 2H.18 et 2H.20, la caméra, et 2H.19, les g
 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.20. 04 est l'histoire, à lire seulement quand une décision
 d'ingénierie te surprend.
 
-Où on en est : 2H.16 à 2H.20 sont CODÉES le 2026-10-15, ENGINE_VERSION toujours 9, rien à
+Où on en est : 2H.16 à 2H.21 sont CODÉES le 2026-10-15, ENGINE_VERSION toujours 9, rien à
 redéployer côté fonctions, le client en ligne PAS redéployé depuis 2H.14 (mon feu vert). Les
-fonctions en ligne restent resolve-action v20 et create-match v18, moteur 9. 669 tests verts sur
-31 fichiers (652 avant 2H.16), typecheck racine, scripts, e2e et client verts, build du client vert (three dans un chunk
-chargé en lazy, le 2D ne le télécharge pas). Le harnais 3D, npm run e2e:board3d, est vert en 1,9
-à 2,5 minutes sur un Vite dédié (5174). SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE CHAUFFER
+fonctions en ligne restent resolve-action v20 et create-match v18, moteur 9. 676 tests verts sur
+31 fichiers (669 avant 2H.21), typecheck racine, scripts, e2e et client verts, build du client vert (three dans un chunk
+chargé en lazy, le 2D ne le télécharge pas). Le harnais 3D, npm run e2e:board3d, est vert en 5,5
+minutes depuis 2H.21 (chaque effet tiré par le crochet, un round de l'IA en slow) sur un Vite dédié (5174). SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE CHAUFFER
 PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN : à froid, global-setup.ts rate le
 champ Email en trente secondes et le run est rouge avant toute 3D, vu deux fois le 15 : bascule en 3D, silo entier capturé, cellToScreen par la caméra,
 clic à la souris sur la case qu'il désigne et le pion arrive, cadrage rapproché, glisser au
 bouton droit puis roulette, la case suivie se projette ailleurs, le bouton de cadrage la ramène,
 flèche droite tenue, le cadre passe en data-camera="free", « Follow the play » la ramène, tour de
-l'équipe adverse, retour 2D, zéro erreur console. Le smoke 2D (npm run e2e) n'a pas été relancé
-de 2H.16 à 2H.20, rien de 2D n'a bougé ; la ligne « Smoke 2D » du journal 2H.15 dans 07 §10 dit
-vert. Ma partie sur le moteur 9 (ab27b827, Striker, 50-0) et le match e2e 7d631b71 sont
+l'équipe adverse, retour 2D, zéro erreur console. Le smoke 2D (npm run e2e) est vert en 18,6 s
+après 2H.21. Ma partie sur le moteur 9 (ab27b827, Striker, 50-0) et le match e2e 7d631b71 sont
 consignés et rejoués sans écart dans docs/matches/, ainsi que ma partie sur 2H.18 (cb618e32,
-30-20). 2H.16 est commitée et poussée (fd85266), 2H.17 commitée (46341a0) ; les commits de 2H.18
-à 2H.20 : à vérifier par git log, c'est moi qui les tape. Mes trois JPEG de context/import/ (le
+30-20). 2H.16 à 2H.20 sont commitées et poussées (fd85266, 46341a0, 2f3096d) ; 2H.21 N'EST PAS
+COMMITÉE, c'est moi qui tape /commit : vérifier git status en premier et me le dire. Mes trois JPEG de context/import/ (le
 gradin cyan, le gradin magenta, la rambarde) ne se commitent pas, leurs WebP dans
 board3d/textures/ oui.
+
+Ce que 2H.21 contient, en six phrases, détail en 00 C23 « comment 2H.21 est codée ». Les
+repères (Cue) sont lus des événements dans motion.ts au même passage que les pas, et datés sur
+les pas qui les précèdent (l'explosion au bout du roulement, les braises au bout du tir, l'impact
+avant le recul), zéro à instant où rien ne tire. En 3D, Effects.tsx (nouveau, pool de huit, une
+useFrame, texture procédurale) joue étincelles du coup, anneau du Shove, explosion du Cracker,
+braises du but, faisceau et flash du Spark ; Floaters.tsx (nouveau, DOM projeté) fait monter le
+chiffre des dégâts dans le maillot du Giff touché et « miss » / « held » en gris ; la boucle de
+Board3D enfonce l'évacué, fait monter le remplaçant et descendre le Spark (link.transitions). En
+2D, Board.tsx fait monter les mêmes mots en SVG SMIL. Banner.tsx (nouveau) montre un bandeau à
+la fois, tiré du beat par Match.tsx (Round n of 10, Sudden death, Goal, Knockout, The Spark is
+loose, Spark caught, Full time, jamais à instant) et « Your turn » au tour jouable, qui vide la
+file. Announce.tsx porte le nom dans le maillot, le verdict en gros à droite, le dé dessous et
+une barre de temps (useMatch.hold) ; Feed.tsx marque ses lignes neuves d'une barre cuivre trois
+secondes, ◆ au but, ✕ gras au KO. Le crochet gagne fx({kind, x, y, text?, unitId?, team?,
+stretch?}) via match/fxBridge.ts, développement seulement, pour capturer chaque effet à coup
+sûr ; sous PATIENT les bandeaux sont tenus quatre fois plus longtemps. Dette : sous le GL
+logiciel les captures des effets courts (étincelles, anneau, braises, flash, affaissement) sont
+des images figées, l'explosion et le faisceau se voient ; le ballon ne disparaît pas dans la
+bouche ; pas d'étincelles en 2D.
 
 Ce que 2H.20 contient, en deux phrases. Les dimensions du silo (APRON_HALF 14, TUBE_RADIUS 15,
 TUBE_TOP, BACK_PLATE_X) sont dans layoutGeometry.ts, partagées par Silo.tsx et framing.ts ;
@@ -135,33 +153,22 @@ vert. Les archives de textures (19 Mo) dans context/import/textures-ambientcg/ e
 dans context/import/ ne sont pas commités non plus ; la copie du glb dans client/public/models/
 et les WebP le sont.
 
-LA TÂCHE : LE JEU VIVANT, 2H.21.
-Mes mots à la fin du chat précédent : « on a une bonne version pour l'instant, on peaufinera
-peut-être des détails plus tard. Maintenant on passe à la version suivante : les animations, et
-j'aimerais aussi qu'on améliore les annonces à l'écran, les popups d'événements. Bref, rendre le
-jeu plus visuellement interactif et vivant, sans surcharge. » La caméra de 2H.16 à 2H.20 est
-close, ne la retouche pas sans un retour de moi.
-1. Vérifier git status avant toute chose ; 2H.18 à 2H.20 doivent être commitées et poussées
-   (commit de /save du 2026-10-15 au soir) ; sinon me le dire en premier.
-2. Faire l'inventaire de ce qui existe avant de proposer : les effets (board3d/Ordnance.tsx
-   pour les Crackers et le Spark, Tokens.tsx pour les anneaux et le projecteur, Silo.tsx pour
-   l'éclat de but sur la bouche, match/pose.ts pour marche, poussée, recul, passe et tir ;
-   Effects.tsx n'existe pas, c'est la phase 6 de 07) et les annonces (screens/Match.tsx pour le
-   toast de beat « THE SILO », le bandeau de refus, le bandeau « The clock ran out », le
-   bouton « Into the silo » ; match/Feed.tsx pour le fil « THE CALL » ; PlacePrompt.tsx pour la
-   popup de place ; Briefing.tsx et SeatPanel.tsx). Lire 07 phase 6 pour ce qui y était prévu.
-3. Me proposer en chat UN lot de dix lignes au plus, en deux colonnes, animations et
-   annonces, chaque ligne nommant ce que je verrai à l'écran et quand, sans surcharge (un
-   effet par événement, jamais deux choses qui clignotent en même temps, le fil reste la
-   source). Me poser une ou deux questions si un choix est à moi. Après mon go, l'écrire en 00
-   C23 et en 08 §5 (la ligne 2H.21 existe, à compléter), puis coder, sous-agents Sonnet sur les
-   fichiers disjoints (Effects.tsx, les composants d'annonce), le fil principal sur
-   Board3D.tsx et Match.tsx.
-4. Une capture par effet dans e2e/board3d.spec.ts, lue, et le smoke 2D relancé si Match.tsx
-   ou Feed.tsx bougent (ils sont partagés par les deux plateaux).
-5. Si je demande le client en ligne : le build est vert, le déploiement passe par mon feu vert
+LA TÂCHE : MA PARTIE SUR 2H.21, PUIS C24.
+Je joue en 3D et en 2D sur 2H.21 et je dis si le jeu est vivant sans le surcharger : ce que je
+vois, ce qui manque, ce qui est de trop, les durées des bandeaux et de la carte, les mots qui
+montent, l'explosion, le but, le Spark, l'évacuation. La caméra de 2H.16 à 2H.20 est close.
+1. Vérifier git status avant toute chose ; 2H.21 doit avoir été commitée par mon /commit
+   après le chat précédent ; sinon me le dire en premier, c'est moi qui le tape.
+2. Lire mes retours contre le code et les captures avant de reformuler ; les reformuler en
+   chat, une ou deux questions par message si un choix est à moi ; les écrire en 00 C24 et en
+   08 §5 (ligne 2H.22) avant la première ligne de code ; puis coder, sous-agents Sonnet sur les
+   fichiers disjoints, le fil principal sur Board3D.tsx et Match.tsx.
+3. Une capture par changement dans e2e/board3d.spec.ts, lue, en sachant que les effets courts
+   sont figés sous le GL logiciel (lire le DOM des mots et l'explosion, me demander le reste) ;
+   le smoke 2D relancé si Match.tsx, Feed.tsx ou Board.tsx bougent.
+4. Si je demande le client en ligne : le build est vert, le déploiement passe par mon feu vert
    explicite, jamais le dépôt GitHub sur Vercel.
-6. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
+5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -224,7 +231,7 @@ Ce qu'il faut savoir tout de suite.
    en 409, le client archive.
 
 7. Le harnais d'écran : npm run e2e en 25 à 55 s, npm run e2e:playthrough en 15 à 70 s, npm run
-   e2e:board3d en 1,7 min, le crochet window.__boomball. waitForPlayableTurn dans e2e/harness.ts
+   e2e:board3d en 5,5 min, le crochet window.__boomball, dont fx() tire un effet à la demande (développement seulement, stretch pour ralentir). waitForPlayableTurn dans e2e/harness.ts
    répond à la popup par un clic à l'écran (data-place, place-close) et capture la première vue ;
    le smoke clique 1, puis Close, puis 2, le playthrough une place différente à chaque round, le
    spec 3D la place 2. Le siège humain du playthrough est piloté par chooseAction du dépôt depuis
@@ -265,7 +272,7 @@ Ce qu'il faut savoir tout de suite.
     dans un commit. Le règlement de table du vault est figé. Ne lis jamais design/Boomball
     Interface.html en entier.
 
-11. Les commandes. Depuis boomball/ : npm test (663), npm run typecheck, npm run sweep (environ
+11. Les commandes. Depuis boomball/ : npm test (676), npm run typecheck, npm run sweep (environ
     16 minutes), npm run e2e, npm run e2e:playthrough, npm run e2e:board3d, node scripts/run-ts.mjs
     scripts/control-2h14.ts (dix-huit matchs de contrôle, pas un sweep). Depuis boomball/client/ :
     npm run dev sur http://localhost:5173, jamais 127.0.0.1, npm run build, npm run typecheck.

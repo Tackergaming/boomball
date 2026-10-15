@@ -25,7 +25,7 @@
 
 import { distance, type Point } from '../../../engine/geometry.js';
 import type { MatchEvent } from '../../../engine/events.js';
-import type { MatchState, UnitId } from '../../../engine/types.js';
+import type { MatchState, TeamId, UnitId } from '../../../engine/types.js';
 import { spec } from '../lib/arena.js';
 import type { ReplaySpeed } from './testHook.js';
 
@@ -58,6 +58,61 @@ export interface TimedStep {
 }
 
 /**
+ * What flashed during a beat, as opposed to what travelled (2H.21, `00` C23).
+ *
+ * A cue is one visible thing for one event: the sparks of a bat that lands,
+ * the number of a wound, the blast of a Cracker, the embers of a goal. Like a
+ * step it is a transcription: the cell and the words come out of the event,
+ * and **when** it happens is read off the steps, never guessed. A cue fires
+ * once every step produced by the events before it is over (`after`), so the
+ * blast waits for the Cracker's roll, the embers for the shot's flight, and
+ * the impact comes before the recoil it causes.
+ */
+export type CueKind =
+  /** A bat landed on `unitId`: sparks, 3D only. The number is the `damage` cue. */
+  | 'hit'
+  /** `unitId` took `text` hit points: the number rises, in both boards. */
+  | 'damage'
+  /** A swing missed `unitId`: the word rises, both boards. */
+  | 'miss'
+  /** A Shove that did not move `unitId`: the word rises, both boards. */
+  | 'held'
+  /** A Shove landed on `unitId`: a ring on the floor under it, 3D only. */
+  | 'push'
+  /** A Cracker went off on `at`, 3D only. */
+  | 'blast'
+  /** A goal went into the mouth at `at`, defended by `team`, 3D only. */
+  | 'goal'
+  /** The Spark came down on `at`, 3D only. */
+  | 'sparkIn'
+  /** `unitId` caught the Spark on `at`, 3D only. */
+  | 'sparkCaught'
+  /** `unitId` was carried off from `at`: it sinks, 3D only. */
+  | 'exit'
+  /** `unitId` came on at `at`: it rises, 3D only. */
+  | 'enter';
+
+export interface Cue {
+  readonly kind: CueKind;
+  /** The cell it happens on, in engine coordinates. */
+  readonly at: Point;
+  /** The unit it concerns, when one does. */
+  readonly unitId?: UnitId | undefined;
+  /** The words that rise over the cell, for `damage`, `miss` and `held`. */
+  readonly text?: string | undefined;
+  /** For a goal: the team whose Furnace took it, so the embers wear its colour. */
+  readonly team?: TeamId | undefined;
+  /** How many of the beat's steps precede it. It fires once they are done. */
+  readonly after: number;
+}
+
+/** A cue with the instant into the beat, in milliseconds, at which it fires. Zero at `instant`. */
+export interface TimedCue {
+  readonly cue: Cue;
+  readonly t: number;
+}
+
+/**
  * Everything `Board.tsx` needs to animate one beat. `key` changes with every
  * beat so the board can tell a new beat from a re-render of the same one, and
  * `totalMs` is the sum of the steps, which is also how long `useMatch.ts` holds
@@ -67,6 +122,10 @@ export interface Motion {
   readonly key: number;
   readonly steps: readonly TimedStep[];
   readonly totalMs: number;
+  /** The speed it was timed at. At `instant` the boards draw `state` and fire nothing. */
+  readonly speed: ReplaySpeed;
+  /** What flashes during the beat, timed. Empty when the beat was quiet. */
+  readonly cues: readonly TimedCue[];
 }
 
 // -- Timing -------------------------------------------------------------------
@@ -103,10 +162,28 @@ export function stepDuration(step: MotionStep, speed: ReplaySpeed): number {
   }
 }
 
-/** Times a beat's steps at a speed. `key` is the caller's: the index of the beat in its batch. */
-export function timeMotion(key: number, steps: readonly MotionStep[], speed: ReplaySpeed): Motion {
+/**
+ * Times a beat's steps, and its cues, at a speed. `key` is the caller's: the
+ * index of the beat in its batch. A cue's instant is the sum of the steps
+ * before it, so it lands exactly where the eye is.
+ */
+export function timeMotion(
+  key: number,
+  steps: readonly MotionStep[],
+  speed: ReplaySpeed,
+  cues: readonly Cue[] = [],
+): Motion {
   const timed = steps.map((step) => ({ step, ms: stepDuration(step, speed) }));
-  return { key, steps: timed, totalMs: timed.reduce((total, one) => total + one.ms, 0) };
+  const starts: number[] = [0];
+  for (const one of timed) starts.push(starts[starts.length - 1]! + one.ms);
+  const total = starts[starts.length - 1]!;
+  return {
+    key,
+    steps: timed,
+    totalMs: total,
+    speed,
+    cues: cues.map((cue) => ({ cue, t: starts[Math.min(cue.after, timed.length)]! })),
+  };
 }
 
 // -- Extraction ---------------------------------------------------------------
@@ -122,7 +199,21 @@ export function timeMotion(key: number, steps: readonly MotionStep[], speed: Rep
  * where its walk ended, not from where the beat started.
  */
 export function motionOf(before: MatchState, events: readonly MatchEvent[]): MotionStep[] {
+  return motionAndCues(before, events).steps;
+}
+
+/**
+ * The steps and the cues of one beat, in one walk, since both need to know
+ * where everything stood at each event. Every cue below names its cell from
+ * the event or from the position tracked so far, and its `after` is the
+ * number of steps already produced, which is what times it.
+ */
+export function motionAndCues(
+  before: MatchState,
+  events: readonly MatchEvent[],
+): { steps: MotionStep[]; cues: Cue[] } {
   const steps: MotionStep[] = [];
+  const cues: Cue[] = [];
 
   const at = new Map<UnitId, Point>(before.units.map((u) => [u.id, { x: u.x, y: u.y }] as const));
   const crackers = new Map(before.crackers.map((c) => [c.id, { x: c.x, y: c.y }] as const));
@@ -145,6 +236,12 @@ export function motionOf(before: MatchState, events: readonly MatchEvent[]): Mot
     if (before.payload.carriedBy === unitId || ball === from) ball = to;
   };
 
+  /** A cue on a unit, where it stands right now. */
+  const cueOn = (kind: CueKind, unitId: UnitId, text?: string): void => {
+    const where = at.get(unitId);
+    if (where) cues.push({ kind, at: where, unitId, text, after: steps.length });
+  };
+
   for (const event of events) {
     switch (event.kind) {
       case 'moved':
@@ -153,7 +250,22 @@ export function motionOf(before: MatchState, events: readonly MatchEvent[]): Mot
       case 'recoiled':
         unitStep(event.unitId, [event.to], 'push');
         break;
+      case 'attacked':
+      case 'opportunityAttacked':
+        if (event.hit) cueOn('hit', event.targetId);
+        else cueOn('miss', event.targetId, 'miss');
+        break;
+      case 'damaged':
+        cueOn('damage', event.unitId, `\u2212${event.amount}`);
+        break;
+      case 'evacuated':
+        cueOn('exit', event.unitId);
+        break;
       case 'shoved':
+        // The ring is under the target where it stood when the Shove landed,
+        // before the push; a Shove that holds says so in a word instead.
+        if (event.success) cueOn('push', event.targetId);
+        else cueOn('held', event.targetId, 'held');
         if (event.pushedTo) unitStep(event.targetId, [event.pushedTo], 'push');
         // Écart 61: the ball goes from where it was to the shover's hands.
         if (event.tookPayload) {
@@ -167,6 +279,11 @@ export function motionOf(before: MatchState, events: readonly MatchEvent[]): Mot
       case 'substituteEntered':
         // Appears; nothing travels. Recorded so a later push starts from the right cell.
         at.set(event.unitId, event.at);
+        cues.push({ kind: 'enter', at: event.at, unitId: event.unitId, after: steps.length });
+        break;
+      case 'crackerDetonated':
+        // The event names the cell; `after` makes the blast wait for the roll.
+        cues.push({ kind: 'blast', at: event.at, after: steps.length });
         break;
       case 'crackerMoved': {
         const from = crackers.get(event.crackerId) ?? event.from;
@@ -179,6 +296,14 @@ export function motionOf(before: MatchState, events: readonly MatchEvent[]): Mot
         break;
       case 'sparkEntered':
         spark = event.at;
+        cues.push({ kind: 'sparkIn', at: event.at, after: steps.length });
+        break;
+      case 'sparkCaught':
+        if (event.caught) cueOn('sparkCaught', event.unitId);
+        break;
+      case 'scored':
+        // The shot's flight set `ball` on the hatch; the embers come when it lands.
+        cues.push({ kind: 'goal', at: ball, team: event.team === 'A' ? 'B' : 'A', after: steps.length });
         break;
       case 'sparkMoved':
         if (event.path.length > 0) steps.push({ kind: 'spark', from: spark, path: event.path });
@@ -229,7 +354,7 @@ export function motionOf(before: MatchState, events: readonly MatchEvent[]): Mot
     }
   }
 
-  return steps;
+  return { steps, cues };
 }
 
 /**

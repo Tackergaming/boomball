@@ -39,7 +39,8 @@ import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
 import { ARENA_HEIGHT, ARENA_WIDTH, arena, spec } from '../lib/arena.js';
 import type { Pending } from './ActionBar.js';
-import type { Motion } from './motion.js';
+import { fxBridge } from './fxBridge.js';
+import type { Cue, Motion } from './motion.js';
 import { planOf, poseAt, type BallPose } from './pose.js';
 
 /** Columns on screen, which is the pitch's length. */
@@ -132,6 +133,21 @@ interface Track {
   readonly live: boolean;
   readonly elapsed: number;
 }
+
+/** A word that rises over a cell: a wound's number, a miss, a Shove that held. */
+interface Floater {
+  readonly id: number;
+  readonly at: Point;
+  readonly text: string;
+  readonly colour: string;
+}
+
+/** How long a floater stays in the SVG; its own rise lasts a second. */
+const FLOATER_MS = 1100;
+/** The grey of the words that are not a wound: miss, held. */
+const FLOATER_GREY = '#9aa7ad';
+
+const isFloaterCue = (cue: Cue): boolean => cue.kind === 'damage' || cue.kind === 'miss' || cue.kind === 'held';
 
 // -- The board ----------------------------------------------------------------
 
@@ -256,6 +272,66 @@ export function Board({
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [playing]);
+
+  // -- Words that rise ---------------------------------------------------------
+  // Jérôme asked for the wound's number on this board too (2H.21, "dégâts aussi
+  // en 2D"). They are SMIL `<animate>`s because the board is SVG and already
+  // uses them for the loose ball, and they are timers rather than part of the
+  // frame loop because a word is not a piece: it needs no position per frame,
+  // only a birth and an end. The 3D board reads the same cues.
+  const [floaters, setFloaters] = useState<readonly Floater[]>([]);
+  const nextFloater = useRef(0);
+  const removals = useRef(new Set<ReturnType<typeof setTimeout>>());
+  // What a floater's colour is read from, kept current without re-keying the effects.
+  const seen = useRef({ state, own, yoursId });
+  useEffect(() => {
+    seen.current = { state, own, yoursId };
+  });
+
+  const floatCue = useRef((cue: Cue): void => {
+    if (!isFloaterCue(cue)) return;
+    const { state: now, own: mine, yoursId: yours } = seen.current;
+    let colour = FLOATER_GREY;
+    if (cue.kind === 'damage') {
+      const unit = now.units.find((u) => u.id === cue.unitId);
+      colour = !unit ? FLOATER_GREY : unit.id === yours ? '#ffc14d' : unit.team === mine ? '#3ce0f0' : '#ff56dc';
+    }
+    const id = nextFloater.current++;
+    setFloaters((all) => [...all, { id, at: cue.at, text: cue.text ?? '', colour }]);
+    const gone = setTimeout(() => {
+      removals.current.delete(gone);
+      setFloaters((all) => all.filter((f) => f.id !== id));
+    }, FLOATER_MS);
+    removals.current.add(gone);
+  });
+
+  // A beat's cues, each at its instant. Leaving the beat (a new one, a skip, the
+  // screen closing) cancels those not yet fired; the floaters already up may
+  // outlive the beat and finish their second.
+  useEffect(() => {
+    if (!motion || motion.speed === 'instant') return;
+    const pending = motion.cues
+      .filter((c) => isFloaterCue(c.cue))
+      .map((c) => setTimeout(() => floatCue.current(c.cue), c.t));
+    return () => pending.forEach(clearTimeout);
+  }, [motion]);
+
+  // The development trigger: `window.__boomball.fx` fires a cue as if a beat had.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    fxBridge.fire = (cue) => floatCue.current(cue);
+    return () => {
+      fxBridge.fire = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timers = removals.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    };
+  }, []);
 
   /**
    * How many screen pixels one cell is worth, which is what lets the labels be
@@ -503,6 +579,36 @@ export function Board({
               px={px}
             />
           )}
+
+          {/* 13. The words that rise, after everything so nothing hides them.
+              Several born on one cell within a second are spread sideways. */}
+          {floaters.map((f) => (
+            <text
+              key={f.id}
+              data-floater={f.text}
+              x={f.at.y + 0.5 + ((f.id % 3) - 1) * 0.35}
+              y={f.at.x + 0.1}
+              textAnchor="middle"
+              fill={f.colour}
+              stroke="#05070a"
+              strokeWidth={px(3)}
+              paintOrder="stroke"
+              opacity={0}
+              style={{ pointerEvents: 'none', font: `800 ${px(13)}px 'IBM Plex Mono', monospace` }}
+            >
+              {f.text}
+              <animate
+                attributeName="y"
+                from={f.at.x + 0.1}
+                to={f.at.x - 1.1}
+                dur="1s"
+                fill="freeze"
+                calcMode="spline"
+                keySplines="0.2 0.8 0.3 1"
+              />
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.6;1" dur="1s" fill="freeze" />
+            </text>
+          ))}
         </svg>
       </div>
     </div>

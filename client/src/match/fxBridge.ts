@@ -1,0 +1,22 @@
+/**
+ * The development trigger for effects (2H.21).
+ *
+ * The screen harness captures each effect on purpose rather than waiting for
+ * the dice to produce one: `window.__boomball.fx(...)` (see `testHook.ts`)
+ * hands a cue to whichever board is mounted, which fires it as if the beat
+ * had. Each board sets `fire` while it is mounted, in development only; a
+ * production build never calls it. Nothing here touches the match.
+ */
+
+import type { Cue } from './motion.js';
+
+export const fxBridge: {
+  fire: ((cue: Cue) => void) | null;
+  /**
+   * How many times slower the next effects run. 1 in play. The harness asks
+   * for more, because headless Chromium's software GL draws three frames a
+   * second and a screenshot takes longer than a bat's sparks last; the hook
+   * sets it for one request and puts it back.
+   */
+  stretch: number;
+} = { fire: null, stretch: 1 };

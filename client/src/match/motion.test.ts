@@ -19,7 +19,7 @@ import { createMatch } from '../../../engine/setup.js';
 import { isHuman, type MatchState } from '../../../engine/types.js';
 import { chooseAction } from '../../../ai/chooseAction.js';
 import { openSession, submitAction } from '../../../server/session.js';
-import { motionOf, stepDuration, timeMotion } from './motion.js';
+import { motionAndCues, motionOf, stepDuration, timeMotion } from './motion.js';
 import { toBeats } from './replay.js';
 
 const arena = new Arena(KILL_SILO);
@@ -240,5 +240,96 @@ describe('on a real match', () => {
       }
     }
     expect(checked).toBeGreaterThan(50);
+  });
+});
+
+describe('what a beat flashes (2H.21)', () => {
+  const hit = { ...roll, total: 18 };
+
+  it('places a landed swing, its wound and a miss on the target, before any recoil', () => {
+    const { steps, cues } = motionAndCues(base, [
+      { kind: 'attacked', attackerId: A.id, targetId: B.id, roll: hit, hit: true },
+      { kind: 'damaged', unitId: B.id, amount: 7, hpAfter: 5, source: 'bat' },
+      { kind: 'recoiled', unitId: A.id, from: { x: A.x, y: A.y }, to: { x: A.x, y: A.y - 1 } },
+      { kind: 'attacked', attackerId: A2.id, targetId: B.id, roll, hit: false },
+    ]);
+    expect(steps.map((s) => s.kind)).toEqual(['unit']);
+    expect(cues).toEqual([
+      { kind: 'hit', at: { x: B.x, y: B.y }, unitId: B.id, text: undefined, after: 0 },
+      { kind: 'damage', at: { x: B.x, y: B.y }, unitId: B.id, text: '\u22127', after: 0 },
+      { kind: 'miss', at: { x: B.x, y: B.y }, unitId: B.id, text: 'miss', after: 1 },
+    ]);
+  });
+
+  it('waits for the walk that came before the swing', () => {
+    const path = [{ x: A.x, y: A.y + 1 }];
+    const { cues } = motionAndCues(base, [
+      { kind: 'moved', unitId: A.id, from: { x: A.x, y: A.y }, to: path[0]!, path, costFeet: 5 },
+      { kind: 'attacked', attackerId: A.id, targetId: B.id, roll: hit, hit: true },
+    ]);
+    expect(cues).toEqual([{ kind: 'hit', at: { x: B.x, y: B.y }, unitId: B.id, text: undefined, after: 1 }]);
+  });
+
+  it('rings the floor under a shoved unit where it stood, and says held when it did not move', () => {
+    const { steps, cues } = motionAndCues(base, [
+      { kind: 'shoved', shoverId: A.id, targetId: B.id, success: true, shoverRoll: roll, targetRoll: roll, pushedTo: { x: B.x, y: B.y + 1 }, tookPayload: false },
+      { kind: 'shoved', shoverId: A2.id, targetId: B.id, success: false, shoverRoll: roll, targetRoll: roll, pushedTo: null, tookPayload: false },
+    ]);
+    expect(steps).toHaveLength(1);
+    expect(cues).toEqual([
+      { kind: 'push', at: { x: B.x, y: B.y }, unitId: B.id, text: undefined, after: 0 },
+      { kind: 'held', at: { x: B.x, y: B.y + 1 }, unitId: B.id, text: 'held', after: 1 },
+    ]);
+  });
+
+  it('blasts where the Cracker went off, after its roll', () => {
+    const home = { x: base.crackers[0]!.x, y: base.crackers[0]!.y };
+    const path = [{ x: home.x + 1, y: home.y }];
+    const { cues } = motionAndCues(base, [
+      { kind: 'crackerMoved', crackerId: 'cracker-1', from: home, to: path[0]!, path },
+      { kind: 'crackerDetonated', crackerId: 'cracker-1', at: path[0]!, targetId: B.id, save: roll, saved: false, damage: 9 },
+      { kind: 'damaged', unitId: B.id, amount: 9, hpAfter: 3, source: 'cracker' },
+    ]);
+    expect(cues[0]).toEqual({ kind: 'blast', at: path[0], after: 1 });
+    expect(cues[1]).toMatchObject({ kind: 'damage', text: '\u22129', after: 1 });
+  });
+
+  it('sends the embers to the hatch once the shot has flown, in the colour of the mouth that took it', () => {
+    const shooter = { ...A, x: 6, y: 36, holdingPayload: true };
+    const carried: MatchState = {
+      ...base,
+      units: base.units.map((u) => (u.id === A.id ? shooter : u)),
+      payload: { carriedBy: A.id, x: 6, y: 36 },
+    };
+    const { cues } = motionAndCues(carried, [
+      { kind: 'shotAtFurnace', unitId: A.id, roll: hit, scored: true, blockedBy: null },
+      { kind: 'scored', team: 'A', points: 10, source: 'payload' },
+    ]);
+    expect(cues).toEqual([{ kind: 'goal', at: { x: 6, y: 44 }, team: 'B', after: 1 }]);
+  });
+
+  it('marks the Spark coming down and being caught, a Giff carried off and one coming on', () => {
+    const { cues } = motionAndCues(base, [
+      { kind: 'sparkEntered', at: { x: 3, y: 20 }, round: 6 },
+      { kind: 'sparkCaught', unitId: A.id, roll: hit, caught: true },
+      { kind: 'sparkCaught', unitId: A2.id, roll, caught: false },
+      { kind: 'evacuated', unitId: B.id, round: 4 },
+      { kind: 'substituteEntered', unitId: B.id, round: 6, at: { x: 7, y: 22 } },
+    ]);
+    expect(cues.map((c) => c.kind)).toEqual(['sparkIn', 'sparkCaught', 'exit', 'enter']);
+    expect(cues[0]!.at).toEqual({ x: 3, y: 20 });
+    expect(cues[1]).toMatchObject({ unitId: A.id, at: { x: A.x, y: A.y } });
+    expect(cues[3]).toMatchObject({ unitId: B.id, at: { x: 7, y: 22 } });
+  });
+
+  it('times a cue at the end of the steps before it, and at zero at instant', () => {
+    const walk = { kind: 'unit' as const, unitId: A.id, from: { x: 0, y: 0 }, path: [{ x: 0, y: 1 }, { x: 0, y: 2 }], gait: 'walk' as const };
+    const cue = { kind: 'hit' as const, at: { x: 0, y: 3 }, after: 1 };
+    const normal = timeMotion(0, [walk], 'normal', [cue, { ...cue, after: 0 }]);
+    expect(normal.speed).toBe('normal');
+    expect(normal.cues.map((c) => c.t)).toEqual([stepDuration(walk, 'normal'), 0]);
+    expect(timeMotion(0, [walk], 'instant', [cue]).cues[0]!.t).toBe(0);
+    // A cue after more steps than there are lands at the end.
+    expect(timeMotion(0, [walk], 'slow', [{ ...cue, after: 9 }]).cues[0]!.t).toBe(stepDuration(walk, 'slow'));
   });
 });

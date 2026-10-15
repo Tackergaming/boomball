@@ -26,7 +26,7 @@ import { thirdOf, type Point } from '../../../engine/geometry.js';
 import type { DiceRoll, MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId, Unit, UnitId } from '../../../engine/types.js';
 import { MOVE_SPEED_FEET, SUBSTITUTE_DELAY_ROUNDS } from '../../../engine/constants.js';
-import { motionOf, type MotionStep } from './motion.js';
+import { motionAndCues, type Cue, type MotionStep } from './motion.js';
 
 /** One watchable moment: a unit's turn, a round's hazards, or the final whistle. */
 export interface Beat {
@@ -41,6 +41,11 @@ export interface Beat {
    * speed the player chose. See `motion.ts`.
    */
   readonly motion: readonly MotionStep[];
+  /**
+   * What flashed during the beat, in event order, each placed after the steps
+   * that precede it (2H.21). Untimed, like `motion`. See `motion.ts`.
+   */
+  readonly cues: readonly Cue[];
   /** What to say about it, at most a few lines. */
   readonly lines: readonly BeatLine[];
   /** Set when the beat is worth interrupting for: a goal, a knockout, the end. */
@@ -80,7 +85,7 @@ export function toBeats(base: MatchState, events: readonly MatchEvent[], own: Te
     if (current.length === 0) return;
     // Read against the board **before** the beat, which is where everything
     // that moves in it starts from.
-    const motion = motionOf(board, current);
+    const { steps: motion, cues } = motionAndCues(board, current);
     const before = board;
     board = project(board, current);
     beats.push({
@@ -88,6 +93,7 @@ export function toBeats(base: MatchState, events: readonly MatchEvent[], own: Te
       events: current,
       state: board,
       motion,
+      cues,
       lines: describe(current, board, own, before),
       weight: loudness(current),
     });

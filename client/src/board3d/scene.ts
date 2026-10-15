@@ -12,6 +12,9 @@
 
 import type { Object3D } from 'three';
 
+import type { Point } from '../../../engine/geometry.js';
+import type { Cue } from '../match/motion.js';
+
 export interface Projected {
   /** Pixels from the canvas's top-left corner. */
   readonly x: number;
@@ -37,6 +40,24 @@ export interface SceneLink {
   project: ((x: number, y: number, z: number) => Projected) | null;
   /** Called once a frame, after the pieces have been placed. */
   readonly listeners: Set<() => void>;
+  /**
+   * Fires one visual effect for a cue (2H.21): sparks, a ring, a blast, the
+   * embers, the Spark's beam or flash. Set by `Effects.tsx` while mounted;
+   * the frame loop calls it when the cue's instant comes.
+   */
+  fx: ((cue: Cue) => void) | null;
+  /**
+   * Raises a word over a cell, in `colour`, for about a second (2H.21): a
+   * wound's number, "miss", "held". Set by `Floaters.tsx` while mounted.
+   */
+  float: ((text: string, colour: string, at: Point) => void) | null;
+  /**
+   * Pieces part of the way into or out of the pitch, by pose key, with when
+   * they began (2H.21): an evacuated Giff sinks (`exit`), a substitute rises
+   * (`enter`), the Spark comes down (`drop`). Written and read by the frame
+   * loop, which places them.
+   */
+  readonly transitions: Map<string, { kind: 'exit' | 'enter' | 'drop'; since: number; stretch: number }>;
 }
 
 export function newSceneLink(): SceneLink {
@@ -49,6 +70,9 @@ export function newSceneLink(): SceneLink {
     lastAt: new Map(),
     project: null,
     listeners: new Set(),
+    fx: null,
+    float: null,
+    transitions: new Map(),
   };
 }
 
@@ -59,4 +83,7 @@ export function shirt(team: 'A' | 'B', own: 'A' | 'B', isYou: boolean): string {
 
 export const BRASS = '#c9b489';
 export const CYAN = '#3ce0f0';
+export const MAGENTA = '#ff56dc';
 export const AMBER = '#ff8a3d';
+/** The colour of a word that reports nothing happened: a miss, a Shove held. */
+export const FAINT = '#9aa7ad';

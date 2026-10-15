@@ -19,6 +19,19 @@ import type { Action } from '../../../engine/actions.js';
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../../../engine/constants.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
 import type { MatchState } from '../../../engine/types.js';
+import type { CueKind } from './motion.js';
+
+/** An effect a script asks for, by kind and cell (2H.21). The words and the team are optional. */
+export interface FxRequest {
+  kind: CueKind;
+  x: number;
+  y: number;
+  text?: string;
+  unitId?: string;
+  team?: 'A' | 'B';
+  /** How many times slower the effect runs, for a capture under software GL. 1 by default. */
+  stretch?: number;
+}
 
 export type ReplaySpeed = 'slow' | 'normal' | 'instant';
 
@@ -64,6 +77,13 @@ export interface BoomballHook {
   act(action: Action): Promise<void>;
   skipReplay(): void;
   dismissBeat(): void;
+  /**
+   * Fires one visual effect on the mounted board as if its beat had, so a
+   * capture can be taken of each on purpose (2H.21). False when no board is
+   * listening. It touches nothing in the match: a word rises, sparks fly,
+   * the state is what it was.
+   */
+  fx(request: FxRequest): boolean;
 }
 
 export function summarise(legal: LegalActions | null): LegalSummary | null {

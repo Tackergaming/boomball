@@ -21,7 +21,7 @@
  */
 
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MathUtils, type Object3D } from 'three';
 
 import type { Point } from '../../../engine/geometry.js';
@@ -31,15 +31,18 @@ import { hasLineOfSight } from '../../../engine/rules/sight.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
 import { arena, spec } from '../lib/arena.js';
 import type { BoardProps } from '../match/Board.js';
-import type { Motion } from '../match/motion.js';
+import { fxBridge } from '../match/fxBridge.js';
+import type { Cue, Motion, TimedCue } from '../match/motion.js';
 import { planOf, poseAt, type Plan, type Pose } from '../match/pose.js';
 import { Rig, type Zoom } from './Camera.js';
+import { Effects } from './Effects.js';
+import { Floaters } from './Floaters.js';
 import { Labels, Tag, type Label } from './Labels.js';
 import { cellCentre } from './layoutGeometry.js';
 import { Minimap } from './Minimap.js';
 import { Ball, Cracker, Spark } from './Ordnance.js';
 import { Overlay, type Sight } from './Overlay.js';
-import { BRASS, newSceneLink, type SceneLink } from './scene.js';
+import { BRASS, FAINT, newSceneLink, shirt, type SceneLink } from './scene.js';
 import { Silo } from './Silo.js';
 import { GIFF_HEIGHT, Plate, Token } from './Tokens.js';
 
@@ -57,7 +60,22 @@ interface Track {
   readonly state: MatchState;
   readonly plan: Plan | null;
   readonly began: number;
+  /**
+   * What flashes during the beat and when (2H.21), fired by the loop as the
+   * clock passes each one. Empty at `instant`, and empty when the same
+   * motion comes back with another state (the snapshot being read again),
+   * so nothing fires twice.
+   */
+  readonly cues: readonly TimedCue[];
 }
+
+/** How long a Giff takes to sink when carried off, or to rise when it comes on; the Spark's drop. */
+const EXIT_MS = 600;
+const DROP_MS = 500;
+/** How far below the floor a Giff sinks to, in cells. */
+const SINK = 1.9;
+/** From how high the Spark comes down, in cells. */
+const DROP_FROM = 6;
 
 export function Board3D({
   state,
@@ -176,17 +194,62 @@ export function Board3D({
   };
 
   // -- The beat ------------------------------------------------------------------
-  const trackRef = useRef<Track>({ motion: null, state, plan: null, began: 0 });
+  const trackRef = useRef<Track>({ motion: null, state, plan: null, began: 0, cues: [] });
   if (motion !== trackRef.current.motion) {
     trackRef.current = {
       motion,
       state,
       plan: motion && motion.totalMs > 0 ? planOf(motion) : null,
       began: performance.now(),
+      cues: motion && motion.speed !== 'instant' ? motion.cues : [],
     };
   } else if (state !== trackRef.current.state) {
-    trackRef.current = { motion, state, plan: null, began: 0 };
+    trackRef.current = { motion, state, plan: null, began: 0, cues: [] };
   }
+
+  /**
+   * One cue, made visible (2H.21). Sparks, rings, blasts, embers and the
+   * Spark's beam and flash go to `Effects`; the words go to `Floaters`, in
+   * the shirt of the Giff they are about, grey when nothing happened; a
+   * Giff carried off, one coming on and the Spark coming down are
+   * transitions the frame loop places. Also what the development trigger
+   * of the hook fires, so each can be captured on purpose.
+   */
+  const fire = useCallback(
+    (cue: Cue) => {
+      const now = performance.now();
+      switch (cue.kind) {
+        case 'damage': {
+          const unit = cue.unitId ? state.units.find((u) => u.id === cue.unitId) : undefined;
+          const colour = unit ? shirt(unit.team, own, unit.id === yoursId) : FAINT;
+          link.float?.(cue.text ?? '', colour, cue.at);
+          break;
+        }
+        case 'miss':
+        case 'held':
+          link.float?.(cue.text ?? cue.kind, FAINT, cue.at);
+          break;
+        case 'exit':
+        case 'enter':
+          if (cue.unitId) link.transitions.set(`u:${cue.unitId}`, { kind: cue.kind, since: now, stretch: fxBridge.stretch });
+          break;
+        case 'sparkIn':
+          link.transitions.set('s', { kind: 'drop', since: now, stretch: fxBridge.stretch });
+          link.fx?.(cue);
+          break;
+        default:
+          link.fx?.(cue);
+      }
+    },
+    [link, state, own, yoursId],
+  );
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    fxBridge.fire = fire;
+    return () => {
+      fxBridge.fire = null;
+    };
+  }, [fire]);
 
   // -- Goals: the mouth that took one flares for a second ------------------------
   const scoreRef = useRef(state.score);
@@ -346,12 +409,15 @@ export function Board3D({
         {sparkSeen && <Spark link={link} />}
         <Ball link={link} />
 
+        <Effects link={link} own={own} />
+
         {/* Last, so it runs after everything above has registered and the
             rig has placed the camera: it places the pieces, then the labels. */}
-        <Mover link={link} track={trackRef.current} state={state} spotlight={spotlight} />
+        <Mover link={link} track={trackRef.current} state={state} spotlight={spotlight} fire={fire} />
       </Canvas>
 
       <Labels link={link} labels={labels} />
+      <Floaters link={link} />
 
       <div style={S.hud}>
         <button
@@ -386,8 +452,22 @@ export function Board3D({
  * registered group where it belongs this frame, the camera's focus too, then
  * lets the label layer follow.
  */
-function Mover({ link, track, state, spotlight }: { link: SceneLink; track: Track; state: MatchState; spotlight: UnitId | null }) {
+function Mover({
+  link,
+  track,
+  state,
+  spotlight,
+  fire,
+}: {
+  link: SceneLink;
+  track: Track;
+  state: MatchState;
+  spotlight: UnitId | null;
+  fire: (cue: Cue) => void;
+}) {
   const facing = useRef(new Map<string, number>());
+  /** How many of the track's cues have fired, and which track that count is for. */
+  const fired = useRef<{ track: Track | null; n: number }>({ track: null, n: 0 });
 
   useFrame((_, delta) => {
     const now = performance.now();
@@ -395,13 +475,41 @@ function Mover({ link, track, state, spotlight }: { link: SceneLink; track: Trac
     const pose: Pose | null =
       track.plan && elapsed < track.plan.motion.totalMs ? poseAt(track.plan, elapsed) : null;
 
+    // The cues whose instant has come, in order, once each (2H.21).
+    if (fired.current.track !== track) fired.current = { track, n: 0 };
+    while (fired.current.n < track.cues.length && track.cues[fired.current.n]!.t <= elapsed) {
+      fire(track.cues[fired.current.n]!.cue);
+      fired.current.n += 1;
+    }
+    /** Whether a cue of this kind for this unit is still to come in the beat. */
+    const pending = (kind: Cue['kind'], unitId: UnitId): boolean => {
+      for (let i = fired.current.n; i < track.cues.length; i++) {
+        const cue = track.cues[i]!.cue;
+        if (cue.kind === kind && cue.unitId === unitId) return true;
+      }
+      return false;
+    };
+    /** A transition's progress, 0 to 1, or null once over (and then forgotten). */
+    const transition = (key: string, kind: 'exit' | 'enter' | 'drop', ms: number): number | null => {
+      const t = link.transitions.get(key);
+      if (!t || t.kind !== kind) return null;
+      const u = (now - t.since) / (ms * t.stretch);
+      if (u >= 1) {
+        link.transitions.delete(key);
+        return null;
+      }
+      return u;
+    };
+
     const place = (node: Object3D, p: Point, y = 0) => {
       const c = cellCentre(p);
       node.position.set(c.x, y, c.z);
     };
 
     // Units: where the pose has them, else where `state` has them. A unit
-    // faces the way it walks, else the Furnace it attacks.
+    // faces the way it walks, else the Furnace it attacks. One carried off
+    // stands until its cue, then sinks (2H.21); one coming on is hidden
+    // until its cue, then rises.
     for (const unit of state.units) {
       const key = `u:${unit.id}`;
       const node = link.pieces.get(key);
@@ -420,8 +528,23 @@ function Mover({ link, track, state, spotlight }: { link: SceneLink; track: Trac
       }
       facing.current.set(key, yaw);
       node.rotation.y = yaw;
-      node.position.set(c.x, 0, c.z);
-      node.visible = unit.status === 'active' || pose?.moving.has(key) === true;
+      let y = 0;
+      let visible = unit.status === 'active' || pose?.moving.has(key) === true;
+      const sinking = transition(key, 'exit', EXIT_MS);
+      const rising = transition(key, 'enter', EXIT_MS);
+      if (sinking !== null) {
+        y = -SINK * sinking * sinking;
+        visible = true;
+      } else if (rising !== null) {
+        y = -SINK * (1 - rising) * (1 - rising);
+        visible = true;
+      } else if (unit.status !== 'active' && pending('exit', unit.id)) {
+        visible = true;
+      } else if (unit.status === 'active' && pending('enter', unit.id)) {
+        visible = false;
+      }
+      node.position.set(c.x, y, c.z);
+      node.visible = visible;
       link.lastAt.set(key, { x: c.x, z: c.z });
     }
 
@@ -435,12 +558,15 @@ function Mover({ link, track, state, spotlight }: { link: SceneLink; track: Trac
       place(node, moving ?? cracker);
     }
 
-    // The Spark.
+    // The Spark. Entering, it comes down from above once its cue has fired
+    // (2H.21), and is not drawn before.
     const spark = link.pieces.get('s');
     if (spark) {
       const moving = pose?.moving.get('s');
-      spark.visible = sparkIsLive(state.spark) || moving !== undefined;
-      place(spark, moving ?? state.spark);
+      const drop = transition('s', 'drop', DROP_MS);
+      const waiting = !moving && track.cues.some((c, i) => i >= fired.current.n && c.cue.kind === 'sparkIn');
+      spark.visible = !waiting && (sparkIsLive(state.spark) || moving !== undefined);
+      place(spark, moving ?? state.spark, drop !== null ? DROP_FROM * (1 - drop) * (1 - drop) : 0);
     }
 
     // The ball: in flight, waiting for its flight, in a hand, or on the floor.

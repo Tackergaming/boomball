@@ -90,6 +90,12 @@ export interface MatchView {
   motion: Motion | null;
   /** How far through the batch the replay is, for the progress pips. */
   progress: { at: number; of: number } | null;
+  /**
+   * How long the card on screen stays, in milliseconds, and a key that
+   * changes with every beat so its time bar restarts (2H.21). Zero once the
+   * replay is over and the card is only the record of it.
+   */
+  hold: { readonly ms: number; readonly key: number };
   refusal: string | null;
   /** Set when the turn clock, not the player, ended the turn. */
   expired: boolean;
@@ -192,6 +198,8 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   const [beat, setBeat] = useState<Beat | null>(null);
   const [motion, setMotion] = useState<Motion | null>(null);
   const [progress, setProgress] = useState<{ at: number; of: number } | null>(null);
+  const [hold, setHold] = useState<{ ms: number; key: number }>({ ms: 0, key: 0 });
+  const holdKey = useRef(0);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
   const [skew, setSkew] = useState(0);
@@ -382,7 +390,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         // player may change the speed between two batches. The board glides
         // through it on its way to `one.state`; at `instant` it is all zero
         // and the board simply draws the state.
-        const travel = timeMotion(i, one.motion, speedRef.current);
+        const travel = timeMotion(i, one.motion, speedRef.current, one.cues);
         setBeat(one);
         setMotion(travel);
         setState(one.state);
@@ -395,10 +403,12 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         const card = holdFor(one, i === 0) * scale * BEAT_MS[speedRef.current];
         const glide = travel.totalMs > 0 ? travel.totalMs + SETTLE_MS : 0;
         const hold = Math.max(card, glide);
+        setHold({ ms: hold, key: ++holdKey.current });
         if (hold > 0) await wait(hold);
       }
 
       setProgress(null);
+      setHold({ ms: 0, key: ++holdKey.current });
       setReplaying(false);
       // The card is deliberately left up. `load()` puts the server's board back
       // underneath it, and the next action clears it.
@@ -535,6 +545,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     beat,
     motion,
     progress,
+    hold,
     refusal,
     expired,
     speed,
