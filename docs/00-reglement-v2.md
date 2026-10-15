@@ -1676,12 +1676,51 @@ l'équipe A, est lourde. La passe au gardien est donc « se débarrasser du ball
 receveur que personne ne peut atteindre », et elle a réussi : le gardien a relancé de huit
 cases au tour suivant. Dans la partie de Jérôme (`ab27b827`), aucune passe gratuite n'a visé un
 gardien : Derro Bellows, Breaker A, a refusé une passe à sept cases en arrière (moins 17,5) et
-gardé le ballon, Bexley Cannonade, Breaker B, a passé à un Striker sur sa ligne. **À trancher par
-Jérôme** : laisser (le gardien est un refuge légitime), ou borner la passe gratuite en arrière à
-huit cases comme un receveur ordinaire (C13 point 9), ou écarter le gardien quand un autre
-receveur existe. Rien n'est codé en attendant.
+gardé le ballon, Bexley Cannonade, Breaker B, a passé à un Striker sur sa ligne. Les trois
+options étaient : laisser (le gardien est un refuge légitime), borner la passe gratuite en
+arrière à huit cases comme un receveur ordinaire (C13 point 9), ou écarter le gardien quand un
+autre receveur existe. **Tranché par Jérôme le 2026-10-15 : laisser.** Ses mots : « c'est
+autorisé et ok pour moi ». La passe gratuite peut viser le gardien loin derrière, rien ne change
+dans `ai/`, et la ligne de dette correspondante est soldée.
 
 **Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
 `engine/`. L'écran dans `client/src/match/Board.tsx` (les carrés retirés). La 2.5D est un bloc
 client derrière l'interrupteur 2D / 3D : `client/src/board3d/`, `screens/Match.tsx` pour
 l'interrupteur et le crochet, `e2e/board3d.spec.ts` pour les captures. Pas de sweep.
+
+## C18. Décisions du 2026-10-15 après sa partie en 3D, **sous-phase 2H.16**
+
+> Écrites par le fil principal (Fable 5.1) sur les retours de Jérôme après **sa partie en 3D**
+> le 2026-10-15, la première sur la scène 2.5D de 2H.15, en local. Deux retours, tous deux de
+> caméra, reformulés en chat et confirmés par lui avec deux arbitrages. **Aucun écart de règle,
+> rien dans l'IA, aucune constante de `00` ne bouge : `ENGINE_VERSION` reste 9, les fonctions ne
+> sont pas à redéployer.** La sous-phase 2H.16 porte ces deux retours, client seul.
+
+**Retour 1, ses mots : « l'angle de la caméra devrait pouvoir être tourné à la souris librement
+et zoomer in et out avec la roulette de la souris. »** C'est l'arbitrage J4 de `08` §7 qui tombe :
+« trois quarts fixe en orientation, sans rotation libre, la rotation en option si elle manque ».
+Elle manque. **La caméra tourne au bouton droit de la souris** (et au bouton du milieu), le bouton
+gauche restant au jeu : clic sur une case, sur un pion, survol. Tranché par Jérôme : « oui bouton
+droit ». Elle pivote autour du point qu'elle suit déjà, le pion dont c'est le tour, sinon le
+ballon, et le centre du terrain en vue large. L'azimut est libre sur le tour entier ;
+l'inclinaison est bornée pour ne jamais passer sous le sol ni regarder à ras. **La roulette règle
+la distance en continu** entre un plus près et un plus loin. L'orientation et la distance
+choisies restent d'un tour à l'autre, tant que le plateau 3D est monté. La minicarte reste fixe
+et devient le repère « ma bouche à gauche » que J4 voulait garder.
+
+**Le bouton « Close in / Whole silo » reste**, comme deux cadrages de départ, et la roulette et
+la rotation s'appliquent par-dessus ; un clic sur le bouton remet la caméra au cadrage choisi,
+azimut et inclinaison compris. Tranché par Jérôme : « oui il reste et on suit ta
+recommandation ».
+
+**Retour 2, ses mots : « le zoom du close in devrait prendre le terrain dans sa largeur, et pas
+aussi près que maintenant. »** Le cadrage rapproché montrait dix-huit cases de long et coupait la
+largeur. **Il cadre désormais les quinze cases de large dans la hauteur de l'image**, avec une
+marge d'une case, et la caméra continue de glisser le long du terrain pour suivre le jeu. Le
+cadrage large reste le silo entier, et il tient aussi la largeur quand la fenêtre est haute.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. La caméra de la 2.5D, `client/src/board3d/Camera.tsx`, et sa géométrie de cadrage,
+pure et testée, dans `client/src/board3d/framing.ts` ; le bouton de zoom dans `Board3D.tsx` ;
+`e2e/board3d.spec.ts` pour une capture après rotation et roulette. J4 de `08` §7 est annoté comme
+tombé. Pas de sweep.

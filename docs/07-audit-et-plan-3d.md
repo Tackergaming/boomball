@@ -1549,7 +1549,7 @@ vert de Jérôme (« oui, redéploie ») :
 dans `context/import/`. Puis la phase 3, la scène 2.5D statique, dont A20 (React 19) est le premier
 pas.
 
-### Sous-phase 2H.15, « les cases orange retirées, la scène 2.5D en un seul bloc », codée le 2026-10-14, porte ouverte
+### Sous-phase 2H.15, « les cases orange retirées, la scène 2.5D en un seul bloc », codée le 2026-10-14, porte franchie le 2026-10-15
 
 Par le fil principal (Fable 5.1), avec trois sous-agents Sonnet nommés ci-dessous, à partir de
 `00` C17 : la partie de Jérôme sur le moteur 9 consignée, son seul retour (« enlève les cases
@@ -1580,3 +1580,28 @@ vert. **Pas de sweep**, pas demandé.
 lendemain. **Ce qui attend Jérôme** : ses parties en 3D (« See it in 3D » sur l'écran de match, le
 choix est gardé), ses retours en `00` C18, et l'option de `00` C17 sur la passe gratuite au gardien. Un sweep
 seulement s'il le demande.
+
+### Sous-phase 2H.16, « la caméra en main », codée le 2026-10-15, porte ouverte
+
+Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C18 : les deux retours de
+Jérôme après **sa première partie en 3D**, tous deux de caméra, reformulés en chat et tranchés
+par lui (bouton droit pour tourner, le bouton de zoom reste comme deux cadrages de départ). Au
+même moment il a tranché l'option de `00` C17 : **la passe gratuite au gardien reste autorisée**,
+rien ne change dans `ai/`. **Aucun écart de règle, `ENGINE_VERSION` reste 9**, rien à redéployer
+côté fonctions ; le client en ligne n'est pas redéployé, c'est son feu vert. **Pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| J4 | L'arbitrage « trois quarts fixe, sans rotation libre » de `08` §7 tombe, annoté là-bas. La minicarte, fixe, devient le repère « ma bouche à gauche » |
+| `framing.ts`, nouveau, pur | Le cadrage comme géométrie testable : la profondeur de sol que la hauteur de l'image couvre selon l'inclinaison et le champ (`groundDepthPerUnit`), le décalage du centre de ce sol par rapport au point visé (`groundCentreOffsetPerUnit`, le cadre couvre plus de sol au-delà du point visé qu'en deçà, donc on vise en retrait pour centrer), les deux cadrages (`presetDistance` : rapproché, les quinze cases de large plus une dans la hauteur de l'image ; large, les quarante-cinq de long dans la largeur et jamais moins que la largeur), la position sur l'orbite (`orbitPosition`), les bornes (inclinaison 20 à 85 degrés, roulette de 0,3 à 2,5 fois le cadrage). **11 tests** dans `framing.test.ts` |
+| `Camera.tsx` | L'orbite en main : glisser au **bouton droit** ou du milieu pour tourner (azimut libre, inclinaison bornée), roulette pour la distance, menu contextuel coupé sur le canevas, défilement de page coupé sous la roulette ; le bouton gauche reste au jeu. Le point visé est amorti comme avant, la position s'en déduit par l'orbite à chaque image. Un clic sur le bouton de cadrage remet l'orbite à la vue fixe. En rapproché, la caméra glisse le long du terrain après le pion dont c'est le tour, sinon le ballon, bornée aux bouts du silo ; la largeur étant dans l'image au cadrage, elle ne suit en travers que si la roulette a rapproché |
+| `Board3D.tsx` | Le bouton « Close in / Whole silo » reste, son infobulle dit la souris |
+| Le crochet | Rien à changer : `cellToScreen` et les plaques lisent la caméra au moment de l'appel |
+| Tests | **663 sur 31 fichiers contre 652 sur 30** ; typecheck racine, scripts, e2e et client verts ; build du client vert |
+| Harnais | `e2e/board3d.spec.ts` gagne un pas : après la capture rapprochée, un glisser au bouton droit de la souris puis la roulette, capture `board3d-orbit`, la case suivie se projette ailleurs, puis deux clics sur le bouton de cadrage la ramènent à moins de douze pixels de sa première projection. **Vert en 1,7 min** sur un Vite dédié, zéro erreur console. Smoke 2D non relancé : rien de 2D n'a bougé |
+| Captures lues | Large : le silo entier, centré. Rapprochée : les quinze cases de large du bord proche au bord lointain, le pion de Jérôme suivi, bloqué au bout du silo comme prévu. Orbite : la scène tournée d'un quart et rapprochée, le pion et son socle lisibles, les caisses de biais |
+| Dette | L'orbite se remet à la vue fixe quand on passe par le 2D et revient (le plateau 3D est remonté) ; la borne de suivi aux bouts du silo est calculée pour l'azimut zéro, approximative quand la caméra est tournée ; en vue large la roulette grossit le centre sans suivre le jeu ; en vue large le bas de l'image reste vide sur un cadre très large |
+
+**Ce qui attend Jérôme** : sa partie en 3D avec la caméra en main, ses retours en `00` C19 avant
+toute ligne de code, et son feu vert pour le client en ligne s'il le veut. Un sweep seulement
+s'il le demande.

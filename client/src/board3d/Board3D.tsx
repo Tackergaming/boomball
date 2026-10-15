@@ -346,7 +346,13 @@ export function Board3D({
       <Labels link={link} labels={labels} />
 
       <div style={S.hud}>
-        <button className="ghost" style={S.zoomButton} data-testid="zoom-toggle" onClick={toggleZoom} title="Two zooms: the whole silo, or close on the play">
+        <button
+          className="ghost"
+          style={S.zoomButton}
+          data-testid="zoom-toggle"
+          onClick={toggleZoom}
+          title="Two framings: the whole silo, or the pitch's width around the play. Right-drag turns the camera, the wheel zooms; this button sets it back."
+        >
           {zoom === 'wide' ? 'Close in' : 'Whole silo'}
         </button>
         <Minimap state={state} own={own} yoursId={yoursId} width={225} />

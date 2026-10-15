@@ -93,6 +93,30 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   await page.waitForTimeout(1_500);
   await shots.take('board3d-close');
 
+  // -- The camera in hand (C18): a right-button drag turns it, the wheel zooms ----
+  // The cell the unit walked to is what the close zoom follows, so its screen
+  // point must move with the camera, and it must still be found through it.
+  const steady = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
+  const centre = { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 };
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(centre.x + 180, centre.y + 50, { steps: 10 });
+  await page.mouse.up({ button: 'right' });
+  await page.mouse.wheel(0, -500);
+  await page.waitForTimeout(1_000);
+  await shots.take('board3d-orbit');
+  const turned = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
+  expect(turned, 'cellToScreen through the turned camera').not.toBeNull();
+  expect(turned, 'the camera turned and zoomed').not.toEqual(steady);
+  // Choosing the preset again puts the orbit back.
+  await page.getByTestId('zoom-toggle').click();
+  await page.getByTestId('zoom-toggle').click();
+  await expect(page.locator('[data-board3d][data-zoom="close"]')).toBeVisible();
+  await page.waitForTimeout(1_200);
+  const back = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
+  expect(back).not.toBeNull();
+  expect(Math.abs(back!.x - steady!.x) + Math.abs(back!.y - steady!.y), 'the preset frames as before').toBeLessThan(12);
+
   // -- The house plays, watched close ---------------------------------------------
   await act(page, { kind: 'endTurn' });
   expect(await myTurn()).toBe('turn');
