@@ -25,6 +25,12 @@ export interface SceneLink {
   readonly pieces: Map<string, Object3D>;
   /** What the camera should look at, in world units, written by the frame loop. */
   focus: { x: number; z: number };
+  /** Which piece `focus` is, by pose key, so the camera can tell a new thing to follow from the same thing moving. */
+  focusKey: string | null;
+  /** The camera's step, run by the frame loop after the pieces are placed and before the listeners. */
+  camera: ((delta: number) => void) | null;
+  /** Frames per second over the last half second, written by the camera's step. */
+  fps: number;
   /** The last world position of each piece, to read a direction of travel from. */
   readonly lastAt: Map<string, { x: number; z: number }>;
   /** A world point through the camera, set by the rig while it is mounted. */
@@ -34,7 +40,16 @@ export interface SceneLink {
 }
 
 export function newSceneLink(): SceneLink {
-  return { pieces: new Map(), focus: { x: 0, z: 0 }, lastAt: new Map(), project: null, listeners: new Set() };
+  return {
+    pieces: new Map(),
+    focus: { x: 0, z: 0 },
+    focusKey: null,
+    camera: null,
+    fps: 0,
+    lastAt: new Map(),
+    project: null,
+    listeners: new Set(),
+  };
 }
 
 /** The colour of a shirt: amber for the Giff this player drives, cyan for the side, magenta for the house. */

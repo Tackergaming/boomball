@@ -1,15 +1,17 @@
 # Reprise du chat suivant, Boomball
 
 > Écrit par le fil principal (Fable 5.1) le 2026-10-15, à la fin du chat qui a pris les retours
-> de Jérôme sur ses deux premières parties en 3D, écrit `00` C18 et C19, consigné sa décision
-> sur C17 et codé 2H.16 puis 2H.17 : la caméra en main, puis décrochée. À coller tel quel comme premier message du chat suivant, dans le
-> workspace `jarvis-jdr`.
+> de Jérôme sur ses cinq premières parties en 3D, écrit `00` C18 à C22, consigné sa décision
+> sur C17 et codé 2H.16 à 2H.20 : la caméra en main, décrochée, stable, les gradins et la
+> nouvelle tentative réseau, puis la caméra retenue dans le silo. Jérôme a clos ce lot (« on a
+> une bonne version pour l'instant ») et ouvert le suivant, le jeu vivant. À coller tel quel
+> comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.17
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.20
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15), §9 la
 parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 63, plus 40 bis,
@@ -22,27 +24,67 @@ du 2026-10-14 : mon retour sur les cases orange, retirées, et la passe gratuite
 son gardien treize cases derrière lui, TRANCHÉE le 2026-10-15 : elle reste autorisée, rien ne
 change. C18 le lot du 2026-10-15 : mes deux retours de caméra après ma première partie en 3D, et
 J4 qui tombe. C19 le second lot du 2026-10-15 : la caméra décrochée du jeu, mon retour après ma
-partie sur 2H.16. Chaque passe finit par « comment ... est codée », poids par poids, À LIRE avant
-de toucher à ai/. Ne rediscute rien de C12 à C19.
+partie sur 2H.16. C20 le troisième lot du même jour : la caméra stable, mes mots « très tremblant
+et instable », les cinq causes, et MON REFUS d'une caméra à quatre nombres lissés, la main reste
+brute. C21 le quatrième lot : 45 à 50 images par seconde, l'erreur réseau du round 8 lue en
+base et la nouvelle tentative, les gradins et la rambarde sur mes trois images. C22 le
+cinquième lot : la caméra retenue dans le silo, et la réponse sur mon Breaker du round 8 (passe
+gratuite, jamais un tir, écart 63, aucune décision). Chaque passe finit par « comment ... est
+codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de C12 à C22.
 07 §10 porte le journal, dont l'entrée 2H.15, qui dit fichier par fichier ce que la 2.5D
-contient, et les entrées 2H.16 et 2H.17, la caméra. 09 §12 est le dernier sweep, tranché « rien
-ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.17. 04 est l'histoire, à lire seulement quand une décision
+contient, les entrées 2H.16, 2H.17, 2H.18 et 2H.20, la caméra, et 2H.19, les gradins. 09 §12
+est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.20. 04 est l'histoire, à lire seulement quand une décision
 d'ingénierie te surprend.
 
-Où on en est : 2H.16 et 2H.17 sont CODÉES le 2026-10-15, ENGINE_VERSION toujours 9, rien à
+Où on en est : 2H.16 à 2H.20 sont CODÉES le 2026-10-15, ENGINE_VERSION toujours 9, rien à
 redéployer côté fonctions, le client en ligne PAS redéployé depuis 2H.14 (mon feu vert). Les
-fonctions en ligne restent resolve-action v20 et create-match v18, moteur 9. 665 tests verts sur
+fonctions en ligne restent resolve-action v20 et create-match v18, moteur 9. 669 tests verts sur
 31 fichiers (652 avant 2H.16), typecheck racine, scripts, e2e et client verts, build du client vert (three dans un chunk
-chargé en lazy, le 2D ne le télécharge pas). Le harnais 3D, npm run e2e:board3d, est vert en 2,0
-minutes sur un Vite dédié (5174) : bascule en 3D, silo entier capturé, cellToScreen par la caméra,
+chargé en lazy, le 2D ne le télécharge pas). Le harnais 3D, npm run e2e:board3d, est vert en 1,9
+à 2,5 minutes sur un Vite dédié (5174). SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE CHAUFFER
+PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN : à froid, global-setup.ts rate le
+champ Email en trente secondes et le run est rouge avant toute 3D, vu deux fois le 15 : bascule en 3D, silo entier capturé, cellToScreen par la caméra,
 clic à la souris sur la case qu'il désigne et le pion arrive, cadrage rapproché, glisser au
 bouton droit puis roulette, la case suivie se projette ailleurs, le bouton de cadrage la ramène,
 flèche droite tenue, le cadre passe en data-camera="free", « Follow the play » la ramène, tour de
 l'équipe adverse, retour 2D, zéro erreur console. Le smoke 2D (npm run e2e) n'a pas été relancé
-en 2H.16 ni 2H.17, rien de 2D n'a bougé ; la ligne « Smoke 2D » du journal 2H.15 dans 07 §10 dit
+de 2H.16 à 2H.20, rien de 2D n'a bougé ; la ligne « Smoke 2D » du journal 2H.15 dans 07 §10 dit
 vert. Ma partie sur le moteur 9 (ab27b827, Striker, 50-0) et le match e2e 7d631b71 sont
-consignés et rejoués sans écart dans docs/matches/. 2H.16 est commitée et poussée (fd85266) ; le
-commit de 2H.17 : à vérifier par git log, c'est moi qui le tape.
+consignés et rejoués sans écart dans docs/matches/, ainsi que ma partie sur 2H.18 (cb618e32,
+30-20). 2H.16 est commitée et poussée (fd85266), 2H.17 commitée (46341a0) ; les commits de 2H.18
+à 2H.20 : à vérifier par git log, c'est moi qui les tape. Mes trois JPEG de context/import/ (le
+gradin cyan, le gradin magenta, la rambarde) ne se commitent pas, leurs WebP dans
+board3d/textures/ oui.
+
+Ce que 2H.20 contient, en deux phrases. Les dimensions du silo (APRON_HALF 14, TUBE_RADIUS 15,
+TUBE_TOP, BACK_PLATE_X) sont dans layoutGeometry.ts, partagées par Silo.tsx et framing.ts ;
+confine retient la position de la caméra entre les parois et les plaques de fond tant qu'elle
+est sous le haut du tube moins une case, jamais sous 1,5 de haut, et la laisse libre au-dessus,
+où se tient la vue large. MIN_TILT 30 degrés, MAX_ZOOM 1,5, PAN_MARGIN 1.
+
+Ce que 2H.19 contient, en quatre phrases. Sur un fetch rejeté par le navigateur (Refused
+porte unreachable), useMatch.send attend 1,5 s, lit headSeq du match, recharge sans renvoyer si
+la tête a dépassé seqRef, sinon renvoie une fois ; rien côté serveur. Silo.tsx : le tube au
+rayon 15, un tablier sombre de 28 cases de large (APRON_HALF 14) autour du terrain de quinze,
+TUBE_LENGTH 56, la rambarde à une demi-case des touches, les gradins de côté en deux moitiés
+(Stand, pente 37 degrés, la couleur de la bouche la plus proche), les gradins de fond au-dessus
+du mur de la bouche ramené à 2,6 de haut et une plaque arrière à BACK_PLATE_X. Les foules sont
+mes images en meshBasicMaterial, MirroredRepeatWrapping, et chaque Stand s'efface (opacité
+jusqu'à 0,08) quand la caméra est derrière lui et plus bas que deux cases au-dessus de sa
+dernière rangée. Le compteur d'images par seconde marque 2 à 4 fps en headless, c'est le GL
+logiciel, chez moi c'est 45 à 50.
+
+Ce que 2H.18 contient, en quatre phrases. La main est brute : le bouton droit tourne tout de
+suite autour de la cible, qui ne bouge pas d'un pixel (le décalage de centrage se calcule dans
+la même image que l'azimut), et Ctrl plus la souris déplace la cible tout de suite. La distance
+ne dépend plus de l'inclinaison : le cadrage se calcule à PRESET_TILT quand le cadrage ou
+l'aspect change, la roulette fixe un facteur vers lequel la distance glisse en un dixième de
+seconde (ZOOM_EASE), les flèches ont une inertie d'un sixième (KEY_EASE). Accrochée, la caméra
+suit une pièce à la fois (link.focusKey), en prend une nouvelle au plus toutes les quatre
+dixièmes de seconde (FOLLOW_DWELL_MS) et glisse vers elle en un quart (FOLLOW_EASE). Le pas de
+la caméra est link.camera(delta), appelé par la boucle de Board3D après les pièces et avant les
+plaques, et un compteur d'images par seconde (link.fps, FpsReadout) s'affiche sous la minicarte
+en mode développement seulement : JE DOIS DONNER CE CHIFFRE.
 
 Ce que 2H.17 contient, en trois phrases. La caméra se décroche du jeu dès qu'on la déplace :
 aux flèches (KEY_PAN_RATE fois la distance par seconde, dans les axes de l'image donnés par
@@ -93,16 +135,33 @@ vert. Les archives de textures (19 Mo) dans context/import/textures-ambientcg/ e
 dans context/import/ ne sont pas commités non plus ; la copie du glb dans client/public/models/
 et les WebP le sont.
 
-LA TÂCHE.
-1. Vérifier git status avant toute chose ; 2H.16 doit être commitée (par /commit ou /save, tapés
-   par moi) ; si elle ne l'est pas, me le dire en premier.
-2. Ma partie en 3D avec la caméra libre : je l'ai jouée ou je la joue, en local (npm run dev
-   dans boomball/client, « See it in 3D », bouton droit pour tourner, roulette pour zoomer,
-   flèches ou Ctrl plus souris pour me déplacer, « Follow the play » pour revenir). Mes retours
-   en chat, puis C20 dans 00 avant toute ligne de code.
-3. Si je demande le client en ligne : le build est vert, le déploiement passe par mon feu vert
+LA TÂCHE : LE JEU VIVANT, 2H.21.
+Mes mots à la fin du chat précédent : « on a une bonne version pour l'instant, on peaufinera
+peut-être des détails plus tard. Maintenant on passe à la version suivante : les animations, et
+j'aimerais aussi qu'on améliore les annonces à l'écran, les popups d'événements. Bref, rendre le
+jeu plus visuellement interactif et vivant, sans surcharge. » La caméra de 2H.16 à 2H.20 est
+close, ne la retouche pas sans un retour de moi.
+1. Vérifier git status avant toute chose ; 2H.18 à 2H.20 doivent être commitées et poussées
+   (commit de /save du 2026-10-15 au soir) ; sinon me le dire en premier.
+2. Faire l'inventaire de ce qui existe avant de proposer : les effets (board3d/Ordnance.tsx
+   pour les Crackers et le Spark, Tokens.tsx pour les anneaux et le projecteur, Silo.tsx pour
+   l'éclat de but sur la bouche, match/pose.ts pour marche, poussée, recul, passe et tir ;
+   Effects.tsx n'existe pas, c'est la phase 6 de 07) et les annonces (screens/Match.tsx pour le
+   toast de beat « THE SILO », le bandeau de refus, le bandeau « The clock ran out », le
+   bouton « Into the silo » ; match/Feed.tsx pour le fil « THE CALL » ; PlacePrompt.tsx pour la
+   popup de place ; Briefing.tsx et SeatPanel.tsx). Lire 07 phase 6 pour ce qui y était prévu.
+3. Me proposer en chat UN lot de dix lignes au plus, en deux colonnes, animations et
+   annonces, chaque ligne nommant ce que je verrai à l'écran et quand, sans surcharge (un
+   effet par événement, jamais deux choses qui clignotent en même temps, le fil reste la
+   source). Me poser une ou deux questions si un choix est à moi. Après mon go, l'écrire en 00
+   C23 et en 08 §5 (la ligne 2H.21 existe, à compléter), puis coder, sous-agents Sonnet sur les
+   fichiers disjoints (Effects.tsx, les composants d'annonce), le fil principal sur
+   Board3D.tsx et Match.tsx.
+4. Une capture par effet dans e2e/board3d.spec.ts, lue, et le smoke 2D relancé si Match.tsx
+   ou Feed.tsx bougent (ils sont partagés par les deux plateaux).
+5. Si je demande le client en ligne : le build est vert, le déploiement passe par mon feu vert
    explicite, jamais le dépôt GitHub sur Vercel.
-4. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
+6. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -215,7 +274,8 @@ Ce qu'il faut savoir tout de suite.
     réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 12. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 63 de 00 partie
-    C, et C11 à C19 en entier ; J4 de 08 §7 est tombé en C18. Dette connue : arenas.art et le
+    C, et C11 à C22 en entier ; J4 de 08 §7 est tombé en C18, la caméra à quatre nombres lissés
+    est refusée en C20. Dette connue : arenas.art et le
     champ art du spec nomment trois JPEG retirés ; substituteEntry et substitute_entry restent et
     ne sont plus lus ; le choix de direction d'un Breaker humain à la parade est automatique ; la
     route proposée au clic reste la ligne droite alors que l'IA prend la route sûre ; le fil garde
@@ -231,8 +291,10 @@ Ce qu'il faut savoir tout de suite.
     mesure entre 1,4 et 2,7 s selon la charge de la machine ; en 3D, l'orientation du modèle, les
     sprites d'effets, le noir sous la lèvre avant, l'orbite remise à la vue fixe au retour du 2D,
     la borne de suivi calculée pour l'azimut zéro, la roulette en vue large qui ne suit pas le
-    jeu, le pan sous Ctrl qui s'interrompt au-dessus de la minicarte et des boutons ; les quatre
-    fichiers du vault modifiés hors de nos sessions, à moi de décider.
+    jeu, le pan sous Ctrl qui s'interrompt au-dessus de la minicarte et des boutons, la largeur
+    du terrain garantie seulement à l'inclinaison de départ, la répétition de la foule visible en
+    vue large, l'effacement des gradins jugé sur la hauteur de la caméra et pas sur la ligne de
+    vue, la retenue de la caméra en boîte et pas en tube ; les quatre fichiers du vault modifiés hors de nos sessions, à moi de décider.
 
 13. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte, après
     avoir récrit ce fichier.

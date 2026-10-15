@@ -1606,7 +1606,7 @@ côté fonctions ; le client en ligne n'est pas redéployé, c'est son feu vert.
 toute ligne de code, et son feu vert pour le client en ligne s'il le veut. Un sweep seulement
 s'il le demande.
 
-### Sous-phase 2H.17, « la caméra décrochée », codée le 2026-10-15, porte ouverte
+### Sous-phase 2H.17, « la caméra décrochée », codée le 2026-10-15, porte franchie le même jour
 
 Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C19 : le retour de Jérôme
 après **sa partie sur 2H.16**, pouvoir décrocher la caméra du joueur en cours et naviguer le
@@ -1628,3 +1628,77 @@ reste 9**, rien à redéployer ; le client en ligne n'est pas redéployé. **Pas
 **Ce qui attend Jérôme** : sa partie en 3D avec la caméra libre, ses retours en `00` C20 avant
 toute ligne de code, et son feu vert pour le client en ligne s'il le veut. Un sweep seulement
 s'il le demande.
+
+### Sous-phase 2H.18, « la caméra stable, la main brute », codée le 2026-10-15, porte franchie le même jour
+
+Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C20 : le retour de Jérôme
+après **sa partie sur 2H.17**, « très tremblant et instable », cinq causes lues dans le code et
+une proposition en chat, dont il a refusé la caméra à quatre nombres lissés (« mécanique,
+s'éloigne de la notion de libre ») et validé le reste. Il joue en normal, parfois en slow.
+**Aucun écart de règle, `ENGINE_VERSION` reste 9**, rien à redéployer ; le client en ligne n'est
+pas redéployé. **Pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| `scene.ts` | Le lien gagne `focusKey` (quelle pièce `focus` désigne), `camera` (le pas de la caméra, appelé par la boucle de `Board3D` après les pièces et avant les plaques, donc les trois s'accordent dans la même image) et `fps` |
+| `Camera.tsx` | Plus de `useFrame` propre : le pas est `link.camera(delta)`. **La main est brute** : le bouton droit tourne tout de suite autour de la cible, qui ne bouge pas (le décalage de centrage se calcule dans la même image que l'azimut) ; Ctrl plus la souris déplace la cible tout de suite, collée au curseur. **La distance ne dépend plus de l'inclinaison** : le cadrage se calcule à `PRESET_TILT` quand le cadrage change et quand l'aspect de l'image change, et la roulette fixe un facteur vers lequel la distance glisse en un dixième de seconde (`ZOOM_EASE`). **Les flèches ont une inertie** (`KEY_EASE`, un sixième de seconde). **Le suivi est calme** : accrochée, la caméra prend une nouvelle pièce à suivre au plus toutes les quatre dixièmes de seconde (`FOLLOW_DWELL_MS`), suit la pièce retenue pendant qu'elle marche, et glisse vers elle en un quart de seconde (`FOLLOW_EASE`). Compteur d'images par seconde sur la dernière demi-seconde |
+| `Board3D.tsx` | La boucle écrit `focusKey` et appelle `link.camera(delta)` ; `FpsReadout`, en mode développement seulement (`import.meta.env.DEV`), sous la minicarte, écrit par un listener sans passer par React |
+| Ce qui n'a pas changé | Les cadrages, le bouton droit, Ctrl, les flèches, le décrochage et « Follow the play » de C18 et C19 ; le crochet ; `framing.ts` |
+| Tests | **665 sur 31 fichiers**, inchangé ; typecheck racine, scripts, e2e et client verts ; build du client vert |
+| Harnais | `e2e/board3d.spec.ts` inchangé, **vert en 1,9 min** sur le Vite 5174 avec le crochet, le 5173 étant à Jérôme, zéro erreur console. Le compteur affiche 8 fps sous le GL logiciel de Chromium headless, ce qui ne dit rien de sa machine |
+| Capture lue | Orbite : son Giff sur son socle au pivot, les caisses de biais, le compteur sous la minicarte |
+| Dette | La largeur du terrain n'est garantie qu'à l'inclinaison de départ, c'est le prix de la distance fixe ; le pan sous Ctrl s'interrompt au-dessus de la minicarte et des boutons ; le chiffre d'images par seconde chez Jérôme reste à lire |
+
+**Ce qui attend Jérôme** : sa partie en 3D, le chiffre du compteur en bas à droite du plateau,
+ses retours en `00` C21 avant toute ligne de code. Si le chiffre est bas, les ombres (2048) et la
+résolution (`dpr` 1,5) s'allègent en premier. Un sweep seulement s'il le demande.
+
+### Sous-phase 2H.19, « les gradins et la nouvelle tentative », codée le 2026-10-15, porte franchie le même jour
+
+Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C21 : les trois retours de
+Jérôme après **sa partie sur 2H.18** (`cb618e32`, consignée et rejouée sans écart) : 45 à 50
+images par seconde, une latence et une erreur réseau au round 8, et le vide autour du terrain,
+avec ses trois images Nano Banana Pro faites sur les prompts du fil principal (skill
+`image-prompt` chargé, espèce décrite jamais nommée). **Aucun écart de règle, `ENGINE_VERSION`
+reste 9**, rien à redéployer côté fonctions ; le client en ligne n'est pas redéployé. **Pas de
+sweep.**
+
+| Quoi | État |
+|---|---|
+| La latence et l'erreur | Lu en base par les horodatages de `match_events` : son Shove du round 8 est enregistré une seule fois, à 13:47:18, raté au dé ; le message « could not reach the resolve-action server » est un `fetch` rejeté par le navigateur avant toute réponse, sans délai ni nouvelle tentative dans `callFunction`. Son premier clic n'a jamais atteint le serveur, le second oui |
+| `lib/supabase.ts` | `Refused` gagne `unreachable: true` sur un `fetch` rejeté ; `headSeq(matchId)` lit le dernier `seq` du match |
+| `match/useMatch.ts` | Dans `send` : sur `unreachable`, attendre `RETRY_AFTER_MS` (1,5 s), lire la tête ; si elle a dépassé `seqRef`, l'action est passée et seule la réponse s'est perdue, `load()` sans renvoyer ; sinon renvoyer une fois. Pas de changement serveur, pas de risque de doublon |
+| Les textures | `stand-cyan.webp`, `stand-magenta.webp` (2048 x 1143) et `barrier.webp` (2048 x 720, la bande du mur recadrée) dans `board3d/textures/`, depuis ses trois JPEG de `context/import/` (non commités). Environ 1 Mo en tout |
+| `Silo.tsx` | Le tube passe au rayon 15 et le sol devient un tablier sombre de 28 cases de large (`APRON_HALF`), le terrain texturé restant quinze cases ; `TUBE_LENGTH` à 56. **La rambarde** : deux plans à une demi-case des lignes de touche, hauteur 1, image en miroir répété. **Les gradins de côté** (`Stand`) : deux moitiés par côté, pente de 37 degrés, du pied à 0,4 au sommet à 4,6, chaque moitié dans la couleur de la bouche la plus proche, une planche sombre derrière le sommet. **Les gradins de fond** : au-dessus du mur de la bouche, ramené à 2,6 de haut et 28 de large, montant vers une plaque arrière à `BACK_PLATE_X` qui ferme le tube. Les foules sont en `meshBasicMaterial`, non éclairées, `MirroredRepeatWrapping`. **L'effacement** : chaque gradin lit la caméra à chaque image ; derrière lui et plus bas que deux cases au-dessus de sa dernière rangée, il devient transparent jusqu'à 0,08 |
+| Tests | **665 sur 31 fichiers**, inchangé ; typecheck racine, scripts, e2e et client verts ; build du client vert |
+| Harnais | `e2e/board3d.spec.ts` inchangé. **Un premier run rouge puis deux verts** sur le Vite 5174 (2,4 min) : le premier échec n'a pas été capturé, les trois textures neuves chargent lentement sous le GL logiciel et l'attente de trois secondes après la bascule en 3D est juste ; à surveiller, à allonger si ça se reproduit |
+| Captures lues | Large : les deux tribunes de côté, cyan côté bouche cyan et magenta côté bouche magenta, la rambarde devant, les tribunes de fond autour des deux bouches, plus de noir autour du terrain. Orbite : la tribune du fond de biais derrière son Giff, nette. Rapprochée : rien ne gêne, le tablier sombre au bord |
+| Dette | La répétition de la foule se voit en vue large (environ deux images par moitié de tribune) ; les gradins de fond sont plus larges que le tube n'est haut à leurs angles ; l'effacement se juge sur la hauteur de la caméra seulement, pas sur la ligne de vue réelle |
+
+**Ce qui attend Jérôme** : sa partie en 3D dans le silo fermé, ses retours en `00` C22 avant
+toute ligne de code, et son feu vert pour le client en ligne s'il le veut. Un sweep seulement
+s'il le demande.
+
+### Sous-phase 2H.20, « la caméra dans le silo », codée le 2026-10-15, porte ouverte
+
+Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C22 : le retour de Jérôme
+après **sa partie sur 2H.19**, « on se rapproche d'un truc bien », avec sa capture d'une caméra
+sortie du terrain, et sa question sur le Breaker du round 8, répondue depuis le dump (la passe
+gratuite de l'écart 63 n'est jamais un tir, aucune décision). **Aucun écart de règle,
+`ENGINE_VERSION` reste 9**, rien à redéployer ; le client en ligne n'est pas redéployé. **Pas de
+sweep.**
+
+| Quoi | État |
+|---|---|
+| `layoutGeometry.ts` | Les dimensions du silo deviennent pures et partagées : `APRON_HALF` 14, `TUBE_RADIUS` 15, `TUBE_CENTRE`, `TUBE_TOP`, `BACK_PLATE_X` (le demi-terrain plus 6,5). `Silo.tsx` les importe au lieu de les porter |
+| `framing.ts` | `MIN_TILT` 30 degrés (20 avant), `MAX_ZOOM` 1,5 (2,5 avant), `PAN_MARGIN` 1 (4 avant). **`confine`** : sous le haut du tube moins une case, la position de la caméra est retenue entre les parois (`APRON_HALF`) et les plaques de fond (`BACK_PLATE_X` moins une), et jamais sous 1,5 de haut ; au-dessus, libre, c'est là que se tient la vue large. **4 tests** de plus |
+| `Camera.tsx` | `confine` s'applique à la position calculée, le point visé ne change pas : une caméra poussée contre une paroi s'en approche de la cible au lieu de la traverser |
+| Tests | **669 sur 31 fichiers contre 665** ; typecheck racine, scripts, e2e et client verts ; build du client vert |
+| Harnais | `e2e/board3d.spec.ts` inchangé, **vert en 2,5 min** sur le Vite 5174. **Un run froid rouge avant** : `global-setup.ts` n'a pas trouvé le champ Email en trente secondes sur un Vite qui venait de démarrer, c'est le cas « la connexion peut expirer une fois, relancer » ; chauffer le Vite par deux `curl` avant le run l'évite, et c'est sans doute aussi la cause du premier rouge de 2H.19 |
+| Capture lue | Rien de neuf à voir en vue large ni rapprochée ; la retenue se voit en jouant, quand la caméra basse bute sur la rambarde du côté proche |
+| Dette | La retenue est une boîte, pas le vrai tube : dans les angles hauts du tube la caméra peut encore voir un coin de paroi de l'extérieur ; la largeur du terrain garantie seulement à l'inclinaison de départ |
+
+**Ce qui attend Jérôme** : sa partie en 3D, ses retours en `00` C23 avant toute ligne de code,
+et son feu vert pour le client en ligne s'il le veut. S'il veut que la passe gratuite puisse
+devenir un tir, ou que le Breaker tire à portée propre, c'est un écart à écrire. Un sweep
+seulement s'il le demande.

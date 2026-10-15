@@ -31,7 +31,12 @@ export const supabase = createClient(url, anonKey, {
   auth: { persistSession: true, autoRefreshToken: true },
 });
 
-export type Refused = { accepted: false; reason: string };
+/**
+ * A refusal. `unreachable` marks the one kind that is not an answer at all:
+ * the browser rejected the request before any reply, so the server may or
+ * may not have seen it (C21).
+ */
+export type Refused = { accepted: false; reason: string; unreachable?: true };
 
 export type CreateMatchReply =
   | {
@@ -98,7 +103,7 @@ async function callFunction<T>(name: string, body: unknown): Promise<T | Refused
     // A rejected `fetch` says nothing useful on purpose, the browser keeps the
     // reason to itself. The console line is where the real one is.
     console.error(`${name} could not be reached`, failure);
-    return { accepted: false, reason: `could not reach the ${name} server. Check your connection.` };
+    return { accepted: false, reason: `could not reach the ${name} server. Check your connection.`, unreachable: true };
   }
 
   try {
@@ -121,6 +126,24 @@ export function submitAction(
   action: Action,
 ): Promise<ResolveActionReply> {
   return callFunction<ResolveActionReply>('resolve-action', { matchId, unitId, action });
+}
+
+/**
+ * The sequence number of the match's last event, or null when it cannot be
+ * read. Asked before sending an action again after the browser rejected the
+ * request (C21): if the head has moved on, the action got through and only
+ * the reply was lost.
+ */
+export async function headSeq(matchId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('match_events')
+    .select('seq')
+    .eq('match_id', matchId)
+    .order('seq', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data as { seq: number }).seq;
 }
 
 /**

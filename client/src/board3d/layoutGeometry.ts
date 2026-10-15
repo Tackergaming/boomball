@@ -15,6 +15,19 @@ export const CELL = 1;
 export const PITCH_LENGTH = ARENA_HEIGHT;
 export const PITCH_WIDTH = ARENA_WIDTH;
 
+/**
+ * The silo around the pitch (C21), in world units, shared by the scene that
+ * draws it (`Silo.tsx`) and the camera that must stay inside it (C22). The
+ * floor is a chord of a tube lying on its side: the pitch in the middle, a
+ * dark apron out to the walls where the stands sit, and a plate closing each
+ * end behind the end stands.
+ */
+export const APRON_HALF = 14;
+export const TUBE_RADIUS = 15;
+export const TUBE_CENTRE = Math.sqrt(TUBE_RADIUS ** 2 - APRON_HALF ** 2);
+export const TUBE_TOP = TUBE_CENTRE + TUBE_RADIUS;
+export const BACK_PLATE_X = PITCH_LENGTH / 2 + 6.5;
+
 const HALF_LENGTH = (ARENA_HEIGHT - 1) / 2;
 const HALF_WIDTH = (ARENA_WIDTH - 1) / 2;
 

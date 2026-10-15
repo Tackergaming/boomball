@@ -7,18 +7,21 @@
  * distances are world units, one cell each.
  */
 
-import { PITCH_LENGTH, PITCH_WIDTH } from './layoutGeometry.js';
+import { APRON_HALF, BACK_PLATE_X, PITCH_LENGTH, PITCH_WIDTH, TUBE_TOP } from './layoutGeometry.js';
 
 export type Zoom = 'wide' | 'close';
 
 /** The three-quarter view both presets start from, below the horizon. */
 export const PRESET_TILT = (52 * Math.PI) / 180;
-/** The orbit may not look at the floor from lower than this, nor from straight above. */
-export const MIN_TILT = (20 * Math.PI) / 180;
+/**
+ * The orbit may not look at the floor from lower than this, nor from straight
+ * above. Thirty degrees (C22) keeps the camera above the stands' heads.
+ */
+export const MIN_TILT = (30 * Math.PI) / 180;
 export const MAX_TILT = (85 * Math.PI) / 180;
-/** The wheel's reach, as a factor over the preset distance. */
+/** The wheel's reach, as a factor over the preset distance; 1.5 (C22) never leaves the silo behind. */
 export const MIN_ZOOM = 0.3;
-export const MAX_ZOOM = 2.5;
+export const MAX_ZOOM = 1.5;
 
 export interface Orbit {
   /** Around the vertical, 0 being the fixed view of J4: own Furnace on the left. */
@@ -83,8 +86,22 @@ export function presetDistance(zoom: Zoom, aspect: number, fov: number, tilt: nu
   return Math.max(distanceForSpan(PITCH_LENGTH + 2, aspect, fov), width);
 }
 
-/** How far past the pitch's edges the camera may be panned (C19). */
-export const PAN_MARGIN = 4;
+/** How far past the pitch's edges the camera may be panned (C19); one cell since C22. */
+export const PAN_MARGIN = 1;
+
+/**
+ * Keeps the camera inside the silo (C22). Below the tube's top the camera
+ * stays between the walls and the end plates, so it never looks in from
+ * outside or through a plate's back; above the open top it is free, which is
+ * where the whole-silo view stands. It never goes under the stands' heads.
+ */
+export function confine(p: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  const y = Math.max(1.5, p.y);
+  if (y >= TUBE_TOP - 1) return { x: p.x, y, z: p.z };
+  const lx = BACK_PLATE_X - 1;
+  const lz = APRON_HALF;
+  return { x: Math.max(-lx, Math.min(lx, p.x)), y, z: Math.max(-lz, Math.min(lz, p.z)) };
+}
 
 /** Keeps a pan target on the pitch and its surroundings. */
 export function clampPan(p: { x: number; z: number }): { x: number; z: number } {

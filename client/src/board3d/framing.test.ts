@@ -16,6 +16,7 @@ import {
   clampPan,
   clampTilt,
   clampZoom,
+  confine,
   distanceForDepth,
   distanceForSpan,
   groundCentreOffsetPerUnit,
@@ -25,7 +26,7 @@ import {
   presetOrbit,
   viewAxes,
 } from './framing.js';
-import { PITCH_LENGTH, PITCH_WIDTH } from './layoutGeometry.js';
+import { APRON_HALF, BACK_PLATE_X, PITCH_LENGTH, PITCH_WIDTH, TUBE_TOP } from './layoutGeometry.js';
 
 const FOV = (36 * Math.PI) / 180;
 
@@ -105,6 +106,30 @@ describe('the pan (C19)', () => {
       const v = viewAxes(yaw);
       expect(v.forward.x * v.right.x + v.forward.z * v.right.z).toBeCloseTo(0, 9);
     }
+  });
+});
+
+describe('the silo around the camera (C22)', () => {
+  it('keeps a low camera between the walls and the end plates', () => {
+    const p = confine({ x: 40, y: 8, z: -30 });
+    expect(p.x).toBe(BACK_PLATE_X - 1);
+    expect(p.z).toBe(-APRON_HALF);
+    expect(p.y).toBe(8);
+  });
+
+  it('leaves a camera above the open top where it is, which is where the wide view stands', () => {
+    const p = confine({ x: 0, y: TUBE_TOP + 10, z: 26 });
+    expect(p).toEqual({ x: 0, y: TUBE_TOP + 10, z: 26 });
+  });
+
+  it('never goes under the stands’ heads', () => {
+    expect(confine({ x: 0, y: -3, z: 0 }).y).toBe(1.5);
+  });
+
+  it('bounds the orbit tighter than before: thirty degrees up, one and a half times out', () => {
+    expect(MIN_TILT).toBeCloseTo((30 * Math.PI) / 180, 9);
+    expect(MAX_ZOOM).toBe(1.5);
+    expect(PAN_MARGIN).toBe(1);
   });
 });
 

@@ -1757,3 +1757,138 @@ cadrage par « Close in / Whole silo » la ramène aussi, avec l'orbite remise.
 `engine/`. `client/src/board3d/Camera.tsx` et `framing.ts` pour le déplacement et ses bornes,
 `Board3D.tsx` pour le bouton et le raccrochage à son tour, `e2e/board3d.spec.ts` pour un pas aux
 flèches. Pas de sweep.
+
+## C20. Décisions du 2026-10-15 après sa partie avec la caméra décrochée, **sous-phase 2H.18**
+
+> Écrites par le fil principal (Fable 5.1) sur le retour de Jérôme après **sa partie sur 2H.17**
+> le 2026-10-15, en local. Un retour, de caméra, analysé dans le code et proposé en chat, puis
+> tranché par lui en deux échanges. **Aucun écart de règle, rien dans l'IA, aucune constante de
+> `00` ne bouge :** `ENGINE_VERSION` reste 9, les fonctions ne sont pas à redéployer. La
+> sous-phase 2H.18 porte ce retour, client seul.
+
+**Le retour, ses mots : « c'est pas mal, ça reste encore très tremblant et instable. Je ne sais
+pas comment l'expliquer mais ça ne me paraît pas très stable. »** Il joue en normal, parfois en
+slow. Les causes, lues dans `Camera.tsx` et `Board3D.tsx` de 2H.17 :
+
+1. **Le pivot bougeait pendant la rotation** : l'azimut changeait tout de suite, le point visé
+   était amorti d'un quart de seconde, donc le pion dérivait dans l'image puis revenait.
+2. **La distance dépendait de l'inclinaison** (pour tenir la largeur du terrain) : incliner
+   faisait avancer ou reculer la caméra et décalait le point visé, trois mouvements pour un geste.
+3. **Le lissage était à l'envers** : rotation et roulette brutes (un cran, un saut de 10 %), mais
+   le déplacement sous Ctrl amorti, le sol traînait derrière la souris comme un élastique.
+4. **La caméra changeait de cible à chaque événement** pendant les tours de l'IA, le pion qui
+   agit puis le suivant puis le pion sur l'horloge, sans jamais arriver.
+5. **Le nombre d'images par seconde n'est pas mesuré** chez lui : quatorze modèles avec des
+   ombres fines sur un GPU intégré peuvent tomber à vingt images par seconde.
+
+**Ce qu'il a tranché.** La proposition d'une caméra à quatre nombres, chacun avec une valeur
+visée et une valeur réelle lissée, est **refusée** : « c'est mécanique et s'éloigne de la notion
+de libre ». Le reste est validé. Donc :
+
+- **La main reste brute.** Le bouton droit tourne tout de suite, Ctrl plus la souris déplace le
+  sol tout de suite, collé au curseur, sans amortissement.
+- **Le pivot est exact** : tourner tourne autour de la cible, qui ne bouge pas d'un pixel.
+- **La distance ne dépend plus de l'inclinaison.** Le cadrage se calcule quand on choisit « Close
+  in » ou « Whole silo » et quand la fenêtre change de taille, à l'inclinaison de départ ;
+  incliner ne fait qu'incliner, et la largeur du terrain n'est garantie qu'à cette inclinaison.
+- **La roulette est douce** : un cran fixe une distance visée, la caméra y glisse en un dixième
+  de seconde. **Les flèches ont une inertie** : la vitesse monte et redescend en un sixième de
+  seconde.
+- **Le suivi est calme** : accrochée, la caméra ne change de cible qu'une fois par action, jamais
+  plus vite que quatre dixièmes de seconde, et glisse vers elle en un quart de seconde ; elle
+  suit le pion qui agit (il joue en normal et en slow).
+- **Un compteur d'images par seconde** s'affiche en mode développement, pour qu'il donne le
+  chiffre. S'il est bas, les ombres et la résolution s'allègent avant de chercher plus loin.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. `client/src/board3d/Camera.tsx` et `scene.ts` (la caméra se place après les pièces et
+avant les plaques, dans la même image), `Board3D.tsx` pour le compteur, `e2e/board3d.spec.ts` si
+un pas change. Pas de sweep.
+
+## C21. Décisions du 2026-10-15 après sa partie sur la caméra stable, **sous-phase 2H.19**
+
+> Écrites par le fil principal (Fable 5.1) sur les retours de Jérôme après **sa partie sur 2H.18**
+> le 2026-10-15 (match `cb618e32`, 13 h 38 heure de Paris, Striker, 30 à 20, consigné et rejoué
+> sans écart dans `docs/matches/2026-10-15-cb618e32/`). Trois retours : le compteur, une
+> latence et une erreur réseau, et le vide autour du terrain. **Aucun écart de règle, rien dans
+> l'IA, aucune constante de `00` ne bouge :** `ENGINE_VERSION` reste 9, les fonctions ne sont pas
+> à redéployer. La sous-phase 2H.19 porte ces retours, client seul.
+
+**Le compteur : 45 à 50 images par seconde.** Suffisant, rien à alléger.
+
+**La latence et l'erreur, ses mots : « au round 8, il y a eu une latence énorme de plusieurs
+secondes entre mon clic et le déplacement de mon personnage » ; sur le Shove, « j'ai cliqué une
+fois et j'ai eu le message d'erreur, puis j'ai cliqué une deuxième fois et ça a marché ».** Le
+message était « could not reach the resolve-action server. Check your connection. » Lu en base :
+au round 8, son déplacement est enregistré à 13:46:23, son Shove à 13:47:18, **une seule fois**,
+raté au dé. Lu dans `client/src/lib/supabase.ts` : ce message vient d'un `fetch` rejeté par le
+navigateur avant toute réponse, donc d'une coupure réseau, pas du serveur ; le client n'a ni
+délai d'attente ni nouvelle tentative. Le premier clic n'a jamais atteint le serveur, le second
+oui. La latence sur le déplacement, une minute plus tôt, est la même coupure qui ralentissait
+déjà la ligne. **Décision du fil principal, à corriger par Jérôme** : sur un `fetch` rejeté, le
+client attend une seconde et demie, relit la tête des événements du match, et **ne renvoie
+l'action que si rien n'a avancé** ; si la tête a avancé, l'action est passée et seule la réponse
+s'est perdue, le client recharge sans renvoyer. Une seule nouvelle tentative, puis le message.
+Pas de changement serveur.
+
+**Le vide autour du terrain, ses mots : « je crois aussi comprendre ce qui me dérange, je pense
+que c'est le vide derrière les bouches et du côté du silo où il n'y a pas de mur. Je pense qu'on
+y gagnerait à y mettre des bords de terrain et des gradins remplis de Giff en spectateurs (pas
+3D, juste une plaque de skin). »** Accord du fil principal : l'œil juge un mouvement de caméra
+contre un cadre fixe, et le noir n'en donne aucun. Fait :
+
+- **Une rambarde** d'une case autour des deux longs côtés du terrain, à hauteur de taille, avec
+  son image (`la rambarde.jpg`, Nano Banana Pro, convertie en WebP 2K).
+- **Des gradins** sur les deux longs côtés et derrière chaque bouche, en pente, avec ses deux
+  images de foule (`le gradin cyan.jpg`, `le gradin magenta.jpg`, WebP 2K), répétées en miroir
+  pour cacher le raccord. Derrière chaque bouche, la couleur de l'équipe qui la défend ; sur les
+  longs côtés, chaque moitié prend la couleur de la bouche la plus proche. Les plaques sont
+  non éclairées pour garder la lumière de l'image.
+- **Le tube s'élargit** pour loger les gradins : rayon 15 au lieu de 10, le sol du terrain reste
+  quinze cases et un tablier sombre court jusqu'aux parois ; les plaques d'extrémité reculent
+  derrière les gradins de fond.
+- **Le gradin qui passe entre la caméra et le terrain s'efface** : quand la caméra descend bas du
+  côté d'un gradin, celui-ci devient transparent, et revient dès qu'elle remonte.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. `client/src/board3d/Silo.tsx` et ses textures, `client/src/lib/supabase.ts` et
+`client/src/match/useMatch.ts` pour la nouvelle tentative, `e2e/board3d.spec.ts` pour les
+captures. Pas de sweep.
+
+## C22. Décisions du 2026-10-15 après sa partie dans le silo fermé, **sous-phase 2H.20**
+
+> Écrites par le fil principal (Fable 5.1) sur les retours de Jérôme après **sa partie sur 2H.19**
+> le 2026-10-15. Un retour de caméra avec sa capture, et une question sur l'IA, lue dans le
+> dump de son match `cb618e32` et pas supposée. **Aucun écart de règle, rien dans l'IA, aucune
+> constante de `00` ne bouge :** `ENGINE_VERSION` reste 9, les fonctions ne sont pas à
+> redéployer. La sous-phase 2H.20 porte le retour de caméra, client seul.
+
+**Le retour, ses mots : « on se rapproche d'un truc bien. Je pense qu'il faut limiter le max
+d'angle et zoom pour éviter de se retrouver en dehors du terrain ou avoir des angles
+impossibles. »** Sa capture montre la caméra basse, déplacée au-delà de la ligne de touche
+proche, qui voit le bord du tablier, l'extérieur du tube et le noir au-delà. Fait :
+
+- **Le déplacement est borné au terrain plus une case** (il l'était à quatre).
+- **L'inclinaison ne descend plus sous trente degrés** (vingt avant), ce qui garde la caméra
+  au-dessus des têtes des gradins.
+- **La roulette ne recule plus qu'à une fois et demie le cadrage** (deux fois et demie avant).
+- **La caméra reste dans le silo** : tant qu'elle est sous le haut du tube, sa position est
+  retenue entre les parois et les plaques de fond, et jamais sous une case et demie de haut ;
+  au-dessus du haut du tube, qui est ouvert, elle est libre, et c'est là que se tient la vue du
+  silo entier. La retenue s'applique à la position, le point visé ne change pas.
+
+**La question, ses mots : « pourquoi en round 8 mon Breaker n'a pas tiré au but ? »** Lu dans
+`docs/matches/2026-10-15-cb618e32/match.md`, round 8 : Nib Oakes, Breaker A, marche en (8, 34)
+sous une allonge, **bouscule Ogga Flintlock et prend le ballon** (écart 61, un 20 naturel contre
+un 1), ce qui dépense son Action. Il lui reste la passe gratuite de l'écart 63, qui est **« jamais
+un tir »**, par la règle de Jérôme en C16. Il marche une case en (9, 35) et passe à Dolm Halyard,
+l'autre Breaker, qui avait déjà joué son tour, parce qu'un receveur qui a déjà joué n'a aucune
+exposition à l'arrivée (125 points contre 58 pour Harrow Flintlock devant). Dolm, Action
+dépensée lui aussi, garde le ballon jusqu'à ce que Marrow Flintlock le lui prenne par un Shove au
+tour suivant. **Aucune décision** : c'est la règle de l'écart 63 qui a joué, et le Breaker porte
+un poids de tir de 15 pour « tout sauf tirer » (C10). S'il voulait que la passe gratuite puisse
+devenir un tir, ou que le Breaker tire à portée propre, ce serait un écart à écrire ici.
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. `client/src/board3d/framing.ts` (`confine`, les bornes), `layoutGeometry.ts` (les
+dimensions du silo partagées avec `Silo.tsx`), `Camera.tsx`. Pas de sweep.

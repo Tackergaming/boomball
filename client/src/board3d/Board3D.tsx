@@ -375,6 +375,7 @@ export function Board3D({
           </button>
         )}
         <Minimap state={state} own={own} yoursId={yoursId} width={225} />
+        {import.meta.env.DEV && <FpsReadout link={link} />}
       </div>
     </div>
   );
@@ -388,7 +389,7 @@ export function Board3D({
 function Mover({ link, track, state, spotlight }: { link: SceneLink; track: Track; state: MatchState; spotlight: UnitId | null }) {
   const facing = useRef(new Map<string, number>());
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const now = performance.now();
     const elapsed = now - track.began;
     const pose: Pose | null =
@@ -477,14 +478,36 @@ function Mover({ link, track, state, spotlight }: { link: SceneLink; track: Trac
     const starNode = star ? link.pieces.get(`u:${star}`) : undefined;
     if (starNode && starNode.visible) {
       link.focus = { x: starNode.position.x, z: starNode.position.z };
+      link.focusKey = `u:${star}`;
     } else if (ball) {
       link.focus = { x: ball.position.x, z: ball.position.z };
+      link.focusKey = 'b';
     }
 
+    // The camera, then the words that follow the pieces through it.
+    link.camera?.(delta);
     for (const listener of link.listeners) listener();
   });
 
   return null;
+}
+
+/** Frames per second, in development only (C20), written by hand once a frame. */
+function FpsReadout({ link }: { link: SceneLink }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let shown = -1;
+    const tick = () => {
+      if (link.fps === shown || !ref.current) return;
+      shown = link.fps;
+      ref.current.textContent = `${shown} fps`;
+    };
+    link.listeners.add(tick);
+    return () => {
+      link.listeners.delete(tick);
+    };
+  }, [link]);
+  return <span ref={ref} style={S.fps} data-testid="fps" />;
 }
 
 const S: Record<string, React.CSSProperties> = {
@@ -509,4 +532,5 @@ const S: Record<string, React.CSSProperties> = {
     pointerEvents: 'none',
   },
   zoomButton: { fontSize: 10, padding: '4px 9px', pointerEvents: 'auto', background: 'rgba(5,7,10,.8)' },
+  fps: { font: `600 10px 'IBM Plex Mono', monospace`, color: BRASS, background: 'rgba(5,7,10,.8)', padding: '1px 5px' },
 };

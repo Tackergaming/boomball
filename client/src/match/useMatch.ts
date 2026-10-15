@@ -48,7 +48,7 @@ import type { AllyOrder } from '../../../ai/orders.js';
 import type { Action } from '../../../engine/actions.js';
 import type { MatchEvent } from '../../../engine/events.js';
 import type { MatchState, TeamId } from '../../../engine/types.js';
-import { sendOrders, submitAction, supabase } from '../lib/supabase.js';
+import { headSeq, sendOrders, submitAction, supabase } from '../lib/supabase.js';
 import { timeMotion, type Motion } from './motion.js';
 import { toBeats, type Beat } from './replay.js';
 
@@ -443,7 +443,23 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
       try {
         const before = state;
         const sentAt = Date.now();
-        const reply = await submitAction(matchId, unitId, action);
+        let reply = await submitAction(matchId, unitId, action);
+
+        // The browser rejected the request before any reply (C21): a dropped
+        // connection, seen once as a Shove that "failed" and then worked on
+        // the second click. The server may still have taken the action, so
+        // before sending it again the match's head is read: moved on, the
+        // action got through and only the reply was lost, so the board is
+        // read again instead; still where it was, one more try.
+        if (!reply.accepted && reply.unreachable) {
+          await wait(RETRY_AFTER_MS);
+          const head = await headSeq(matchId);
+          if (head !== null && head > seqRef.current) {
+            await load();
+            return;
+          }
+          reply = await submitAction(matchId, unitId, action);
+        }
 
         // Every reply carries the server's clock. Half the round trip is a
         // rough enough correction: what matters is catching a machine minutes
@@ -548,6 +564,9 @@ function holdFor(beat: Beat, isFirst: boolean): number {
   if (isFirst && !hasDice && beat.unitId === null) return 0;
   return 1;
 }
+
+/** How long to let a dropped connection come back before an action is sent again (C21). */
+const RETRY_AFTER_MS = 1500;
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
