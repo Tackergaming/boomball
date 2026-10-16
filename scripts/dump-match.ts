@@ -572,6 +572,9 @@ md.push('');
 let round = 0;
 let turnOf: UnitId | null = null;
 let decisionIndex = 0;
+// Écart 63 (2H.23): a Shove that takes the Payload leaves the shover one free
+// pass that turn, and no event says so, so it is deduced here as the feed does.
+let freePassFrom: UnitId | null = null;
 for (let seq = 0; seq < stored.length; seq++) {
   const e = stored[seq]!;
   if (e.kind === 'roundStarted') {
@@ -580,6 +583,7 @@ for (let seq = 0; seq < stored.length; seq++) {
     continue;
   }
   if (e.kind === 'turnStarted') {
+    freePassFrom = null;
     turnOf = e.unitId;
     const u = nm(e.unitId);
     md.push('', `### R${round} · ${u}${humans.has(e.unitId) ? ' · HUMAN' : ''}`, '');
@@ -596,8 +600,13 @@ for (let seq = 0; seq < stored.length; seq++) {
       `- at (${b.at.x}, ${b.at.y}), ${b.hp} hp${b.holding ? ', ball' : ''}, ${b.feetLeft} ft${b.actionUsed ? ', Action spent' : ''} · plan: « ${top?.why ?? 'end turn'} » [${top?.score ?? 0}]${d.plans.slice(1, 3).map((p) => ` / « ${p.why} » [${p.score}]`).join('')} · played: ${describe(d.played)}${tag}`,
     );
   }
+  if (e.kind === 'turnEnded') freePassFrom = null;
+  if (e.kind === 'shoved' && e.tookPayload && e.shoverId === turnOf) freePassFrom = e.shoverId;
+  const free =
+    freePassFrom !== null &&
+    ((e.kind === 'passed' && e.fromId === freePassFrom) || (e.kind === 'passIntercepted' && e.throwerId === freePassFrom));
   const text = line(e);
-  if (text) md.push(`  - ${text}`);
+  if (text) md.push(`  - ${text}${free ? ' (free pass, off the Shove)' : ''}`);
   void turnOf;
 }
 

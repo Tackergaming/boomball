@@ -42,6 +42,23 @@ const HINT = ['', 'open the play', 'read one team-mate first', 'read two team-ma
 /** Pixels of the card that must stay inside the parent. */
 const KEEP = 60;
 
+/**
+ * Pure geometry of the drag clamp: keeps at least `keep` px of the card inside
+ * the parent. Pulled out so 2H.23 can test it and reuse it on window resize.
+ */
+export function clampInto(
+  x: number,
+  y: number,
+  card: { width: number; height: number },
+  parent: { width: number; height: number },
+  keep = KEEP,
+): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(x, keep - card.width), parent.width - keep),
+    y: Math.min(Math.max(y, 0), parent.height - keep),
+  };
+}
+
 export function PlacePrompt({
   name,
   role,
@@ -60,10 +77,12 @@ export function PlacePrompt({
     const el = card.current;
     const parent = el?.offsetParent as HTMLElement | null;
     if (!el || !parent) return { x, y };
-    return {
-      x: Math.min(Math.max(x, KEEP - el.offsetWidth), parent.clientWidth - KEEP),
-      y: Math.min(Math.max(y, 0), parent.clientHeight - KEEP),
-    };
+    return clampInto(
+      x,
+      y,
+      { width: el.offsetWidth, height: el.offsetHeight },
+      { width: parent.clientWidth, height: parent.clientHeight },
+    );
   };
 
   const onDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -90,6 +109,18 @@ export function PlacePrompt({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // 2H.23: when the browser window shrinks the parent shrinks with it, and the
+  // card could be left outside the screen. Pull it back inside on every resize.
+  useEffect(() => {
+    const onResize = () => {
+      const next = clamp(position.x, position.y);
+      if (next.x !== position.x || next.y !== position.y) onMove(next);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+    // `clamp` is not a dependency: it only reads refs.
+  }, [position, onMove]);
 
   const plural = role === 'striker' ? 'Strikers' : 'Breakers';
   const slots = Array.from({ length: places }, (_, i) => i + 1);

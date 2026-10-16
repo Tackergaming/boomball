@@ -25,7 +25,15 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { MathUtils, type Object3D } from 'three';
 
 import type { Point } from '../../../engine/geometry.js';
-import { pathCostFeet, pathTo, reachableCells, type Reachable } from '../../../engine/rules/movement.js';
+import {
+  pathCostFeet,
+  pathTo,
+  reachableCells,
+  safePathTo,
+  safeReachableCells,
+  type Reachable,
+  type SafeReachable,
+} from '../../../engine/rules/movement.js';
 import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { hasLineOfSight } from '../../../engine/rules/sight.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
@@ -140,13 +148,34 @@ export function Board3D({
     return reachableCells(arena, there, moved, (state.turn?.movementFeetRemaining ?? 0) - spent);
   }, [legal, canMove, mover, planned, state]);
 
+  // 2H.23 (C25 4a): the route offered under the cursor and sent by a click is
+  // the AI's safe route, the one that provokes the fewest opportunity attacks
+  // on the same budget (`safeReachableCells` reaches exactly the cells
+  // `reachableCells` does). The shortest route is the fallback, and the two
+  // coincide when nothing provokes. The player can still plot their own.
+  const sweep = useMemo((): { safe: ReadonlyMap<string, SafeReachable>; state: MatchState; unit: Unit } | null => {
+    if (!legal || !canMove || !mover) return null;
+    const budget = state.turn?.movementFeetRemaining ?? 0;
+    if (planned.length === 0) return { safe: safeReachableCells(arena, state, mover, budget), state, unit: mover };
+    const waypoint = planned[planned.length - 1]!;
+    const spent = pathCostFeet({ x: mover.x, y: mover.y }, planned);
+    const moved = unitAt(mover, waypoint);
+    const there: MatchState = { ...state, units: state.units.map((u) => (u.id === mover.id ? moved : u)) };
+    return { safe: safeReachableCells(arena, there, moved, budget - spent), state: there, unit: moved };
+  }, [legal, canMove, mover, planned, state]);
+  const routeTo = useCallback(
+    (cell: Point): Point[] | null =>
+      (sweep ? safePathTo(sweep.state, sweep.unit, sweep.safe, cell) : null) ?? (reachable ? pathTo(reachable, cell) : null),
+    [sweep, reachable],
+  );
+
   const origin: Point | null = mover && canMove ? { x: mover.x, y: mover.y } : null;
   const ahead = useMemo(() => {
     if (!hover || !reachable || !mover) return null;
-    const segment = pathTo(reachable, hover);
+    const segment = routeTo(hover);
     if (!segment) return null;
     return { segment, swings: provokedAlong(state, mover, [...planned, ...segment]).length };
-  }, [hover, reachable, mover, planned, state]);
+  }, [hover, reachable, mover, planned, state, routeTo]);
   const plannedSwings = planned.length > 0 && mover ? provokedAlong(state, mover, planned).length : 0;
 
   // The line of sight from the mover to the token under the cursor, and the
@@ -172,7 +201,7 @@ export function Board3D({
 
   const onCellClick = (cell: Point) => {
     if (!reachable) return;
-    const route = pathTo(reachable, cell);
+    const route = routeTo(cell);
     if (!route) return;
     if (plotting) {
       setHover(null);
@@ -238,6 +267,7 @@ export function Board3D({
       const gesture = (key: string, kind: 'swing' | 'lunge' | 'flinch' | 'throw') => {
         const aim = cue.toward ? cellCentre(cue.toward) : null;
         link.gestures.set(key, { kind, since: now, stretch: fxBridge.stretch, toward: aim ? { x: aim.x, z: aim.z } : null });
+        link.bodies.get(key)?.play(kind, GESTURE_MS[kind] * fxBridge.stretch);
       };
       switch (cue.kind) {
         case 'damage':
@@ -251,6 +281,7 @@ export function Board3D({
             if (word === 'SWING' || word === 'ATCK OP' || word === 'BAT') gesture(`u:${cue.unitId}`, 'swing');
             else if (word === 'SHOVE') gesture(`u:${cue.unitId}`, 'lunge');
             else if (word === 'PASS' || word === 'SHOOT') gesture(`u:${cue.unitId}`, 'throw');
+            else if (word === 'DASH') link.bodies.get(`u:${cue.unitId}`)?.dash();
           }
           break;
         }
@@ -267,7 +298,6 @@ export function Board3D({
         case 'exit':
         case 'enter':
           if (cue.unitId) link.transitions.set(`u:${cue.unitId}`, { kind: cue.kind, since: now, stretch: fxBridge.stretch });
-        link.bodies.get(key)?.play(kind, GESTURE_MS[kind] * fxBridge.stretch);
           break;
         case 'sparkIn':
           link.transitions.set('s', { kind: 'drop', since: now, stretch: fxBridge.stretch });
@@ -281,7 +311,6 @@ export function Board3D({
   );
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-            else if (word === 'DASH') link.bodies.get(`u:${cue.unitId}`)?.dash();
     fxBridge.fire = fire;
     fxBridge.probe = (unitId) => {
       const node = link.pieces.get(`u:${unitId}`);
@@ -292,6 +321,7 @@ export function Board3D({
         roll: node.rotation.z,
         y: node.position.y,
         gesture: link.gestures.get(`u:${unitId}`)?.kind ?? null,
+        clip: link.bodies.get(`u:${unitId}`)?.clip ?? null,
       };
     };
     return () => {
@@ -321,7 +351,6 @@ export function Board3D({
     }
   };
 
-        clip: link.bodies.get(`u:${unitId}`)?.clip ?? null,
   const motionCrackers = new Set(
     (motion?.steps ?? []).flatMap((t) => (t.step.kind === 'cracker' ? [t.step.crackerId] : [])),
   );
@@ -619,6 +648,7 @@ function Mover({
               push = { x: Math.sin(aim) * reach * arc, z: Math.cos(aim) * reach * arc };
               pitch += 0.35 * arc * puppet;
               break;
+            }
             case 'flinch':
               pitch -= 0.45 * arc * puppet;
               bob += 0.1 * arc * puppet;
@@ -648,7 +678,6 @@ function Mover({
         visible = true;
       } else if (unit.status === 'active' && pending('enter', unit.id)) {
         visible = false;
-            }
       }
       node.position.set(c.x + push.x, y + bob, c.z + push.z);
       node.visible = visible;

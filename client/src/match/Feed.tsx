@@ -113,15 +113,34 @@ export function feedLines(
 ): { event: MatchEvent; line: string; index: number }[] {
   const out: { event: MatchEvent; line: string; index: number }[] = [];
   let acted = true;
+  // Écart 63 (2H.23): a Shove that takes the Payload leaves the shover one free
+  // pass in the same turn, and the `passed` event does not say so (events are
+  // stored and replays compare on them, so they stay as they are). The feed
+  // deduces it: the flag is raised by such a `shoved` from the unit whose turn
+  // it is, and only a turn boundary lowers it. An intercepted throw can come as
+  // a `passIntercepted` then a `passed` for the same throw, and both read free.
+  let freePassFrom: string | null = null;
+  let turnOf: string | null = null;
   for (const [index, event] of feed.entries()) {
-    if (event.kind === 'turnStarted') acted = false;
-    else if (ACTIONS.has(event.kind)) acted = true;
+    if (event.kind === 'turnStarted') {
+      acted = false;
+      turnOf = event.unitId;
+      freePassFrom = null;
+    } else if (event.kind === 'turnEnded') freePassFrom = null;
+    else if (event.kind === 'shoved' && event.tookPayload && event.shoverId === turnOf) {
+      freePassFrom = event.shoverId;
+    }
+    if (event.kind !== 'turnStarted' && ACTIONS.has(event.kind)) acted = true;
+    const free =
+      freePassFrom !== null &&
+      ((event.kind === 'passed' && event.fromId === freePassFrom) ||
+        (event.kind === 'passIntercepted' && event.throwerId === freePassFrom));
     const line =
       event.kind === 'turnEnded'
         ? acted
           ? null
           : `${name(event.unitId)} holds position.`
-        : describe(event, name);
+        : describe(event, name, free);
     if (line) out.push({ event, line, index });
     if (event.kind === 'turnEnded') acted = true;
   }
@@ -150,7 +169,7 @@ function toneOf(
   return {};
 }
 
-function describe(event: MatchEvent, name: (id: string) => string): string | null {
+function describe(event: MatchEvent, name: (id: string) => string, free = false): string | null {
   switch (event.kind) {
     case 'roundStarted':
       return `— Round ${event.round} —`;
@@ -206,8 +225,16 @@ function describe(event: MatchEvent, name: (id: string) => string): string | nul
     case 'payloadDropped':
       return `${name(event.unitId)} drops it.`;
     case 'passed':
+      if (free) {
+        return `${name(event.fromId)} throws the free pass off his Shove to ${name(event.toId)}${event.caught ? '.' : ', and it spills.'}`;
+      }
       return `${name(event.fromId)} passes to ${name(event.toId)}${event.caught ? '' : ', and it spills'}.`;
     case 'passIntercepted':
+      if (free) {
+        return event.success
+          ? `${name(event.interceptorId)} picks off ${name(event.throwerId)}'s free pass to ${name(event.toId)}.`
+          : `${name(event.interceptorId)} reaches for ${name(event.throwerId)}'s free pass to ${name(event.toId)} and misses.`;
+      }
       return event.success
         ? `${name(event.interceptorId)} picks off ${name(event.throwerId)}'s pass to ${name(event.toId)}.`
         : `${name(event.interceptorId)} reaches for ${name(event.throwerId)}'s pass to ${name(event.toId)} and misses.`;

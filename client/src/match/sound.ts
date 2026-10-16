@@ -101,8 +101,10 @@ const SAMPLES: Partial<Record<SoundKind, { readonly file: string; readonly gain:
  * seconds cut from a steady stretch and crossfaded over themselves into a
  * loop, played low under everything while sound is on. `trim` keeps the loop
  * points clear of the MP3 encoder's padding at either end, which would click.
+ * Gain 0.16 at first; Jérôme heard it a touch too loud on the 16th, so 0.11
+ * (about three decibels lower).
  */
-const AMBIENCE = { file: 'crowd.mp3', gain: 0.16, trim: 0.06 } as const;
+const AMBIENCE = { file: 'crowd.mp3', gain: 0.11, trim: 0.06 } as const;
 
 // ---------------------------------------------------------------------------
 // The remembered toggle. Pure, and tested in `sound.test.ts`.

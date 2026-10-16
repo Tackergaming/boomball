@@ -247,6 +247,14 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   // now: Jérôme heard nothing on his first game because StrictMode's effect
   // rehearsal had disposed the instance, and the switch alone could not say.
   await page.waitForFunction(() => window.__boomball?.audio() === 'running', undefined, { timeout: 5_000 });
+  // -- 2H.23: the clock notice of a place popup that ran out, said by the hook --
+  // Reaching it for real means letting a popup stand two minutes; the hook
+  // shows the same block, and the next action sent drops it.
+  expect(await fx({ kind: 'notice', notice: 'place', x: 0, y: 0 })).toBe(true);
+  const notice = page.locator('[data-testid="clock-notice"][data-notice="place"]');
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveText(/Default initiative · you go last/);
+  await shots.take('notice-place');
   // Wait the goal banner out (2.5 s, four times longer under PATIENT) before the house's round.
   await goalBanner.waitFor({ state: 'detached', timeout: 15_000 });
 

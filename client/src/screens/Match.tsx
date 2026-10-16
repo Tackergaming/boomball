@@ -22,7 +22,7 @@ import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
 import { legalActions, onlyEndTurnLeft } from '../../../engine/legalActions.js';
 import { BENCH_SIZE, MATCH_ROUNDS, TURN_TIMER_SECONDS } from '../../../engine/constants.js';
-import { pathTo } from '../../../engine/rules/movement.js';
+import { pathTo, safePathTo, safeReachableCells } from '../../../engine/rules/movement.js';
 import { isHuman } from '../../../engine/types.js';
 import { arena } from '../lib/arena.js';
 import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
@@ -302,8 +302,13 @@ export function Match({
       setSpeed: match.setSpeed,
       cellToScreen: view === '3d' ? projectCell : cellToScreen,
       clickCell: (x, y) => {
-        if (!canAct || !legal) return false;
-        const route = pathTo(legal.destinations, { x, y });
+        if (!canAct || !legal || !state) return false;
+        // 2H.23 (C25 4a): the safe route, as a click on either board sends;
+        // the shortest one if the sweep has nothing (it never does: same cells).
+        const mover = state.units.find((u) => u.id === legal.unitId) ?? null;
+        const safe = mover ? safeReachableCells(arena, state, mover, state.turn?.movementFeetRemaining ?? 0) : null;
+        const route =
+          (mover && safe ? safePathTo(state, mover, safe, { x, y }) : null) ?? pathTo(legal.destinations, { x, y });
         if (!route) return false;
         void send({ kind: 'move', path: route });
         return true;
@@ -318,6 +323,11 @@ export function Match({
       // purpose. The mounted board set `fxBridge.fire`; nothing else moves.
       fx: (request) => {
         if (!fxBridge.fire) return false;
+        if (request.kind === 'notice') {
+          if (!fxBridge.notice) return false;
+          fxBridge.notice(request.notice ?? 'turn');
+          return true;
+        }
         if (request.kind === 'banner') {
           if (!fxBridge.announce) return false;
           fxBridge.announce(request.banner ?? 'loud', request.text ?? '', request.tone ?? 'neutral');
@@ -357,6 +367,26 @@ export function Match({
    * given again.
    */
   const [called, setCalled] = useState(false);
+
+  /**
+   * The clock notice (2H.23, C25 1). `match.expired` says which turn the
+   * clock spent; the development hook can show either on request, and that
+   * request is dropped by the next action sent, like the real one.
+   */
+  const [noticeOverride, setNoticeOverride] = useState<'turn' | 'place' | null>(null);
+  useEffect(() => {
+    if (!HOOK_ENABLED) return;
+    fxBridge.notice = (kind) => setNoticeOverride(kind);
+    return () => {
+      fxBridge.notice = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (match.busy) setNoticeOverride(null);
+  }, [match.busy]);
+  const notice = match.expired ?? noticeOverride;
+  const mineRole = state?.units.find((u) => u.id === mineId)?.role ?? null;
+  const roleName = mineRole === 'striker' ? 'Strikers' : mineRole === 'breaker' ? 'Breakers' : 'your role';
 
   // The place popup is born at the top left of the body (Jérôme, 2026-10-14,
   // 2H.14; it used to sit over the right column) and the player can drag it.
@@ -625,15 +655,27 @@ export function Match({
             {briefing && <Briefing onClose={() => setBriefing(false)} />}
           </div>
 
-          {match.expired && (
-            <div style={S.expired}>
-              <span className="label" style={{ color: 'var(--brass)' }}>
-                The clock ran out
+          {notice && (
+            <div style={S.expired} data-testid="clock-notice" data-notice={notice}>
+              <span className="label" style={{ color: 'var(--brass)', flex: 'none', whiteSpace: 'nowrap' }}>
+                {notice === 'place' ? 'Default initiative · you go last' : 'The clock ran out'}
               </span>
               <span style={S.expiredLine}>
-                Your Giff took cover and the turn passed to the house. You have{' '}
-                {TURN_TIMER_SECONDS} seconds a turn, counted from the moment the board is yours
-                again.
+                {notice === 'place' ? (
+                  // Jérôme's words (C25 1): say that we play last. The server put
+                  // this Giff last of its role the moment the popup ran out.
+                  <>
+                    The clock ran out before you chose your place. Your Giff plays last of the{' '}
+                    {roleName} this round; your turn opens when the ladder reaches it, with a full
+                    clock.
+                  </>
+                ) : (
+                  <>
+                    Your Giff took cover and the turn passed to the house. You have{' '}
+                    {TURN_TIMER_SECONDS} seconds a turn, counted from the moment the board is yours
+                    again.
+                  </>
+                )}
               </span>
             </div>
           )}
@@ -670,8 +712,10 @@ export function Match({
                 ...(called ? { color: 'var(--brass)', borderColor: 'var(--brass)' } : null),
               }}
               // `busy` as well as the turn: an orders write and a turn write
-              // both land on the `matches` row, and the last one in wins.
-              disabled={!yours || replaying || match.busy}
+              // both land on the `matches` row, and the last one in wins. And
+              // not while the place is asked (2H.23, C25 2): the turn has not
+              // begun, there is nobody to call for yet.
+              disabled={!yours || replaying || match.busy || placing !== null}
               onClick={() => void callForBall()}
               title="Tell your AI team-mates to look for you with the Payload"
             >

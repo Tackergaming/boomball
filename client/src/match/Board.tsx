@@ -34,7 +34,14 @@ import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
 import type { LegalActions } from '../../../engine/legalActions.js';
 import { boxClosed, penaltyBoxCells } from '../../../engine/rules/box.js';
-import { pathCostFeet, pathTo, reachableCells, type Reachable } from '../../../engine/rules/movement.js';
+import {
+  pathCostFeet,
+  pathTo,
+  reachableCells,
+  safePathTo,
+  safeReachableCells,
+  type Reachable,
+} from '../../../engine/rules/movement.js';
 import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
 import { ARENA_HEIGHT, ARENA_WIDTH, arena, spec } from '../lib/arena.js';
@@ -101,10 +108,10 @@ function swingsTo(
   state: MatchState,
   mover: Unit,
   planned: readonly Point[],
-  reach: ReadonlyMap<string, Reachable>,
+  routeTo: (cell: Point) => Point[] | null,
   cell: Point,
 ): { segment: Point[]; swings: number } | null {
-  const segment = pathTo(reach, cell);
+  const segment = routeTo(cell);
   if (!segment) return null;
   return { segment, swings: provokedAlong(state, mover, [...planned, ...segment]).length };
 }
@@ -196,8 +203,32 @@ export function Board({
     return reachableCells(arena, there, moved, (state.turn?.movementFeetRemaining ?? 0) - spent);
   }, [legal, canMove, mover, planned, state]);
 
+  /**
+   * The same sweep as `reachable`, on the same state, unit and feet, but kept
+   * with its parents set for the safest route (fewest opportunity attacks).
+   */
+  const sweep = useMemo(() => {
+    if (!legal || !canMove || !mover) return null;
+    const feet = state.turn?.movementFeetRemaining ?? 0;
+    if (planned.length === 0) {
+      return { state, unit: mover, safe: safeReachableCells(arena, state, mover, feet) };
+    }
+    const waypoint = planned[planned.length - 1]!;
+    const spent = pathCostFeet({ x: mover.x, y: mover.y }, planned);
+    const moved = unitAt(mover, waypoint);
+    const there: MatchState = { ...state, units: state.units.map((u) => (u.id === mover.id ? moved : u)) };
+    return { state: there, unit: moved, safe: safeReachableCells(arena, there, moved, feet - spent) };
+  }, [legal, canMove, mover, planned, state, arena]);
+
+  // The route offered to the player is the AI's safe route since 2H.23 (C25),
+  // the shortest one as a fallback (the same straight line when nothing
+  // provokes). The player can still plot their own, waypoint by waypoint.
+  const routeTo = (cell: Point): Point[] | null =>
+    (sweep ? safePathTo(sweep.state, sweep.unit, sweep.safe, cell) : null) ??
+    (reachable ? pathTo(reachable, cell) : null);
+
   const origin: Point | null = mover ? { x: mover.x, y: mover.y } : null;
-  const ahead = hover && reachable && mover ? swingsTo(state, mover, planned, reachable, hover) : null;
+  const ahead = hover && reachable && mover ? swingsTo(state, mover, planned, routeTo, hover) : null;
   const plannedSwings = planned.length > 0 && mover ? provokedAlong(state, mover, planned).length : 0;
 
   // -- Tokens as targets -------------------------------------------------------
@@ -426,7 +457,7 @@ export function Board({
                 onMouseEnter={() => setHover(step.cell)}
                 onMouseLeave={() => setHover((h) => (h && h.x === step.cell.x && h.y === step.cell.y ? null : h))}
                 onClick={() => {
-                  const route = pathTo(reachable, step.cell);
+                  const route = routeTo(step.cell);
                   if (!route) return;
                   // Plotting: the click adds a waypoint and sends nothing.
                   // The cell may stop being a destination once the route grows,

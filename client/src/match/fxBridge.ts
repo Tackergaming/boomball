@@ -19,6 +19,13 @@ export const fxBridge: {
    */
   announce: ((kind: 'loud' | 'goal' | 'round' | 'turn', text: string, tone: 'own' | 'foe' | 'neutral') => void) | null;
   /**
+   * Shows the clock notice on request (2H.23): `place` is the one the harness
+   * cannot otherwise reach without letting a place popup run two minutes.
+   * Set by the match screen while mounted, in development only; cleared by
+   * the next action sent.
+   */
+  notice: ((kind: 'turn' | 'place') => void) | null;
+  /**
    * Reads a piece of the 3D scene (2H.22): its rotation and height, and
    * whether a puppet gesture is on it. Set by the 3D board while mounted, in
    * development only, so the harness can tell a Giff turned when a capture
@@ -32,4 +39,4 @@ export const fxBridge: {
    * sets it for one request and puts it back.
    */
   stretch: number;
-} = { fire: null, announce: null, probe: null, stretch: 1 };
+} = { fire: null, announce: null, notice: null, probe: null, stretch: 1 };

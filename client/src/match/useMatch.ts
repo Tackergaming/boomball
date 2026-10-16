@@ -96,8 +96,13 @@ export interface MatchView {
    * replay is over and the card is only the record of it.
    */
   refusal: string | null;
-  /** Set when the turn clock, not the player, ended the turn. */
-  expired: boolean;
+  /**
+   * Set when the turn clock, not the player, ended the turn: `turn` when a
+   * turn was spent in Dodge, `place` when the place popup ran out and the
+   * server put this Giff last of its role (2H.23, C25 1; the server did that
+   * since écart 58, the screen just could not tell the two apart).
+   */
+  expired: 'turn' | 'place' | null;
   speed: Speed;
   setSpeed: (speed: Speed) => void;
   /** Drops the rest of the replay and jumps to the server's board. */
@@ -198,7 +203,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   const [motion, setMotion] = useState<Motion | null>(null);
   const [progress, setProgress] = useState<{ at: number; of: number } | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const [expired, setExpired] = useState(false);
+  const [expired, setExpired] = useState<'turn' | 'place' | null>(null);
   const [skew, setSkew] = useState(0);
   const [speed, setSpeedState] = useState<Speed>(storedSpeed);
   const seqRef = useRef(-1);
@@ -439,7 +444,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
 
       setBusy(true);
       setRefusal(null);
-      setExpired(false);
+      setExpired(null);
       setBeat(null);
       inFlightRef.current += 1;
       // `busy` locks the action bar, so every path out of here has to clear it.
@@ -502,7 +507,9 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         seqRef.current = Math.max(seqRef.current, reply.fromSeq + reply.events.length - 1);
         // The server answers `expired` when the clock, not the player, spent
         // the turn. It is news, not an error, and the screen says so.
-        if ('expired' in reply && reply.expired) setExpired(true);
+        // Which turn it spent is read off the board it was sent from: a place
+        // still to choose means the clock chose it, last.
+        if ('expired' in reply && reply.expired) setExpired(before?.turn?.placing != null ? 'place' : 'turn');
         await play(before, reply.events);
       } catch (failure) {
         console.error('the turn could not be sent', failure);

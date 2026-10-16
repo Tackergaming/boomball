@@ -2207,9 +2207,90 @@ par le fil principal, trois faits.
   partout) contre `crowd1.wav` (4 min, des vagues de −13 à −66 dB, matière pour des réactions,
   pas pour un fond) ; trente secondes découpées et la fin fondue sur le début en 1,5 s, boucle
   sans couture (`crowd.mp3`), jouée en fond à 0,16 dès que le contexte tourne et que le son est
-  allumé (`AMBIENCE` dans `sound.ts`, `loopStart` et `loopEnd` à 60 ms des bords pour éviter le
+  allumé (ramenée à 0,11 le 2026-10-16, ses mots : « un tout petit peu trop fort », trois
+  décibels de moins) (`AMBIENCE` dans `sound.ts`, `loopStart` et `loopEnd` à 60 ms des bords pour éviter le
   clic du remplissage MP3), coupée et reprise par le bouton son.
 - **Les sources des assets** (les trois JPEG des gradins et de la rambarde, le JPEG du Giff en
   2D, le GLB source, les trois WAV, les trois archives ambientCG) sont déplacées de
   `context/import/` vers `boomball/assets/source/`, avec un README qui dit le dérivé de chacune.
   36 Mo, non commités sauf sa décision.
+
+## C25. Décisions du 2026-10-16 après sa partie sur 2H.22, **sous-phase 2H.23, trois défauts d'écran**
+
+> Écrites par le fil principal (Fable 5.1) sur les retours de Jérôme en chat le 2026-10-16, après
+> sa partie sur 2H.22 en 3D et en 2D avec le son. Ses mots d'abord : « j'ai tout testé et tout me
+> va, sauf le son de la foule est un tout petit peu trop fort ». La foule est ramenée de 0,16 à
+> 0,11 (C24, note du 16). Le pantin et `Tokens.tsx` sont réservés à son autre chat, qui rigge le
+> Giff sous Blender : rien ici ne les touche. Sa partie `2e30f587` n'est pas à analyser (ouverte
+> pour une capture, laissée tourner sans jouer). Le client en ligne attend encore. **Aucun écart
+> de règle, rien dans l'IA, aucune constante de `00` ne bouge :** `ENGINE_VERSION` reste 9, les
+> fonctions ne sont pas à redéployer. Client, harnais et `dump-match` seuls.
+
+1. **Le chrono qui expire pendant la popup de place.** Ses mots : « le message devrait dire
+   qu'on joue en dernier, et le mettre en dernier de l'initiative de ce rôle. un truc du genre
+   "Default initiative - you go last" ». Constat dans le code : le serveur le fait déjà depuis
+   l'écart 58 (`expireIfDue` dans `server/session.ts` choisit la dernière place quand la popup
+   expire, et le tour de l'humain s'ouvre quand l'échelle l'atteint, avec un chrono entier).
+   Seul l'écran mentait : `useMatch.expired` était un booléen et `Match.tsx` disait « Your Giff
+   took cover » dans les deux cas. Décidé : `expired` devient `'turn' | 'place' | null`, jugé
+   sur l'état d'avant l'envoi (`placing` posé ou non) ; la note dit **« Default initiative ·
+   you go last »** puis « The clock ran out before you chose your place. Your Giff plays last
+   of the Strikers this round; your turn opens when the ladder reaches it, with a full clock. »
+   (Breakers selon le rôle). L'autre cas garde « The clock ran out » et « took cover ». Le
+   briefing le dit en une phrase. Le crochet gagne `fx({ kind: 'notice', notice: 'place' })`
+   pour capturer la note sans attendre deux minutes, développement seulement.
+2. **« Call for the ball » grisé pendant la popup.** Ses mots : « ok, à griser ». Le bouton est
+   `disabled` tant que `placing` n'est pas nul, en plus de `yours`, `replaying` et `busy`.
+3. **La passe gratuite dans le fil.** Ses mots : « ok, il suffit juste de faire une phrase
+   différente qui clarifie la situation. utile pour les logs également. » Constat : l'événement
+   `passed` ne dit pas qu'elle était gratuite, et on ne touche pas aux événements (ils sont en
+   base et les relectures se comparent dessus). Le fil la déduit : un `shoved` avec
+   `tookPayload` par la même unité, plus tôt dans le même tour, fait de la passe qui suit la
+   passe gratuite de l'écart 63. Phrases : **« Grim throws the free pass off his Shove to
+   Varn. »**, « ..., and it spills. » si elle tombe ; interceptée, « Zed picks off Grim's free
+   pass to Varn. » et « ... reaches for Grim's free pass to Varn and misses. ». `dump-match`
+   marque la même passe « (free pass, off the Shove) » dans `match.md` : ce sont ses logs.
+4. **Les défauts mineurs, à ma main.** Ses mots : « gère-les en background de ton côté. pas
+   besoin que je tranche dessus, tu sais déjà quoi faire. » Décidé : (a) **la route proposée au
+   clic et sous le curseur est la route sûre**, celle de l'IA (`safePathTo` sur
+   `safeReachableCells`), dans les deux plateaux et dans `clickCell` du crochet ; quand rien ne
+   provoque elle est la ligne droite d'avant, et les étapes à la main restent possibles ; (b)
+   **la popup de place se reborne quand la fenêtre change de taille**, par le même `clamp` que
+   le glisser ; (c) **le choix de direction d'un Breaker humain à la parade reste automatique** :
+   le rendre à l'humain veut dire arrêter le roulement des Crackers pour une décision, un
+   nouvel état de tour, `ENGINE_VERSION` et un redéploiement, c'est noté dans les
+   fonctionnalités à venir de `05` ; (d) `FEED_LIMIT` reste à 120.
+
+Fonctionnalités à venir, notées sur ses mots le même jour, à cadrer avec lui avant toute ligne
+de code : choisir son niveau de ligue quand les niveaux d'en dessous sont déjà débloqués, le mode
+multijoueur, annuler un match en cours et en sortir, d'autres à voir.
+
+**Comment 2H.23 est codée** (le 2026-10-16, fil principal Fable 5.1 et trois sous-agents Sonnet
+effort moyen, un par fichier disjoint). **La note du chrono** : `useMatch.expired` est
+`'turn' | 'place' | null`, décidé au retour `expired` sur le plateau d'avant l'envoi
+(`before.turn.placing` posé, c'est la popup qui a expiré) ; `Match.tsx` rend un seul bloc
+`data-testid="clock-notice"` avec `data-notice`, le libellé « Default initiative · you go last »
+et la phrase avec le pluriel du rôle de `mineId` (`roleName`), l'autre cas inchangé ;
+`fxBridge.notice` et `fx({ kind: 'notice', notice })` sous `HOOK_ENABLED` posent la note à la
+demande et le premier envoi (`match.busy`) l'efface ; le spec 3D la capture (`notice-place`).
+**Le bouton** : `disabled` ajoute `placing !== null` ; `waitForPlayableTurn` dans `e2e/harness.ts`
+l'affirme grisé à chaque popup, pour les trois specs. **La passe gratuite** (Sonnet) :
+`feedLines` dans `Feed.tsx` tient `turnOf` (posé au `turnStarted`) et `freePassFrom` (posé par un
+`shoved` à `tookPayload` du tour en cours, levé à `turnStarted` et `turnEnded`, jamais à la
+première passe parce qu'un lancer intercepté s'écrit `passIntercepted` puis `passed`) ;
+`describe(event, name, free)` rend les quatre phrases ; `feed.test.ts`, trois tests ;
+`scripts/dump-match.ts` fait le même suivi dans la boucle de `match.md` et suffixe « (free pass,
+off the Shove) » ; `c3867408` rejoué après coup, 0 écart. **La route sûre** (Sonnet pour
+`Board.tsx`, fil principal pour `Board3D.tsx` et le crochet) : un `useMemo` `sweep` appelle
+`safeReachableCells` aux mêmes arguments que `reachable` (état et unité déplacés au dernier point
+tracé, budget moins le dépensé) et `routeTo(cell)` rend `safePathTo(sweep.state, sweep.unit,
+sweep.safe, cell) ?? pathTo(reachable, cell)` ; le survol (`swingsTo`, `ahead`), le clic
+(`onClick`, `onCellClick`) et `clickCell` du crochet passent par elle, le tracé d'étapes aussi ;
+le surlignage lit toujours `reachable`. **La popup** (Sonnet) : `clampInto(x, y, card, parent,
+keep)` pure et exportée de `PlacePrompt.tsx`, un `useEffect` sur `resize` qui rappelle `onMove`
+quand la position bornée diffère, `placePrompt.test.ts`, trois tests ; une phrase dans l'item
+« Your turn » de `Briefing.tsx`. **Rien d'autre** : ni `engine/`, ni `ai/`, ni les événements,
+`ENGINE_VERSION` 9. **689 tests sur 34 fichiers** (683 avant), typecheck racine, scripts, e2e et
+client verts, smoke 2D vert en 39,3 s, `e2e:board3d` vert en 6,5 min sur le Vite 5174 chauffé,
+captures lues : la popup avec « Call for the ball » grisé, la note « Default initiative · you go
+last » en 3D.

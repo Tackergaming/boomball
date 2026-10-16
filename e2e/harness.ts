@@ -191,6 +191,9 @@ export async function waitForPlayableTurn(
 
     const prompt = page.getByTestId('place-prompt');
     await prompt.waitFor({ state: 'visible', timeout: 10_000 });
+    // 2H.23 (C25 2): the call button is greyed out while the place is asked.
+    const call = page.getByRole('button', { name: /call(ing)? for the ball/i });
+    if (!(await call.isDisabled())) throw new Error('"Call for the ball" is live while the place is asked');
     if (shots && !placeSeen) {
       placeSeen = true;
       await shots.take(`place-prompt-round-${board.round}`);

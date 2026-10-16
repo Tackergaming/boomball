@@ -93,7 +93,7 @@ export function Briefing({ onClose }: { onClose: () => void }) {
           <Item
             mark={<span style={S.clock}>{TURN_TIMER_SECONDS}</span>}
             title="Your turn"
-            body={`One move and one action, in any order, within ${TURN_TIMER_SECONDS} seconds. Run out and the clock takes cover for you and passes the turn on. A Bulwark can dig in for its Action: until its next turn, or until it moves, shoving it rolls at disadvantage and minus 3.`}
+            body={`One move and one action, in any order, within ${TURN_TIMER_SECONDS} seconds. Run out and the clock takes cover for you and passes the turn on. Asked your place and out of time? You play last of your role this round, and your turn opens later with a full clock. A Bulwark can dig in for its Action: until its next turn, or until it moves, shoving it rolls at disadvantage and minus 3.`}
           />
           <Item
             mark={<span style={S.shove}>&times;</span>}

@@ -27,11 +27,13 @@ import type { CueKind } from './motion.js';
  * `banner` is its kind, `text` its words, `tone` its colour; the cell is ignored.
  */
 export interface FxRequest {
-  kind: CueKind | 'banner';
+  kind: CueKind | 'banner' | 'notice';
   x: number;
   y: number;
   text?: string;
   banner?: 'loud' | 'goal' | 'round' | 'turn';
+  /** For `kind: 'notice'` (2H.23): which clock notice to show, `turn` by default. */
+  notice?: 'turn' | 'place';
   tone?: 'own' | 'foe' | 'neutral';
   unitId?: string;
   team?: 'A' | 'B';

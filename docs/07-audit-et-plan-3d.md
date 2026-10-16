@@ -1762,3 +1762,32 @@ redéployé. La caméra n'est pas touchée. **Pas de sweep.**
 **Ce qui attend Jérôme** : `/commit` (deux commits, 2H.21 puis 2H.22), sa partie en 3D et en 2D
 avec le son, ses retours en `00` C25 avant toute ligne de code, et son feu vert pour le client en
 ligne s'il le veut. Un sweep seulement s'il le demande.
+
+### Sous-phase 2H.23, « trois défauts d'écran », codée le 2026-10-16, porte ouverte
+
+Par le fil principal (Fable 5.1), avec trois sous-agents Sonnet effort moyen, à partir de `00`
+C25 : les retours de Jérôme après sa partie sur 2H.22 avec le son (« tout me va », la foule un
+peu trop forte), ses trois réponses sur les défauts d'écran, et les mineurs laissés à la main du
+fil principal. **Aucun écart de règle, rien dans `ai/` ni `engine/`, `ENGINE_VERSION` reste 9**,
+rien à redéployer, le client en ligne n'est pas redéployé. Le pantin, `Tokens.tsx` et le modèle
+riggé sont dans son autre chat, sous Blender, **dans la même copie de travail**. **Pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| La foule | `AMBIENCE.gain` 0,16 à 0,11 dans `sound.ts`, trois décibels de moins, sur ses mots |
+| La note du chrono | `useMatch.expired` en `'turn' \| 'place' \| null` ; « Default initiative · you go last » quand la popup a expiré, le serveur plaçant déjà en dernier depuis l'écart 58 ; `fx({ kind: 'notice' })` pour la capturer |
+| Le bouton | « Call for the ball » grisé tant que `placing` n'est pas nul ; affirmé par le harnais à chaque popup |
+| La passe gratuite | Déduite dans `Feed.tsx` (Sonnet) du `shoved` à `tookPayload` du même tour : « throws the free pass off his Shove to », et le même suffixe dans `match.md` de `dump-match.ts` ; 3 tests ; `c3867408` rejoué sans écart |
+| La route sûre | `routeTo` = `safePathTo ?? pathTo` dans `Board.tsx` (Sonnet), `Board3D.tsx` et `clickCell` du crochet : le joueur se voit proposer la route de l'IA |
+| La popup | `clampInto` pure et le `resize` dans `PlacePrompt.tsx` (Sonnet), 3 tests ; une phrase dans `Briefing.tsx` |
+| Laissé | La parade du Breaker humain reste automatique (moteur, `ENGINE_VERSION`, redéploiement), notée dans les fonctionnalités à venir ; `FEED_LIMIT` 120 |
+| Tests | **689 sur 34 fichiers contre 683** ; typecheck racine, scripts, e2e et client verts |
+| Harnais | Smoke 2D **vert en 39,3 s** sur le Vite 5174 chauffé ; `e2e:board3d` **vert en 6,5 min** |
+| Captures lues | La popup de place avec « Call for the ball » grisé et la note « The clock ran out » d'un vrai tour expiré ; en 3D, « DEFAULT INITIATIVE · YOU GO LAST » avec sa phrase sur les Strikers |
+| Sa partie `2e30f587` | Pas à analyser, sur ses mots : ouverte pour une capture, laissée tourner sans jouer |
+| Commit | Attend son `/commit`. **Quatre fichiers sont aussi modifiés par son chat Blender** (`fxBridge.ts`, `testHook.ts`, `Board3D.tsx`, `board3d.spec.ts`) et ses fichiers propres (`Tokens.tsx`, `scene.ts`, `giffRig.ts`, `giff-rigged.glb`, `scripts/blender/`, `assets/source/README.md`) ne sont pas à 2H.23 |
+
+**Ce qui attend Jérôme** : relire les deux phrases anglaises (la note et la passe gratuite),
+`/commit` quand le chat Blender a fini ou par `git add -p` sur les quatre fichiers partagés, et
+sa partie quand le Giff riggé sera dans le jeu. Les fonctionnalités à venir sont notées en `05`
+et en `00` C25.

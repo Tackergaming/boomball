@@ -13,7 +13,7 @@
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.22
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.23
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15), §9 la
 parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 63, plus 40 bis,
@@ -37,45 +37,61 @@ passe, mes sept retours après ma partie sur 2H.21 : mots deux fois plus gros et
 longs, toutes les actions en mot (SWING, ATCK OP, SHOVE, SHOOT, PASS, DISENGAGE, DASH, BAT,
 DODGE), le bandeau de but plus visible (« Goal · Your Team », « Goal · The other Team »), la
 barre de temps de la carte retirée (c'était elle que j'appelais barre de défilement), le son
-synthétisé, le pantin en attendant un modèle riggé. Chaque passe finit par « comment ... est
-codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de C12 à C24.
+synthétisé, le pantin en attendant un modèle riggé. C25 le lot du 2026-10-16 après ma partie
+sur 2H.22 (« tout me va », la foule baissée à 0,11) : la note « Default initiative · you go
+last » quand la popup de place expire, « Call for the ball » grisé pendant la popup, la passe
+gratuite dite dans le fil et dans match.md, la route sûre proposée au clic, la popup rebornée,
+et les fonctionnalités à venir. Chaque passe finit par « comment ... est
+codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de C12 à C25.
 07 §10 porte le journal, dont l'entrée 2H.15, qui dit fichier par fichier ce que la 2.5D
 contient, les entrées 2H.16 à 2H.20, la caméra et les gradins, 2H.21 et 2H.22, le jeu vivant.
 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.22.
 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.16 à 2H.22 sont CODÉES le 2026-10-15, ENGINE_VERSION toujours 9, rien à
-redéployer côté fonctions, le client en ligne PAS redéployé depuis 2H.14 (mon feu vert). Les
-fonctions en ligne restent resolve-action v20 et create-match v18, moteur 9. 683 tests verts sur
-32 fichiers (676 avant 2H.22), typecheck racine, scripts, e2e et client verts, build du client
-vert (three dans un chunk chargé en lazy, le 2D ne le télécharge pas). Le harnais 3D, npm run
-e2e:board3d, est vert en 5,6 minutes depuis 2H.22 sur un Vite dédié (5174). SUR UN VITE 5174 QUI
-VIENT DE DÉMARRER, LE CHAUFFER PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN : à froid,
-global-setup.ts rate le champ Email en trente secondes et le run est rouge avant toute 3D, vu
-deux fois le 15. Ce qu'il fait : bascule en 3D, silo entier capturé, cellToScreen par la caméra,
-clic à la souris sur la case qu'il désigne et le pion arrive, cadrage rapproché, glisser au
-bouton droit puis roulette, la case suivie se projette ailleurs, le bouton de cadrage la ramène,
-flèche droite tenue, le cadre passe en data-camera="free", « Follow the play » la ramène, chaque
-effet tiré par le crochet dont le mot SWING, le bandeau de but dit par le crochet, le bouton son
-lu (on, off, on), un round de l'IA en slow, retour 2D, zéro erreur console. Le smoke 2D (npm run
-e2e) est vert en 18,3 s après 2H.22. Ma partie sur le moteur 9 (ab27b827, Striker, 50-0), le
-match e2e 7d631b71 et ma partie sur 2H.18 (cb618e32, 30-20) sont consignés et rejoués sans écart
-dans docs/matches/. Mes deux parties sur 2H.21 sont consignées le 2026-10-15 au soir :
-c3867408 (40-50, rejouée sans écart) et 2e30f587 (20-10) dont LA RELECTURE S'ARRÊTE AU ROUND 2
-(« the engine refused the rebuilt action of A-breaker-6 at seq 161: (4, 16) is already
-occupied », 669 événements non atteints) : personne n'a cherché pourquoi, c'est à moi de
-demander l'analyse. 2H.16 à 2H.20 sont commitées et poussées (fd85266, 46341a0, 2f3096d), 2H.21
-(54cd99f) et 2H.22 (2bcc46e) commitées en local le 15 au soir. LA CORRECTION QUI A SUIVI MA
-PARTIE N'EST PAS COMMITÉE, c'est moi qui tape /commit : vérifier git status en premier et me le
-dire. Elle contient : le son que StrictMode tuait (Match.tsx, l'instance dans un seul effet,
-sound.ts expose state, le crochet audio()), la sonde probe(unitId) du crochet (fxBridge.probe,
-Board3D) et le spec 3D qui lit le pantin par elle, les amplitudes du pantin doublées, mes trois
-WAV en MP3 dans client/public/sounds/ (SAMPLES dans sound.ts : swing, goal, blast, puis dash
-depuis le deuxième burst de son jetpack1, et la foule crowd2 en boucle de 30 s jouée en fond par
-AMBIENCE, coupée par le bouton son), le fil des
-sources d'assets déplacé de context/import/ vers boomball/assets/source/ (36 Mo, images,
-models, sounds, textures, README) : à moi de dire au /commit si ces sources entrent dans git ;
-les dérivés (WebP, MP3, le GLB de public/models/) y entrent.
+Où on en est : 2H.16 à 2H.23 sont CODÉES (2H.23 le 2026-10-16), ENGINE_VERSION toujours 9,
+rien à redéployer côté fonctions, le client en ligne PAS redéployé depuis 2H.14 (mon feu vert, et
+j'ai dit le 16 : pas encore, il reste des changements d'interface en partie et hors partie). Les
+fonctions en ligne restent resolve-action v20 et create-match v18, moteur 9. 689 tests verts sur
+34 fichiers (683 avant 2H.23), typecheck racine, scripts, e2e et client verts. Le harnais 3D,
+npm run e2e:board3d, est vert en 6,5 minutes après 2H.23 sur un Vite dédié (5174). SUR UN VITE
+5174 QUI VIENT DE DÉMARRER, LE CHAUFFER PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN :
+à froid, global-setup.ts rate le champ Email en trente secondes et le run est rouge avant toute
+3D, vu deux fois le 15. Ce qu'il fait : bascule en 3D, silo entier capturé, cellToScreen par la
+caméra, clic à la souris sur la case qu'il désigne et le pion arrive, cadrage rapproché, glisser
+au bouton droit puis roulette, la case suivie se projette ailleurs, le bouton de cadrage la
+ramène, flèche droite tenue, le cadre passe en data-camera="free", « Follow the play » la ramène,
+chaque effet tiré par le crochet dont le mot SWING, le bandeau de but dit par le crochet, le
+bouton son lu (on, off, on), la note « Default initiative · you go last » dite par le crochet
+(capture notice-place), un round de l'IA en slow, retour 2D, zéro erreur console. Le smoke 2D
+(npm run e2e) est vert en 39 s après 2H.23, et le harnais affirme « Call for the ball » grisé à
+chaque popup de place. Ma partie sur le moteur 9 (ab27b827, Striker, 50-0), le match e2e
+7d631b71, ma partie sur 2H.18 (cb618e32, 30-20) et ma partie sur 2H.21 (c3867408, 40-50,
+rejouée sans écart encore le 16 avec le dump-match modifié) sont consignés dans docs/matches/.
+2e30f587 n'est PAS à analyser (ouverte pour une capture, laissée tourner sans jouer). Tout
+jusqu'à 2H.22 et sa correction est commité et poussé (dernier commit 4aec3f8). 2H.23 N'EST PAS
+COMMITÉE, c'est moi qui tape /commit : vérifier git status en premier et me le dire. ATTENTION,
+MON CHAT BLENDER TRAVAILLE DANS LA MÊME COPIE DE TRAVAIL : ses fichiers (Tokens.tsx, scene.ts,
+giffRig.ts, client/public/models/giff-rigged.glb, scripts/blender/, assets/source/README.md) ne
+sont pas à 2H.23, et quatre fichiers portent les deux lots à la fois (fxBridge.ts, testHook.ts,
+Board3D.tsx, e2e/board3d.spec.ts) : commiter quand les deux lots sont finis, ou par git add -p.
+Les fichiers de 2H.23 : sound.ts, useMatch.ts, Match.tsx, Feed.tsx et feed.test.ts, PlacePrompt.tsx
+et placePrompt.test.ts, Briefing.tsx, Board.tsx, Board3D.tsx, fxBridge.ts, testHook.ts,
+scripts/dump-match.ts, e2e/harness.ts, e2e/board3d.spec.ts, docs 00 (C24 note et C25), 07 §10,
+08 §5, et ce fichier.
+
+Ce que 2H.23 contient, en six phrases, détail en 00 C25 « comment 2H.23 est codée ». La foule
+joue à 0,11 (AMBIENCE dans sound.ts). useMatch.expired vaut 'turn', 'place' ou null, jugé sur le
+plateau d'avant l'envoi, et Match.tsx rend un seul bloc clock-notice : « Default initiative · you
+go last » quand la popup de place a expiré (le serveur plaçait déjà en dernier depuis l'écart 58,
+l'écran disait « took cover » à tort), fx({ kind: 'notice', notice: 'place' }) le pose à la
+demande en développement. « Call for the ball » est disabled tant que placing n'est pas nul. Le
+fil déduit la passe gratuite (shoved à tookPayload du même tour) et dit « X throws the free pass
+off his Shove to Y » ; dump-match suffixe « (free pass, off the Shove) » ; les événements et le
+moteur n'ont pas bougé. La route proposée au survol, au clic et par clickCell du crochet est la
+route sûre de l'IA (routeTo = safePathTo ?? pathTo) dans les deux plateaux. La popup de place se
+reborne au resize (clampInto, pure et testée) et le briefing dit qu'on joue en dernier si elle
+expire. Laissé : la parade du Breaker humain reste automatique (moteur et redéploiement),
+FEED_LIMIT 120.
 
 Ce que 2H.22 contient, en sept phrases, détail en 00 C24 « comment 2H.22 est codée ». Les mots
 au-dessus des têtes font 28 px en 3D et 26 en 2D et vivent FLOAT_MS (2 s en normal, 3 s en slow,
@@ -196,33 +212,38 @@ vert. Les sources d'assets vivent dans boomball/assets/source/ depuis le 15 au s
 et ne sont pas commitées sauf ma décision ; la copie du glb dans client/public/models/, les
 WebP et les MP3 le sont.
 
-LA TÂCHE : MA PARTIE SUR 2H.22 CORRIGÉE, PUIS C25.
-Ma première partie sur 2H.22 n'a rien donné à entendre (le son était mort au montage) et je
-n'ai pas vu le pantin (il tournait, mais trop peu). Je rejoue en 3D et en 2D, son allumé, après
-un premier clic n'importe où, et je dis ce que j'entends et ce que je vois : les mots et leur
-taille, les actions, le bandeau de but, chaque son (mes trois enregistrements et les treize
-recettes synthétisées : ce qui sonne juste, ce qui est de trop, ce qui manque, et quels autres
-enregistrements je dépose dans boomball/assets/source/sounds/), le pantin (la marche, le coup
-vers la cible, le Shove, le recul du touché). La caméra de 2H.16 à 2H.20 est close.
-1. Vérifier git status et git diff --cached --stat avant toute chose ; 2H.21 (l'index) et 2H.22
-   (la copie de travail) doivent avoir été commitées en deux commits par mon /commit après le
-   chat précédent ; sinon me le dire en premier, c'est moi qui le tape.
+NOTÉ LE 2026-10-16, À GARDER DANS CHAQUE RÉÉCRITURE DE CE FICHIER.
+Ma partie 2e30f587 n'est pas à analyser : je l'ai ouverte pour une capture d'écran puis laissée
+tourner sans jouer, sa relecture qui s'arrête au round 2 n'est pas un bug à chercher. Le client en
+ligne ne se redéploie pas encore : il reste pas mal de changements d'interface en partie et hors
+partie. Fonctionnalités à implémenter dans des chats à venir, à cadrer avec moi avant toute
+ligne de code : choisir son niveau de ligue quand les niveaux d'en dessous sont déjà débloqués ;
+le mode multijoueur ; annuler un match en cours et en sortir ; d'autres à voir. Le modèle de Giff
+riggé (squelette et clips de course et de batte) se fait dans un autre chat, sous Blender : ne
+pas toucher au pantin ni à Tokens.tsx ici tant qu'il n'a pas livré son GLB.
+
+LA TÂCHE : CE QUE JE DÉCIDE EN OUVRANT LE CHAT. Trois portes possibles, c'est moi qui choisis.
+(a) Les fonctionnalités à venir notées plus haut (le niveau de ligue au choix, le multijoueur,
+annuler et quitter un match), à cadrer une par une en chat avant toute ligne de code : la
+première est à moi de nommer. (b) Le Giff riggé quand mon chat Blender l'a livré : brancher ses
+clips dans la boucle de Board3D à la place du pantin, c'est une sous-phase à part, et c'est moi
+qui dis qu'il est livré. (c) Ma partie sur 2H.23 si j'en veux une, et ma relecture des deux
+phrases anglaises (la note du chrono et la passe gratuite).
+1. Vérifier git status et git diff --cached --stat avant toute chose ; 2H.23 doit avoir été
+   commitée par mon /commit, en séparant les fichiers du chat Blender ; sinon me le dire en
+   premier, c'est moi qui le tape.
 2. Lire mes retours contre le code et les captures avant de reformuler ; les reformuler en
-   chat, une ou deux questions par message si un choix est à moi ; les écrire en 00 C25 et en
-   08 §5 (ligne 2H.23) avant la première ligne de code ; puis coder, sous-agents sur les
-   fichiers disjoints (Sonnet pour le borné, Opus 5.5 ou Fable 5.1 quand la qualité le réclame,
-   c'est permis depuis le 2026-10-15), le fil principal sur Board3D.tsx et Match.tsx.
-3. Une capture par changement dans e2e/board3d.spec.ts, lue, en sachant que les effets courts
-   sont figés sous le GL logiciel et que ni le son ni le pantin ne se capturent (lire le DOM des
-   mots et des bandeaux, me demander le reste) ; le smoke 2D relancé si Match.tsx, Feed.tsx ou
-   Board.tsx bougent.
-4. Si je demande le client en ligne : le build est vert, le déploiement passe par mon feu vert
-   explicite, jamais le dépôt GitHub sur Vercel.
+   chat, une ou deux questions par message si un choix est à moi ; les écrire en 00 (C26) et en
+   08 §5 (ligne 2H.24) avant la première ligne de code ; puis coder, sous-agents sur les
+   fichiers disjoints (Sonnet pour le borné, Opus 5.5 ou Fable 5.1 quand la qualité le réclame),
+   le fil principal sur Board3D.tsx et Match.tsx.
+3. Une capture par changement dans e2e/board3d.spec.ts ou e2e/smoke.spec.ts, lue, en sachant que
+   les effets courts sont figés sous le GL logiciel et que ni le son ni le pantin ne se capturent
+   (lire le DOM, la sonde probe, me demander le reste) ; le smoke 2D relancé si Match.tsx,
+   Feed.tsx ou Board.tsx bougent.
+4. Si je demande le client en ligne : le build est à refaire et à vérifier, le déploiement passe
+   par mon feu vert explicite, jamais le dépôt GitHub sur Vercel.
 5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
-6. Si je demande l'analyse de ma partie 2e30f587 : un agent Opus 5.5 effort élevé, et d'abord
-   comprendre pourquoi dump-match refuse l'action rebâtie de A-breaker-6 au seq 161 (le recul
-   ou la marche vers (4, 16) occupée), parce que sans relecture complète il n'y a pas de plans à
-   lire après le round 2.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -360,16 +381,14 @@ Ce qu'il faut savoir tout de suite.
     est refusée en C20, la barre de temps de la carte est retirée en C24. Dette connue :
     arenas.art et le champ art du spec nomment trois JPEG retirés ; substituteEntry et
     substitute_entry restent et ne sont plus lus ; le choix de direction d'un Breaker humain à la
-    parade est automatique ; la route proposée au clic reste la ligne droite alors que l'IA prend
-    la route sûre ; le fil garde 120 événements (FEED_LIMIT) ; le Spark peut rebondir plusieurs
+    parade est automatique (gardé en C25 : le rendre à l'humain, c'est le moteur et un
+    redéploiement) ; le fil garde 120 événements (FEED_LIMIT) ; le Spark peut rebondir plusieurs
     rounds dans une poche du terrain ; le test du point 5 dans fifthPass.test.ts fait varier
-    idleSwing en place et le remet ; le bandeau « The clock ran out » dit « Your Giff took cover »
-    même quand c'est la popup qui a expiré ; plusieurs humains d'un même rôle (coop) n'ont pas de
-    popup, à relire en phase 7 ; la popup n'est pas rebornée quand la fenêtre rétrécit, la
-    déplacer suffit ; le bouton « Call for the ball » reste actif pendant la popup ; un gardien
+    idleSwing en place et le remet ; plusieurs humains d'un même rôle (coop) n'ont pas de
+    popup, à relire en phase 7 ; un gardien
     peut marcher au-delà de sa laisse jusqu'à côté d'un receveur marqué pour une passe d'une
     case, qu'aucune allonge n'intercepte (écart 48) ; le Shove d'un Bulwark n'est borné que par
-    l'adjacence, pas par sa laisse ; le fil ne dit pas qu'une passe était gratuite ; le temps par
+    l'adjacence, pas par sa laisse ; le temps par
     match d'auto-jeu se mesure entre 1,4 et 2,7 s selon la charge de la machine ; en 3D,
     l'orientation du modèle, le noir sous la lèvre avant, l'orbite remise à la vue fixe au
     retour du 2D, la borne de suivi calculée pour l'azimut zéro, la roulette en vue large qui ne
@@ -379,7 +398,7 @@ Ce qu'il faut savoir tout de suite.
     ligne de vue, la retenue de la caméra en boîte et pas en tube, les captures des effets courts
     figées sous le GL logiciel, le ballon qui ne disparaît pas dans la bouche, pas d'étincelles
     en 2D, le pantin sans bras ni jambes (modèle sans squelette), le son synthétique ; la
-    relecture de 2e30f587 qui s'arrête au round 2 ; les quatre fichiers du vault modifiés hors de
+    relecture de 2e30f587 qui s'arrête au round 2 (pas à analyser, dit le 16) ; les quatre fichiers du vault modifiés hors de
     nos sessions, à moi de décider.
 
 13. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte, après
