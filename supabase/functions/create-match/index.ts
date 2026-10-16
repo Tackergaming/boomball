@@ -128,12 +128,14 @@ Deno.serve(async (request: Request): Promise<Response> => {
   // two matches, and the second silently becomes the one the client watches
   // while the first sits unfinished forever. A match left open by an earlier
   // engine does not count: it is archived, nobody can play it, and it must not
-  // lock the team out of the game (audit line A11).
+  // lock the team out of the game (audit line A11). Nor does an abandoned one
+  // (2H.28, `00` C29): leaving a match is exactly how a new one gets opened.
   const { data: running } = await db
     .from('matches')
     .select('id')
     .eq('team_id', teamId)
     .neq('phase', 'finished')
+    .is('abandoned_at', null)
     .eq('engine_version', ENGINE_VERSION)
     .limit(1);
   if (running && running.length > 0) {

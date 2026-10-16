@@ -39,6 +39,7 @@ const Board3D = lazy(() => import('../board3d/Board3D.js').then((m) => ({ defaul
 import { projectCell } from '../board3d/projection.js';
 import { Briefing, hasBeenBriefed } from '../match/Briefing.js';
 import { PlacePrompt } from '../match/PlacePrompt.js';
+import { AbandonPrompt } from '../match/AbandonPrompt.js';
 import { Feed } from '../match/Feed.js';
 import { Ladder } from '../match/Ladder.js';
 import { TurnStrip } from '../match/TurnStrip.js';
@@ -51,17 +52,23 @@ export function Match({
   userId,
   teamName,
   onFinished,
+  onLeft,
 }: {
   matchId: string;
   userId: string;
   teamName: string;
   onFinished: () => void;
+  /** The owner abandoned the match from here (2H.28, `00` C29): back to the hub, no result. */
+  onLeft: () => void | Promise<void>;
 }) {
   // The human always plays team A: `createMatch` seats every human there.
   const own = 'A' as const;
 
   const match = useMatch(matchId, own);
   const [selected, setSelected] = useState<string | null>(null);
+  // The confirmation before leaving the match (2H.28). A hook, so it stays
+  // above the early return on `state` like every other one.
+  const [leaving, setLeaving] = useState(false);
 
   /**
    * What the action bar has started (a Swing waiting for its target, say). It
@@ -813,8 +820,23 @@ export function Match({
               >
                 {soundOn ? '♪ Sound on' : 'Sound off'}
               </button>
+              <button
+                className="ghost"
+                style={S.speed}
+                data-testid="leave-match"
+                onClick={() => setLeaving(true)}
+                disabled={leaving}
+                title="Abandon this match: no result, back to the hub"
+              >
+                Leave the match
+              </button>
             </div>
           </div>
+          {leaving && (
+            <div style={S.leaving}>
+              <AbandonPrompt matchId={matchId} onAbandoned={onLeft} onKeep={() => setLeaving(false)} />
+            </div>
+          )}
 
           <ActionBar
             legal={legal}
@@ -997,6 +1019,8 @@ const S: Record<string, React.CSSProperties> = {
   },
   clockRow: { flex: 'none', display: 'flex', alignItems: 'center', gap: 10 },
   speed: { fontSize: 10, padding: '4px 9px' },
+  /** The abandon confirmation, over the board, under the top bar (2H.28). */
+  leaving: { position: 'absolute', top: 56, right: 16, zIndex: 20 },
   expired: {
     flex: 'none',
     display: 'flex',

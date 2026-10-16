@@ -1856,7 +1856,7 @@ sweep.**
 **Sa partie, le même soir** : « tout est parfait ». Porte franchie, et il ouvre le point sur ce
 qu'il reste à faire.
 
-### Sous-phase 2H.27, « la ligue au choix », codée le 2026-10-16 au soir, porte ouverte
+### Sous-phase 2H.27, « la ligue au choix », codée le 2026-10-16 au soir, porte franchie le même soir (« c'est fait et ça a marché »)
 
 Par le fil principal (Fable 5.1), seul, à partir de `00` C28. Le point sur la suite, dont il a
 validé l'ordre : ses trois fonctionnalités sans le multijoueur (ligue au choix, annuler et
@@ -1876,5 +1876,27 @@ phase 8. La ligue est la première. Rien dans le moteur ni dans l'IA, `ENGINE_VE
 | En ligne | **`resolve-action` v22, `create-match` v20, redéployées le 2026-10-16 au soir sur son feu vert**, moteur 10 inchangé ; smoke 2D **vert en 35,5 s** sur les fonctions redéployées |
 | Commit | Son `/commit` du même soir |
 
-**Ce qui attend Jérôme** : une partie en dessous de son palier : le compteur de victoires ne
-doit pas bouger, et le lobby doit être clair. Puis le cadrage d'annuler et quitter un match.
+**Sa partie en dessous de son palier, le même soir** : « c'est fait et ça a marché ». Porte
+franchie. Suivant : le cadrage d'annuler et quitter un match.
+
+### Sous-phase 2H.28, « annuler et quitter un match », codée et en ligne le 2026-10-16 au soir, porte ouverte
+
+Par le fil principal (Fable 5.1), seul, à partir de `00` C29 : trois réponses de Jérôme en chat
+(le propriétaire, depuis l'écran de match et le hub, avec confirmation ; option B, pas de
+résultat ; les mots de la confirmation, dont il a retiré la dernière phrase). Rien dans le moteur
+ni dans l'IA, `ENGINE_VERSION` toujours 10, **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| Migration `0008_abandon_match.sql` | Colonne `matches.abandoned_at`, fonction SQL `abandon_match(match uuid)` en `security definer`, exécutable par `authenticated`, bornée au propriétaire de la batterie par `auth.uid()`, refuse un match fini ou déjà abandonné. **Appliquée par Jérôme le 2026-10-16 au soir** (`/supabase-migrate`), vérifiée en lecture avant et après : colonne et fonction présentes, 115 matchs dont 4 non finis inchangés, aucun abandonné, droits `authenticated`, `postgres`, `service_role` ; consignée dans `04` |
+| `resolve-action` | Lit `abandoned_at`, refuse en 409 « this match was abandoned » |
+| `create-match` | Un match abandonné ne compte plus comme « déjà en cours » (`.is('abandoned_at', null)`) |
+| Client | `useAccount` : un abandonné n'est ni en cours ni archivé, compté dans `abandoned` ; `abandonMatch` dans `lib/supabase.ts` (rpc) ; `match/AbandonPrompt.tsx`, la confirmation partagée (`abandon-prompt`, `abandon-yes`, `abandon-no`) ; `TeamHub.tsx` : « Abandon this match » (`abandon-match`) à côté de « Back to the silo », la note « 2 matches abandoned: no result, kept, never resumed » (`abandoned-note`) ; `Match.tsx` : « Leave the match » (`leave-match`) dans la barre du haut, la confirmation en surimpression sous la barre ; `App.tsx` : `onLeft` ramène au hub après `refresh` |
+| Harnais | `e2e/abandon.spec.ts`, tag `@abandon`, `npm run e2e:abandon`, hors du smoke par défaut : « Leave the match », la confirmation capturée, « Keep playing » referme, puis « Yes, abandon it », le hub revient sans bandeau et la note monte de un. **Vert en 9,5 s** sur les fonctions redéployées. Smoke 2D **vert en 48 s** par le lobby sur un match neuf ; un premier run rouge sur le cas connu, le match e2e arrivé au round 10 pendant ses trois tours |
+| Captures lues | `01-leave-prompt.png` : la confirmation en haut à droite du plateau, par-dessus le briefing resté ouvert, les deux boutons ; `02-hub-after-abandon.png` : le hub sans bandeau, « To the lobby » actif, « 1 match abandoned: no result, kept, never resumed », l'échelle à 24 inchangée par l'abandon |
+| Vérifié | **708 tests sur 35 fichiers, inchangés** (rien dans le moteur, pas de test unitaire ajouté : la règle vit en SQL et à l'écran, le spec `@abandon` la couvre) ; typecheck racine, scripts, e2e et client verts ; les deux fonctions bundlent |
+| En ligne | **`resolve-action` v23, `create-match` v21, redéployées le 2026-10-16 au soir sur son feu vert**, moteur 10 inchangé |
+| Commit | Attend son `/commit`, après le harnais |
+
+**Ce qui attend Jérôme, dans l'ordre** : le harnais lu par le fil principal (smoke et
+`e2e:abandon`), son `/commit`, puis il abandonne un match et dit si c'est clair.

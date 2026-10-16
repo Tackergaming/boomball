@@ -49,6 +49,8 @@ export interface LiveMatch {
   is_draw: boolean;
   /** Which engine wrote it. Only a match on `ENGINE_VERSION` can be played. */
   engine_version: number;
+  /** When the owner abandoned it (2H.28, `00` C29): no result, never resumed. Null otherwise. */
+  abandoned_at: string | null;
 }
 
 export interface Account {
@@ -67,6 +69,8 @@ export interface Account {
   lastFinished: LiveMatch | null;
   /** Unfinished matches written by an earlier engine: archived, never resumed. */
   archived: number;
+  /** Matches the owner abandoned (2H.28): no result, kept, never resumed. */
+  abandoned: number;
   /**
    * Why the account could not be read, in words a player can act on, or null.
    * Set by the first read that fails; the rest of the load is abandoned.
@@ -88,6 +92,7 @@ export function useAccount(): Account {
   const [live, setLive] = useState<LiveMatch | null>(null);
   const [lastFinished, setLastFinished] = useState<LiveMatch | null>(null);
   const [archived, setArchived] = useState(0);
+  const [abandoned, setAbandoned] = useState(0);
   const [failure, setFailure] = useState<string | null>(null);
 
   const load = useCallback(async (id: string | null) => {
@@ -99,6 +104,7 @@ export function useAccount(): Account {
       setLive(null);
       setLastFinished(null);
       setArchived(0);
+      setAbandoned(0);
       setLoading(false);
       return;
     }
@@ -140,13 +146,14 @@ export function useAccount(): Account {
       setLive(null);
       setLastFinished(null);
       setArchived(0);
+      setAbandoned(0);
       setLoading(false);
       return;
     }
 
     const { data: matches, error: matchesError } = await supabase
       .from('matches')
-      .select('id, phase, round, score_a, score_b, winner, is_draw, engine_version')
+      .select('id, phase, round, score_a, score_b, winner, is_draw, engine_version, abandoned_at')
       .eq('team_id', mine.id)
       .order('created_at', { ascending: false })
       .limit(10);
@@ -157,9 +164,12 @@ export function useAccount(): Account {
     }
 
     const rows = (matches ?? []) as LiveMatch[];
-    const unfinished = rows.filter((row) => row.phase !== 'finished');
+    // An abandoned match (2H.28) is neither live nor archived: it has no
+    // result and is only counted, so the hub can say it is kept.
+    const unfinished = rows.filter((row) => row.phase !== 'finished' && !row.abandoned_at);
     setLive(unfinished.find((row) => row.engine_version === ENGINE_VERSION) ?? null);
     setArchived(unfinished.filter((row) => row.engine_version !== ENGINE_VERSION).length);
+    setAbandoned(rows.filter((row) => row.abandoned_at).length);
     setLastFinished(rows.find((row) => row.phase === 'finished') ?? null);
     setLoading(false);
   }, []);
@@ -193,5 +203,5 @@ export function useAccount(): Account {
     };
   }, [load]);
 
-  return { loading, userId, profile, team, live, lastFinished, archived, failure, refresh };
+  return { loading, userId, profile, team, live, lastFinished, archived, abandoned, failure, refresh };
 }

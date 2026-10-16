@@ -125,6 +125,23 @@ export function createMatch(
   return callFunction<CreateMatchReply>('create-match', { teamId, seats, tier });
 }
 
+/**
+ * Abandons a match (2H.28, `00` C29): the SQL function `abandon_match` checks
+ * that the caller owns the battery and that the match is neither finished nor
+ * already abandoned, then stamps `abandoned_at`. No result is written, the
+ * ladder does not move. The reason comes back in the server's own words.
+ */
+export async function abandonMatch(matchId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const { error } = await supabase.rpc('abandon_match', { match: matchId });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (failure) {
+    console.error('the match could not be abandoned', failure);
+    return { ok: false, reason: 'could not reach the server. Check your connection and try again.' };
+  }
+}
+
 export function submitAction(
   matchId: string,
   unitId: string,

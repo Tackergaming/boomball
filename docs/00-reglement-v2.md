@@ -2509,3 +2509,48 @@ dans la ligne du header, déverrouillé ; chaque bouton verrouillé est `disable
 fonctions bundlent (`npm run build:function`). 708 tests sur 35 fichiers (705 avant), smoke 2D
 vert en 39,7 s par le lobby. **Redéployées le 2026-10-16 au soir sur son feu vert :
 `resolve-action` v22, `create-match` v20, moteur 10 inchangé**, smoke 2D vert en 35,5 s dessus.
+
+## C29. Décisions du 2026-10-16 au soir, **sous-phase 2H.28, annuler et quitter un match**
+
+> Écrites par le fil principal (Fable 5.1) sur trois réponses de Jérôme en chat, après la porte
+> de 2H.27 franchie (« c'est fait et ça a marché »). Deuxième de ses trois fonctionnalités, dans
+> l'ordre qu'il a validé. Rien dans le moteur ni dans l'IA, `ENGINE_VERSION` reste 10 ; **une
+> migration, `0008`, qu'il applique par `/supabase-migrate`, et les deux fonctions à redéployer
+> sur son feu vert.**
+
+1. **Qui, et depuis où.** Sa réponse : « oui c'est ça » au dessin proposé. Le propriétaire de la
+   batterie, depuis l'écran de match (bouton « Leave the match » dans la barre du haut, à côté
+   de « See it in 3D ») comme depuis le hub quand « A match is running » est affiché (bouton
+   « Abandon this match » à côté de « Back to the silo »), à n'importe quel round, avec une
+   confirmation en place dans la page avant de le faire.
+2. **Que devient le match.** Son choix parmi deux : **B, abandonné sans résultat**. Ni victoire ni
+   défaite, l'échelle ne bouge pas, le match sort de la vue, ses événements restent en base,
+   il n'est jamais repris. L'option A (le match finit en défaite, vainqueur l'adversaire) est
+   écartée.
+3. **Les mots de la confirmation**, relus par lui, qui a retiré la dernière phrase (« What was
+   played stays on record. ») :
+   « Abandon this match? It ends here with no result: no win, no loss, and the ladder does not
+   move. » Boutons « Yes, abandon it » et « Keep playing ». Le hub compte ensuite « 2 matches
+   abandoned » sous la note d'archive.
+
+**Comment c'est codé, décidé avec le dessin.** Pas une quatrième valeur de l'enum `phase` mais
+une colonne `matches.abandoned_at timestamptz` : même effet (ni en cours ni fini), sans le
+piège d'une valeur d'enum ajoutée et utilisée dans la même transaction, que Postgres refuse par
+l'API qu'emploie `apply-migration.mjs`. Une fonction SQL `abandon_match(match uuid)` en
+`security definer`, exécutable par `authenticated`, qui vérifie que l'appelant (`auth.uid()`,
+jamais le corps) est le propriétaire de la batterie du match, que le match n'est pas
+`finished` ni déjà abandonné, puis écrit `abandoned_at = now()`. C'est la seule écriture client
+ouverte sur les tables de match, bornée par cette vérification. `resolve-action` lit
+`abandoned_at` et refuse en 409 « this match was abandoned » ; `create-match` ne compte plus un
+match abandonné comme « déjà en cours ». Côté client, `useAccount` exclut les abandonnés du match
+en cours et de l'archive et les compte à part ; `abandonMatch` dans `lib/supabase.ts` appelle
+la fonction SQL ; `AbandonPrompt.tsx` porte la confirmation, partagée par le hub et l'écran de
+match ; après confirmation, retour au hub. Le harnais gagne `abandon.spec.ts`, tag `@abandon`,
+hors du smoke par défaut pour ne pas priver le playthrough de son match ouvert.
+
+**Appliqué et en ligne le 2026-10-16 au soir.** La migration `0008` par Jérôme (`/supabase-migrate`),
+vérifiée en lecture avant et après (colonne et fonction présentes, 115 matchs dont 4 non finis
+inchangés, aucun abandonné, droits `authenticated`, `postgres`, `service_role`) ; les fonctions
+redéployées sur son feu vert : **`resolve-action` v23, `create-match` v21**, moteur 10 inchangé.
+708 tests sur 35 fichiers, inchangés (rien dans le moteur) ; typecheck racine, scripts, e2e et
+client verts.

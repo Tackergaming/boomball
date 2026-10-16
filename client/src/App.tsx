@@ -67,6 +67,13 @@ export function App() {
           await account.refresh();
           setWhere('results');
         }}
+        onLeft={async () => {
+          // The match was abandoned from the board (2H.28): no result, so
+          // the hub and not the results screen.
+          setAtTheBoard(false);
+          await account.refresh();
+          setWhere('hub');
+        }}
       />
     );
   }
@@ -104,7 +111,9 @@ export function App() {
       displayName={name}
       live={account.live}
       archived={account.archived}
+      abandoned={account.abandoned}
       onResume={() => setAtTheBoard(true)}
+      onAbandoned={() => account.refresh()}
       onCreated={() => void account.refresh()}
       onEnterLobby={() => setWhere('lobby')}
     />

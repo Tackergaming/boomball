@@ -23,6 +23,7 @@ import { MATCH_ROUNDS, TIER_WINS_STAR, TIER_WINS_VETERAN } from '../../../engine
 import { ROLES, TEAM_COMPOSITION, type Role, type Tier } from '../../../engine/stats.js';
 import { supabase } from '../lib/supabase.js';
 import type { LiveMatch, Team } from '../lib/useAccount.js';
+import { AbandonPrompt } from '../match/AbandonPrompt.js';
 
 interface StatRow {
   role: Role;
@@ -47,7 +48,9 @@ export function TeamHub({
   displayName,
   live,
   archived,
+  abandoned,
   onResume,
+  onAbandoned,
   onCreated,
   onEnterLobby,
 }: {
@@ -58,11 +61,17 @@ export function TeamHub({
   live: LiveMatch | null;
   /** Matches from an earlier engine version: kept as a record, never resumable. */
   archived: number;
+  /** Matches the owner abandoned (2H.28): counted, kept, never resumed. */
+  abandoned: number;
   onResume: () => void;
+  /** The running match was abandoned from here: the account is re-read. */
+  onAbandoned: () => void | Promise<void>;
   onCreated: () => void;
   onEnterLobby: () => void;
 }) {
   const [stats, setStats] = useState<StatRow[]>([]);
+  // The confirmation before abandoning the running match (2H.28, `00` C29).
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     void supabase
@@ -117,6 +126,28 @@ export function TeamHub({
           <button onClick={onResume} style={{ marginLeft: 'auto', flex: 'none' }}>
             Back to the silo
           </button>
+          <button
+            className="ghost"
+            onClick={() => setLeaving(true)}
+            disabled={leaving}
+            style={{ flex: 'none' }}
+            data-testid="abandon-match"
+            title="End this match with no result and open the lobby again"
+          >
+            Abandon this match
+          </button>
+        </div>
+      )}
+      {live && leaving && (
+        <div style={{ margin: '0 32px 22px' }}>
+          <AbandonPrompt
+            matchId={live.id}
+            onAbandoned={async () => {
+              await onAbandoned();
+              setLeaving(false);
+            }}
+            onKeep={() => setLeaving(false)}
+          />
         </div>
       )}
 
@@ -125,6 +156,12 @@ export function TeamHub({
           {archived} {archived === 1 ? 'match' : 'matches'} from the old silo{' '}
           {archived === 1 ? 'is' : 'are'} archived: they were played on an earlier version of the
           game and cannot be resumed, their record is kept.
+        </p>
+      )}
+      {abandoned > 0 && (
+        <p style={S.archivedNote} data-testid="abandoned-note">
+          {abandoned} {abandoned === 1 ? 'match' : 'matches'} abandoned: no result, kept, never
+          resumed.
         </p>
       )}
 

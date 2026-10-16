@@ -111,7 +111,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     db.from('match_state').select('seq, snapshot').eq('match_id', matchId).single(),
     db
       .from('matches')
-      .select('arena_id, turn_deadline, team_id, orders, engine_version, tier')
+      .select('arena_id, turn_deadline, team_id, orders, engine_version, tier, abandoned_at')
       .eq('id', matchId)
       .single(),
   ]);
@@ -121,6 +121,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
   // engine is not a board this one can read (audit line A11).
   const archived = engineVersionRefusal(match.engine_version as number | null);
   if (archived) return refuse(archived, 409);
+  // An abandoned match (2H.28, `00` C29) is over without a result: nothing
+  // may be written to it, including an action that was in flight when the
+  // owner left.
+  if (match.abandoned_at) return refuse('this match was abandoned', 409);
 
   // The caller must be in this match. Read through `match_participants` rather
   // than trusting the unit id in the body.
