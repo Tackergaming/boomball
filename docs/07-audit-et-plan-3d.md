@@ -1879,7 +1879,7 @@ phase 8. La ligue est la première. Rien dans le moteur ni dans l'IA, `ENGINE_VE
 **Sa partie en dessous de son palier, le même soir** : « c'est fait et ça a marché ». Porte
 franchie. Suivant : le cadrage d'annuler et quitter un match.
 
-### Sous-phase 2H.28, « annuler et quitter un match », codée et en ligne le 2026-10-16 au soir, porte ouverte
+### Sous-phase 2H.28, « annuler et quitter un match », codée et en ligne le 2026-10-16 au soir, porte franchie le même soir (« parfait ça a fonctionné »)
 
 Par le fil principal (Fable 5.1), seul, à partir de `00` C29 : trois réponses de Jérôme en chat
 (le propriétaire, depuis l'écran de match et le hub, avec confirmation ; option B, pas de
@@ -1896,7 +1896,31 @@ ni dans l'IA, `ENGINE_VERSION` toujours 10, **pas de sweep.**
 | Captures lues | `01-leave-prompt.png` : la confirmation en haut à droite du plateau, par-dessus le briefing resté ouvert, les deux boutons ; `02-hub-after-abandon.png` : le hub sans bandeau, « To the lobby » actif, « 1 match abandoned: no result, kept, never resumed », l'échelle à 24 inchangée par l'abandon |
 | Vérifié | **708 tests sur 35 fichiers, inchangés** (rien dans le moteur, pas de test unitaire ajouté : la règle vit en SQL et à l'écran, le spec `@abandon` la couvre) ; typecheck racine, scripts, e2e et client verts ; les deux fonctions bundlent |
 | En ligne | **`resolve-action` v23, `create-match` v21, redéployées le 2026-10-16 au soir sur son feu vert**, moteur 10 inchangé |
-| Commit | Attend son `/commit`, après le harnais |
+| Commit | `1b2422a`, poussé sur sa demande avec les deux commits précédents du soir (`fc1fdcc`, `aedda25`) |
 
-**Ce qui attend Jérôme, dans l'ordre** : le harnais lu par le fil principal (smoke et
-`e2e:abandon`), son `/commit`, puis il abandonne un match et dit si c'est clair.
+**Sa partie, le même soir** : il a abandonné un match, « parfait ça a fonctionné ». Porte
+franchie. Suivant : la phase 6, à cadrer.
+
+### Sous-phase 2H.29, « la phase 6 : la 3D par défaut, le porteur visible, l'effectif fixe », codée et en ligne le 2026-10-16 au soir, porte ouverte
+
+Par le fil principal (Fable 5.1), avec un Sonnet effort moyen sur `Briefing.tsx` et un Opus 5.5
+effort élevé sur le faisceau du porteur (`Tokens.tsx`, `Board3D.tsx`, `scene.ts`,
+`Minimap.tsx`), à partir de `00` C30 : son cadrage de la phase 6 en trois réponses. Rien dans
+l'IA, aucune règle du moteur ne change (`MatchSetup.roster` est un champ de plus),
+`ENGINE_VERSION` toujours 10, **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| La 3D par défaut | `Match.tsx` ouvre en 3D sauf si `boomball.view` dit `2d` ; « Back to 2D » garde le choix. Le harnais pose le 2D lui-même (`prefer2D` dans `harness.ts`, appelé par le smoke, le playthrough et le spec d'abandon avant la première navigation) ; le spec 3D ne bascule plus à l'entrée et affirme « Back to 2D » |
+| Le briefing (Sonnet) | Quatre fiches de plus : « The view » (la 3D, la caméra, les deux cadrages), « Sound and the booth », « Your league », « Leaving » ; « Your Furnace is on the left as the match opens » ; le pied dit « plays at the league you picked » |
+| Le porteur (Opus 5.5) | `CarrierMarker` dans `Tokens.tsx` : un faisceau or (`#ffc14d`, `BALL_GOLD`) de y 1,4 à 3,4, rayon 0,15, additif, et un anneau au sol 0,9 à 1,0 ; pièce `b:carrier` et `link.carrierGlow` dans `scene.ts` ; la boucle de `Board3D` le pose sur la pièce du porteur à chaque image (le lanceur en marche avant le lancer, le receveur après la prise, le porteur de l'état hors beat), `visible` seulement quand le ballon est en main, respiration de 1,6 s (`BREATH_MS`) entre 0,35 et 0,75. `Minimap.tsx` : le porteur en or, 1,2 contre 0,8, cerné de sombre, dessiné en dernier |
+| L'effectif | `engine/setup.ts` : `Roster`, `slotKey`, `rosterSlots` (`striker-1` à `striker-3`, `breaker-1`, `breaker-2`, `bulwark-1`, `trajector-1`), `drawRoster(rng, taken)`, `nameCollision`, `MatchSetup.roster` ; `buildTeam` pose le nom d'effectif sur un poste de l'équipe A sans humain, `createMatch` jette sur une collision de noms posés ; `nameUnits` tire le reste (l'adversaire) en évitant tout nom posé, comme avant. `server/lobby.ts` : `LobbyRequest.roster`, le refus « X is already on your battery: pick another name for yourself ». `create-match` : lit `teams.roster`, le tire au premier match avec le RNG de la graine en évitant les noms des sièges, l'écrit (`update ... is('roster', null)`, un échec n'empêche pas le match), le passe au lobby. Migration `0009_roster.sql` : `teams.roster jsonb`, **à appliquer par Jérôme**, sans elle `useAccount` lit une colonne absente et le hub ne charge pas |
+| Le hub | Chaque carte de composition porte le nom d'effectif de son poste (`data-roster-slot`, `data-roster-name`), « Named at your first match » tant qu'il n'y en a pas ; le pied de section réécrit |
+| Migration `0009` | **Appliquée par Jérôme le 2026-10-16 au soir**, vérifiée en lecture avant (colonne absente, 2 batteries) et après (présente, aucune batterie encore nommée), consignée dans `04` |
+| Tests | **713 sur 35 fichiers contre 708** : quatre dans `setup.test.ts` (sept noms distincts par poste hors noms humains ; l'équipe A à ses noms et l'humain au sien, l'adversaire jamais dessus ; le même effectif sur deux graines et le poste quitté qui reprend son nom ; la collision refusée), un dans `lobby.test.ts` ; typecheck racine, scripts, e2e et client verts ; les deux fonctions bundlent |
+| Harnais | Smoke 2D **vert en 43,8 s** sur les fonctions redéployées, le 2D posé par `prefer2D`. `e2e:board3d` : l'entrée directement en 3D et les vingt-trois captures passent (route, orbite, pan, quinze effets, bandeaux, popup) ; deux runs rouges à la fin sur le match e2e en fin de partie (un but en round 9 qui tient le bandeau de tour derrière lui sous PATIENT, l'attente passée de 6 à 30 s ; puis le sifflet final en plein run, cas connu), le troisième **vert en 7,7 min** sur un match neuf ouvert par le lobby. **Le faisceau du porteur se voit sur `05-board3d-moved.png` du run vert** : un trait or au-dessus de Harrow Cannonade, qui vient de recevoir la passe de Sarn Gunwale, petit sous le GL logiciel mais là ; les deux runs rouges capturaient un ballon au sol. Le spec ne force pas un porteur : c'est sa partie qui juge la lisibilité. **La même capture montre l'effectif tiré au premier match de E2E Battery** (Harrow Cannonade, Quill Ironmaw, Vandy Halyard, Voss Vantch, Sarn Gunwale, Petra Sparshot et le Giff du siège) |
+| En ligne | **`resolve-action` v24, `create-match` v22, redéployées le 2026-10-16 au soir sur son feu vert**, moteur 10 inchangé |
+| Commit | Par `/save` à sa demande, le 2026-10-16 au soir, en local (voir `git log`) |
+
+**Ce qui attend Jérôme** : deux matchs de suite : les mêmes noms d'effectif, le porteur vu tout
+de suite, le briefing relu. Puis le redéploiement du client.

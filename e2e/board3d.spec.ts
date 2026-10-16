@@ -53,8 +53,8 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   if (await into.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) await into.click();
   await page.getByRole('button', { name: 'instant', exact: true }).click();
 
-  // -- Into 3D -------------------------------------------------------------------
-  await page.getByTestId('view-toggle').click();
+  // -- In 3D, which is the default since 2H.29 -----------------------------------
+  await expect(page.getByTestId('view-toggle')).toHaveText('Back to 2D');
   await expect(page.locator('[data-board3d] canvas')).toBeVisible({ timeout: 20_000 });
   await page.waitForFunction(() => window.__boomball?.view === '3d');
   // The textures and the Giff model come over the wire, and the camera glides
@@ -296,8 +296,11 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   // The turn banner (2H.21) is up for 1.2 s from the moment the clock came
   // back to this player. Checked here and not at the first turn, which a
   // resumed match may have been standing on since before the page loaded.
-  // Behind at most the banner that was up when the turn came.
-  await expect(page.locator('[data-testid="banner"][data-banner="turn"]')).toBeVisible({ timeout: 6_000 });
+  // Behind the banners that were queued when the turn came: under PATIENT a
+  // goal or a Spark banner holds four times longer, ten seconds for a goal,
+  // and a house round late in a match can queue two of them (seen on the 16th,
+  // 40 to 0 in round 9: the 6 s this waited before were not enough).
+  await expect(page.locator('[data-testid="banner"][data-banner="turn"]')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(300);
   await shots.take('board3d-house-played');
   await expect(page.locator('[data-fresh]').first()).toBeAttached();

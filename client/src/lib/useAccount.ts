@@ -37,6 +37,8 @@ export interface Team {
   wins: number;
   tier: 'rookie' | 'veteran' | 'star';
   owner: string;
+  /** The standing names by slot (2H.29), null until the battery's first match draws them. */
+  roster: Record<string, string> | null;
 }
 
 export interface LiveMatch {
@@ -131,7 +133,7 @@ export function useAccount(): Account {
     // and there is no invitation flow at the MVP, so one team per player.
     const { data: teamRow, error: teamError } = await supabase
       .from('teams')
-      .select('id, name, wins, tier, owner')
+      .select('id, name, wins, tier, owner, roster')
       .eq('owner', id)
       .maybeSingle();
     if (teamError) {

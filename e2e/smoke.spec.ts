@@ -35,7 +35,7 @@ import {
   waitForHook,
   waitForPlayableTurn,
   watch,
-} from './harness.js';
+prefer2D } from './harness.js';
 
 test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   const shots = new Shots(page, info, stamp());
@@ -53,6 +53,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
 
   // -- Hub ------------------------------------------------------------------
 
+  await prefer2D(page);
   await page.goto('/');
   const raise = page.getByRole('heading', { name: 'Raise a battery' });
   const toLobby = page.getByRole('button', { name: 'To the lobby' });

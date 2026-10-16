@@ -94,6 +94,21 @@ export function report(seen: Watch): string {
   return [block('errors', seen.errors), block('warnings', seen.warnings), block('failed responses', seen.failed)].join('\n\n');
 }
 
+/**
+ * Poses the flat board before the first navigation (2H.29): the match opens
+ * in 3D for everyone now, and the 2D specs click cells and tokens that only
+ * the SVG board puts in the DOM. The key is the one `Match.tsx` remembers.
+ */
+export async function prefer2D(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('boomball.view', '2d');
+    } catch {
+      // A browser without storage opens in 3D; the spec will say so loudly.
+    }
+  });
+}
+
 /** Fails with the one explanation that fits when the hook never shows. */
 export async function waitForHook(page: Page): Promise<void> {
   try {

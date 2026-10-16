@@ -10,16 +10,20 @@
 > et la phase 8), et la première, **2H.27 la ligue au choix** (`00` C28), est codée, en ligne
 > (v22, v20), commitée (`aedda25`) et sa porte franchie. La deuxième, **2H.28 annuler et quitter
 > un match** (`00` C29), est codée, sa migration `0008` appliquée par lui, ses fonctions en ligne
-> (v23, v21) sur son feu vert ; le harnais et son `/commit` sont ce qui reste, voir le chat. À
-> coller tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
+> (v23, v21) sur son feu vert, commitée et poussée (`1b2422a`), porte franchie (« parfait ça a
+> fonctionné »). Puis la phase 6 cadrée en chat et codée comme **2H.29** (`00` C30 : la 3D par
+> défaut, le porteur marqué, l'effectif fixe), migration `0009` appliquée par lui, fonctions en
+> ligne (v24, v22), harnais vert, commitée en local par `/save` à sa demande, pas poussée. Sa
+> partie sur 2H.29 est la porte suivante.
+> À coller tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.28
-est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15), §9 la
-parallélisation.
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.29
+est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15, la 6 par 2H.29),
+§9 la parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 63, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 la quatrième passe, C13 la cinquième, C14 l'écart 58 (ma place dans
@@ -55,28 +59,35 @@ coupe la réplique en cours pour de vrai. C28 la ligue au choix (2H.27) : dans l
 à son palier ou en dessous, jamais au-dessus ; une victoire ne compte que jouée au palier de la
 batterie (ma réponse : « non ») ; l'écran doit montrer qu'on choisit. C29 annuler et quitter un
 match (2H.28) : le propriétaire, depuis l'écran de match ou le hub, avec confirmation ; le match
-n'a pas de résultat (mon choix B) ; les mots de la confirmation relus par moi. Chaque passe finit
-par « comment ... est codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien
-de C12 à C29.
+n'a pas de résultat (mon choix B) ; les mots de la confirmation relus par moi. C30 la phase 6
+(2H.29) : la 3D par défaut pour tout le monde, le porteur marqué d'un faisceau doré, l'effectif
+fixe de sept noms tiré au premier match et jamais renommé, l'adversaire qui les évite. Chaque
+passe finit par « comment ... est codée », poids par poids, À LIRE avant de toucher à ai/. Ne
+rediscute rien de C12 à C30.
 07 §10 porte le journal, dont l'entrée 2H.15, qui dit fichier par fichier ce que la 2.5D
 contient, les entrées 2H.16 à 2H.20, la caméra et les gradins, 2H.21 et 2H.22, le jeu vivant.
 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.22.
 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.16 à 2H.28 sont CODÉES (2H.26 à 2H.28 le 2026-10-16 au soir), ENGINE_VERSION 10, **MOTEUR 10 EN
-LIGNE depuis le 2026-10-16 sur mon feu vert, fonctions redéployées le soir pour 2H.27 (v22, v20)
-puis pour 2H.28 : resolve-action v23, create-match v21** (npm run
+Où on en est : 2H.16 à 2H.29 sont CODÉES (2H.26 à 2H.29 le 2026-10-16 au soir), ENGINE_VERSION 10, **MOTEUR 10 EN
+LIGNE depuis le 2026-10-16 sur mon feu vert, fonctions redéployées le soir pour 2H.27 (v22, v20),
+2H.28 (v23, v21) puis 2H.29 : resolve-action v24, create-match v22** (npm run
 deploy:function après set -a && . ../.env && set +a, depuis boomball/) ; les matchs du moteur 9
-sont archivés par le client. Le client en ligne n'est PAS redéployé depuis 2H.14 (mon feu vert, pas encore). 708 tests
-verts sur 35 fichiers, typecheck racine, scripts, e2e et client verts, les deux fonctions bundlent (npm run build:function). Smoke 2D vert en 48 s sur 2H.28 et e2e:abandon vert en 9,5 s (la confirmation et le hub sans bandeau capturés) ; sur 2H.27, smoke vert en 39,7 s (la section League affirmée, capture 02-lobby.png lue ; E2E Battery est Star, l'état grisé des paliers ne s'y voit pas) ; sur 2H.25, playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu) et e2e:board3d vert en 6,4 min (CATCH capturé, le côté de la foule et le clip du coup d'envoi lus par le crochet), rien n'y a bougé depuis. SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE
+sont archivés par le client. Le client en ligne n'est PAS redéployé depuis 2H.14 (mon feu vert, pas encore). 713 tests
+verts sur 35 fichiers, typecheck racine, scripts, e2e et client verts, les deux fonctions bundlent (npm run build:function). Sur 2H.29, smoke 2D vert en 43,8 s et e2e:board3d vert en 7,7 min (le spec entre directement en 3D). Smoke 2D vert en 48 s sur 2H.28 et e2e:abandon vert en 9,5 s (la confirmation et le hub sans bandeau capturés) ; sur 2H.27, smoke vert en 39,7 s (la section League affirmée, capture 02-lobby.png lue ; E2E Battery est Star, l'état grisé des paliers ne s'y voit pas) ; sur 2H.25, playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu) et e2e:board3d vert en 6,4 min (CATCH capturé, le côté de la foule et le clip du coup d'envoi lus par le crochet), rien n'y a bougé depuis. SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE
 CHAUFFER PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN. Le smoke échoue encore quand le
 match e2e atteint le round 10 pendant ses trois tours, le suivant ouvre un nouveau match : vu le
 16 à midi. Mes parties consignées : ab27b827, 7d631b71, cb618e32, c3867408 sont du moteur 9 et ne se
 rejouent plus avec le dépôt au moteur 10 (le rebond diffère). 2e30f587 n'est
-PAS à analyser. Tout jusqu'à 2H.27 est commité (aedda25) ; 2H.28 N'EST PAS COMMITÉE : vérifier
-git status en premier et me le dire. La migration 0008 est APPLIQUÉE par moi le 16 au soir
-(vérifiée avant et après en lecture, consignée en 04), les fonctions de 2H.28 sont en ligne
-(v23, v21, moteur 10 inchangé). Le client en ligne est à 2H.14. Les fichiers de 2H.28 : supabase/migrations/0008_abandon_match.sql (nouveau),
+PAS à analyser. Tout jusqu'à 2H.28 est commité et poussé (1b2422a) ; 2H.29 est commitée en local
+par /save, pas poussée : vérifier git status et git log origin/main..main en premier et me le dire. Les migrations 0008 et 0009 sont APPLIQUÉES par
+moi le 16 au soir (vérifiées avant et après en lecture, consignées en 04). Le client en ligne
+est à 2H.14. Les fichiers de 2H.29 : engine/setup.ts et setup.test.ts, server/lobby.ts et
+lobby.test.ts, supabase/migrations/0009_roster.sql (nouveau), supabase/functions/create-match,
+client/src/lib/useAccount.ts, screens/Match.tsx, screens/TeamHub.tsx, match/Briefing.tsx,
+board3d/Tokens.tsx, Board3D.tsx, scene.ts, Minimap.tsx, e2e/harness.ts et les quatre specs,
+docs 00 (C30), 04, 07 §10 (2H.29), 08 §5 (ligne 2H.29), le skill boomball, et ce fichier.
+Les fichiers de 2H.28 : supabase/migrations/0008_abandon_match.sql (nouveau),
 supabase/functions/create-match et resolve-action, client/src/lib/useAccount.ts et supabase.ts,
 client/src/match/AbandonPrompt.tsx (nouveau), screens/TeamHub.tsx, screens/Match.tsx, App.tsx,
 e2e/abandon.spec.ts (nouveau), package.json (e2e:abandon, @abandon exclu du smoke), docs 00
@@ -294,16 +305,41 @@ jamais le dépôt GitHub ; (4) la coop, phase 7 de 07, A10 d'abord (persist non 
 resolve-action), migration 0008 des invitations, lobby à plusieurs sièges ; (5) la phase 8, le
 déploiement pour un ami (deploy-vercel.mjs n'existe pas encore), /security-review par moi.
 
-LA TÂCHE : CLORE 2H.28, ANNULER ET QUITTER UN MATCH (00 C29, codée et en ligne le 16 au soir).
-1. Vérifier git status et git diff --cached --stat avant toute chose ; 2H.27 est commitée
-   (aedda25), porte franchie ; 2H.28 est commitée par mon /commit du 16 au soir si tout s'est
-   bien passé, sinon elle est dans le working tree : me le dire.
-2. Ce qui reste de 2H.28 : ma partie où j'abandonne un match, depuis le plateau ou le hub, et je
-   dis si c'est clair ; la migration 0008 est appliquée et les fonctions (v23, v21) en ligne. Le
-   moteur 10 reste en ligne ; le client en ligne reste à 2H.14 tant que je ne dis pas de le
-   déployer (jamais le dépôt GitHub sur Vercel).
-3. Puis la phase 6 de 07 (la 3D par défaut, le budget d'images par seconde au harnais, le
-   briefing), à cadrer avec moi avant la première ligne de code, puis le redéploiement du client.
+LA TÂCHE : MA PARTIE SUR 2H.29 (00 C30, la phase 6 : la 3D par défaut, le porteur visible,
+l'effectif fixe), PUIS LE REDÉPLOIEMENT DU CLIENT.
+1. Vérifier git status et git diff --cached --stat avant toute chose ; tout jusqu'à 2H.28 est
+   poussé (1b2422a) ; 2H.29 est COMMITÉE EN LOCAL par /save le 16 au soir et PAS POUSSÉE : me le
+   dire et me proposer le push. Détail en 07 §10 (entrée 2H.29) et 00 C30.
+2. La migration 0009 est APPLIQUÉE par moi le 16 au soir (vérifiée avant et après, consignée en
+   04) et les fonctions de 2H.29 sont en ligne (resolve-action v24, create-match v22, moteur 10
+   inchangé). Smoke 2D vert en 43,8 s, e2e:board3d vert en 7,7 min sur un match neuf (deux runs
+   rouges avant sur le match e2e en fin de partie, cas connu, l'attente du bandeau de tour portée
+   à 30 s). Le faisceau du porteur se voit sur 05-board3d-moved.png du run vert (petit sous le GL
+   logiciel) et l'effectif de E2E Battery y est tiré ; c'est ma partie qui juge la lisibilité. 2H.29 est commitée par /save
+   le 16 au soir, EN LOCAL, PAS POUSSÉE : me proposer le push. Ce qui reste : deux matchs de suite,
+   les mêmes noms d'effectif, le porteur vu tout de suite, le briefing relu. Le client en ligne
+   reste à 2H.14 tant que je ne dis pas de le déployer (jamais le dépôt GitHub sur Vercel).
+3. Puis le redéploiement du client sur mon feu vert, par l'API Vercel (deploy-vercel.mjs n'existe
+   pas encore, à écrire : POST /v13/deployments avec les fichiers de client/dist/, jamais de
+   dépôt lié), puis la coop (phase 7, A10 d'abord).
+
+Ce que 2H.29 contient, en six phrases, détail en 00 C30 et 07 §10. Match.tsx ouvre en 3D sauf si
+boomball.view dit 2d ; le harnais pose le 2D par prefer2D (harness.ts) dans le smoke, le
+playthrough et le spec d'abandon, et le spec 3D affirme « Back to 2D » à l'entrée au lieu de
+basculer. Briefing.tsx (Sonnet) a quatre fiches de plus : The view, Sound and the booth, Your
+league, Leaving. Le porteur (Opus 5.5) : CarrierMarker dans Tokens.tsx, un faisceau or
+(BALL_GOLD #ffc14d) de 1,4 à 3,4 de haut et un anneau au sol, pièce b:carrier et
+link.carrierGlow dans scene.ts, posé par la boucle de Board3D sur la pièce du porteur à chaque
+image, visible seulement ballon en main, respiration BREATH_MS 1,6 s ; la minicarte dessine le
+porteur en or, plus gros, en dernier. L'effectif : engine/setup.ts porte Roster, slotKey,
+rosterSlots (striker-1..3, breaker-1..2, bulwark-1, trajector-1), drawRoster, nameCollision et
+MatchSetup.roster ; buildTeam pose le nom d'effectif sur les postes de l'équipe A sans humain,
+createMatch jette sur une collision, l'adversaire tire ses noms en évitant tout nom posé ;
+server/lobby.ts refuse « X is already on your battery » ; create-match lit teams.roster, le tire
+au premier match (RNG de la graine, hors noms des sièges), l'écrit avec is('roster', null), le
+passe au lobby. Le hub montre le nom d'effectif sur chaque carte de composition
+(data-roster-slot, data-roster-name) et « Named at your first match » sinon. 713 tests sur 35
+fichiers, typecheck et bundle verts ; harnais pas encore lancé.
 4. Une capture par changement d'écran, le smoke 2D relancé si Match.tsx, Feed.tsx ou Board.tsx
    bougent ; ni le son ni la foule ne se capturent : le crochet audio(), crowd(), lastSaid().
 5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.

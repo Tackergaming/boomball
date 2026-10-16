@@ -34,6 +34,18 @@ describe('the league a battery may play at (2H.27, C28)', () => {
     expect(isTier(undefined)).toBe(false);
   });
 
+  it('fields the roster and refuses a human named after a team-mate (2H.29)', () => {
+    const roster = { 'bulwark-1': 'Quill Cannonade', 'trajector-1': 'Hamm Rivet' };
+    const opened = open(SOLO, { roster });
+    expect(opened.ok).toBe(true);
+    if (opened.ok) {
+      expect(opened.opening.kickoff.units.find((u) => u.id === 'A-bulwark-1')!.name).toBe('Quill Cannonade');
+    }
+    const refused = open([{ profileId: 'jerome', role: 'striker', characterName: 'quill cannonade' }], { roster });
+    expect(refused.ok).toBe(false);
+    expect(reasonOf(refused)).toMatch(/already on your battery/);
+  });
+
   it('opens the match at the Tier it is asked for', () => {
     const result = open(SOLO, { tier: 'star' });
     expect(result.ok).toBe(true);

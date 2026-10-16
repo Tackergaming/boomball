@@ -4,13 +4,14 @@
  * Moving a mesh through React state once a frame would re-render the whole
  * scene sixty times a second. Instead every piece that can travel registers
  * its `Object3D` here under the same key `pose.ts` uses (`u:<id>`, `c:<id>`,
- * `s`, and `b` for the ball), and one `useFrame` in `Board3D.tsx` sets the
+ * `s`, and `b` for the ball; `b:loose` is the loose ball's ring and
+ * `b:carrier` the carrier's marker), and one `useFrame` in `Board3D.tsx` sets the
  * positions by hand. The camera reads `focus` from the same object, and the
  * label layer (`Labels.tsx`), which lives in the DOM outside the canvas,
  * reads `project` to follow the pieces on the screen.
  */
 
-import type { Object3D } from 'three';
+import type { MeshBasicMaterial, Object3D } from 'three';
 
 import type { Point } from '../../../engine/geometry.js';
 import type { Cue } from '../match/motion.js';
@@ -75,6 +76,14 @@ export interface SceneLink {
    * loop, which places them.
    */
   readonly transitions: Map<string, { kind: 'exit' | 'enter' | 'drop'; since: number; stretch: number }>;
+  /**
+   * The ball carrier's marker (2H.29, `00` C30): the materials of its golden
+   * beam and floor ring, set by `CarrierMarker` in `Tokens.tsx` while
+   * mounted. Its group is the piece `b:carrier`; the frame loop places it,
+   * shows it only while the ball is in a hand, and breathes both through
+   * these, so the marker has no clock of its own.
+   */
+  carrierGlow: { readonly beam: MeshBasicMaterial; readonly ring: MeshBasicMaterial } | null;
 }
 
 export function newSceneLink(): SceneLink {
@@ -92,6 +101,7 @@ export function newSceneLink(): SceneLink {
     transitions: new Map(),
     gestures: new Map(),
     bodies: new Map(),
+    carrierGlow: null,
   };
 }
 

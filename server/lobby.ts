@@ -34,7 +34,7 @@
 
 import type { ArenaSpec } from '../engine/arena.js';
 import { Arena } from '../engine/arena.js';
-import { createMatch, MAX_HUMANS, type HumanSeat } from '../engine/setup.js';
+import { createMatch, MAX_HUMANS, nameCollision, type HumanSeat, type Roster } from '../engine/setup.js';
 import { ROLES, TEAM_COMPOSITION, type Role, type Tier } from '../engine/stats.js';
 import { isHuman, type MatchState, type UnitId } from '../engine/types.js';
 import { openSession, type Refusal, type SessionStep } from './session.js';
@@ -56,6 +56,12 @@ export interface LobbyRequest {
   readonly seats: readonly SeatRequest[];
   readonly seed: number;
   readonly now: number;
+  /**
+   * The battery's standing names by slot (2H.29, `00` C30 point 3), read off
+   * `teams.roster` by the caller, which draws and writes it at the first match.
+   * Absent for self-play.
+   */
+  readonly roster?: Roster;
 }
 
 /** One `match_participants` row, with the name the engine actually settled on. */
@@ -132,6 +138,14 @@ export function openLobbyMatch(arena: ArenaSpec, request: LobbyRequest): LobbyRe
     }
   }
 
+  // A human may not take a roster team-mate's name: two Quills on one side
+  // make the ladder unreadable, and the engine would throw on it (2H.29).
+  const clash = nameCollision([
+    ...seats.map((seat) => seat.characterName ?? ''),
+    ...Object.values(request.roster ?? {}),
+  ]);
+  if (clash) return no(`${clash} is already on your battery: pick another name for yourself`);
+
   const humans: HumanSeat[] = seats.map((seat) => {
     const name = seat.characterName?.trim() ?? '';
     return name ? { humanId: seat.profileId, role: seat.role, name } : {
@@ -140,7 +154,13 @@ export function openLobbyMatch(arena: ArenaSpec, request: LobbyRequest): LobbyRe
     };
   });
 
-  const state = createMatch({ arena, tier: request.tier, humans, seed: request.seed });
+  const state = createMatch({
+    arena,
+    tier: request.tier,
+    humans,
+    seed: request.seed,
+    ...(request.roster ? { roster: request.roster } : {}),
+  });
   const step = openSession(new Arena(arena), state, request.now);
 
   // Read the seats back off the board rather than off the request: the unit id

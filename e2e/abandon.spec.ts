@@ -12,13 +12,14 @@
 
 import { expect, test } from '@playwright/test';
 
-import { Shots, report, stamp, waitForHook, watch } from './harness.js';
+import { Shots, report, stamp, waitForHook, watch, prefer2D } from './harness.js';
 
 test('@abandon leaves the running match with no result', async ({ page }, info) => {
   test.setTimeout(3 * 60_000);
   const shots = new Shots(page, info, `${stamp()}-abandon`);
   const seen = watch(page);
 
+  await prefer2D(page);
   await page.goto('/');
   const toLobby = page.getByRole('button', { name: 'To the lobby' });
   const resume = page.getByRole('button', { name: 'Back to the silo' });

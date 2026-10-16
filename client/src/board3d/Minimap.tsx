@@ -18,6 +18,8 @@ const OWN = '#3ce0f0';
 const FOE = '#ff56dc';
 const YOURS = '#ffc14d';
 const BRASS = '#c9b489';
+/** The ball's gold, as the carrier's beam wears it in the 3D view (2H.29). */
+const CARRIER = '#ffc14d';
 const CELLS_X = Array.from({ length: ROWS }, (_, i) => i);
 const CELLS_Y = Array.from({ length: COLS }, (_, i) => i);
 
@@ -97,19 +99,34 @@ export const Minimap = memo(function Minimap({
         {/* Spark */}
         {sparkIsLive(state.spark) && <circle cx={state.spark.y + 0.5} cy={state.spark.x + 0.5} r={0.35} fill="#fffce8" />}
 
-        {/* Units */}
-        {units.map((u) => (
+        {/* Units; the carrier after the others, so its larger dot sits on top */}
+        {units.map((u) =>
+          u === carrier ? null : (
+            <rect
+              key={u.id}
+              x={u.y + 0.1}
+              y={u.x + 0.1}
+              width={0.8}
+              height={0.8}
+              fill={u.id === yoursId ? YOURS : u.team === own ? OWN : FOE}
+              stroke="#05070a"
+              strokeWidth={0.08}
+            />
+          ),
+        )}
+        {/* The ball carrier (2H.29, `00` C30): in the ball's gold, a size up,
+            ringed dark, so the ball is found at a glance. */}
+        {carrier && (
           <rect
-            key={u.id}
-            x={u.y + 0.1}
-            y={u.x + 0.1}
-            width={0.8}
-            height={0.8}
-            fill={u.id === yoursId ? YOURS : u.team === own ? OWN : FOE}
+            x={carrier.y - 0.1}
+            y={carrier.x - 0.1}
+            width={1.2}
+            height={1.2}
+            fill={CARRIER}
             stroke="#05070a"
-            strokeWidth={0.08}
+            strokeWidth={0.14}
           />
-        ))}
+        )}
 
         {/* Payload */}
         <circle cx={ball.y + 0.5} cy={ball.x + 0.5} r={0.3} fill={BRASS} stroke="#05070a" strokeWidth={0.06} />

@@ -92,15 +92,17 @@ export function Match({
   const [briefing, setBriefing] = useState(() => !hasBeenBriefed());
 
   /**
-   * The 2D / 3D switch (2H.15). The SVG board stays the default and the
-   * harness's view; the 2.5D board is the same match in three quarters, and
-   * the choice is kept on this browser.
+   * The 2D / 3D switch (2H.15). Since 2H.29 the 2.5D board in three quarters
+   * is the default for everyone and the SVG board sits under "Back to 2D"; the
+   * choice is kept on this browser. The harness poses 2D itself before it
+   * enters, because its cells and tokens are DOM.
    */
   const [view, setView] = useState<'2d' | '3d'>(() => {
     try {
-      return localStorage.getItem('boomball.view') === '3d' ? '3d' : '2d';
+      // 3D by default for everyone since 2H.29 (`00` C30 point 1); "Back to 2D" is remembered.
+      return localStorage.getItem('boomball.view') === '2d' ? '2d' : '3d';
     } catch {
-      return '2d';
+      return '3d';
     }
   });
   const toggleView = () => {

@@ -23,6 +23,15 @@ export interface HumanSeat {
   readonly name?: string;
 }
 
+/**
+ * The battery's fixed roster (2H.29, `00` C30 point 3): one name per slot of
+ * team A, keyed by `slotKey`, drawn once at the battery's first match and kept
+ * on the team for ever. Jérôme: « je veux que mon bulwark soit toujours le
+ * même gars ». A slot a human sits in that match wears the human's name
+ * instead; the roster name comes back when the human plays another role.
+ */
+export type Roster = Readonly<Record<string, string>>;
+
 export interface MatchSetup {
   readonly arena: ArenaSpec;
   /** Both teams field the same Tier: the house always matches the players. */
@@ -30,9 +39,58 @@ export interface MatchSetup {
   /** Zero to three, all on team A. Zero means a self-play balance run. */
   readonly humans: readonly HumanSeat[];
   readonly seed: number;
+  /** Team A's standing names by slot. Absent (self-play, old matches): drawn from the pool as before. */
+  readonly roster?: Roster;
 }
 
 export const MAX_HUMANS = 3;
+
+/**
+ * The key of the k-th unit of a role on a team, 1-based in composition order:
+ * `striker-1` to `striker-3`, `breaker-1`, `breaker-2`, `bulwark-1`,
+ * `trajector-1`. Stable as long as `TEAM_COMPOSITION` is, which is the rule.
+ */
+export function slotKey(role: Role, k: number): string {
+  return `${role}-${k}`;
+}
+
+/** The seven slot keys of a team, in composition order. */
+export function rosterSlots(): string[] {
+  const seen = new Map<Role, number>();
+  return TEAM_COMPOSITION.map((role) => {
+    const k = (seen.get(role) ?? 0) + 1;
+    seen.set(role, k);
+    return slotKey(role, k);
+  });
+}
+
+/**
+ * Draws a battery's roster: seven distinct names, none in `taken` (the names
+ * its humans go by), one per slot. Called once per battery, by `create-match`
+ * at its first match, with the match's own RNG.
+ */
+export function drawRoster(rng: Rng, taken: Iterable<string> = []): Roster {
+  const slots = rosterSlots();
+  const names = drawNames(slots.length, rng, taken);
+  return Object.fromEntries(slots.map((slot, i) => [slot, names[i]!]));
+}
+
+/**
+ * Two names on the same side that read the same, or null. A human who names
+ * themselves after a roster team-mate is refused by the lobby with this; the
+ * engine throws on it, as a backstop, because two Quills make the ladder
+ * unreadable.
+ */
+export function nameCollision(names: readonly string[]): string | null {
+  const seen = new Set<string>();
+  for (const name of names) {
+    const key = name.trim().toLowerCase();
+    if (!key) continue;
+    if (seen.has(key)) return name.trim();
+    seen.add(key);
+  }
+  return null;
+}
 
 export function createMatch(setup: MatchSetup): MatchState {
   const arena = new Arena(setup.arena);
@@ -40,10 +98,10 @@ export function createMatch(setup: MatchSetup): MatchState {
 
   assertSeatsAreFillable(setup.humans);
 
-  const units = nameUnits(
-    [...buildTeam(setup, 'A', setup.humans), ...buildTeam(setup, 'B', [])],
-    rng,
-  );
+  const sides = [...buildTeam(setup, 'A', setup.humans), ...buildTeam(setup, 'B', [])];
+  const clash = nameCollision(sides.map((u) => u.name));
+  if (clash) throw new Error(`two units on the field would be called ${clash}`);
+  const units = nameUnits(sides, rng);
 
   const ordnance = setup.arena.ordnanceStart;
   if (!arena.isOccupiable(ordnance)) {
@@ -141,21 +199,28 @@ function buildTeam(
   const roles = [...TEAM_COMPOSITION].sort(
     (a, b) => Number(b === 'bulwark') - Number(a === 'bulwark'),
   );
+  // The k-th unit of each role, for the roster's slot key (2H.29).
+  const kOf = new Map<Role, number>();
 
   return roles.map((role, index) => {
     const seatIndex = seats.findIndex((s) => s.role === role);
     const seat = seatIndex >= 0 ? seats.splice(seatIndex, 1)[0] : undefined;
+    const k = (kOf.get(role) ?? 0) + 1;
+    kOf.set(role, k);
 
     const cell = starts[index];
     if (!cell) throw new Error(`arena ${setup.arena.id} has no start cell ${index} for team ${team}`);
 
     const stats = statsFor(role, setup.tier);
 
+    // A human's own name first; then, on team A, the battery's standing name
+    // for this slot (2H.29, C30 point 3); else blank, and nameUnits fills it
+    // from the pool, seeing the whole field at once to keep every name distinct.
+    const standing = team === 'A' && !seat ? setup.roster?.[slotKey(role, k)] : undefined;
+
     return {
       id: `${team}-${role}-${index + 1}`,
-      // Left blank here and filled by nameUnits, which needs to see the whole
-      // field at once to keep every name on it distinct.
-      name: seat?.name?.trim() ?? '',
+      name: seat?.name?.trim() || standing?.trim() || '',
       team,
       role,
       tier: setup.tier,

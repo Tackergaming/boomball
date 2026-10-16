@@ -52,7 +52,7 @@ import { Ball, Cracker, Spark } from './Ordnance.js';
 import { Overlay, type Sight } from './Overlay.js';
 import { BRASS, FAINT, newSceneLink, shirt, type SceneLink } from './scene.js';
 import { Silo } from './Silo.js';
-import { GIFF_HEIGHT, Plate, Token } from './Tokens.js';
+import { CarrierMarker, GIFF_HEIGHT, Plate, Token } from './Tokens.js';
 
 const NO_ROUTE: readonly Point[] = [];
 
@@ -98,6 +98,12 @@ const GESTURE_MS: Readonly<Record<'swing' | 'lunge' | 'flinch' | 'throw', number
 const SINK = 1.9;
 /** From how high the Spark comes down, in cells. */
 const DROP_FROM = 6;
+/**
+ * The carrier's marker breathes (2H.29, `00` C30): one slow swell per
+ * `BREATH_MS`, the beam between 0.35 and 0.75, the floor ring in phase
+ * around 0.6. Slow enough to be a presence and not a blink (`Effects.tsx`).
+ */
+const BREATH_MS = 1600;
 
 export function Board3D({
   state,
@@ -487,6 +493,7 @@ export function Board3D({
         ))}
         {sparkSeen && <Spark link={link} />}
         <Ball link={link} />
+        <CarrierMarker link={link} />
 
         <Effects link={link} own={own} />
 
@@ -706,8 +713,14 @@ function Mover({
     }
 
     // The ball: in flight, waiting for its flight, in a hand, or on the floor.
+    // The carrier's marker (2H.29, `00` C30) goes with the hand: shown only
+    // while the ball is held, on the holder's piece rather than its engine
+    // cell so it glides with the walk, and dark the moment the ball flies,
+    // drops or goes into a mouth.
     const ball = link.pieces.get('b');
     const loose = link.pieces.get('b:loose');
+    const marker = link.pieces.get('b:carrier');
+    let held = false;
     if (ball) {
       const bp = pose?.ball ?? null;
       if (bp?.kind === 'air') {
@@ -720,9 +733,26 @@ function Mover({
           loose.visible = !bp.held;
           place(loose, bp.at);
         }
+        if (bp.held && marker) {
+          // Before the first flight the hand may be a thrower walking to
+          // their launch cell (`pose.ts`'s bearer): follow that piece. After
+          // a catch, the catcher stands on the cell the pose names.
+          const plan = track.plan;
+          const bearer =
+            plan?.bearer && elapsed < plan.starts[plan.firstBall]! ? link.pieces.get(`u:${plan.bearer}`) : undefined;
+          if (bearer) marker.position.set(bearer.position.x, 0, bearer.position.z);
+          else place(marker, bp.at);
+          held = bearer ? bearer.visible : true;
+        }
       } else if (state.payload.carriedBy) {
         const carrier = link.pieces.get(`u:${state.payload.carriedBy}`);
-        if (carrier) ball.position.set(carrier.position.x + 0.3, 1.15, carrier.position.z + 0.25);
+        if (carrier) {
+          ball.position.set(carrier.position.x + 0.3, 1.15, carrier.position.z + 0.25);
+          if (marker) {
+            marker.position.set(carrier.position.x, 0, carrier.position.z);
+            held = carrier.visible;
+          }
+        }
         if (loose) loose.visible = false;
       } else {
         place(ball, state.payload, 0.22);
@@ -732,6 +762,15 @@ function Mover({
         }
       }
       ball.visible = true;
+    }
+    if (marker) {
+      marker.visible = held;
+      const glow = link.carrierGlow;
+      if (held && glow) {
+        const breath = 0.5 + 0.5 * Math.sin((now / BREATH_MS) * Math.PI * 2);
+        glow.beam.opacity = 0.35 + 0.4 * breath;
+        glow.ring.opacity = 0.45 + 0.3 * breath;
+      }
     }
 
     // What the camera follows: the beat's unit, else the unit on the clock,

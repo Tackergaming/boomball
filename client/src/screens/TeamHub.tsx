@@ -203,10 +203,17 @@ export function TeamHub({
         <div style={S.roster}>
           {TEAM_COMPOSITION.map((role, i) => {
             const line = lineFor(role);
+            // The slot's standing name (2H.29, `00` C30 point 3): the k-th of
+            // this role in composition order, as `engine/setup.ts` keys it.
+            const k = TEAM_COMPOSITION.slice(0, i + 1).filter((r) => r === role).length;
+            const standing = team.roster?.[`${role}-${k}`];
             return (
-              <div key={`${role}-${i}`} style={S.card}>
+              <div key={`${role}-${i}`} style={S.card} data-roster-slot={`${role}-${k}`}>
                 <p className="label" style={{ margin: 0, color: 'var(--team-own)' }}>
                   {role}
+                </p>
+                <p className="display" style={{ margin: '6px 0 0', fontSize: 18 }} data-roster-name>
+                  {standing ?? 'Named at your first match'}
                 </p>
                 {line ? (
                   <p style={S.statLine}>
@@ -222,8 +229,9 @@ export function TeamHub({
         </div>
 
         <p style={S.footnote}>
-          Names are typed at the lobby, one per human seat. Every other Giff on the field is drawn
-          from the house pool. One Bulwark and one Trajector, ever.
+          These are your Giff, named once at your first match and the same every match after. The
+          seat you take wears your own name for that match; the other side never shares a name
+          with your battery. One Bulwark and one Trajector, ever.
         </p>
 
         <button style={{ marginTop: 22 }} onClick={onEnterLobby} disabled={!!live}>

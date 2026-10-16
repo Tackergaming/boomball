@@ -58,7 +58,7 @@ export function Briefing({ onClose }: { onClose: () => void }) {
           <Item
             mark={<span style={{ ...S.dot, background: '#c9b489' }} />}
             title="The Payload"
-            body="The gold disc, and the only thing that scores. Take it, carry it to their Furnace and shoot. Your Furnace is on the left of the screen, theirs on the right. Ten points."
+            body="The gold disc, and the only thing that scores. Take it, carry it to their Furnace and shoot. Your Furnace is on the left as the match opens, theirs on the right. Ten points."
           />
           <Item
             mark={<span style={S.slab} />}
@@ -105,11 +105,37 @@ export function Briefing({ onClose }: { onClose: () => void }) {
             title="The keeper restarts"
             body="After a goal, the Bulwark who let it in goes first in the initiative of his side at its next block, and restarts the play at once."
           />
+          <Item
+            mark={<span style={S.shove}>3D</span>}
+            title="The view"
+            body={
+              'The match opens in 3D, in three quarters inside the silo. "Back to 2D" at the top switches to the flat board from above, and the choice is remembered. Right mouse button drag turns around the play, the wheel zooms. Arrow keys, or Ctrl plus mouse drag, move the camera over the field and unhook it from the play; "Follow the play" hooks it back, and so does your own Giff coming onto the clock. "Close in" frames the fifteen cells of the width, "Whole silo" the lot.'
+            }
+          />
+          <Item
+            mark={<span style={S.shove}>&#9835;</span>}
+            title="Sound and the booth"
+            body={
+              'Bats, blasts, the whistle and the furnace are heard. The crowd follows possession: it surges while your side has the ball. Two announcers comment hits, misses, Shoves, Crackers, knockouts and the Spark, one line at a time. "Sound on" at the top mutes everything, and it is remembered.'
+            }
+          />
+          <Item
+            mark={<span style={S.shove}>&uarr;</span>}
+            title="Your league"
+            body="A battery starts Rookie and climbs by winning: 3 wins Veteran, 6 Star. In the lobby you pick the league to play at, your own or any below it, never above, and the house fields that league against you. Only a win at your own league climbs the ladder. A win below it is a win and nothing more."
+          />
+          <Item
+            mark={<span style={S.shove}>&times;</span>}
+            title="Leaving"
+            body={
+              '"Leave the match" at the top, or "Abandon this match" on the hub, ends the match after a confirmation. No result: no win, no loss, and the ladder does not move. The match is kept and never resumed.'
+            }
+          />
         </div>
 
         <p style={S.foot}>
-          {MATCH_ROUNDS} rounds. The house fields {TEAM_SIZE * 2 - 1} Giff against you and plays at your own Tier,
-          so a match you win is a match you were meant to be able to lose.
+          {MATCH_ROUNDS} rounds. The house fields {TEAM_SIZE * 2 - 1} Giff against you and plays at the league
+          you picked, so a match you win is a match you were meant to be able to lose.
         </p>
 
         <div style={S.actions}>

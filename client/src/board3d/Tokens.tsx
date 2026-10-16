@@ -14,12 +14,25 @@
  * it attacks. Nothing in here decides anything: the rings come from the same
  * three target lists the action bar reads, and a click answers a pending
  * action or selects, exactly as on the SVG board.
+ *
+ * The ball carrier's marker lives here too (`CarrierMarker`, 2H.29): one for
+ * the whole pitch, not one per token, moved by the loop to whoever holds the
+ * ball.
  */
 
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
-import { type Group, type Mesh, type MeshBasicMaterial, MeshStandardMaterial } from 'three';
+import {
+  AdditiveBlending,
+  CylinderGeometry,
+  DoubleSide,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  RingGeometry,
+} from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 import type { Unit, UnitId } from '../../../engine/types.js';
@@ -159,6 +172,78 @@ function PulsingRing({ colour }: { colour: string }) {
       <meshBasicMaterial ref={material} color={colour} transparent opacity={1} depthWrite={false} />
     </mesh>
   );
+}
+
+/** The ball's gold, the pass ring's: what the carrier's marker wears (2H.29, `00` C30). */
+export const BALL_GOLD = '#ffc14d';
+/**
+ * The carrier's beam, in cells: from the head, where the top of the body
+ * hides its foot, two cells up. Thin enough to read as a mark and not a
+ * pillar in the close framing, tall enough to stand out of a crowd in the
+ * wide one.
+ */
+const BEAM_FROM = GIFF_HEIGHT - 0.1;
+const BEAM_LENGTH = 2;
+const BEAM_RADIUS = 0.15;
+
+/**
+ * The ball carrier's marker (2H.29, `00` C30): Jérôme lost track of who had
+ * the ball in three quarters, so the carrier wears a thin golden beam from
+ * the head up and a golden ring on the floor. Built once, by hand as in
+ * `Effects.tsx`, and registered as the piece `b:carrier` with its two
+ * materials as `link.carrierGlow`: only the frame loop knows whether the
+ * ball is in a hand, so it places the group, shows it or hides it, and
+ * breathes both opacities each frame. Nothing here re-renders.
+ *
+ * The beam is additive and writes no depth, so it reads as light from any
+ * angle and over anything; the ring is drawn like the other floor rings.
+ */
+export function CarrierMarker({ link }: { link: SceneLink }) {
+  const marker = useMemo(() => {
+    const beamGeometry = new CylinderGeometry(BEAM_RADIUS, BEAM_RADIUS, BEAM_LENGTH, 16, 1, true);
+    const ringGeometry = new RingGeometry(0.9, 1.0, 48);
+    const beamMaterial = new MeshBasicMaterial({
+      color: BALL_GOLD,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      toneMapped: false,
+      side: DoubleSide,
+    });
+    const ringMaterial = new MeshBasicMaterial({ color: BALL_GOLD, transparent: true, opacity: 0.6, depthWrite: false });
+    const root = new Group();
+    root.name = 'carrier-marker';
+    root.visible = false;
+    const beam = new Mesh(beamGeometry, beamMaterial);
+    beam.position.y = BEAM_FROM + BEAM_LENGTH / 2;
+    root.add(beam);
+    const ring = new Mesh(ringGeometry, ringMaterial);
+    ring.rotation.x = -Math.PI / 2;
+    // Just over the Giff's own rings, so the two never fight for the same depth.
+    ring.position.y = 0.017;
+    root.add(ring);
+    return {
+      root,
+      glow: { beam: beamMaterial, ring: ringMaterial },
+      dispose() {
+        beamGeometry.dispose();
+        ringGeometry.dispose();
+        beamMaterial.dispose();
+        ringMaterial.dispose();
+      },
+    };
+  }, []);
+  useEffect(() => {
+    link.pieces.set('b:carrier', marker.root);
+    link.carrierGlow = marker.glow;
+    return () => {
+      if (link.pieces.get('b:carrier') === marker.root) link.pieces.delete('b:carrier');
+      if (link.carrierGlow === marker.glow) link.carrierGlow = null;
+    };
+  }, [link, marker]);
+  useEffect(() => () => marker.dispose(), [marker]);
+  return <primitive object={marker.root} />;
 }
 
 /** The stand-in body: a capsule the height of a Giff. */

@@ -15,7 +15,8 @@ import { pathTo, reachableCells } from './rules/movement.js';
 import { rangeToFurnace } from './rules/payload.js';
 import { buildTurnOrder, ladderRungs } from './initiative.js';
 import { crackerPost } from './rules/ordnance.js';
-import { createMatch, MAX_HUMANS, type MatchSetup } from './setup.js';
+import { Rng } from './rng.js';
+import { createMatch, drawRoster, MAX_HUMANS, nameCollision, rosterSlots, type MatchSetup } from './setup.js';
 import { TEAM_COMPOSITION } from './stats.js';
 import { activeUnitsOf, isHuman, type MatchState } from './types.js';
 
@@ -273,6 +274,59 @@ describe('kick-off', () => {
       .toBe(summarise(createMatch({ ...base, humans: [{ humanId: 'j', role: 'striker' }] })));
     expect(summarise(createMatch({ ...base, seed: 1, humans: [{ humanId: 'j', role: 'striker' }] })))
       .not.toBe(summarise(createMatch({ ...base, seed: 2, humans: [{ humanId: 'j', role: 'striker' }] })));
+  });
+});
+
+describe('the roster (2H.29, C30 point 3)', () => {
+  const roster = drawRoster(new Rng(99), ['Wilhelm Duarte']);
+
+  it('draws seven distinct names, one per slot, none of them a human name', () => {
+    expect(Object.keys(roster).sort()).toEqual(rosterSlots().sort());
+    expect(rosterSlots()).toEqual(['striker-1', 'striker-2', 'striker-3', 'breaker-1', 'breaker-2', 'bulwark-1', 'trajector-1']);
+    const names = Object.values(roster);
+    expect(new Set(names.map((n) => n.toLowerCase())).size).toBe(7);
+    expect(names).not.toContain('Wilhelm Duarte');
+  });
+
+  it('gives team A its standing names, the human their own, and keeps the house off all of them', () => {
+    const state = createMatch({
+      ...base,
+      humans: [{ humanId: 'jerome', role: 'striker', name: 'Wilhelm Duarte' }],
+      roster,
+    });
+    const a = state.units.filter((u) => u.team === 'A');
+    const b = state.units.filter((u) => u.team === 'B');
+    const bulwark = a.find((u) => u.role === 'bulwark')!;
+    expect(bulwark.name).toBe(roster['bulwark-1']);
+    expect(a.find((u) => u.role === 'trajector')!.name).toBe(roster['trajector-1']);
+    // The human sits in the first Striker slot; the other two keep their names.
+    const strikers = a.filter((u) => u.role === 'striker');
+    expect(strikers[0]!.name).toBe('Wilhelm Duarte');
+    expect(strikers.slice(1).map((u) => u.name)).toEqual([roster['striker-2'], roster['striker-3']]);
+    const aNames = new Set(a.map((u) => u.name.toLowerCase()));
+    for (const unit of b) expect(aNames.has(unit.name.toLowerCase())).toBe(false);
+  });
+
+  it('is the same roster across two matches with different seeds, and the slot the human leaves gets its name back', () => {
+    const first = createMatch({ ...base, seed: 1, humans: [{ humanId: 'jerome', role: 'bulwark', name: 'Wilhelm Duarte' }], roster });
+    const second = createMatch({ ...base, seed: 2, humans: [{ humanId: 'jerome', role: 'striker', name: 'Wilhelm Duarte' }], roster });
+    expect(first.units.find((u) => u.id === 'A-bulwark-1')!.name).toBe('Wilhelm Duarte');
+    expect(second.units.find((u) => u.id === 'A-bulwark-1')!.name).toBe(roster['bulwark-1']);
+    expect(first.units.find((u) => u.role === 'trajector' && u.team === 'A')!.name).toBe(
+      second.units.find((u) => u.role === 'trajector' && u.team === 'A')!.name,
+    );
+  });
+
+  it('refuses a human named after a roster team-mate', () => {
+    expect(nameCollision(['Quill Cannonade', 'Hamm Rivet', 'quill cannonade'])).toBe('quill cannonade');
+    expect(nameCollision(['Quill Cannonade', '', 'Hamm Rivet'])).toBeNull();
+    expect(() =>
+      createMatch({
+        ...base,
+        humans: [{ humanId: 'jerome', role: 'striker', name: roster['bulwark-1']! }],
+        roster,
+      }),
+    ).toThrow(/would be called/);
   });
 });
 

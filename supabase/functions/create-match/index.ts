@@ -32,6 +32,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
 import { ENGINE_VERSION } from '../../../engine/constants.ts';
+import { Rng } from '../../../engine/rng.ts';
+import { drawRoster, type Roster } from '../../../engine/setup.ts';
 import { isTier, tierAllowed, type Tier } from '../../../engine/stats.ts';
 import { toArenaSpec } from '../../../server/arenaRow.ts';
 import { openLobbyMatch, type SeatRequest } from '../../../server/lobby.ts';
@@ -99,7 +101,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   // played at the battery's Tier, as it always was.
   const { data: team } = await db
     .from('teams')
-    .select('id, owner, tier')
+    .select('id, owner, tier, roster')
     .eq('id', teamId)
     .single();
   if (!team) return refuse('no such team', 404);
@@ -109,12 +111,12 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (!tierAllowed(tier, reached)) return refuse(`your battery has not reached ${tier}`, 403);
 
   // Everyone taking a seat must belong to the team, the caller included. Read
-  // the roster once and answer both questions from it.
-  const { data: roster } = await db
+  // the membership once and answer both questions from it.
+  const { data: membership } = await db
     .from('team_members')
     .select('profile_id')
     .eq('team_id', teamId);
-  const members = new Set<string>((roster ?? []).map((row) => row.profile_id as string));
+  const members = new Set<string>((membership ?? []).map((row) => row.profile_id as string));
   members.add(team.owner as string);
 
   if (!members.has(callerId)) return refuse('you are not on this team', 403);
@@ -146,12 +148,26 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (!arenaRow) return refuse(`there is no arena called ${arenaId}`, 404);
 
   const seed = freshSeed();
+
+  // The battery's standing names (2H.29, `00` C30 point 3): drawn once, at
+  // its first match, off this match's seed and away from the humans' own
+  // names, then written and never touched again. A write that fails is not
+  // fatal: the match is still fielded with these names, the next match draws
+  // again, and the roster settles the first time the write goes through.
+  let roster = (team.roster as Roster | null) ?? null;
+  if (!roster) {
+    roster = drawRoster(new Rng(seed), seats.map((seat) => seat.characterName ?? ''));
+    const { error: rosterError } = await db.from('teams').update({ roster }).eq('id', teamId).is('roster', null);
+    if (rosterError) console.warn('the roster was not saved', rosterError);
+  }
+
   const opened = openLobbyMatch(toArenaSpec(arenaRow), {
     callerId,
     tier,
     seats,
     seed,
     now: Date.now(),
+    roster,
   });
   if (!opened.ok) return refuse(opened.reason);
 

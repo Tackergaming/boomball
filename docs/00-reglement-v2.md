@@ -2554,3 +2554,76 @@ inchangés, aucun abandonné, droits `authenticated`, `postgres`, `service_role`
 redéployées sur son feu vert : **`resolve-action` v23, `create-match` v21**, moteur 10 inchangé.
 708 tests sur 35 fichiers, inchangés (rien dans le moteur) ; typecheck racine, scripts, e2e et
 client verts.
+
+## C30. Décisions du 2026-10-16 au soir, **sous-phase 2H.29, la phase 6 : la 3D par défaut, le porteur visible, l'effectif fixe**
+
+> Écrites par le fil principal (Fable 5.1) sur les réponses de Jérôme en chat au cadrage de la
+> phase 6 de `07`, après la porte de 2H.28. Rien dans l'IA ; **un champ de plus dans
+> `MatchSetup` (l'effectif), le moteur ne change pas de règle, `ENGINE_VERSION` reste 10** ; une
+> migration, `0009`, qu'il applique ; les deux fonctions à redéployer sur son feu vert.
+
+1. **La 3D par défaut, pour tout le monde.** Ses mots : « oui 3d par défaut pour tout le
+   monde ». Un nouveau compte s'ouvre en 3D ; « Back to 2D » reste et garde le choix. Le budget
+   d'images par seconde de `07` phase 6 est tenu sur sa machine (45 à 50) et ne se mesure pas au
+   harnais (GL logiciel, 2 à 4) : la mesure tombe, le compteur de développement reste. Le
+   briefing dit la caméra (bouton droit, roulette, flèches, Ctrl plus souris, « Follow the
+   play »), les deux cadrages, le son et l'annonceur, la ligue au choix, l'abandon.
+2. **Le porteur du ballon se voit tout de suite en 3D.** Ses mots : « parfois je perds de vue
+   qui est le porteur du ballon, il nous faudrait un moyen visuel de savoir où il est tout de
+   suite ». Décidé, sur son « ça me va » : un **faisceau doré** vertical et fin au-dessus du
+   porteur, de la tête à deux cases de haut, qui respire doucement, et un anneau doré au sol
+   sous lui, dans l'or du ballon ; il suit le porteur en marche, s'éteint quand le ballon tombe
+   ou entre dans la bouche, se voit en vue large. Le point du porteur sur la minicarte passe à
+   l'or, plus gros.
+3. **Un effectif fixe par batterie, à jamais.** Ses mots : « il faut que les noms des membres
+   d'une batterie gardent toujours le même nom [...] je veux que mon bulwark soit toujours le
+   même gars, s'il s'appelle Quill un match, alors le prochain aussi », et « un nom ne soit
+   jamais en doublon dans son équipe ET ne soit jamais utilisé dans l'équipe adverse ». Constat :
+   `createMatch` tirait les treize noms non humains à chaque match avec la graine, en n'évitant
+   que le nom tapé par l'humain ; rien n'était gardé entre deux matchs ; dans un même match, le
+   tirage garantissait déjà l'absence de doublon. Décidé : **sept noms, un par poste** (trois
+   Strikers, deux Breakers, le Bulwark, le Trajector), tirés **une fois au premier match** de la
+   batterie et gardés dans `teams.roster` ; **pas de renommage** (sa réponse : « oui à jamais.
+   pas de renommage »). À chaque match, les six postes que l'humain n'occupe pas portent leur
+   nom d'effectif, le poste qu'il prend porte le sien ; s'il change de rôle, le poste quitté
+   reprend son nom d'effectif. L'adversaire tire ses sept noms par match en évitant l'effectif
+   et le nom de l'humain : jamais un même nom des deux côtés. Si l'humain se renomme du nom
+   d'un coéquipier, le lobby refuse en le disant. Le hub montre l'effectif.
+
+**Ce que ces décisions rouvrent.** `engine/setup.ts` (`MatchSetup.roster`, les noms posés par
+poste avant le tirage ; une collision entre deux noms posés est une erreur) ; `server/lobby.ts`
+(le refus en clair) ; la migration `0009_roster.sql` (`teams.roster jsonb`, lisible par
+`teams_read`) ; `create-match` (lit l'effectif, le tire et l'écrit au premier match avec la
+clé de service, le passe au moteur) ; `useAccount` (l'effectif) ; `TeamHub.tsx` (l'effectif par
+poste à côté de la composition) ; `Lobby.tsx` (le refus affiché) ; `Match.tsx` (3D par défaut) ;
+`Briefing.tsx` ; `Board3D.tsx`, `Tokens.tsx` ou `Effects.tsx` (le faisceau du porteur) ;
+`Minimap.tsx` ; le smoke (pose le 2D) et le spec 3D (ne bascule plus). Pas de sweep.
+
+**Comment 2H.29 est codée** (le 2026-10-16 au soir, fil principal Fable 5.1, un Sonnet effort
+moyen sur `Briefing.tsx`, un Opus 5.5 effort élevé sur le faisceau). `Match.tsx` : `view` vaut
+`3d` sauf si `boomball.view` dit `2d` ; `prefer2D(page)` dans `e2e/harness.ts` pose la clé par
+`addInitScript` avant la première navigation du smoke, du playthrough et du spec d'abandon ; le
+spec 3D affirme « Back to 2D » à l'entrée au lieu de cliquer. `Briefing.tsx` : quatre fiches
+(« The view », « Sound and the booth », « Your league », « Leaving »), « Your Furnace is on the
+left as the match opens », le pied « plays at the league you picked ». Le porteur :
+`CarrierMarker` dans `Tokens.tsx` (faisceau `CylinderGeometry` ouvert, rayon 0,15, de y 1,4 à
+3,4, `MeshBasicMaterial` or `BALL_GOLD` `#ffc14d` additif sans écriture de profondeur ; anneau
+`RingGeometry` 0,9 à 1,0 au sol), pièce `b:carrier` et `link.carrierGlow` dans `scene.ts` ; la
+boucle de `Board3D` le pose à chaque image sur la pièce du porteur (le lanceur en marche avant
+le lancer, le receveur après la prise, le porteur de l'état hors beat) et `visible` seulement
+ballon en main, opacités en respiration `BREATH_MS` 1,6 s de 0,35 à 0,75 ; `Minimap.tsx` dessine
+le porteur en dernier, en or, 1,2 contre 0,8, cerné de sombre. L'effectif : `engine/setup.ts`
+porte `Roster`, `slotKey(role, k)`, `rosterSlots()` (`striker-1` à `striker-3`, `breaker-1`,
+`breaker-2`, `bulwark-1`, `trajector-1`), `drawRoster(rng, taken)` (sept noms distincts hors
+`taken`), `nameCollision(names)`, `MatchSetup.roster` ; `buildTeam` pose le nom d'effectif sur
+chaque poste de l'équipe A sans humain, `createMatch` jette « two units on the field would be
+called X » sur une collision de noms posés, puis `nameUnits` tire les blancs (l'adversaire) en
+évitant tous les noms posés comme avant. `server/lobby.ts` : `LobbyRequest.roster`, le refus
+« X is already on your battery: pick another name for yourself ». `create-match` : lit
+`teams.roster`, s'il est nul tire `drawRoster(new Rng(seed), noms des sièges)`, l'écrit par
+`update ... is('roster', null)` (un échec d'écriture n'empêche pas le match, le tirage suivant
+réessaie), le passe au lobby. Migration `0009_roster.sql` : `alter table teams add column roster
+jsonb`. `useAccount` lit `roster` ; `TeamHub.tsx` l'affiche par poste. 713 tests sur 35 fichiers
+(708 avant) ; typecheck racine, scripts, e2e et client verts ; les deux fonctions bundlent.
+**Appliqué et en ligne le même soir** : la migration par Jérôme (vérifiée avant et après),
+`resolve-action` v24 et `create-match` v22 sur son feu vert.
