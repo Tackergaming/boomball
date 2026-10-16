@@ -36,10 +36,11 @@
  * decode, is simply not commented; nothing else changes.
  */
 export const ANNOUNCER_LINES = {
-  // The match opens: the first turn banner of round 1.
-  champion: ['dragon-01-select-your-champion.mp3'],
   // Round 1 opens. Jérôme cut "Death match" and "First round", and the round
   // two and three calls, on 2026-10-16: one word, then the whistle does the job.
+  // "Select your champion", said at the first turn banner since 2H.25, went the
+  // same evening after his match on 2H.29 (2H.30, `00` C31): the clip stays on
+  // disk like the other cut lines, the moment is gone.
   kickoff: ['dragon-02-fight.mp3'],
   suddenDeath: ['dragon-15-sudden-death.mp3', 'dragon-12-death-round.mp3'],
   // A bat lands on a Giff, every time the floor is free (2H.26).

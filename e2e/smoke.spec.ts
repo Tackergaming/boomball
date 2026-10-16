@@ -199,8 +199,38 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   expect(point!.x).toBeLessThanOrEqual(box!.x + box!.width);
   expect(point!.y).toBeGreaterThanOrEqual(box!.y);
   expect(point!.y).toBeLessThanOrEqual(box!.y + box!.height);
-  await page.locator(`[data-cell="${to3.x},${to3.y}"]`).click();
-  await waitForArrival(page, legal3.unitId, to3);
+  // The Dash held (2H.30, `00` C31 point 3): pressing Dash sends nothing and
+  // the board offers the cells the Dash's feet reach on top of the plain
+  // ones; a second press takes them back; and a click on a cell past the
+  // plain feet sends the Dash and the walk as two requests. The plain cells
+  // are the hook's (the server's board), the held ones are the rects.
+  const cellsOn = async () =>
+    new Set(await page.locator('[data-cell]').evaluateAll((rects) => rects.map((r) => r.getAttribute('data-cell'))));
+  const plain = await cellsOn();
+  const dash = page.getByTestId('dash');
+  await dash.click();
+  await expect(page.getByTestId('feet-left')).toHaveAttribute('data-dash-held', 'yes');
+  await expect(page.getByTestId('feet-left')).toContainText('Dash held');
+  await expect(dash).toHaveAttribute('data-on', 'yes');
+  const held = await cellsOn();
+  const beyond = [...held].filter((cell) => !plain.has(cell));
+  expect(beyond.length, 'cells only the held Dash reaches').toBeGreaterThan(0);
+  await shots.take('turn-3-dash-held');
+  await dash.click();
+  await expect(page.getByTestId('feet-left')).toHaveAttribute('data-dash-held', 'no');
+  expect((await cellsOn()).size).toBe(plain.size);
+  expect(await page.evaluate(() => window.__boomball!.state!.turn!.actionUsed)).toBe(false);
+  // Held again, and spent by a walk only the Dash reaches: the first such
+  // cell, the nearest in the sweep's order, so feet are left and the turn
+  // stays open for the "End turn" the glide below is watched on (a walk to
+  // the farthest cell emptied the turn, which passed itself on).
+  await dash.click();
+  const [bx, by] = beyond[0]!.split(',').map(Number) as [number, number];
+  await page.locator(`[data-cell="${bx},${by}"]`).click();
+  await waitForArrival(page, legal3.unitId, { x: bx, y: by });
+  expect(await page.evaluate(() => window.__boomball!.state!.turn!.actionUsed)).toBe(true);
+  // The bar may already read "The house is playing": a walk that spent every
+  // foot and the Action empties the turn, which passes itself on after a beat.
   await shots.take('turn-3-moved');
 
   // -- Turn 3, the house's reply at slow: the pieces glide (2H.5) -----------

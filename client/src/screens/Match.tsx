@@ -30,6 +30,7 @@ import { ActionBar, type Pending } from '../match/ActionBar.js';
 import { Announce } from '../match/Announce.js';
 import { Banner, type Announcement } from '../match/Banner.js';
 import { Board } from '../match/Board.js';
+import { dashNeeded, heldDashState } from '../match/dashHold.js';
 import { fxBridge } from '../match/fxBridge.js';
 import { FLOAT_MS, type Cue } from '../match/motion.js';
 import { createSounds, readSoundEnabled, type AnnouncerCue, type SoundKind, type Sounds } from '../match/sound.js';
@@ -253,6 +254,38 @@ export function Match({
     turnKeyRef.current = turnKeyNow;
     tookControl.current = Date.now();
   }
+
+  /**
+   * The Dash held back (2H.30, `00` C31 point 3, `match/dashHold.ts`).
+   * Pressing Dash sends nothing: the boards and the bar are shown the turn
+   * with the Dash's feet already counted (`viewState`, `legalView`), and the
+   * Dash goes to the server right before the first walk that needs it, as
+   * two requests (`moveWith`). A second press cancels it. The hold ends with
+   * the turn, and the moment the Action is spent (the Dash sent, or any
+   * other Action taken), which is when `legal.canDash` goes false. The hook
+   * keeps publishing the server's board and its own legal set: `act` on the
+   * hook sends a real Dash, as before.
+   */
+  const [dashHeld, setDashHeld] = useState(false);
+  useEffect(() => {
+    setDashHeld(false);
+  }, [turnKeyNow]);
+  useEffect(() => {
+    if (!legal?.canDash) setDashHeld(false);
+  }, [legal?.canDash]);
+  const viewState = useMemo(() => (dashHeld && state ? heldDashState(state) : state), [dashHeld, state]);
+  const legalView = useMemo(
+    () => (dashHeld && viewState && legal ? legalActions(arena, viewState) : legal),
+    [dashHeld, viewState, legal],
+  );
+  const moveWith = (path: readonly Point[]) => {
+    const mover = state && legal ? state.units.find((u) => u.id === legal.unitId) : null;
+    if (dashHeld && state && mover && dashNeeded(state, { x: mover.x, y: mover.y }, path)) {
+      void match.sendMany([{ kind: 'dash' }, { kind: 'move', path }]);
+    } else {
+      void send({ kind: 'move', path });
+    }
+  };
 
   /**
    * The knock that makes the clock mean something.
@@ -526,8 +559,6 @@ export function Match({
   useEffect(() => {
     if (!turnBanner || !onClock || turnBannerShown.current === turnBanner) return;
     turnBannerShown.current = turnBanner;
-    // "Select your champion" on the first turn of the match (2H.25).
-    if (state?.round === 1) soundsRef.current?.say('champion');
     // What the replay still had to announce gives way: the board is the
     // player's now, and a queue of old news in front of "your turn" is noise.
     setBanners([{ kind: 'turn', text: `Your turn · ${onClock.name}`, tone: 'own', id: ++bannerId.current }]);
@@ -542,10 +573,20 @@ export function Match({
   const motionForSound = match.motion;
   useEffect(() => {
     if (!motionForSound || motionForSound.speed === 'instant') return;
+    // 2H.30 (`00` C31 point 2): a bat that carries its target off is one
+    // moment, not two. The hit's line took the floor first and the knockout's
+    // was dropped behind it, so a hit on a Giff that exits in this same beat
+    // says nothing and the knockout speaks. The crack of the bat still plays.
+    const carriedOff = new Set(
+      motionForSound.cues.filter((timed) => timed.cue.kind === 'exit' && timed.cue.unitId).map((timed) => timed.cue.unitId),
+    );
     const timers = motionForSound.cues.flatMap((timed) => {
       const kind = soundOf(timed.cue.kind, timed.cue.text);
       // The announcer (2H.25, C26 5) speaks a beat after the sound of the moment.
-      const said = sayOf(timed.cue, own, mineId);
+      const said =
+        timed.cue.kind === 'hit' && timed.cue.unitId && carriedOff.has(timed.cue.unitId)
+          ? null
+          : sayOf(timed.cue, own, mineId);
       return [
         ...(kind ? [setTimeout(() => soundsRef.current?.play(kind), timed.t)] : []),
         ...(said ? [setTimeout(() => soundsRef.current?.say(said), timed.t + 350)] : []),
@@ -681,10 +722,10 @@ export function Match({
           <div style={S.boardWrap}>
             <BoardOf
               view={view}
-              state={state}
-              legal={legal}
+              state={viewState ?? state}
+              legal={legalView}
               own={own}
-              onMove={canAct ? (path) => void send({ kind: 'move', path }) : null}
+              onMove={canAct ? moveWith : null}
               onSelectUnit={setSelected}
               selected={selected}
               yoursId={mineId}
@@ -841,13 +882,16 @@ export function Match({
           )}
 
           <ActionBar
-            legal={legal}
+            legal={legalView}
             yours={canAct && placing === null}
             busy={match.busy}
-            movementFeet={state.turn?.movementFeetRemaining ?? 0}
+            movementFeet={(viewState ?? state).turn?.movementFeetRemaining ?? 0}
             onAct={act}
             pending={pending}
             onPending={setPending}
+            dashHeld={dashHeld}
+            onHoldDash={() => setDashHeld(true)}
+            onDropDash={() => setDashHeld(false)}
             selectedId={selected}
             plotting={plotting}
             plotLength={route.length}
@@ -857,7 +901,7 @@ export function Match({
             }}
             onGo={() => {
               if (route.length === 0) return;
-              void send({ kind: 'move', path: [...route] });
+              moveWith([...route]);
               setRoute([]);
             }}
             onClearPlot={() => setRoute([])}

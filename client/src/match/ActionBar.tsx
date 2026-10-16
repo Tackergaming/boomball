@@ -20,6 +20,14 @@
  * is a rule hidden. This does not weaken the one-generator rule: what is
  * *possible* still comes from `legalActions` alone, and a greyed button cannot
  * be pressed. Only the sentence explaining the absence is written here.
+ *
+ * **Dash is held, not sent** (2H.30, `00` C31 point 3, `match/dashHold.ts`).
+ * Pressing it tells the match screen to show the turn with the Dash's feet
+ * counted; the Dash itself goes to the server with the first walk that needs
+ * it, and a second press cancels it while nothing has been spent. The
+ * `legal` this bar reads while the Dash is held is the engine's answer on
+ * that extended turn, so the rule above still holds: nothing here decides
+ * what forty feet reach.
  */
 
 import { useEffect, useState } from 'react';
@@ -50,6 +58,9 @@ export function ActionBar({
   onAct,
   pending,
   onPending,
+  dashHeld,
+  onHoldDash,
+  onDropDash,
   selectedId,
   plotting,
   plotLength,
@@ -66,6 +77,10 @@ export function ActionBar({
   /** Owned by the match screen, so the board can answer it with a click on a token. */
   pending: Pending;
   onPending: (pending: Pending) => void;
+  /** Whether the Dash is held (2H.30): shown in the feet and lit on the button, sent with the walk that needs it. */
+  dashHeld: boolean;
+  onHoldDash: () => void;
+  onDropDash: () => void;
   /** The unit picked on the board or the ladder, whose own options get a tray. */
   selectedId: string | null;
   /** Whether a click on a cell adds a waypoint instead of moving. */
@@ -209,8 +224,8 @@ export function ActionBar({
       )}
 
       <div style={S.bar}>
-        <span className="label" style={{ marginRight: 6 }}>
-          {movementFeet} ft left
+        <span className="label" style={{ marginRight: 6 }} data-testid="feet-left" data-dash-held={dashHeld ? 'yes' : 'no'}>
+          {movementFeet} ft left{dashHeld ? ' · Dash held' : ''}
         </span>
 
         <Act
@@ -264,11 +279,20 @@ export function ActionBar({
           onClick={() => setPending('cracker')}
         />
 
+        {/* Held, never sent from here (2H.30): the walk that needs it sends it. */}
         <Act
-          label="Dash"
+          label={dashHeld ? 'Dash · held' : 'Dash'}
+          on={dashHeld}
+          {...(dashHeld ? { hint: 'spent by the walk that needs it · click to cancel' } : {})}
           busy={busy}
           off={legal.canDash ? null : 'the Action is already spent'}
-          onClick={() => act({ kind: 'dash' })}
+          testId="dash"
+          onClick={() => {
+            setPending(null);
+            setCracker(null);
+            if (dashHeld) onDropDash();
+            else onHoldDash();
+          }}
         />
         <Act
           label="Dodge"
@@ -321,6 +345,7 @@ function Act({
   on,
   busy,
   off,
+  testId,
   onClick,
 }: {
   label: string;
@@ -331,6 +356,8 @@ function Act({
   busy: boolean;
   /** Why this action is unavailable, or null when it can be taken. */
   off: string | null;
+  /** A handle for the screen harness, on the buttons it presses. */
+  testId?: string;
   onClick: () => void;
 }) {
   const colour =
@@ -343,6 +370,7 @@ function Act({
       disabled={busy || off !== null}
       onClick={onClick}
       title={note}
+      {...(testId ? { 'data-testid': testId, 'data-on': on ? 'yes' : 'no' } : {})}
       style={{
         ...S.act,
         ...(off ? S.off : colour ? { color: colour, borderColor: colour } : {}),

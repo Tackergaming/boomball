@@ -1924,3 +1924,30 @@ l'IA, aucune règle du moteur ne change (`MatchSetup.roster` est un champ de plu
 
 **Ce qui attend Jérôme** : deux matchs de suite : les mêmes noms d'effectif, le porteur vu tout
 de suite, le briefing relu. Puis le redéploiement du client.
+
+**Porte franchie le 2026-10-16** sur l'effectif et le porteur (« les noms des joueurs sont bons
+et restent », « le halo du porteur est ok »), avec cinq retours de partie qui font 2H.30.
+
+### Sous-phase 2H.30, « cinq retours de partie », codée le 2026-10-16, porte ouverte
+
+Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C31 : ses cinq retours
+après ses deux matchs sur 2H.29 (`e0d9b642`, star, 30 à 20 ; `c5cb20f6`, abandonné au round 2).
+Rien dans le moteur, rien dans l'IA, `ENGINE_VERSION` toujours 10, rien à redéployer, pas de
+migration, **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| La latence au round 2 | Lue en base (`match_events.created_at`) : la popup du round 2 arrive dans la même réponse que la fin de son tour du round 1, cinquante événements rejoués à l'écran avant qu'elle ne s'affiche ; place 1 ouvre son tour dans la même réponse. Les journaux des fonctions refusés par l'API de gestion. **Non reproduit, rien ne change**, question posée à lui (`00` C31 point 1) |
+| La réplique de KO | `Match.tsx` : un `hit` sur un Giff qui a un repère `exit` dans le même mouvement ne demande pas de réplique, le KO parle ; le craquement joue toujours |
+| Le Dash tenu | `match/dashHold.ts` (`heldDashState`, `dashNeeded`, six tests) ; `Match.tsx` (`dashHeld`, `viewState`, `legalView`, `moveWith`) ; `ActionBar.tsx` (« Dash · held » allumé, « 80 ft left · Dash held », `data-testid` `dash` et `feet-left`) ; `useMatch.ts` (`sendMany`, `stateRef`). Le Dash part au serveur avec la première marche qui en a besoin, en deux requêtes ; un second clic l'annule. Proposition du fil principal, à relire par lui |
+| La foule dès le Trajector | `sound.ts` : `pageHasBeenActivated()` (`navigator.userActivation.hasBeenActive`), `start()` à la création quand la page a déjà reçu un geste, `onGesture` sinon ; deux tests |
+| « Select your champion » | Clé `champion` retirée du manifeste, appel retiré de `Match.tsx` ; le clip reste sur disque |
+| Tests | **719 sur 36 fichiers contre 713** : six dans `dashHold.test.ts`, deux dans `sound.test.ts` ; typecheck racine, scripts, e2e et client verts ; le client bundle |
+| Harnais | Smoke 2D **vert en 47,7 s** sur les fonctions en ligne, le tour 3 tient le Dash, l'annule, le tient et le dépense par une marche de neuf cases (captures `11-turn-3-dash-held.png` : « 80 FT LEFT · DASH HELD », le bouton allumé, les cases en plus ; `12-turn-3-moved.png` : « Giff dashes. Giff moves 9 cells. », « 35 ft left », Dash grisé). Quatre runs rouges avant : deux sur mon spec (la marche la plus lointaine vidait le tour, qui passait tout seul avant le « End turn » que le glissé attend), deux sur le match e2e où le Giff était cerné de huit pions (zéro case), abandonné par `e2e:abandon`. `e2e:board3d` **vert en 8,0 min** au second run (`e2e/out/2026-10-16T15-28-24/`) ; le premier est tombé sur l'attente du bandeau de tour après le round de l'adversaire, après vingt-trois captures, le cas connu des bandeaux en file sous PATIENT (deux runs pareils sur 2H.29) ; sa trace ne porte aucun avertissement d'AudioContext : le contexte créé à l'ouverture de l'écran passe le harnais |
+| En ligne | Rien à redéployer, `resolve-action` v24 et `create-match` v22 inchangées |
+
+**Porte franchie le même jour** : sa partie sur 2H.30, « mes retours après le match : aucun,
+tout va bien ». Sa réponse sur la latence : après son clic sur la place 3, la popup reste, rien
+ne se passe « pendant longtemps », puis le match reprend par les Strikers de l'IA ; l'attente est
+donc dans la requête `choosePlace` qui joue les deux Strikers avant lui (`00` C31 point 1, à
+mesurer au chat suivant). Reste ensuite le redéploiement du client sur son feu vert.

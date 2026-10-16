@@ -287,6 +287,27 @@ describe('createSounds with a fake AudioContext (2H.25)', () => {
     lastCtx = null;
   });
 
+  it('starts without a gesture once the page has been activated (2H.30)', async () => {
+    fakeBrowser();
+    vi.stubGlobal('navigator', { userActivation: { hasBeenActive: true, isActive: false } });
+    const sounds = createSounds({ storage: null });
+    expect(sounds.state).toBe('running');
+    await settle();
+    expect(lastCtx!.live('crowd.mp3')).toHaveLength(1);
+    sounds.dispose();
+  });
+
+  it('still waits for a gesture on a page never touched', () => {
+    const browser = fakeBrowser();
+    vi.stubGlobal('navigator', { userActivation: { hasBeenActive: false, isActive: true } });
+    const sounds = createSounds({ storage: null });
+    expect(sounds.state).toBe('waiting');
+    expect(lastCtx).toBeNull();
+    browser.gesture();
+    expect(sounds.state).toBe('running');
+    sounds.dispose();
+  });
+
   it('plays the defence crowd first, crossfades on a change of side, ignores the same side', async () => {
     const browser = fakeBrowser();
     const sounds = createSounds({ storage: null });

@@ -2627,3 +2627,111 @@ jsonb`. `useAccount` lit `roster` ; `TeamHub.tsx` l'affiche par poste. 713 tests
 (708 avant) ; typecheck racine, scripts, e2e et client verts ; les deux fonctions bundlent.
 **Appliqué et en ligne le même soir** : la migration par Jérôme (vérifiée avant et après),
 `resolve-action` v24 et `create-match` v22 sur son feu vert.
+
+## C31. Décisions du 2026-10-16 après ses deux matchs sur 2H.29, **sous-phase 2H.30, cinq retours de partie**
+
+> Écrites par le fil principal (Fable 5.1) sur les retours de Jérôme en chat le 2026-10-16, après
+> ses deux matchs sur 2H.29 en 3D avec le son (`e0d9b642`, star, 30 à 20, consigné dans
+> `docs/matches/` ; `c5cb20f6`, abandonné par lui au round 2). Ses mots d'abord : « les noms des
+> joueurs sont bons et restent », « le halo du porteur est ok » : **la porte de 2H.29 est franchie
+> sur l'effectif et le porteur.** Rien dans le moteur, rien dans l'IA, `ENGINE_VERSION` reste 10,
+> rien à redéployer, aucune constante de `00` ne bouge. Client et harnais seuls.
+
+1. **La latence au round 2, à la popup de place.** Ses mots : « round 2, grosse latence au
+   moment de choisir mon tour dans l'init ». Constat, lu en base sur `match_events.created_at`
+   de `e0d9b642` : la popup du round 2 (`placeOffered`, seq 68) est écrite à 14:38:56 UTC dans
+   la même réponse que la fin de son tour du round 1 (seq 18, `turnEnded`), cinquante événements
+   d'un coup, le reste du round 1 et le début du round 2, que son écran rejoue à la vitesse
+   normale avant de montrer la popup ; `placeChosen` place 1 à 14:39:45 ; son premier `moved` à
+   14:40:19. Place 1 ouvre son tour dans la même réponse, sans tour d'IA entre les deux : les
+   34 secondes entre son choix et son premier pas ne se partagent pas, avec ces horodatages
+   seuls, entre sa réflexion et une attente. Même lecture sur `c5cb20f6` au round 1 (popup
+   14:50:57, place 3 à 14:51:54, pas à 14:52:13). Les journaux des fonctions n'ont pas pu être
+   lus : l'API de gestion refuse `function_edge_logs` et `edge_logs` sur son point d'entrée
+   `analytics/endpoints/logs`. Rien dans le code ne distingue le round 2. **Non reproduit, rien
+   ne change** ; question posée à lui : la latence est-elle avant la popup (le rejeu des tours
+   de la maison, qui n'est pas une attente), ou après son clic sur la place (la popup qui reste,
+   « The house is playing » qui s'affiche, le compteur d'images qui tombe) ? **Sa réponse, le
+   même jour** : « la popup est apparue normalement, et j'ai cliqué sur 3rd place. Là rien ne
+   s'est passé pendant longtemps, et je ne pouvais plus cliquer ailleurs ou sur un autre choix,
+   le clic semblait avoir été enregistré. Ce n'est que quelques longues secondes plus tard que la
+   popup a disparu et que le match a repris en faisant jouer les Strikers 1. » Donc l'attente
+   est **entre l'envoi de `choosePlace` place 3 et la réponse de `resolve-action`**, qui joue les
+   deux Strikers de l'IA avant lui dans cette même requête : le serveur ou le réseau, pas le
+   rejeu ni l'écran. **À mesurer au chat suivant**, jamais une supposition : la durée de la
+   requête côté client (un horodatage autour de `submitAction` dans `useMatch.sendMany`, ou la
+   trace réseau d'un spec qui choisit la place 3), et la durée côté fonction (`live-match.ts`
+   contre les fonctions en ligne, ou les journaux de la fonction dans le tableau de bord
+   Supabase, puisque l'API de gestion les refuse). Trois pistes à départager par la mesure : le
+   démarrage à froid de la fonction après une minute sans requête, le plan de tour des deux
+   Strikers sous Deno (2,7 ms par décision en Node, la limite de temps CPU d'une fonction Edge
+   est courte), ou l'écriture du lot en base.
+2. **La réplique de KO plutôt que celle du coup.** Ses mots : « quand un coup de batte (swing
+   ou att op) tue un personnage, on devrait entendre la réplique de ko plutôt que la réplique
+   du coup de batte ». Constat dans `motion.ts` et `Match.tsx` : le coup qui touche pose `hit`
+   et, si la cible est évacuée, `exit` au même instant du beat ; les deux répliques sont
+   programmées 350 ms après, celle du coup la première, et elle prend la voix pour 2,5 s, donc
+   celle du KO est jetée derrière elle. Décidé : **un coup qui évacue sa cible dans le même beat
+   ne dit rien, et le KO parle** ; le craquement de la batte joue toujours. Une réplique déjà en
+   cours d'un coup précédent jette encore le KO, comme toute réplique : le verrou « une voix »
+   de C27 ne bouge pas.
+3. **Le Dash annulable tant que ses pas ne sont pas consommés.** Ses mots : « quand on clique
+   sur le bouton dash, on devrait pouvoir annuler si on n'a pas encore consommé les extra
+   mouvements ». Constat : le bouton envoyait `dash` au serveur sur-le-champ, l'Action partait
+   même si le joueur ne marchait ensuite pas plus loin que ses pieds. Le moteur n'a pas d'annulation,
+   et lui en donner une est une action de plus, un événement, `ENGINE_VERSION` 11 et un
+   redéploiement. Décidé, **proposition du fil principal, à relire par lui** : **le client tient
+   le Dash au lieu de l'envoyer.** Le bouton devient « Dash · held », le plateau et la barre
+   montrent le tour avec les quarante pieds déjà comptés (« 80 ft left · Dash held »), rien n'est
+   envoyé ; un second clic l'annule et rien n'a été dépensé ; le Dash part au serveur juste
+   avant la première marche qui en a besoin, en deux requêtes à la suite, et c'est là qu'il
+   s'entend et se lit dans le fil (« Giff dashes. Giff moves 9 cells. »). Une marche dans les
+   pieds de base n'envoie rien et le Dash reste tenu ; toute autre Action le lâche ; le tour
+   suivant repart sans. Aux yeux du moteur c'est le même tour : un Dash déclaré plus tard ajoute
+   les mêmes quarante pieds.
+4. **La foule dès le Trajector.** Ses mots : « le bruit de la foule ne démarre qu'après la popup
+   de choix d'init de mon striker, elle devrait démarrer au trajector ». Constat dans `sound.ts` :
+   le contexte audio n'était créé que dans un geste reçu par l'écran de match, et le premier
+   geste de l'écran de match est son clic sur la popup de place, après le tour du Trajector.
+   Décidé : **le contexte se crée dès l'ouverture de l'écran quand la page a déjà reçu un geste**
+   (`navigator.userActivation.hasBeenActive`, l'activation collante que le navigateur accorde
+   après les boutons du hub et du lobby), sans attendre un clic ; une page jamais touchée (un
+   rechargement sur l'écran de match) attend le premier geste comme avant.
+5. **« Select your champion » retiré.** Ses mots : « enlever le son "select your champion" ».
+   La réplique du premier bandeau de tour (C26) n'est plus dite ; le clip reste sur disque comme
+   les autres répliques retirées, le moment disparaît du manifeste.
+
+**Ce que ces décisions rouvrent.** `announcer.ts`, `sound.ts`, `Match.tsx`, `ActionBar.tsx`,
+`useMatch.ts`, un module `match/dashHold.ts`, le smoke. Rien dans `engine/` ni `ai/`, rien dans
+les événements, pas de migration, pas de sweep.
+
+**Comment 2H.30 est codée** (le 2026-10-16, fil principal Fable 5.1, aucun sous-agent).
+**Le KO** : l'effet de son de `Match.tsx` relève les `unitId` des repères `exit` du mouvement
+(`carriedOff`) et ne demande pas de réplique pour un `hit` sur l'un d'eux ; `sayOf` et
+`soundOf` ne bougent pas. **Le Dash tenu** : `match/dashHold.ts`, pur, `heldDashState(state)`
+(le même tour avec `MOVE_SPEED_FEET` de plus, l'Action en main) et `dashNeeded(state, from,
+path)` (`pathCostFeet` au-delà des pieds restants), six tests ; `Match.tsx` tient `dashHeld`,
+remis à faux au changement de tour (`turnKeyNow`) et dès que `legal.canDash` tombe, calcule
+`viewState` et `legalView = legalActions(arena, viewState)` pour les deux plateaux et la barre,
+et `moveWith(path)` envoie `sendMany([dash, move])` quand `dashNeeded`, `send(move)` sinon ;
+le crochet publie toujours l'état du serveur et son `legal`, et `act({ kind: 'dash' })` par le
+crochet envoie un vrai Dash. `ActionBar.tsx` : `dashHeld`, `onHoldDash`, `onDropDash`, le bouton
+« Dash · held » allumé (`data-testid="dash"`, `data-on`), les pieds « 80 ft left · Dash held »
+(`data-testid="feet-left"`, `data-dash-held`). `useMatch.ts` : `sendMany(actions)` envoie à la
+suite sous un seul `busy`, chaque action depuis le plateau que la précédente a laissé
+(`stateRef`, écrit partout où `setState` l'est), s'arrête au premier refus ; `send` est
+`sendMany([action])`. **La foule** : `pageHasBeenActivated()` lit `hasBeenActive`, `start()`
+(l'ancien corps de `onGesture`) est appelé à la création quand elle est vraie, `onGesture` le
+garde pour le cas contraire ; deux tests dans `sound.test.ts`. **L'annonceur** : la clé
+`champion` retirée de `ANNOUNCER_LINES`, l'appel du premier bandeau retiré de `Match.tsx`. **Le
+smoke** : au tour 3, Dash tenu, les cases que seul le Dash atteint comptées en plus des cases
+du crochet (`[data-cell]`), capture `turn-3-dash-held`, annulé puis les cases revenues et
+`actionUsed` faux, tenu à nouveau et la première case hors des pieds cliquée, l'arrivée
+attendue et `actionUsed` vrai. **719 tests sur 36 fichiers** (713 avant) ; typecheck racine,
+scripts, e2e et client verts ; smoke 2D **vert en 47,7 s** sur les fonctions en ligne (après
+l'abandon par `e2e:abandon` d'un match e2e où le Giff était cerné de huit pions, zéro case au
+tour 1, cas du harnais et non du jeu), captures lues : « 80 FT LEFT · DASH HELD » et le bouton
+allumé, puis « Giff dashes. Giff moves 9 cells. » et « 35 ft left » ; `e2e:board3d` **vert en
+8,0 min** au second run, le premier tombé sur l'attente du bandeau de tour après le round de
+l'adversaire (cas connu des bandeaux en file sous PATIENT), sans aucun avertissement
+d'AudioContext dans sa trace : le contexte créé à l'ouverture de l'écran passe le harnais.

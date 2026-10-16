@@ -108,6 +108,12 @@ export interface MatchView {
   /** Drops the rest of the replay and jumps to the server's board. */
   skip: () => void;
   send: (action: Action) => Promise<void>;
+  /**
+   * Sends several actions in a row, each from the board the one before left,
+   * under one `busy`; stops at the first refusal (2H.30: the held Dash and
+   * the walk that needs it).
+   */
+  sendMany: (actions: readonly Action[]) => Promise<void>;
   /** Posts standing orders to AI team-mates. Spends no turn. */
   order: (orders: readonly AllyOrder[]) => Promise<void>;
   dismissRefusal: () => void;
@@ -194,6 +200,13 @@ interface Opening {
 
 export function useMatch(matchId: string, own: TeamId): MatchView {
   const [state, setState] = useState<MatchState | null>(null);
+  /**
+   * The board as last set, readable from a closure made before it was set:
+   * `sendMany` sends its second action from the board the first one left,
+   * which `load()` has put in React state but not in this closure (2H.30).
+   * Written wherever `setState` is.
+   */
+  const stateRef = useRef<MatchState | null>(null);
   const [seq, setSeq] = useState(-1);
   const [feed, setFeed] = useState<MatchEvent[]>([]);
   const [deadline, setDeadline] = useState<number | null>(null);
@@ -305,7 +318,9 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     // With an opening to replay, the board drawn is the kick-off and the
     // replay walks from it to the snapshot, which `play` re-reads at the end.
     setMotion(null);
-    setState(opening ? opening.from : (snapshot.snapshot as MatchState));
+    const board = opening ? opening.from : (snapshot.snapshot as MatchState);
+    stateRef.current = board;
+    setState(board);
     setSeq(seqNow);
     seqRef.current = seqNow;
     return opening;
@@ -395,6 +410,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         const travel = timeMotion(i, one.motion, speedRef.current, one.cues);
         setBeat(one);
         setMotion(travel);
+        stateRef.current = one.state;
         setState(one.state);
         setProgress({ at: i + 1, of: beats.length });
         // Held for the card, or for the glide, whichever is longer. The card's
@@ -437,10 +453,16 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     };
   }, [load, play]);
 
-  const send = useCallback(
-    async (action: Action) => {
-      const unitId = state?.turn?.unitId;
-      if (!unitId || busy) return;
+  /**
+   * Sends one action, or several in a row (2H.30, `00` C31 point 3: the held
+   * Dash is sent right before the walk that needs it, as two requests). Each
+   * one goes from the board the previous one left, read off `stateRef`
+   * because `load()` sets the React state after this closure was made. A
+   * refusal, a lost reply or a board with no turn stops the run there.
+   */
+  const sendMany = useCallback(
+    async (actions: readonly Action[]) => {
+      if (busy || actions.length === 0) return;
 
       setBusy(true);
       setRefusal(null);
@@ -451,66 +473,70 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
       // One that did not is what left the lobby button stuck forever, and in a
       // match the same mistake costs a player the rest of the game.
       try {
-        const before = state;
-        const sentAt = Date.now();
-        let reply = await submitAction(matchId, unitId, action);
+        for (const action of actions) {
+          const before = stateRef.current;
+          const unitId = before?.turn?.unitId;
+          if (!before || !unitId) return;
+          const sentAt = Date.now();
+          let reply = await submitAction(matchId, unitId, action);
 
-        // The browser rejected the request before any reply (C21): a dropped
-        // connection, seen once as a Shove that "failed" and then worked on
-        // the second click. The server may still have taken the action, so
-        // before sending it again the match's head is read: moved on, the
-        // action got through and only the reply was lost, so the board is
-        // read again instead; still where it was, one more try.
-        // 2H.22: the function has twice answered 404 "no such match" on a
-        // match the database held, both times on the first request after
-        // three idle minutes, under the screen harness. Treated like a lost
-        // reply: the head is read through the REST path (which finds the
-        // match), then one more try.
-        if (!reply.accepted && (reply.unreachable || reply.reason === 'no such match')) {
-          await wait(RETRY_AFTER_MS);
-          const head = await headSeq(matchId);
-          if (head !== null && head > seqRef.current) {
+          // The browser rejected the request before any reply (C21): a dropped
+          // connection, seen once as a Shove that "failed" and then worked on
+          // the second click. The server may still have taken the action, so
+          // before sending it again the match's head is read: moved on, the
+          // action got through and only the reply was lost, so the board is
+          // read again instead; still where it was, one more try.
+          // 2H.22: the function has twice answered 404 "no such match" on a
+          // match the database held, both times on the first request after
+          // three idle minutes, under the screen harness. Treated like a lost
+          // reply: the head is read through the REST path (which finds the
+          // match), then one more try.
+          if (!reply.accepted && (reply.unreachable || reply.reason === 'no such match')) {
+            await wait(RETRY_AFTER_MS);
+            const head = await headSeq(matchId);
+            if (head !== null && head > seqRef.current) {
+              await load();
+              return;
+            }
+            reply = await submitAction(matchId, unitId, action);
+          }
+
+          // Every reply carries the server's clock. Half the round trip is a
+          // rough enough correction: what matters is catching a machine minutes
+          // out, not milliseconds.
+          if ('serverNow' in reply && typeof reply.serverNow === 'number') {
+            setSkew(reply.serverNow - (sentAt + Date.now()) / 2);
+          }
+
+          if (!reply.accepted) {
+            setRefusal(reply.reason);
+            // A refusal usually means a stale board, so read it again rather than
+            // leaving the player looking at the position that produced it.
             await load();
             return;
           }
-          reply = await submitAction(matchId, unitId, action);
-        }
 
-        // Every reply carries the server's clock. Half the round trip is a
-        // rough enough correction: what matters is catching a machine minutes
-        // out, not milliseconds.
-        if ('serverNow' in reply && typeof reply.serverNow === 'number') {
-          setSkew(reply.serverNow - (sentAt + Date.now()) / 2);
+          // **Our own batch comes back twice**: in this reply, and as the
+          // broadcast the function sends on the match channel, which lands
+          // either just before this line or while the replay below is walking
+          // the beats. Unclaimed, the echo appended every line to the feed a
+          // second time and re-read the snapshot in the middle of the replay,
+          // which snapped the board to the final position (audit line A9). The
+          // feed takes the batch once, whichever copy came first, and `seqRef`
+          // is moved here rather than at the end of the replay so a late echo
+          // reads as behind.
+          if (!seenRef.current.has(reply.fromSeq)) {
+            seenRef.current.add(reply.fromSeq);
+            setFeed((old) => [...old, ...reply.events].slice(-FEED_LIMIT));
+          }
+          seqRef.current = Math.max(seqRef.current, reply.fromSeq + reply.events.length - 1);
+          // The server answers `expired` when the clock, not the player, spent
+          // the turn. It is news, not an error, and the screen says so.
+          // Which turn it spent is read off the board it was sent from: a place
+          // still to choose means the clock chose it, last.
+          if ('expired' in reply && reply.expired) setExpired(before.turn?.placing != null ? 'place' : 'turn');
+          await play(before, reply.events);
         }
-
-        if (!reply.accepted) {
-          setRefusal(reply.reason);
-          // A refusal usually means a stale board, so read it again rather than
-          // leaving the player looking at the position that produced it.
-          await load();
-          return;
-        }
-
-        // **Our own batch comes back twice**: in this reply, and as the
-        // broadcast the function sends on the match channel, which lands
-        // either just before this line or while the replay below is walking
-        // the beats. Unclaimed, the echo appended every line to the feed a
-        // second time and re-read the snapshot in the middle of the replay,
-        // which snapped the board to the final position (audit line A9). The
-        // feed takes the batch once, whichever copy came first, and `seqRef`
-        // is moved here rather than at the end of the replay so a late echo
-        // reads as behind.
-        if (!seenRef.current.has(reply.fromSeq)) {
-          seenRef.current.add(reply.fromSeq);
-          setFeed((old) => [...old, ...reply.events].slice(-FEED_LIMIT));
-        }
-        seqRef.current = Math.max(seqRef.current, reply.fromSeq + reply.events.length - 1);
-        // The server answers `expired` when the clock, not the player, spent
-        // the turn. It is news, not an error, and the screen says so.
-        // Which turn it spent is read off the board it was sent from: a place
-        // still to choose means the clock chose it, last.
-        if ('expired' in reply && reply.expired) setExpired(before?.turn?.placing != null ? 'place' : 'turn');
-        await play(before, reply.events);
       } catch (failure) {
         console.error('the turn could not be sent', failure);
         setRefusal('the turn could not be sent. Check your connection and try again.');
@@ -519,8 +545,9 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         setBusy(false);
       }
     },
-    [matchId, state, busy, load, play],
+    [matchId, busy, load, play],
   );
+  const send = useCallback((action: Action) => sendMany([action]), [sendMany]);
 
   /**
    * Orders go through the same door and come back with nothing to replay, so
@@ -558,6 +585,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     setSpeed,
     skip,
     send,
+    sendMany,
     order,
     dismissRefusal: () => setRefusal(null),
     dismissBeat: () => setBeat(null),

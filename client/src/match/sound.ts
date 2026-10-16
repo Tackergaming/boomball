@@ -20,7 +20,13 @@
  * where that exists; a touch `pointerdown` or an Escape key does not). Until
  * then every `play()` is dropped without a word. The listeners leave once the
  * context runs. Without `AudioContext` at all (Node, very old browsers) the
- * whole thing is a no-op. Nothing here ever throws.
+ * whole thing is a no-op. Nothing here ever throws. Since 2H.30 (`00` C31
+ * point 4) the context is also made at once, with no gesture, when the page
+ * already holds one (`navigator.userActivation.hasBeenActive`): the player
+ * reached the match through the hub's buttons, so the browser lets a context
+ * start outside a handler, and the crowd no longer waited for the first click
+ * of the match, which was the place popup of Jérôme's Striker, long after the
+ * Trajector had opened the round.
  *
  * Mixing. Each play builds fresh nodes into its own voice gain, which feeds a
  * compressor, then a master gain at 0.5, then the speakers: overlapping sounds
@@ -633,6 +639,16 @@ function gestureIsActive(): boolean {
   return navigator.userActivation.isActive;
 }
 
+/**
+ * Whether the page has had a gesture at some point (sticky activation), which
+ * is what lets a context start outside a handler without a word in the
+ * console. False where the browser cannot say: then only a gesture starts it.
+ */
+function pageHasBeenActivated(): boolean {
+  if (typeof navigator === 'undefined' || !('userActivation' in navigator)) return false;
+  return navigator.userActivation.hasBeenActive;
+}
+
 function buildEngine(Ctor: AudioContextCtor): Engine {
   const ctx = new Ctor();
   const compressor = ctx.createDynamicsCompressor();
@@ -758,8 +774,13 @@ export function createSounds(options: SoundOptions = {}): Sounds {
     for (const type of GESTURES) window.removeEventListener(type, onGesture, true);
   };
 
-  function onGesture(): void {
-    if (disposed || !gestureIsActive()) return;
+  /**
+   * Makes the context and loads the clips: from a gesture handler, or at once
+   * when the page already holds an activation (2H.30). A context that comes
+   * up suspended is resumed; refused, the listeners stay for the next gesture.
+   */
+  function start(): void {
+    if (disposed) return;
     try {
       if (!engine) engine = buildEngine(ctor);
       const { ctx } = engine;
@@ -789,12 +810,19 @@ export function createSounds(options: SoundOptions = {}): Sounds {
     }
   }
 
+  function onGesture(): void {
+    if (!gestureIsActive()) return;
+    start();
+  }
+
   try {
     for (const type of GESTURES) window.addEventListener(type, onGesture, { capture: true, passive: true });
     listening = true;
   } catch {
     return silentSounds(storage);
   }
+  // The page has been touched before this screen (the hub's buttons): start now.
+  if (pageHasBeenActivated()) start();
 
   return {
     play(kind) {

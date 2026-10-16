@@ -1,30 +1,27 @@
 # Reprise du chat suivant, Boomball
 
-> Écrit par le fil principal (Fable 5.1) le 2026-10-16, à la fin du chat qui a pris le retour de
-> Jérôme après sa partie sur 2H.25 avec le son (« il manque la plupart des sons sur les swing
-> raté et réussi et les attaques d'opp »), l'a confronté au code, précisé en répliques
-> d'annonceur, écrit `00` C27 et codé 2H.26, l'annonceur systématique, plus le bug du but qui ne
-> coupait pas la réplique en cours. Sa partie sur 2H.26 : « tout est parfait », porte franchie,
-> commitée (`fc1fdcc`). Le même soir il a demandé le point sur ce qu'il reste à faire, validé
-> l'ordre (ligue au choix, annuler et quitter un match, phase 6, client redéployé, puis la coop
-> et la phase 8), et la première, **2H.27 la ligue au choix** (`00` C28), est codée, en ligne
-> (v22, v20), commitée (`aedda25`) et sa porte franchie. La deuxième, **2H.28 annuler et quitter
-> un match** (`00` C29), est codée, sa migration `0008` appliquée par lui, ses fonctions en ligne
-> (v23, v21) sur son feu vert, commitée et poussée (`1b2422a`), porte franchie (« parfait ça a
-> fonctionné »). Puis la phase 6 cadrée en chat et codée comme **2H.29** (`00` C30 : la 3D par
-> défaut, le porteur marqué, l'effectif fixe), migration `0009` appliquée par lui, fonctions en
-> ligne (v24, v22), harnais vert, commitée en local par `/save` à sa demande, pas poussée. Sa
-> partie sur 2H.29 est la porte suivante.
+> Écrit par le fil principal (Fable 5.1) le 2026-10-16, à la fin du chat qui a pris les cinq
+> retours de Jérôme après ses deux matchs sur 2H.29 (« les noms des joueurs sont bons et
+> restent », « le halo du porteur est ok » : la porte de 2H.29 est franchie sur l'effectif et le
+> porteur), les a confrontés au code et à la base, écrit `00` C31 et codé **2H.30, cinq retours
+> de partie** : la réplique de KO à la place de celle du coup qui tue, **le Dash tenu côté
+> client** (annulable tant que ses pas ne sont pas consommés, envoyé avec la marche qui en a
+> besoin), la foule dès l'ouverture de l'écran, « Select your champion » retiré, et la latence du
+> round 2 lue en base sans être reproduite. Rien dans le moteur, rien à redéployer. **Porte
+> franchie le même jour** (« aucun, tout va bien ») et sa réponse sur la latence : elle est dans
+> la requête `choosePlace` place 3, après son clic, à mesurer. 2H.29 (`03fe9db`) et 2H.30 sont
+> commitées par `/save` et poussées sur sa demande. La mesure de la latence puis le
+> redéploiement du client sont la suite.
 > À coller tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.29
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.30
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15, la 6 par 2H.29),
 §9 la parallélisation.
-Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 63, plus 40 bis,
+Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 64, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 la quatrième passe, C13 la cinquième, C14 l'écart 58 (ma place dans
 mon rôle, par une popup) et la sixième passe, C15 le lot du 2026-10-14 (le chrono, les écarts 59
@@ -61,41 +58,95 @@ batterie (ma réponse : « non ») ; l'écran doit montrer qu'on choisit. C29 an
 match (2H.28) : le propriétaire, depuis l'écran de match ou le hub, avec confirmation ; le match
 n'a pas de résultat (mon choix B) ; les mots de la confirmation relus par moi. C30 la phase 6
 (2H.29) : la 3D par défaut pour tout le monde, le porteur marqué d'un faisceau doré, l'effectif
-fixe de sept noms tiré au premier match et jamais renommé, l'adversaire qui les évite. Chaque
-passe finit par « comment ... est codée », poids par poids, À LIRE avant de toucher à ai/. Ne
-rediscute rien de C12 à C30.
+fixe de sept noms tiré au premier match et jamais renommé, l'adversaire qui les évite. C31 mes
+cinq retours après mes deux matchs sur 2H.29 (2H.30) : la latence au round 2 (lue en base, non
+reproduite, QUESTION POSÉE À MOI : avant la popup ou après mon clic ?), la réplique de KO à la
+place de celle du coup qui tue, LE DASH TENU côté client (« Dash · held », annulable tant
+qu'aucune marche n'a dépassé mes pieds de base, envoyé avec celle qui en a besoin ; proposition
+du fil principal, à relire par moi), la foule dès l'ouverture de l'écran, « Select your
+champion » retiré. Chaque passe finit par « comment ... est codée », poids par poids, À LIRE
+avant de toucher à ai/. Ne rediscute rien de C12 à C31.
 07 §10 porte le journal, dont l'entrée 2H.15, qui dit fichier par fichier ce que la 2.5D
-contient, les entrées 2H.16 à 2H.20, la caméra et les gradins, 2H.21 et 2H.22, le jeu vivant.
-09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.22.
+contient, les entrées 2H.16 à 2H.20, la caméra et les gradins, 2H.21 et 2H.22, le jeu vivant,
+2H.29 la phase 6, 2H.30 les cinq retours.
+09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.30.
 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.16 à 2H.29 sont CODÉES (2H.26 à 2H.29 le 2026-10-16 au soir), ENGINE_VERSION 10, **MOTEUR 10 EN
-LIGNE depuis le 2026-10-16 sur mon feu vert, fonctions redéployées le soir pour 2H.27 (v22, v20),
-2H.28 (v23, v21) puis 2H.29 : resolve-action v24, create-match v22** (npm run
-deploy:function après set -a && . ../.env && set +a, depuis boomball/) ; les matchs du moteur 9
-sont archivés par le client. Le client en ligne n'est PAS redéployé depuis 2H.14 (mon feu vert, pas encore). 713 tests
-verts sur 35 fichiers, typecheck racine, scripts, e2e et client verts, les deux fonctions bundlent (npm run build:function). Sur 2H.29, smoke 2D vert en 43,8 s et e2e:board3d vert en 7,7 min (le spec entre directement en 3D). Smoke 2D vert en 48 s sur 2H.28 et e2e:abandon vert en 9,5 s (la confirmation et le hub sans bandeau capturés) ; sur 2H.27, smoke vert en 39,7 s (la section League affirmée, capture 02-lobby.png lue ; E2E Battery est Star, l'état grisé des paliers ne s'y voit pas) ; sur 2H.25, playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu) et e2e:board3d vert en 6,4 min (CATCH capturé, le côté de la foule et le clip du coup d'envoi lus par le crochet), rien n'y a bougé depuis. SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE
-CHAUFFER PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN. Le smoke échoue encore quand le
-match e2e atteint le round 10 pendant ses trois tours, le suivant ouvre un nouveau match : vu le
-16 à midi. Mes parties consignées : ab27b827, 7d631b71, cb618e32, c3867408 sont du moteur 9 et ne se
-rejouent plus avec le dépôt au moteur 10 (le rebond diffère). 2e30f587 n'est
-PAS à analyser. Tout jusqu'à 2H.28 est commité et poussé (1b2422a) ; 2H.29 est commitée en local
-par /save, pas poussée : vérifier git status et git log origin/main..main en premier et me le dire. Les migrations 0008 et 0009 sont APPLIQUÉES par
-moi le 16 au soir (vérifiées avant et après en lecture, consignées en 04). Le client en ligne
-est à 2H.14. Les fichiers de 2H.29 : engine/setup.ts et setup.test.ts, server/lobby.ts et
-lobby.test.ts, supabase/migrations/0009_roster.sql (nouveau), supabase/functions/create-match,
-client/src/lib/useAccount.ts, screens/Match.tsx, screens/TeamHub.tsx, match/Briefing.tsx,
-board3d/Tokens.tsx, Board3D.tsx, scene.ts, Minimap.tsx, e2e/harness.ts et les quatre specs,
-docs 00 (C30), 04, 07 §10 (2H.29), 08 §5 (ligne 2H.29), le skill boomball, et ce fichier.
-Les fichiers de 2H.28 : supabase/migrations/0008_abandon_match.sql (nouveau),
-supabase/functions/create-match et resolve-action, client/src/lib/useAccount.ts et supabase.ts,
-client/src/match/AbandonPrompt.tsx (nouveau), screens/TeamHub.tsx, screens/Match.tsx, App.tsx,
-e2e/abandon.spec.ts (nouveau), package.json (e2e:abandon, @abandon exclu du smoke), docs 00
-(C29), 07 §10 (2H.28), 08 §5 (ligne 2H.28), et ce fichier.
-Les fichiers de 2H.27 : engine/stats.ts (isTier, tierAllowed), supabase/functions/create-match
-et resolve-action (index.ts), client/src/lib/supabase.ts, screens/Lobby.tsx, screens/TeamHub.tsx,
-server/lobby.test.ts, e2e/smoke.spec.ts, docs 00 (C28), 07 §10 (2H.27), 08 §5 (ligne 2H.27), et
-ce fichier. Les deux WAV d'annonceur sont dans boomball/assets/source/sounds/ (hors git, 39 Mo).
+Où on en est : 2H.16 à 2H.30 sont CODÉES (2H.26 à 2H.29 le 2026-10-16 au soir, 2H.30 le même
+jour), ENGINE_VERSION 10, **MOTEUR 10 EN LIGNE depuis le 2026-10-16 sur mon feu vert, fonctions
+redéployées le soir pour 2H.27 (v22, v20), 2H.28 (v23, v21) puis 2H.29 : resolve-action v24,
+create-match v22** (npm run deploy:function après set -a && . ../.env && set +a, depuis
+boomball/) ; 2H.30 ne touche pas les fonctions, rien à redéployer ; les matchs du moteur 9 sont
+archivés par le client. Le client en ligne n'est PAS redéployé depuis 2H.14 (mon feu vert, pas
+encore). 719 tests verts sur 36 fichiers, typecheck racine, scripts, e2e et client verts, le
+client bundle. Sur 2H.30, smoke 2D vert en 47,7 s (le tour 3 tient le Dash, l'annule, le tient
+et le dépense par une marche de neuf cases, captures 11-turn-3-dash-held.png et
+12-turn-3-moved.png de e2e/out/2026-10-16T15-18-19/) ; e2e:board3d vert en 8,0 min au second
+run (le premier tombé sur l'attente du bandeau de tour après le round de l'adversaire, cas connu
+des bandeaux en file sous PATIENT, aucun avertissement d'AudioContext dans sa trace). Sur 2H.29, smoke 2D vert en
+43,8 s et e2e:board3d vert en 7,7 min (le spec entre directement en 3D). SUR UN VITE 5174 QUI
+VIENT DE DÉMARRER, LE CHAUFFER PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN. Le smoke
+échoue encore quand le match e2e atteint le round 10 pendant ses trois tours, le suivant ouvre
+un nouveau match ; et il échoue quand le Giff du compte e2e est cerné de huit pions (zéro case
+de destination, vu le 16 après-midi, quatre runs de suite) : npm run e2e:abandon abandonne ce
+match et le smoke suivant en ouvre un neuf. Mes parties consignées : ab27b827, 7d631b71,
+cb618e32, c3867408 sont du moteur 9 et ne se rejouent plus avec le dépôt au moteur 10 (le rebond
+diffère) ; e0d9b642 (2H.29, star, 30 à 20) est du moteur 10 et se rejoue ; c5cb20f6 est
+abandonné par moi au round 2. 2e30f587 n'est PAS à analyser. Tout jusqu'à 2H.28 est commité et
+poussé (1b2422a) ; 2H.29 est commitée en local par /save (03fe9db), pas poussée ; 2H.30 N'EST
+PAS COMMITÉE : vérifier git status et git log origin/main..main en premier et me le dire, me
+proposer /save ou /commit puis le push. Les migrations 0008 et 0009 sont APPLIQUÉES par moi le
+16 au soir (vérifiées avant et après en lecture, consignées en 04). Le client en ligne est à
+2H.14. Les fichiers de 2H.30 : client/src/match/dashHold.ts et dashHold.test.ts (nouveaux),
+match/announcer.ts, match/sound.ts et sound.test.ts, match/useMatch.ts, match/ActionBar.tsx,
+screens/Match.tsx, e2e/smoke.spec.ts, docs 00 (C31), 07 §10 (2H.30), 08 (en-tête et §5, ligne
+2H.30), le skill boomball, docs/matches/2026-10-16-e0d9b642 et 2026-10-16-c5cb20f6 (dumps de
+mes deux matchs), et ce fichier. Les fichiers de 2H.29 : engine/setup.ts et setup.test.ts,
+server/lobby.ts et lobby.test.ts, supabase/migrations/0009_roster.sql, supabase/functions/
+create-match, client/src/lib/useAccount.ts, screens/Match.tsx, screens/TeamHub.tsx,
+match/Briefing.tsx, board3d/Tokens.tsx, Board3D.tsx, scene.ts, Minimap.tsx, e2e/harness.ts et
+les quatre specs, docs 00 (C30), 04, 07 §10 (2H.29), 08 §5 (ligne 2H.29), le skill boomball.
+Les deux WAV d'annonceur sont dans boomball/assets/source/sounds/ (hors git, 39 Mo).
+
+Ce que 2H.30 contient, en six phrases, détail en 00 C31 « comment 2H.30 est codée ». Le KO :
+l'effet de son de Match.tsx relève les unitId des repères exit du mouvement (carriedOff) et ne
+demande pas de réplique pour un hit sur l'un d'eux, donc la réplique de KO prend la voix ; le
+craquement joue toujours ; une réplique déjà en cours d'un coup précédent jette encore le KO,
+le verrou « une voix » de C27 ne bouge pas. Le Dash tenu : match/dashHold.ts est pur,
+heldDashState(state) rend le même tour avec MOVE_SPEED_FEET de plus et l'Action en main,
+dashNeeded(state, from, path) dit si pathCostFeet dépasse les pieds restants ; Match.tsx tient
+dashHeld (remis à faux au changement de tour, turnKeyNow, et dès que legal.canDash tombe),
+calcule viewState et legalView = legalActions(arena, viewState) pour les deux plateaux et la
+barre, et moveWith(path) envoie match.sendMany([dash, move]) quand dashNeeded, send(move)
+sinon ; le crochet publie toujours l'état du serveur et son legal, et act({ kind: 'dash' })
+par le crochet envoie un vrai Dash. ActionBar.tsx : dashHeld, onHoldDash, onDropDash, le bouton
+« Dash · held » allumé (data-testid dash, data-on), les pieds « 80 ft left · Dash held »
+(data-testid feet-left, data-dash-held) ; toute autre Action lâche le Dash tenu. useMatch.ts :
+sendMany(actions) envoie à la suite sous un seul busy, chaque action depuis le plateau que la
+précédente a laissé (stateRef, écrit partout où setState l'est), s'arrête au premier refus ;
+send est sendMany([action]). La foule : sound.ts crée le contexte dès la création de l'instance
+quand navigator.userActivation.hasBeenActive est vrai (la page a reçu un geste dans le hub ou
+le lobby), start() porte l'ancien corps de onGesture, une page jamais touchée attend le geste
+comme avant ; deux tests. L'annonceur : la clé champion retirée du manifeste (le clip reste sur
+disque comme les autres répliques retirées) et l'appel retiré du premier bandeau de tour.
+
+Ce que 2H.29 contient, en six phrases, détail en 00 C30 et 07 §10. Match.tsx ouvre en 3D sauf si
+boomball.view dit 2d ; le harnais pose le 2D par prefer2D (harness.ts) dans le smoke, le
+playthrough et le spec d'abandon, et le spec 3D affirme « Back to 2D » à l'entrée au lieu de
+basculer. Briefing.tsx (Sonnet) a quatre fiches de plus : The view, Sound and the booth, Your
+league, Leaving. Le porteur (Opus 5.5) : CarrierMarker dans Tokens.tsx, un faisceau or
+(BALL_GOLD #ffc14d) de 1,4 à 3,4 de haut et un anneau au sol, pièce b:carrier et
+link.carrierGlow dans scene.ts, posé par la boucle de Board3D sur la pièce du porteur à chaque
+image, visible seulement ballon en main, respiration BREATH_MS 1,6 s ; la minicarte dessine le
+porteur en or, plus gros, en dernier. L'effectif : engine/setup.ts porte Roster, slotKey,
+rosterSlots (striker-1..3, breaker-1..2, bulwark-1, trajector-1), drawRoster, nameCollision et
+MatchSetup.roster ; buildTeam pose le nom d'effectif sur les postes de l'équipe A sans humain,
+createMatch jette sur une collision, l'adversaire tire ses noms en évitant tout nom posé ;
+server/lobby.ts refuse « X is already on your battery » ; create-match lit teams.roster, le tire
+au premier match (RNG de la graine, hors noms des sièges), l'écrit avec is('roster', null), le
+passe au lobby. Le hub montre le nom d'effectif sur chaque carte de composition
+(data-roster-slot, data-roster-name) et « Named at your first match » sinon. Porte franchie le
+16 sur l'effectif et le porteur.
 
 Ce que 2H.28 contient, en cinq phrases, détail en 00 C29. Le propriétaire abandonne un match en
 cours depuis l'écran de match (« Leave the match », data-testid leave-match, dans la barre du
@@ -140,18 +191,16 @@ direction au d8, arrêté à la dernière case libre, tournant depuis la face si
 un joueur (reboundLanding, reboundCell, nearestHatch dans rules/payload.ts, applyShoot),
 ENGINE_VERSION 10. La foule bascule en fondu croisé de 2 s selon la possession : crowd-attack.mp3
 (les vagues de crowd1) quand mon équipe a le ballon, crowd.mp3 sinon, rien quand il est au sol
-(Sounds.setCrowd, Match.tsx lit l'équipe du porteur). L'annonceur : announcer.ts porte vingt
-moments et leurs clips, une chance par moment (hit 0,3, miss 0,25, shove 0,25, blast 0,5 en
-2H.25, TOUTES À 1 DEPUIS 2H.26), un tirage sans répéter la dernière, un délai de 2,5 s, les buts
-et la fin coupent ;
+(Sounds.setCrowd, Match.tsx lit l'équipe du porteur). L'annonceur : announcer.ts porte dix-neuf
+moments et leurs clips (plus de champion depuis 2H.30), une chance par moment (TOUTES À 1 DEPUIS
+2H.26), un tirage sans répéter la dernière, un délai de 2,5 s, les buts et la fin coupent ;
 Sounds.say(cue), lastSaid ; Match.tsx appelle say par repère 350 ms après le son, le round au
-sifflet, la fin de match en win, loss ou fullTime, « Select your champion » au premier tour,
-« Come on, do something! » à trente secondes. La répartition des clips est relue par moi le 16 : plus de
-commentaire de but (mon « and it's a goal » suffit), plus de Dash, plus d'appel des rounds 2 et
-3, « Fight » seul au coup d'envoi, et huit répliques retirées ; ce qui reste est dans
-announcer.ts. Le crochet a crowd(), lastSaid() et say(cue). Les hooks de
-Match.tsx restent au-dessus du retour anticipé sur state : un effet placé après a planté l'écran
-au harnais.
+sifflet, la fin de match en win, loss ou fullTime, « Come on, do something! » à trente secondes.
+La répartition des clips est relue par moi le 16 : plus de commentaire de but (mon « and it's a
+goal » suffit), plus de Dash, plus d'appel des rounds 2 et 3, « Fight » seul au coup d'envoi, et
+huit répliques retirées ; ce qui reste est dans announcer.ts. Le crochet a crowd(), lastSaid()
+et say(cue). Les hooks de Match.tsx restent au-dessus du retour anticipé sur state : un effet
+placé après a planté l'écran au harnais.
 
 Ce que 2H.23 contient, en six phrases, détail en 00 C25 « comment 2H.23 est codée ». La foule
 joue à 0,11 (AMBIENCE dans sound.ts). useMatch.expired vaut 'turn', 'place' ou null, jugé sur le
@@ -177,18 +226,17 @@ l'attaquant précède hit ou miss sur la cible. Le bandeau de but est la sorte g
 other Team ». La carte de beat n'a plus de barre de temps (useMatch.hold et bb-drain retirés). Le
 son est match/sound.ts : seize recettes Web Audio synthétisées (swing, hit, miss, push, held,
 blast, goal, sparkIn, sparkCaught, exit, enter, throw, shoot, dash, whistle, fullTime), le
-contexte audio ouvert seulement dans un gestionnaire de geste confirmé par
-navigator.userActivation (sinon Chrome avertit en console et le harnais tombe), douze voix,
-Match.tsx programme un son par repère à son instant et le sifflet au round, le bouton « ♪ Sound on
-» (data-testid sound-toggle, data-sound) garde le choix dans localStorage sous boomball.sound,
-allumé par défaut, rien à instant. Le pantin est dans la boucle de Board3D : bob et pente en
-marche, torsion vers la cible au coup, poussée au Shove, recul de la cible, inclinaison au lancer
-(link.gestures, l'ordre d'Euler du pion en YXZ), le maillage entier parce que MON GLB N'A NI
-SQUELETTE NI CLIP (export trimesh, deux nœuds) : les vrais clips de course et de batte attendent
-un modèle riggé, Mixamo sur le maillage en pose neutre puis export GLB, ou Blender, et sont une
-sous-phase à part. Feed.tsx juge ses lignes neuves par le dernier événement et plus par la taille
-du fil, défaut de 2H.21 vu par le harnais quand la fenêtre de 120 est pleine. Le crochet gagne
-fx({ kind: 'banner', banner, text, tone }) pour dire un bandeau sans but.
+contexte audio ouvert dans un gestionnaire de geste confirmé par navigator.userActivation ou,
+depuis 2H.30, dès l'ouverture de l'écran quand la page a déjà reçu un geste (sinon Chrome avertit
+en console et le harnais tombe), douze voix, Match.tsx programme un son par repère à son instant
+et le sifflet au round, le bouton « ♪ Sound on » (data-testid sound-toggle, data-sound) garde le
+choix dans localStorage sous boomball.sound, allumé par défaut, rien à instant. Le pantin est
+dans la boucle de Board3D : bob et pente en marche, torsion vers la cible au coup, poussée au
+Shove, recul de la cible, inclinaison au lancer (link.gestures, l'ordre d'Euler du pion en YXZ),
+remplacé pour le corps par le Giff riggé de 2H.24 (giffRig.ts, sept clips). Feed.tsx juge ses
+lignes neuves par le dernier événement et plus par la taille du fil, défaut de 2H.21 vu par le
+harnais quand la fenêtre de 120 est pleine. Le crochet gagne fx({ kind: 'banner', banner, text,
+tone }) pour dire un bandeau sans but.
 
 Ce que 2H.21 contient, en six phrases, détail en 00 C23 « comment 2H.21 est codée ». Les
 repères (Cue) sont lus des événements dans motion.ts au même passage que les pas, et datés sur
@@ -272,79 +320,68 @@ flambent au but, mes trois textures en WebP 1K dans board3d/textures/), Camera.t
 hurler React 19), Ordnance.tsx, Minimap.tsx, Board3D.tsx. L'animation lit match/pose.ts, sorti
 de Board.tsx sans changement et partagé par les deux plateaux, dans une seule useFrame : marche,
 poussée, recul, Crackers, Spark, passe et tir en arc. L'interrupteur est le bouton « See it in
-3D » de l'écran de match, choix gardé dans localStorage, et le crochet publie view. Dette connue
-de la 2.5D : l'orientation du modèle (MODEL_YAW dans Tokens.tsx, à vérifier sur mes captures),
-le noir sous la lèvre avant en vue large, les pions tous du même maillage sans couleur d'équipe
-sur l'armure (le socle et les plaques la portent) ; et depuis 2H.16, l'orbite qui se remet à la
-vue fixe quand on passe par le 2D et revient, la borne de suivi aux bouts du silo calculée pour
-l'azimut zéro, la roulette en vue large qui grossit le centre sans suivre le jeu.
+3D » / « Back to 2D » de l'écran de match (3D par défaut depuis 2H.29), choix gardé dans
+localStorage, et le crochet publie view. Dette connue de la 2.5D : l'orientation du modèle
+(MODEL_YAW dans Tokens.tsx, à vérifier sur mes captures), le noir sous la lèvre avant en vue
+large, les pions tous du même maillage sans couleur d'équipe sur l'armure (le socle et les
+plaques la portent) ; et depuis 2H.16, l'orbite qui se remet à la vue fixe quand on passe par
+le 2D et revient, la borne de suivi aux bouts du silo calculée pour l'azimut zéro, la roulette
+en vue large qui grossit le centre sans suivre le jeu.
 
 Les quatre fichiers du vault modifiés hors de nos sessions (Sapphire Hammer.md, la PREP de la
 scène 1.2 Ilthavax, sa battlemap et les prompts de battlemap de la scène 1.3) et les deux
 fichiers non suivis MARGO.md et theodo.md ne sont pas à nous : ne les commite pas sans mon feu
 vert. Les sources d'assets vivent dans boomball/assets/source/ depuis le 15 au soir (README dedans)
 et ne sont pas commitées sauf ma décision ; la copie du glb dans client/public/models/, les
-WebP et les MP3 le sont.
+WebP et les MP3 le sont. boomball/scripts/blender/__pycache__/ n'est pas à commiter non plus.
 
 NOTÉ LE 2026-10-16, À GARDER DANS CHAQUE RÉÉCRITURE DE CE FICHIER.
 Ma partie 2e30f587 n'est pas à analyser : je l'ai ouverte pour une capture d'écran puis laissée
 tourner sans jouer, sa relecture qui s'arrête au round 2 n'est pas un bug à chercher. Le client en
 ligne ne se redéploie pas encore : il reste pas mal de changements d'interface en partie et hors
 partie. Fonctionnalités à implémenter dans des chats à venir, à cadrer avec moi avant toute
-ligne de code : choisir son niveau de ligue quand les niveaux d'en dessous sont déjà débloqués ;
-le mode multijoueur ; annuler un match en cours et en sortir ; d'autres à voir. Le modèle de Giff
-riggé (squelette et clips de course et de batte) se fait dans un autre chat, sous Blender : ne
-pas toucher au pantin ni à Tokens.tsx ici tant qu'il n'a pas livré son GLB.
+ligne de code : choisir son niveau de ligue quand les niveaux d'en dessous sont déjà débloqués
+(FAIT, 2H.27) ; le mode multijoueur ; annuler un match en cours et en sortir (FAIT, 2H.28) ;
+d'autres à voir. Le modèle de Giff riggé (squelette et clips de course et de batte) est livré
+(2H.24, close) : Tokens.tsx se touche à nouveau, avec ses commentaires « 2H.23 » à corriger en
+2H.24 à la prochaine passe.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI LE 2026-10-16 AU SOIR : (1) mes trois fonctionnalités sans
-le multijoueur : la ligue au choix (2H.27, codée), puis annuler un match en cours et en sortir
-(à cadrer avec moi, touche la base donc une fonction ou une politique, feu vert à moi) ; (2) la
-phase 6 de 07 : la 3D par défaut, la 2D sous l'interrupteur, le budget d'images par seconde
-mesuré au harnais, le briefing ; (3) le client redéployé sur mon feu vert, par l'API Vercel,
-jamais le dépôt GitHub ; (4) la coop, phase 7 de 07, A10 d'abord (persist non atomique dans
-resolve-action), migration 0008 des invitations, lobby à plusieurs sièges ; (5) la phase 8, le
-déploiement pour un ami (deploy-vercel.mjs n'existe pas encore), /security-review par moi.
+le multijoueur : la ligue au choix (2H.27, codée), annuler un match en cours et en sortir
+(2H.28, codée) ; (2) la phase 6 de 07 : la 3D par défaut, la 2D sous l'interrupteur, le
+briefing (2H.29, codée, porte franchie sur l'effectif et le porteur) ; (3) le client redéployé
+sur mon feu vert, par l'API Vercel, jamais le dépôt GitHub ; (4) la coop, phase 7 de 07, A10
+d'abord (persist non atomique dans resolve-action), migration des invitations, lobby à
+plusieurs sièges ; (5) la phase 8, le déploiement pour un ami (deploy-vercel.mjs n'existe pas
+encore), /security-review par moi.
 
-LA TÂCHE : MA PARTIE SUR 2H.29 (00 C30, la phase 6 : la 3D par défaut, le porteur visible,
-l'effectif fixe), PUIS LE REDÉPLOIEMENT DU CLIENT.
-1. Vérifier git status et git diff --cached --stat avant toute chose ; tout jusqu'à 2H.28 est
-   poussé (1b2422a) ; 2H.29 est COMMITÉE EN LOCAL par /save le 16 au soir et PAS POUSSÉE : me le
-   dire et me proposer le push. Détail en 07 §10 (entrée 2H.29) et 00 C30.
-2. La migration 0009 est APPLIQUÉE par moi le 16 au soir (vérifiée avant et après, consignée en
-   04) et les fonctions de 2H.29 sont en ligne (resolve-action v24, create-match v22, moteur 10
-   inchangé). Smoke 2D vert en 43,8 s, e2e:board3d vert en 7,7 min sur un match neuf (deux runs
-   rouges avant sur le match e2e en fin de partie, cas connu, l'attente du bandeau de tour portée
-   à 30 s). Le faisceau du porteur se voit sur 05-board3d-moved.png du run vert (petit sous le GL
-   logiciel) et l'effectif de E2E Battery y est tiré ; c'est ma partie qui juge la lisibilité. 2H.29 est commitée par /save
-   le 16 au soir, EN LOCAL, PAS POUSSÉE : me proposer le push. Ce qui reste : deux matchs de suite,
-   les mêmes noms d'effectif, le porteur vu tout de suite, le briefing relu. Le client en ligne
-   reste à 2H.14 tant que je ne dis pas de le déployer (jamais le dépôt GitHub sur Vercel).
+LA TÂCHE : MESURER LA LATENCE DE LA POPUP DE PLACE, PUIS LE REDÉPLOIEMENT DU CLIENT.
+1. Vérifier git status et git log origin/main..main avant toute chose ; 2H.29 et 2H.30 sont
+   commitées par /save le 16 (voir git log) et poussées sur ma demande (« /save /commit et
+   push ») : vérifier que origin/main..main est vide et me le dire. Détail en 07 §10 (entrées
+   2H.29 et 2H.30), 00 C30 et C31. La porte de 2H.30 est franchie (« aucun, tout va bien »).
+2. La latence (00 C31 point 1, ma réponse du 16) : après mon clic sur la place 3, la popup
+   reste, rien pendant de longues secondes, puis les Strikers de l'IA jouent. L'attente est dans
+   la requête choosePlace qui joue les deux Strikers avant moi. MESURER avant toute ligne,
+   jamais une supposition : la durée de la requête côté client (horodatage autour de
+   submitAction dans useMatch.sendMany, ou la trace réseau d'un spec qui choisit la place 3, le
+   smoke choisit 1, Close puis 2) et côté fonction (live-match.ts contre les fonctions en ligne
+   avec un chrono par requête, ou les journaux de la fonction dans le tableau de bord Supabase,
+   l'API de gestion refusant function_edge_logs et edge_logs sur analytics/endpoints/logs).
+   Trois pistes : le démarrage à froid après une minute sans requête, le plan de tour des deux
+   Strikers sous Deno (2,7 ms par décision en Node, limite CPU courte en Edge), l'écriture du lot
+   en base. Me présenter les chiffres, puis cadrer la parade avec moi.
 3. Puis le redéploiement du client sur mon feu vert, par l'API Vercel (deploy-vercel.mjs n'existe
    pas encore, à écrire : POST /v13/deployments avec les fichiers de client/dist/, jamais de
    dépôt lié), puis la coop (phase 7, A10 d'abord).
-
-Ce que 2H.29 contient, en six phrases, détail en 00 C30 et 07 §10. Match.tsx ouvre en 3D sauf si
-boomball.view dit 2d ; le harnais pose le 2D par prefer2D (harness.ts) dans le smoke, le
-playthrough et le spec d'abandon, et le spec 3D affirme « Back to 2D » à l'entrée au lieu de
-basculer. Briefing.tsx (Sonnet) a quatre fiches de plus : The view, Sound and the booth, Your
-league, Leaving. Le porteur (Opus 5.5) : CarrierMarker dans Tokens.tsx, un faisceau or
-(BALL_GOLD #ffc14d) de 1,4 à 3,4 de haut et un anneau au sol, pièce b:carrier et
-link.carrierGlow dans scene.ts, posé par la boucle de Board3D sur la pièce du porteur à chaque
-image, visible seulement ballon en main, respiration BREATH_MS 1,6 s ; la minicarte dessine le
-porteur en or, plus gros, en dernier. L'effectif : engine/setup.ts porte Roster, slotKey,
-rosterSlots (striker-1..3, breaker-1..2, bulwark-1, trajector-1), drawRoster, nameCollision et
-MatchSetup.roster ; buildTeam pose le nom d'effectif sur les postes de l'équipe A sans humain,
-createMatch jette sur une collision, l'adversaire tire ses noms en évitant tout nom posé ;
-server/lobby.ts refuse « X is already on your battery » ; create-match lit teams.roster, le tire
-au premier match (RNG de la graine, hors noms des sièges), l'écrit avec is('roster', null), le
-passe au lobby. Le hub montre le nom d'effectif sur chaque carte de composition
-(data-roster-slot, data-roster-name) et « Named at your first match » sinon. 713 tests sur 35
-fichiers, typecheck et bundle verts ; harnais pas encore lancé.
-4. Une capture par changement d'écran, le smoke 2D relancé si Match.tsx, Feed.tsx ou Board.tsx
-   bougent ; ni le son ni la foule ne se capturent : le crochet audio(), crowd(), lastSaid().
-5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
-6. Les fonctionnalités à venir (ligue au choix, multijoueur, annuler et quitter un match) restent
-   à cadrer avec moi, une par une.
+4. Le Dash tenu est validé par ma partie ; s'il me gêne un jour, l'alternative est une action
+   undoDash dans le moteur, ENGINE_VERSION 11 et un redéploiement, à cadrer avec moi.
+5. Une capture par changement d'écran, le smoke 2D relancé si Match.tsx, Feed.tsx, Board.tsx ou
+   ActionBar.tsx bougent ; ni le son ni la foule ne se capturent : le crochet audio(), crowd(),
+   lastSaid().
+6. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
+7. Les fonctionnalités à venir (le multijoueur, d'autres à voir) restent à cadrer avec moi, une
+   par une.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -395,64 +432,70 @@ Ce qu'il faut savoir tout de suite.
    --match <id>. --list ne montre que les douze derniers matchs ; pour en voir plus, copier le
    script avec limit=40 dans scripts/, lancer, effacer la copie. Il écrit match.md, viewer.html,
    events.json, kickoff.json et match.json dans docs/matches/<date>-<id8>/ et rejoue le match en
-   local. Les horaires de --list sont en UTC, deux heures de moins que l'heure de Paris. Une
-   passe interceptée peut afficher « DIFFERS » sans vraie différence : le receveur d'une passe
-   volée est dans l'événement (toId), mais le dump retient encore la première passe qui produit
-   les mêmes jets. Pour publier le viewer en artefact privé, l'outil Artifact sur viewer.html ;
-   pour lire les plans d'une décision sans ouvrir le navigateur, le JSON est dans la balise
-   match-data du viewer. Les dossiers de docs/matches/ d'avant 20edbca9 sont des matchs des
-   moteurs 5 à 7, les trois du 14 au soir du moteur 8 : ils ne se rejouent plus avec le dépôt du
-   moteur 9 ; ab27b827, 7d631b71, cb618e32 et c3867408 sont du moteur 9 et se rejouent ;
-   2e30f587 est du moteur 9 et sa relecture s'arrête au round 2, voir la tâche 6.
+   local. Les horaires de --list sont en UTC, deux heures de moins que l'heure de Paris. Pour
+   lire les horodatages des événements (la latence), curl sur
+   /rest/v1/match_events?match_id=eq.<uuid>&select=seq,kind,created_at,payload&order=seq avec la
+   clé de service : un lot d'IA est écrit d'un coup, tous ses événements portent la même
+   created_at. Une passe interceptée peut afficher « DIFFERS » sans vraie différence : le
+   receveur d'une passe volée est dans l'événement (toId), mais le dump retient encore la
+   première passe qui produit les mêmes jets. Pour publier le viewer en artefact privé, l'outil
+   Artifact sur viewer.html ; pour lire les plans d'une décision sans ouvrir le navigateur, le
+   JSON est dans la balise match-data du viewer. Les dossiers de docs/matches/ d'avant 20edbca9
+   sont des matchs des moteurs 5 à 7, les trois du 14 au soir du moteur 8 : ils ne se rejouent
+   plus ; ab27b827, 7d631b71, cb618e32 et c3867408 sont du moteur 9 et ne se rejouent plus au
+   moteur 10 ; e0d9b642 est du moteur 10 et se rejoue ; 2e30f587 est du moteur 9 et sa relecture
+   s'arrête au round 2, pas à analyser.
 
 6. Toute migration passe par moi via /supabase-migrate, tout redéploiement par mon feu vert
    explicite. Chaque match porte engine_version ; une fonction qui lit une autre version refuse
    en 409, le client archive.
 
 7. Le harnais d'écran : npm run e2e en 18 à 55 s, npm run e2e:playthrough en 15 à 70 s, npm run
-   e2e:board3d en 6 à 7 min, le crochet window.__boomball, dont fx() tire un effet à la demande
-   (développement seulement, stretch pour ralentir, kind 'banner' pour dire un bandeau),
-   audio() dit où en est le son (running après un clic), probe(unitId) lit la rotation, la
-   hauteur et le geste d'un pion en 3D : c'est par elle que le spec juge le pantin, parce que
-   deux captures à une seconde d'écart sous le GL logiciel reviennent identiques alors que la
-   scène a tourné.
+   e2e:board3d en 6 à 8 min, npm run e2e:abandon en 10 s, le crochet window.__boomball, dont
+   fx() tire un effet à la demande (développement seulement, stretch pour ralentir, kind 'banner'
+   pour dire un bandeau), audio() dit où en est le son (running dès l'ouverture de l'écran
+   depuis 2H.30 quand la page a reçu un geste), probe(unitId) lit la rotation, la hauteur et le
+   geste d'un pion en 3D : c'est par elle que le spec juge le pantin, parce que deux captures à
+   une seconde d'écart sous le GL logiciel reviennent identiques alors que la scène a tourné.
    waitForPlayableTurn dans e2e/harness.ts répond à la popup par un clic à l'écran (data-place,
    place-close) et capture la première vue ; le smoke clique 1, puis Close, puis 2, le playthrough
    une place différente à chaque round, le spec 3D la place 2. Le siège humain du playthrough est
    piloté par chooseAction du dépôt depuis Node. Le smoke suppose une case de destination au
-   tour 1 et au tour 3, un clic simple sur une case qui envoie la route la plus courte, et un
-   pion cliquable au tour 2. Il échoue si le match e2e en cours atteint le round 10 pendant ses
-   trois tours ; le smoke suivant ouvre alors un nouveau match de lui-même, vu le 15 au soir.
-   Juste après un déploiement, la connexion de global-setup.ts peut expirer une fois :
-   relancer. Si le npm run dev de Jérôme occupe 5173 sans le crochet, le smoke échoue sur « hook
-   absent » : lancer un second Vite depuis boomball/client en arrière-plan,
-   VITE_BOOMBALL_HOOK=1 VITE_BOOMBALL_PATIENT=1 npx vite --port 5174 --strictPort, le chauffer
-   par deux curl, puis BASE_URL=http://localhost:5174 npm run e2e, et le tuer après (netstat
-   -ano, taskkill). En 3D il n'y a ni data-cell ni data-unit : le spec clique à la souris là où
-   cellToScreen projette, et les plaques portent data-plate. Le spec 3D tourne la caméra avec
-   page.mouse.down({ button: 'right' }) puis page.mouse.wheel, et la déplace avec
-   page.keyboard.down('ArrowRight'). Il admet deux avertissements console qui ne sont pas à nous
-   (THREE.Clock déprécié par three 0.186 mais construit par fiber 9, et les messages de
-   performance du GL logiciel de Chromium headless) ; toute autre ligne le fait échouer, y
-   compris l'avertissement de Chrome sur un AudioContext créé hors geste : c'est pourquoi
-   sound.ts n'ouvre le contexte que dans un gestionnaire de geste confirmé. Le spec 3D dure plus
-   que les 120 s du chrono : le tour expire pendant les effets (bandeau « The clock ran out »),
-   c'est attendu, et un resolve-action a répondu 404 « no such match » deux fois à ce moment-là
-   (la première requête après trois minutes sans action), sans cause serveur trouvée ;
-   useMatch.send traite ce 404 comme une réponse perdue et renvoie une fois après avoir lu la
-   tête du match par REST. Pour lire ce que le harnais a vraiment envoyé, la
-   trace Playwright de e2e/test-results/ se lit avec un script Python sur trace.zip (les
-   entrées resource-snapshot du .network).
+   tour 1 et au tour 3, un clic simple sur une case qui envoie la route la plus courte, un pion
+   cliquable au tour 2, et au tour 3 des cases que seul le Dash tenu atteint. Il échoue si le
+   match e2e en cours atteint le round 10 pendant ses trois tours (le suivant ouvre un nouveau
+   match de lui-même) ou si le Giff e2e est cerné (npm run e2e:abandon, puis relancer). Juste
+   après un déploiement, la connexion de global-setup.ts peut expirer une fois : relancer. Si
+   le npm run dev de Jérôme occupe 5173 sans le crochet, le smoke échoue sur « hook absent » :
+   lancer un second Vite depuis boomball/client en arrière-plan, VITE_BOOMBALL_HOOK=1
+   VITE_BOOMBALL_PATIENT=1 npx vite --port 5174 --strictPort, le chauffer par deux curl, puis
+   BASE_URL=http://localhost:5174 npm run e2e, et le tuer après (netstat -ano, taskkill). En 3D
+   il n'y a ni data-cell ni data-unit : le spec clique à la souris là où cellToScreen projette,
+   et les plaques portent data-plate. Le spec 3D tourne la caméra avec page.mouse.down({ button:
+   'right' }) puis page.mouse.wheel, et la déplace avec page.keyboard.down('ArrowRight'). Il
+   admet deux avertissements console qui ne sont pas à nous (THREE.Clock déprécié par three
+   0.186 mais construit par fiber 9, et les messages de performance du GL logiciel de Chromium
+   headless) ; toute autre ligne le fait échouer, y compris l'avertissement de Chrome sur un
+   AudioContext créé hors geste : c'est pourquoi sound.ts ne crée le contexte que dans un geste
+   ou quand navigator.userActivation.hasBeenActive est vrai. Le spec 3D dure plus que les 120 s
+   du chrono : le tour expire pendant les effets (bandeau « The clock ran out »), c'est attendu,
+   et un resolve-action a répondu 404 « no such match » deux fois à ce moment-là (la première
+   requête après trois minutes sans action), sans cause serveur trouvée ; useMatch.sendMany
+   traite ce 404 comme une réponse perdue et renvoie une fois après avoir lu la tête du match
+   par REST. Pour lire ce que le harnais a vraiment envoyé, la trace Playwright de
+   e2e/test-results/ se lit avec un script Python sur trace.zip (les entrées resource-snapshot
+   du .network).
 
 8. useMatch.load porte un compteur de génération : React StrictMode monte l'effet initial deux
-   fois en dev. Ne l'enlève pas. Le bash de l'outil casse sur les accents graves et les
-   apostrophes dans un heredoc : pour une série de remplacements, un script Python écrit par
-   l'outil d'écriture dans le scratchpad, puis lancé avec python -I. Jamais Html de drei : React
-   19 signale son démontage synchrone en erreur console, les étiquettes passent par Labels.tsx et
+   fois en dev. Ne l'enlève pas. useMatch.stateRef est écrit partout où setState l'est : ne pose
+   pas un setState sans lui. Le bash de l'outil casse sur les accents graves et les apostrophes
+   dans un heredoc : pour une série de remplacements, un script Python écrit par l'outil
+   d'écriture dans le scratchpad, puis lancé avec python -I. Jamais Html de drei : React 19
+   signale son démontage synchrone en erreur console, les étiquettes passent par Labels.tsx et
    link.project, les mots par Floaters.tsx. La caméra ne passe pas par OrbitControls de drei :
    l'orbite est dans Camera.tsx et sa géométrie dans framing.ts, parce que le point visé est
-   amorti et suit le jeu. Le pantin tourne le pion entier par link.gestures dans la boucle de
-   Board3D, pas par Tokens.tsx.
+   amorti et suit le jeu. Le corps du pion est le Giff riggé (giffRig.ts) dans la boucle de
+   Board3D, pas dans Tokens.tsx.
 
 9. L'initiative (écart 51) est un ordre sans comptes ; un humain Trajector ou Bulwark joue en
    dernier de son rôle (écart 55), un humain Striker ou Breaker choisit sa place (écart 58) ;
@@ -461,50 +504,53 @@ Ce qu'il faut savoir tout de suite.
    le Bulwark lance ; écart 56, turn.startedAt ; écart 57, un porteur ne tente jamais le Spark ;
    écart 59, la dérive du Spark tire un d8 par round loin des Trajectors ; écart 60, le retour à
    9 cases ; écart 61, le Shove prend le ballon ; écart 63, la passe gratuite qui suit,
-   turn.freePass. Deux faits de règle constatés sans décision : l'équipe qui a l'humain joue
-   juste après le Spark à chaque round ; la dérive du Spark traverse les unités et peut finir sous
-   les pieds d'une unité.
+   turn.freePass ; écart 64, le rebond d'un tir manqué part de la bouche. Deux faits de règle
+   constatés sans décision : l'équipe qui a l'humain joue juste après le Spark à chaque round ;
+   la dérive du Spark traverse les unités et peut finir sous les pieds d'une unité.
 
 10. Les interdits ne changent pas. Jamais le dépôt GitHub sur Vercel. Jamais le .env ni une clé
     dans un commit. Le règlement de table du vault est figé. Ne lis jamais design/Boomball
     Interface.html en entier.
 
-11. Les commandes. Depuis boomball/ : npm test (683), npm run typecheck, npm run sweep (environ
-    16 minutes), npm run e2e, npm run e2e:playthrough, npm run e2e:board3d, node scripts/run-ts.mjs
-    scripts/control-2h14.ts (dix-huit matchs de contrôle, pas un sweep). Depuis boomball/client/ :
-    npm run dev sur http://localhost:5173, jamais 127.0.0.1, npm run build, npm run typecheck.
-    Depuis la racine du workspace : python boomball/supabase/checks/rls-check.py et
-    browser-path.py, et python .claude/scripts/check_drift.py. Le cwd de l'outil Bash se
-    réinitialise entre deux appels : chemins absolus, ou npm --prefix.
+11. Les commandes. Depuis boomball/ : npm test (719), npm run typecheck, npm run sweep (environ
+    16 minutes), npm run e2e, npm run e2e:playthrough, npm run e2e:board3d, npm run e2e:abandon,
+    node scripts/run-ts.mjs scripts/control-2h14.ts (dix-huit matchs de contrôle, pas un sweep).
+    Depuis boomball/client/ : npm run dev sur http://localhost:5173, jamais 127.0.0.1, npm run
+    build, npm run typecheck. Depuis la racine du workspace : python
+    boomball/supabase/checks/rls-check.py et browser-path.py, et python
+    .claude/scripts/check_drift.py. Le cwd de l'outil Bash se réinitialise entre deux appels :
+    chemins absolus, ou npm --prefix.
 
-12. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 63 de 00 partie
-    C, et C11 à C27 en entier ; J4 de 08 §7 est tombé en C18, la caméra à quatre nombres lissés
+12. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 64 de 00 partie
+    C, et C11 à C31 en entier ; J4 de 08 §7 est tombé en C18, la caméra à quatre nombres lissés
     est refusée en C20, la barre de temps de la carte est retirée en C24, l'annonceur parle à
     chaque coup et une seule voix à la fois en C27. Dette connue :
     arenas.art et le champ art du spec nomment trois JPEG retirés ; substituteEntry et
     substitute_entry restent et ne sont plus lus ; le choix de direction d'un Breaker humain à la
     parade est automatique (gardé en C25 : le rendre à l'humain, c'est le moteur et un
     redéploiement) ; le fondu croisé des foules sans compensation de puissance ; le délai de
-    l'annonceur compté depuis le début du clip ; un seul annonceur à la fois (voulu, C27) ; la
-    coupure par un but ne libère pas le plancher du délai (l'annonceur se tait jusqu'à la fin de
-    la fenêtre ouverte, pendant le son du but) ; le fil garde 120 événements (FEED_LIMIT) ; le Spark peut rebondir plusieurs
-    rounds dans une poche du terrain ; le test du point 5 dans fifthPass.test.ts fait varier
-    idleSwing en place et le remet ; plusieurs humains d'un même rôle (coop) n'ont pas de
-    popup, à relire en phase 7 ; un gardien
-    peut marcher au-delà de sa laisse jusqu'à côté d'un receveur marqué pour une passe d'une
-    case, qu'aucune allonge n'intercepte (écart 48) ; le Shove d'un Bulwark n'est borné que par
-    l'adjacence, pas par sa laisse ; le temps par
-    match d'auto-jeu se mesure entre 1,4 et 2,7 s selon la charge de la machine ; en 3D,
-    l'orientation du modèle, le noir sous la lèvre avant, l'orbite remise à la vue fixe au
-    retour du 2D, la borne de suivi calculée pour l'azimut zéro, la roulette en vue large qui ne
-    suit pas le jeu, le pan sous Ctrl qui s'interrompt au-dessus de la minicarte et des boutons,
-    la largeur du terrain garantie seulement à l'inclinaison de départ, la répétition de la foule
-    visible en vue large, l'effacement des gradins jugé sur la hauteur de la caméra et pas sur la
-    ligne de vue, la retenue de la caméra en boîte et pas en tube, les captures des effets courts
-    figées sous le GL logiciel, le ballon qui ne disparaît pas dans la bouche, pas d'étincelles
-    en 2D, le pantin sans bras ni jambes (modèle sans squelette), le son synthétique ; la
-    relecture de 2e30f587 qui s'arrête au round 2 (pas à analyser, dit le 16) ; les quatre fichiers du vault modifiés hors de
-    nos sessions, à moi de décider.
+    l'annonceur compté depuis le début du clip ; un seul annonceur à la fois (voulu, C27) ; une
+    réplique en cours jette encore le KO d'un coup suivant (C31 point 2 ne traite que le coup
+    qui tue dans le même beat) ; la coupure par un but ne libère pas le plancher du délai
+    (l'annonceur se tait jusqu'à la fin de la fenêtre ouverte, pendant le son du but) ; le fil
+    garde 120 événements (FEED_LIMIT) ; le Spark peut rebondir plusieurs rounds dans une poche
+    du terrain ; le test du point 5 dans fifthPass.test.ts fait varier idleSwing en place et le
+    remet ; plusieurs humains d'un même rôle (coop) n'ont pas de popup, à relire en phase 7 ; un
+    gardien peut marcher au-delà de sa laisse jusqu'à côté d'un receveur marqué pour une passe
+    d'une case, qu'aucune allonge n'intercepte (écart 48) ; le Shove d'un Bulwark n'est borné
+    que par l'adjacence, pas par sa laisse ; le Dash tenu n'existe que côté client, le crochet
+    act({ kind: 'dash' }) envoie un vrai Dash ; le temps par match d'auto-jeu se mesure entre
+    1,4 et 2,7 s selon la charge de la machine ; en 3D, l'orientation du modèle, le noir sous la
+    lèvre avant, l'orbite remise à la vue fixe au retour du 2D, la borne de suivi calculée pour
+    l'azimut zéro, la roulette en vue large qui ne suit pas le jeu, le pan sous Ctrl qui
+    s'interrompt au-dessus de la minicarte et des boutons, la largeur du terrain garantie
+    seulement à l'inclinaison de départ, la répétition de la foule visible en vue large,
+    l'effacement des gradins jugé sur la hauteur de la caméra et pas sur la ligne de vue, la
+    retenue de la caméra en boîte et pas en tube, les captures des effets courts figées sous le
+    GL logiciel, le ballon qui ne disparaît pas dans la bouche, pas d'étincelles en 2D, les
+    commentaires « 2H.23 » de Tokens.tsx à passer en 2H.24 ; la relecture de 2e30f587 qui
+    s'arrête au round 2 (pas à analyser, dit le 16) ; les quatre fichiers du vault modifiés hors
+    de nos sessions, à moi de décider.
 
 13. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte, après
     avoir récrit ce fichier.

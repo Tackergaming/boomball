@@ -1,0 +1,1285 @@
+[
+ {
+  "seq": 0,
+  "kind": "roundStarted",
+  "payload": {
+   "kind": "roundStarted",
+   "round": 1
+  }
+ },
+ {
+  "seq": 1,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "A-trajector-7"
+  }
+ },
+ {
+  "seq": 2,
+  "kind": "dashed",
+  "payload": {
+   "kind": "dashed",
+   "unitId": "A-trajector-7",
+   "extraFeet": 40
+  }
+ },
+ {
+  "seq": 3,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 8,
+    "y": 29
+   },
+   "from": {
+    "x": 12,
+    "y": 14
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 12,
+     "y": 15
+    },
+    {
+     "x": 11,
+     "y": 16
+    },
+    {
+     "x": 11,
+     "y": 17
+    },
+    {
+     "x": 11,
+     "y": 18
+    },
+    {
+     "x": 11,
+     "y": 19
+    },
+    {
+     "x": 10,
+     "y": 20
+    },
+    {
+     "x": 10,
+     "y": 21
+    },
+    {
+     "x": 10,
+     "y": 22
+    },
+    {
+     "x": 10,
+     "y": 23
+    },
+    {
+     "x": 9,
+     "y": 24
+    },
+    {
+     "x": 8,
+     "y": 25
+    },
+    {
+     "x": 8,
+     "y": 26
+    },
+    {
+     "x": 9,
+     "y": 27
+    },
+    {
+     "x": 8,
+     "y": 28
+    },
+    {
+     "x": 8,
+     "y": 29
+    }
+   ],
+   "unitId": "A-trajector-7",
+   "costFeet": 75
+  }
+ },
+ {
+  "seq": 4,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "A-trajector-7"
+  }
+ },
+ {
+  "seq": 5,
+  "kind": "placeOffered",
+  "payload": {
+   "kind": "placeOffered",
+   "round": 1,
+   "places": 3,
+   "unitId": "A-striker-2"
+  }
+ },
+ {
+  "seq": 6,
+  "kind": "placeChosen",
+  "payload": {
+   "kind": "placeChosen",
+   "place": 3,
+   "unitId": "A-striker-2"
+  }
+ },
+ {
+  "seq": 7,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "A-striker-3"
+  }
+ },
+ {
+  "seq": 8,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 7,
+    "y": 22
+   },
+   "from": {
+    "x": 4,
+    "y": 14
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 4,
+     "y": 15
+    },
+    {
+     "x": 5,
+     "y": 16
+    },
+    {
+     "x": 5,
+     "y": 17
+    },
+    {
+     "x": 6,
+     "y": 18
+    },
+    {
+     "x": 6,
+     "y": 19
+    },
+    {
+     "x": 6,
+     "y": 20
+    },
+    {
+     "x": 7,
+     "y": 21
+    },
+    {
+     "x": 7,
+     "y": 22
+    }
+   ],
+   "unitId": "A-striker-3",
+   "costFeet": 40
+  }
+ },
+ {
+  "seq": 9,
+  "kind": "payloadGrabbed",
+  "payload": {
+   "kind": "payloadGrabbed",
+   "unitId": "A-striker-3"
+  }
+ },
+ {
+  "seq": 10,
+  "kind": "passed",
+  "payload": {
+   "kind": "passed",
+   "roll": {
+    "die": 20,
+    "mode": "normal",
+    "bonus": 11,
+    "total": 29,
+    "rolled": 18,
+    "against": 12
+   },
+   "toId": "A-striker-4",
+   "caught": true,
+   "fromId": "A-striker-3"
+  }
+ },
+ {
+  "seq": 11,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "A-striker-3"
+  }
+ },
+ {
+  "seq": 12,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "A-striker-4"
+  }
+ },
+ {
+  "seq": 13,
+  "kind": "passed",
+  "payload": {
+   "kind": "passed",
+   "roll": {
+    "die": 20,
+    "mode": "normal",
+    "bonus": 11,
+    "total": 18,
+    "rolled": 7,
+    "against": 12
+   },
+   "toId": "A-striker-2",
+   "caught": true,
+   "fromId": "A-striker-4"
+  }
+ },
+ {
+  "seq": 14,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 1,
+    "y": 22
+   },
+   "from": {
+    "x": 6,
+    "y": 14
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 5,
+     "y": 15
+    },
+    {
+     "x": 5,
+     "y": 16
+    },
+    {
+     "x": 4,
+     "y": 17
+    },
+    {
+     "x": 3,
+     "y": 18
+    },
+    {
+     "x": 3,
+     "y": 19
+    },
+    {
+     "x": 2,
+     "y": 20
+    },
+    {
+     "x": 2,
+     "y": 21
+    },
+    {
+     "x": 1,
+     "y": 22
+    }
+   ],
+   "unitId": "A-striker-4",
+   "costFeet": 40
+  }
+ },
+ {
+  "seq": 15,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "A-striker-4"
+  }
+ },
+ {
+  "seq": 16,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "A-striker-2"
+  }
+ },
+ {
+  "seq": 17,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 8,
+    "y": 12
+   },
+   "from": {
+    "x": 2,
+    "y": 14
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 3,
+     "y": 14
+    },
+    {
+     "x": 4,
+     "y": 13
+    },
+    {
+     "x": 5,
+     "y": 13
+    },
+    {
+     "x": 6,
+     "y": 13
+    },
+    {
+     "x": 7,
+     "y": 12
+    },
+    {
+     "x": 8,
+     "y": 12
+    }
+   ],
+   "unitId": "A-striker-2",
+   "costFeet": 30
+  }
+ },
+ {
+  "seq": 18,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "A-striker-2"
+  }
+ },
+ {
+  "seq": 19,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "A-breaker-5"
+  }
+ },
+ {
+  "seq": 20,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 7,
+    "y": 13
+   },
+   "from": {
+    "x": 8,
+    "y": 14
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 7,
+     "y": 13
+    }
+   ],
+   "unitId": "A-breaker-5",
+   "costFeet": 5
+  }
+ },
+ {
+  "seq": 21,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "A-breaker-5"
+  }
+ },
+ {
+  "seq": 22,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "A-breaker-6"
+  }
+ },
+ {
+  "seq": 23,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 9,
+    "y": 13
+   },
+   "from": {
+    "x": 10,
+    "y": 14
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 9,
+     "y": 13
+    }
+   ],
+   "unitId": "A-breaker-6",
+   "costFeet": 5
+  }
+ },
+ {
+  "seq": 24,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "A-breaker-6"
+  }
+ },
+ {
+  "seq": 25,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "A-bulwark-1"
+  }
+ },
+ {
+  "seq": 26,
+  "kind": "braced",
+  "payload": {
+   "kind": "braced",
+   "unitId": "A-bulwark-1"
+  }
+ },
+ {
+  "seq": 27,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "A-bulwark-1"
+  }
+ },
+ {
+  "seq": 28,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "B-trajector-7"
+  }
+ },
+ {
+  "seq": 29,
+  "kind": "dashed",
+  "payload": {
+   "kind": "dashed",
+   "unitId": "B-trajector-7",
+   "extraFeet": 40
+  }
+ },
+ {
+  "seq": 30,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 4,
+    "y": 22
+   },
+   "from": {
+    "x": 12,
+    "y": 30
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 11,
+     "y": 29
+    },
+    {
+     "x": 10,
+     "y": 28
+    },
+    {
+     "x": 9,
+     "y": 27
+    },
+    {
+     "x": 8,
+     "y": 26
+    },
+    {
+     "x": 7,
+     "y": 25
+    },
+    {
+     "x": 6,
+     "y": 24
+    },
+    {
+     "x": 5,
+     "y": 23
+    },
+    {
+     "x": 4,
+     "y": 22
+    }
+   ],
+   "unitId": "B-trajector-7",
+   "costFeet": 40
+  }
+ },
+ {
+  "seq": 31,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 10,
+    "y": 14
+   },
+   "from": {
+    "x": 4,
+    "y": 22
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 5,
+     "y": 21
+    },
+    {
+     "x": 5,
+     "y": 20
+    },
+    {
+     "x": 6,
+     "y": 19
+    },
+    {
+     "x": 7,
+     "y": 18
+    },
+    {
+     "x": 8,
+     "y": 17
+    },
+    {
+     "x": 8,
+     "y": 16
+    },
+    {
+     "x": 9,
+     "y": 15
+    },
+    {
+     "x": 10,
+     "y": 14
+    }
+   ],
+   "unitId": "B-trajector-7",
+   "costFeet": 40
+  }
+ },
+ {
+  "seq": 32,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "B-trajector-7"
+  }
+ },
+ {
+  "seq": 33,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "B-striker-2"
+  }
+ },
+ {
+  "seq": 34,
+  "kind": "dashed",
+  "payload": {
+   "kind": "dashed",
+   "unitId": "B-striker-2",
+   "extraFeet": 40
+  }
+ },
+ {
+  "seq": 35,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 0,
+    "y": 21
+   },
+   "from": {
+    "x": 2,
+    "y": 30
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 2,
+     "y": 29
+    },
+    {
+     "x": 2,
+     "y": 28
+    },
+    {
+     "x": 1,
+     "y": 27
+    },
+    {
+     "x": 1,
+     "y": 26
+    },
+    {
+     "x": 1,
+     "y": 25
+    },
+    {
+     "x": 1,
+     "y": 24
+    },
+    {
+     "x": 1,
+     "y": 23
+    },
+    {
+     "x": 2,
+     "y": 22
+    },
+    {
+     "x": 1,
+     "y": 21
+    },
+    {
+     "x": 0,
+     "y": 21
+    }
+   ],
+   "unitId": "B-striker-2",
+   "costFeet": 50
+  }
+ },
+ {
+  "seq": 36,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "B-striker-2"
+  }
+ },
+ {
+  "seq": 37,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "B-striker-3"
+  }
+ },
+ {
+  "seq": 38,
+  "kind": "dashed",
+  "payload": {
+   "kind": "dashed",
+   "unitId": "B-striker-3",
+   "extraFeet": 40
+  }
+ },
+ {
+  "seq": 39,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 0,
+    "y": 20
+   },
+   "from": {
+    "x": 4,
+    "y": 30
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 4,
+     "y": 29
+    },
+    {
+     "x": 3,
+     "y": 28
+    },
+    {
+     "x": 3,
+     "y": 27
+    },
+    {
+     "x": 2,
+     "y": 26
+    },
+    {
+     "x": 2,
+     "y": 25
+    },
+    {
+     "x": 2,
+     "y": 24
+    },
+    {
+     "x": 3,
+     "y": 23
+    },
+    {
+     "x": 3,
+     "y": 22
+    },
+    {
+     "x": 3,
+     "y": 21
+    },
+    {
+     "x": 2,
+     "y": 20
+    },
+    {
+     "x": 1,
+     "y": 20
+    },
+    {
+     "x": 0,
+     "y": 20
+    }
+   ],
+   "unitId": "B-striker-3",
+   "costFeet": 60
+  }
+ },
+ {
+  "seq": 40,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 2,
+    "y": 16
+   },
+   "from": {
+    "x": 0,
+    "y": 20
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 0,
+     "y": 19
+    },
+    {
+     "x": 1,
+     "y": 18
+    },
+    {
+     "x": 1,
+     "y": 17
+    },
+    {
+     "x": 2,
+     "y": 16
+    }
+   ],
+   "unitId": "B-striker-3",
+   "costFeet": 20
+  }
+ },
+ {
+  "seq": 41,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "B-striker-3"
+  }
+ },
+ {
+  "seq": 42,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "B-striker-4"
+  }
+ },
+ {
+  "seq": 43,
+  "kind": "dashed",
+  "payload": {
+   "kind": "dashed",
+   "unitId": "B-striker-4",
+   "extraFeet": 40
+  }
+ },
+ {
+  "seq": 44,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 0,
+    "y": 20
+   },
+   "from": {
+    "x": 6,
+    "y": 30
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 5,
+     "y": 29
+    },
+    {
+     "x": 5,
+     "y": 28
+    },
+    {
+     "x": 4,
+     "y": 27
+    },
+    {
+     "x": 3,
+     "y": 26
+    },
+    {
+     "x": 3,
+     "y": 25
+    },
+    {
+     "x": 2,
+     "y": 24
+    },
+    {
+     "x": 3,
+     "y": 23
+    },
+    {
+     "x": 3,
+     "y": 22
+    },
+    {
+     "x": 3,
+     "y": 21
+    },
+    {
+     "x": 2,
+     "y": 20
+    },
+    {
+     "x": 1,
+     "y": 20
+    },
+    {
+     "x": 0,
+     "y": 20
+    }
+   ],
+   "unitId": "B-striker-4",
+   "costFeet": 60
+  }
+ },
+ {
+  "seq": 45,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 1,
+    "y": 18
+   },
+   "from": {
+    "x": 0,
+    "y": 20
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 0,
+     "y": 19
+    },
+    {
+     "x": 1,
+     "y": 18
+    }
+   ],
+   "unitId": "B-striker-4",
+   "costFeet": 10
+  }
+ },
+ {
+  "seq": 46,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "B-striker-4"
+  }
+ },
+ {
+  "seq": 47,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "B-breaker-5"
+  }
+ },
+ {
+  "seq": 48,
+  "kind": "attacked",
+  "payload": {
+   "hit": false,
+   "kind": "attacked",
+   "roll": {
+    "die": 20,
+    "mode": "normal",
+    "bonus": 8,
+    "total": 11,
+    "rolled": 3,
+    "against": 16
+   },
+   "targetId": "A-trajector-7",
+   "attackerId": "B-breaker-5"
+  }
+ },
+ {
+  "seq": 49,
+  "kind": "recoiled",
+  "payload": {
+   "to": {
+    "x": 8,
+    "y": 32
+   },
+   "from": {
+    "x": 8,
+    "y": 30
+   },
+   "kind": "recoiled",
+   "unitId": "B-breaker-5"
+  }
+ },
+ {
+  "seq": 50,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 0,
+    "y": 24
+   },
+   "from": {
+    "x": 8,
+    "y": 32
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 7,
+     "y": 31
+    },
+    {
+     "x": 6,
+     "y": 30
+    },
+    {
+     "x": 5,
+     "y": 29
+    },
+    {
+     "x": 4,
+     "y": 28
+    },
+    {
+     "x": 3,
+     "y": 27
+    },
+    {
+     "x": 2,
+     "y": 26
+    },
+    {
+     "x": 1,
+     "y": 25
+    },
+    {
+     "x": 0,
+     "y": 24
+    }
+   ],
+   "unitId": "B-breaker-5",
+   "costFeet": 40
+  }
+ },
+ {
+  "seq": 51,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "B-breaker-5"
+  }
+ },
+ {
+  "seq": 52,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "B-breaker-6"
+  }
+ },
+ {
+  "seq": 53,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 8,
+    "y": 28
+   },
+   "from": {
+    "x": 10,
+    "y": 30
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 9,
+     "y": 29
+    },
+    {
+     "x": 8,
+     "y": 28
+    }
+   ],
+   "unitId": "B-breaker-6",
+   "costFeet": 10
+  }
+ },
+ {
+  "seq": 54,
+  "kind": "attacked",
+  "payload": {
+   "hit": true,
+   "kind": "attacked",
+   "roll": {
+    "die": 20,
+    "mode": "normal",
+    "bonus": 8,
+    "total": 25,
+    "rolled": 17,
+    "against": 16
+   },
+   "targetId": "A-trajector-7",
+   "attackerId": "B-breaker-6"
+  }
+ },
+ {
+  "seq": 55,
+  "kind": "damaged",
+  "payload": {
+   "kind": "damaged",
+   "amount": 15,
+   "source": "bat",
+   "unitId": "A-trajector-7",
+   "hpAfter": 30
+  }
+ },
+ {
+  "seq": 56,
+  "kind": "recoiled",
+  "payload": {
+   "to": {
+    "x": 8,
+    "y": 26
+   },
+   "from": {
+    "x": 8,
+    "y": 28
+   },
+   "kind": "recoiled",
+   "unitId": "B-breaker-6"
+  }
+ },
+ {
+  "seq": 57,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 2,
+    "y": 20
+   },
+   "from": {
+    "x": 8,
+    "y": 26
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 7,
+     "y": 25
+    },
+    {
+     "x": 6,
+     "y": 24
+    },
+    {
+     "x": 5,
+     "y": 23
+    },
+    {
+     "x": 4,
+     "y": 22
+    },
+    {
+     "x": 3,
+     "y": 21
+    },
+    {
+     "x": 2,
+     "y": 20
+    }
+   ],
+   "unitId": "B-breaker-6",
+   "costFeet": 30
+  }
+ },
+ {
+  "seq": 58,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "B-breaker-6"
+  }
+ },
+ {
+  "seq": 59,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 1,
+   "unitId": "B-bulwark-1"
+  }
+ },
+ {
+  "seq": 60,
+  "kind": "braced",
+  "payload": {
+   "kind": "braced",
+   "unitId": "B-bulwark-1"
+  }
+ },
+ {
+  "seq": 61,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "B-bulwark-1"
+  }
+ },
+ {
+  "seq": 62,
+  "kind": "roundStarted",
+  "payload": {
+   "kind": "roundStarted",
+   "round": 2
+  }
+ },
+ {
+  "seq": 63,
+  "kind": "turnStarted",
+  "payload": {
+   "kind": "turnStarted",
+   "round": 2,
+   "unitId": "A-trajector-7"
+  }
+ },
+ {
+  "seq": 64,
+  "kind": "moved",
+  "payload": {
+   "to": {
+    "x": 7,
+    "y": 21
+   },
+   "from": {
+    "x": 8,
+    "y": 29
+   },
+   "kind": "moved",
+   "path": [
+    {
+     "x": 8,
+     "y": 28
+    },
+    {
+     "x": 8,
+     "y": 27
+    },
+    {
+     "x": 8,
+     "y": 26
+    },
+    {
+     "x": 7,
+     "y": 25
+    },
+    {
+     "x": 7,
+     "y": 24
+    },
+    {
+     "x": 7,
+     "y": 23
+    },
+    {
+     "x": 8,
+     "y": 22
+    },
+    {
+     "x": 7,
+     "y": 21
+    }
+   ],
+   "unitId": "A-trajector-7",
+   "costFeet": 40
+  }
+ },
+ {
+  "seq": 65,
+  "kind": "turnEnded",
+  "payload": {
+   "kind": "turnEnded",
+   "unitId": "A-trajector-7"
+  }
+ },
+ {
+  "seq": 66,
+  "kind": "placeOffered",
+  "payload": {
+   "kind": "placeOffered",
+   "round": 2,
+   "places": 3,
+   "unitId": "A-striker-2"
+  }
+ }
+]
