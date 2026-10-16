@@ -24,7 +24,7 @@ export const fxBridge: {
    * development only, so the harness can tell a Giff turned when a capture
    * under software GL cannot.
    */
-  probe: ((unitId: string) => { yaw: number; pitch: number; roll: number; y: number; gesture: string | null } | null) | null;
+  probe: ((unitId: string) => { yaw: number; pitch: number; roll: number; y: number; gesture: string | null; clip: string | null } | null) | null;
   /**
    * How many times slower the next effects run. 1 in play. The harness asks
    * for more, because headless Chromium's software GL draws three frames a

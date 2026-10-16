@@ -2,8 +2,8 @@
  * A Giff on the pitch.
  *
  * Each unit is one group: a hexagonal base in the shirt's colour and the
- * body. The body is Jérôme's own Giff model (`public/models/giff-boomball.glb`,
- * TRELLIS, one mesh, no rig) when it has loaded, and a plain capsule until
+ * body. The body is Jérôme's own Giff model, rigged and animated
+ * (`public/models/giff-rigged.glb`, `giffRig.ts`) when it has loaded, and a plain capsule until
  * then or if it never does: a capsule in code is what every one-prompt 3D
  * demo stands on, and the match does not wait for a download. The plate over
  * the head (name, hit points, role, the spent Reaction) is DOM, in
@@ -18,13 +18,16 @@
 
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { Suspense, useCallback, useMemo, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 import { type Group, type Mesh, type MeshBasicMaterial, MeshStandardMaterial } from 'three';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 import type { Unit, UnitId } from '../../../engine/types.js';
+import { giffBody } from './giffRig.js';
 import { type SceneLink, shirt } from './scene.js';
 
-const MODEL_URL = '/models/giff-boomball.glb';
+/** Built from Jérôme's model by `scripts/blender/rig_giff.py` (2H.23). */
+const MODEL_URL = '/models/giff-rigged.glb';
 /** How tall a Giff stands, in cells. Eight feet of hippo in a five-foot cell. */
 export const GIFF_HEIGHT = 1.5;
 /**
@@ -91,7 +94,7 @@ export function Token({ unit, own, isYou, selected, onTheClock, spotlit, ring, r
 
       {/* The body: the model once it is here, a capsule meanwhile. */}
       <Suspense fallback={<Capsule />}>
-        <Giff />
+        <Giff link={link} pieceKey={key} />
       </Suspense>
     </group>
   );
@@ -169,16 +172,17 @@ function Capsule() {
 }
 
 /**
- * Jérôme's Giff. One mesh with positions and texture coordinates and no
- * normals, so they are computed once on load; scaled to `GIFF_HEIGHT` and
- * stood on the base. The file names no metalness, and glTF's default for
- * that is full metal, which without an environment to reflect renders black:
- * the material is read as painted armour instead. The geometry and the
- * material are shared by every token: fourteen draws of the same buffers.
+ * Jérôme's Giff, rigged (2H.23): the skinned mesh and its skeleton, cloned
+ * per token so each has its own bones, the geometry and the material shared.
+ * Scaled to `GIFF_HEIGHT` by the bind pose and stood on the base. The file
+ * names no metalness, and glTF's default for that is full metal, which
+ * without an environment to reflect renders black: the material is read as
+ * painted armour instead. The body's clips are registered with the scene link
+ * under the token's key, and the frame loop drives them.
  */
-function Giff() {
+function Giff({ link, pieceKey }: { link: SceneLink; pieceKey: string }) {
   const gltf = useGLTF(MODEL_URL);
-  const body = useMemo(() => {
+  const shared = useMemo(() => {
     let found: Mesh | null = null;
     gltf.scene.traverse((node) => {
       if (!found && (node as Mesh).isMesh) found = node as Mesh;
@@ -191,24 +195,39 @@ function Giff() {
     const box = geometry.boundingBox!;
     const scale = GIFF_HEIGHT / Math.max(1e-6, box.max.y - box.min.y);
     const source = mesh.material as MeshStandardMaterial;
-    const material = source instanceof MeshStandardMaterial ? source : new MeshStandardMaterial();
-    material.metalness = 0.15;
-    material.roughness = 0.8;
-    material.needsUpdate = true;
-    return { geometry, material, scale, lift: 0.08 - box.min.y * scale };
+    if (source instanceof MeshStandardMaterial) {
+      source.metalness = 0.15;
+      source.roughness = 0.8;
+      source.needsUpdate = true;
+    }
+    return { scale, lift: 0.08 - box.min.y * scale };
   }, [gltf]);
-  if (!body) return <Capsule />;
-  return (
-    <mesh
-      geometry={body.geometry}
-      material={body.material}
-      scale={body.scale}
-      position-y={body.lift}
-      rotation-y={MODEL_YAW}
-      castShadow
-      receiveShadow
-    />
-  );
+  const root = useMemo(() => {
+    const clone = cloneSkinned(gltf.scene);
+    clone.traverse((node) => {
+      if ((node as Mesh).isMesh) {
+        node.castShadow = true;
+        node.receiveShadow = true;
+        // The skinned bounds are the bind pose's; a swing reaches past them.
+        node.frustumCulled = false;
+      }
+    });
+    return clone;
+  }, [gltf]);
+  // The mixer is born and dies in one effect: StrictMode runs each effect
+  // twice in development, and a body made outside would be disposed by the
+  // first cleanup and then registered dead (the sound's lesson, 2H.22).
+  useEffect(() => {
+    const animator = giffBody(root, gltf.animations);
+    if (!animator) return;
+    link.bodies.set(pieceKey, animator);
+    return () => {
+      if (link.bodies.get(pieceKey) === animator) link.bodies.delete(pieceKey);
+      animator.dispose();
+    };
+  }, [link, pieceKey, root, gltf]);
+  if (!shared) return <Capsule />;
+  return <primitive object={root} scale={shared.scale} position-y={shared.lift} rotation-y={MODEL_YAW} />;
 }
 
 useGLTF.preload(MODEL_URL);

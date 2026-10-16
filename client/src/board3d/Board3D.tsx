@@ -267,6 +267,7 @@ export function Board3D({
         case 'exit':
         case 'enter':
           if (cue.unitId) link.transitions.set(`u:${cue.unitId}`, { kind: cue.kind, since: now, stretch: fxBridge.stretch });
+        link.bodies.get(key)?.play(kind, GESTURE_MS[kind] * fxBridge.stretch);
           break;
         case 'sparkIn':
           link.transitions.set('s', { kind: 'drop', since: now, stretch: fxBridge.stretch });
@@ -280,6 +281,7 @@ export function Board3D({
   );
   useEffect(() => {
     if (!import.meta.env.DEV) return;
+            else if (word === 'DASH') link.bodies.get(`u:${cue.unitId}`)?.dash();
     fxBridge.fire = fire;
     fxBridge.probe = (unitId) => {
       const node = link.pieces.get(`u:${unitId}`);
@@ -319,6 +321,7 @@ export function Board3D({
     }
   };
 
+        clip: link.bodies.get(`u:${unitId}`)?.clip ?? null,
   const motionCrackers = new Set(
     (motion?.steps ?? []).flatMap((t) => (t.step.kind === 'cracker' ? [t.step.crackerId] : [])),
   );
@@ -583,9 +586,14 @@ function Mover({
       stride.phase = walking ? stride.phase + (moved * Math.PI) / STRIDE : 0;
       stride.lean += ((walking ? LEAN : 0) - stride.lean) * 0.2;
       gait.current.set(key, stride);
-      let bob = walking ? BOB * Math.abs(Math.sin(stride.phase)) : 0;
-      let pitch = stride.lean;
-      let roll = walking ? SWAY * Math.sin(stride.phase) : 0;
+      // A rigged Giff (2H.23) runs, swings and staggers by its own clips: the
+      // puppet only turns it and pushes it, and leaves its body upright.
+      const body = link.bodies.get(key);
+      body?.drive(walking, delta > 0 ? moved / delta : 0, delta);
+      const puppet = body ? 0 : 1;
+      let bob = walking ? BOB * Math.abs(Math.sin(stride.phase)) * puppet : 0;
+      let pitch = stride.lean * puppet;
+      let roll = walking ? SWAY * Math.sin(stride.phase) * puppet : 0;
       let twist = 0;
       let push = { x: 0, z: 0 };
       const g = link.gestures.get(key);
@@ -600,23 +608,25 @@ function Mover({
             case 'swing':
               // Wind back a third of the way, strike round in a quarter, come back.
               yaw = aim;
-              twist = u < 0.3 ? -1.0 * (u / 0.3) : u < 0.55 ? -1.0 + 2.4 * ((u - 0.3) / 0.25) : 1.4 * (1 - (u - 0.55) / 0.45);
-              pitch += 0.25 * arc;
-              bob += 0.06 * arc;
+              twist = (u < 0.3 ? -1.0 * (u / 0.3) : u < 0.55 ? -1.0 + 2.4 * ((u - 0.3) / 0.25) : 1.4 * (1 - (u - 0.55) / 0.45)) * puppet;
+              pitch += 0.25 * arc * puppet;
+              bob += 0.06 * arc * puppet;
               break;
-            case 'lunge':
+            case 'lunge': {
+              // The Shove clip steps a fifth of a cell itself; the push makes up the rest.
               yaw = aim;
-              push = { x: Math.sin(aim) * LUNGE * arc, z: Math.cos(aim) * LUNGE * arc };
-              pitch += 0.35 * arc;
+              const reach = body ? LUNGE * 0.6 : LUNGE;
+              push = { x: Math.sin(aim) * reach * arc, z: Math.cos(aim) * reach * arc };
+              pitch += 0.35 * arc * puppet;
               break;
             case 'flinch':
-              pitch -= 0.45 * arc;
-              bob += 0.1 * arc;
+              pitch -= 0.45 * arc * puppet;
+              bob += 0.1 * arc * puppet;
               break;
             case 'throw':
               yaw = aim;
-              pitch += 0.3 * arc;
-              bob += 0.08 * arc;
+              pitch += 0.3 * arc * puppet;
+              bob += 0.08 * arc * puppet;
               break;
           }
         }
@@ -638,6 +648,7 @@ function Mover({
         visible = true;
       } else if (unit.status === 'active' && pending('enter', unit.id)) {
         visible = false;
+            }
       }
       node.position.set(c.x + push.x, y + bob, c.z + push.z);
       node.visible = visible;

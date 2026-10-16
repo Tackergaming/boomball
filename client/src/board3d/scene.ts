@@ -14,6 +14,7 @@ import type { Object3D } from 'three';
 
 import type { Point } from '../../../engine/geometry.js';
 import type { Cue } from '../match/motion.js';
+import type { GiffBody } from './giffRig.js';
 
 export interface Projected {
   /** Pixels from the canvas's top-left corner. */
@@ -62,6 +63,12 @@ export interface SceneLink {
    */
   readonly gestures: Map<string, { kind: 'swing' | 'lunge' | 'flinch' | 'throw'; since: number; stretch: number; toward: { x: number; z: number } | null }>;
   /**
+   * The rigged bodies (2H.23), by pose key, registered by `Tokens.tsx` once
+   * the model has loaded. A Giff here plays its clips and the puppet leaves
+   * its body alone; one missing (the capsule) still gets the puppet.
+   */
+  readonly bodies: Map<string, GiffBody>;
+  /**
    * Pieces part of the way into or out of the pitch, by pose key, with when
    * they began (2H.21): an evacuated Giff sinks (`exit`), a substitute rises
    * (`enter`), the Spark comes down (`drop`). Written and read by the frame
@@ -84,6 +91,7 @@ export function newSceneLink(): SceneLink {
     float: null,
     transitions: new Map(),
     gestures: new Map(),
+    bodies: new Map(),
   };
 }
 

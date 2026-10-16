@@ -184,10 +184,11 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
     await page.waitForTimeout(effect.after * STRETCH);
     await shots.take(effect.name);
     if (effect.request.kind === 'action') {
-      // The puppet (2H.22): the swing winds the Giff back then round at its
-      // target. Under software GL a capture cannot catch it (two captures a
-      // second apart came back identical while the scene had turned), so the
-      // probe reads the piece itself: a gesture is on it and it has turned.
+      // The swing (2H.22, rigged in 2H.23): the Giff plays its Swing clip at
+      // its target. Under software GL a capture cannot catch it (two captures
+      // a second apart came back identical while the scene had turned), so the
+      // probe reads the piece itself: a gesture is on it and the clip that
+      // weighs the most is the Swing.
       // Fired again, slower still, because under software GL the capture
       // above alone outlasts the first one; then waited out, since the Giff
       // carried off below is this one.
@@ -196,21 +197,21 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
         async (id) => {
           const h = window.__boomball!;
           const rest = h.probe(id);
-          let best = 0;
           let seen = false;
+          let clip = false;
           for (let i = 0; i < 40; i++) {
             await new Promise((r) => setTimeout(r, 100));
             const p = h.probe(id);
             if (!p || !rest) continue;
             if (p.gesture === 'swing') seen = true;
-            best = Math.max(best, Math.abs(p.yaw - rest.yaw), Math.abs(p.pitch));
+            if (p.clip === 'Swing') clip = true;
           }
-          return { seen, best };
+          return { seen, clip };
         },
         effect.request.unitId!,
       );
       expect(turned.seen, 'a swing gesture was on the Giff').toBe(true);
-      expect(turned.best, 'the Giff turned or leaned').toBeGreaterThan(0.15);
+      expect(turned.clip, 'the Giff played its Swing clip').toBe(true);
       await page.waitForTimeout(6_000);
     }
     // The next effect takes a slot of its own; what is left of this one may overlap.
