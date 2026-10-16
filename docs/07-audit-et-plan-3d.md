@@ -70,7 +70,7 @@ Les lignes vues à l'écran dans ce chat sont marquées « vu ».
 | # | Quoi | Où | Pourquoi ça compte | Sévérité | Séances |
 |---|---|---|---|---|---|
 | A1 | **Playtest humain du terrain vertical**, jamais fait | Jérôme, `npm run dev` | Tout l'écran depuis le 2 septembre repose sur deux tours joués par script | Bloquant | 0, c'est à Jérôme |
-| A2 | **Déploiement Vercel par l'API**, projet à créer, fichiers construits à envoyer, `site_url` à changer | `scripts/` à écrire, Supabase auth config | Rien n'est déployé. Décision D3 : en dernière phase | Majeur | 1 |
+| A2 | **Déploiement Vercel par l'API**, projet à créer, fichiers construits à envoyer, `site_url` à changer | `scripts/` à écrire, Supabase auth config | **Fait le 2026-10-16** : `scripts/deploy-vercel.mjs`, projet `boomball` sans lien Git, `https://boomball.vercel.app` (journal §10). `site_url` reste à changer par propreté | Majeur | 1 |
 | A3 | `/security-review` | Jérôme la lance | Avant la mise en ligne | Majeur | 0,5 |
 | A4 | **Compteur de victoires** : 1 victoire pour 3 matchs gagnés | `teams.wins`, lu en base | L'ordre des quatre matchs en base colle à l'hypothèse de `04` : seul le dernier, 50-30, a été compté après la migration 0003. Se tranche à la prochaine victoire, humaine ou par script | Majeur | 0,25 |
 | A5 | **Fait le 2026-10-10 en 2H.3.** Crackers mesurés à 6 et à 10 sur le terrain horizontal, tableau dans `09-equilibrage-2H3-2026-10-10.md`, Jérôme a tranché 10 : écart 40 de `00` partie C, `CRACKER_MOVE_CELLS = 10` | `engine/constants.ts`, `00-reglement-v2.md` C4 et C6 | Décision D4 | Clos | 0 |
@@ -1937,7 +1937,7 @@ migration, **pas de sweep.**
 
 | Quoi | État |
 |---|---|
-| La latence au round 2 | Lue en base (`match_events.created_at`) : la popup du round 2 arrive dans la même réponse que la fin de son tour du round 1, cinquante événements rejoués à l'écran avant qu'elle ne s'affiche ; place 1 ouvre son tour dans la même réponse. Les journaux des fonctions refusés par l'API de gestion. **Non reproduit, rien ne change**, question posée à lui (`00` C31 point 1) |
+| La latence au round 2 | Lue en base (`match_events.created_at`) : la popup du round 2 arrive dans la même réponse que la fin de son tour du round 1, cinquante événements rejoués à l'écran avant qu'elle ne s'affiche ; place 1 ouvre son tour dans la même réponse. Les journaux des fonctions refusés par l'API de gestion. **Non reproduit, rien ne change**, question posée à lui (`00` C31 point 1). **Mesurée au chat suivant** par `scripts/measure-latency.ts` : toute requête coûte 1,6 à 2,7 s quel que soit le travail, l'IA et le démarrage à froid hors de cause ; la fonction tournait à `us-east-1` pour une base à `eu-west-3`, parce que la machine de Jérôme sort par Newark ; épinglée à Paris par `x-region`, 0,84 s médiane. Parade à cadrer avec lui |
 | La réplique de KO | `Match.tsx` : un `hit` sur un Giff qui a un repère `exit` dans le même mouvement ne demande pas de réplique, le KO parle ; le craquement joue toujours |
 | Le Dash tenu | `match/dashHold.ts` (`heldDashState`, `dashNeeded`, six tests) ; `Match.tsx` (`dashHeld`, `viewState`, `legalView`, `moveWith`) ; `ActionBar.tsx` (« Dash · held » allumé, « 80 ft left · Dash held », `data-testid` `dash` et `feet-left`) ; `useMatch.ts` (`sendMany`, `stateRef`). Le Dash part au serveur avec la première marche qui en a besoin, en deux requêtes ; un second clic l'annule. Proposition du fil principal, à relire par lui |
 | La foule dès le Trajector | `sound.ts` : `pageHasBeenActivated()` (`navigator.userActivation.hasBeenActive`), `start()` à la création quand la page a déjà reçu un geste, `onGesture` sinon ; deux tests |
@@ -1949,5 +1949,32 @@ migration, **pas de sweep.**
 **Porte franchie le même jour** : sa partie sur 2H.30, « mes retours après le match : aucun,
 tout va bien ». Sa réponse sur la latence : après son clic sur la place 3, la popup reste, rien
 ne se passe « pendant longtemps », puis le match reprend par les Strikers de l'IA ; l'attente est
-donc dans la requête `choosePlace` qui joue les deux Strikers avant lui (`00` C31 point 1, à
-mesurer au chat suivant). Reste ensuite le redéploiement du client sur son feu vert.
+donc dans la requête `choosePlace` qui joue les deux Strikers avant lui (`00` C31 point 1,
+**mesurée au chat suivant, le 2026-10-16 : la géographie, pas le travail**, chiffres et parade
+candidate dans `00` C31 point 1). Reste ensuite le redéploiement du client sur son feu vert.
+
+### Le client en ligne, le 2026-10-16 au soir : `https://boomball.vercel.app`
+
+Par le fil principal (Fable 5.1), sans sous-agent, sur le mot de Jérôme « passons au déploiement
+vercel », après qu'il a tranché la latence (« on laisse tomber le problème de latence, ce n'est
+pas grave », chiffres en `00` C31 point 1). C'est l'étape 3 de l'ordre qu'il a validé le 16 au
+soir, et la ligne A2 de l'audit. **Contrairement à ce que disaient les prompts de reprise depuis
+2H.14, aucun client n'avait jamais été mis en ligne** : le compte Vercel ne portait aucun projet
+Boomball (lu par l'API avant d'agir), le client n'avait tourné que sur `localhost:5173`.
+
+| Quoi | État |
+|---|---|
+| `scripts/deploy-vercel.mjs` | Nouveau. Lit `VERCEL_TOKEN` et `VERCEL_TEAM_ID` du `.env` lui-même ; `GET /v9/projects/boomball`, créé par `POST /v10/projects` s'il manque, **refuse de continuer si le projet porte un `link` Git** ; parcourt `client/dist/`, envoie chaque fichier par `POST /v2/files` avec son SHA-1 (six en parallèle), ajoute un `vercel.json` (réécriture de tout chemin vers `index.html`, `Cache-Control` immuable sur `assets/`), puis `POST /v13/deployments` avec `projectSettings` sans framework ni build, et attend `READY`. Préversion par défaut, `--production` pour le jeu |
+| Le déploiement | 82 fichiers, 11,9 Mo, envoyés en 6,5 s, `READY` en 10,5 s. Le premier déploiement d'un projet neuf devient production de lui-même : alias `boomball.vercel.app` et `boomball-montigny-gmailcoms-projects.vercel.app`. Le projet n'a pas de `link`, `framework` nul, `nodeVersion` 24 sans effet |
+| Vérifié | `curl` : `/` 200 en `text/html`, `/anything/deep` 200 (la réécriture), `/models/giff-rigged.glb` 200 en `model/gltf-binary`, les `assets/` en `max-age=31536000, immutable` ; Playwright MCP : l'écran de connexion rendu (`e2e/out/vercel-login-2026-10-16.png`), zéro message console ; `browser-path.py` avec `ORIGIN=https://boomball.vercel.app` **ALL GREEN** (CORS `*` sur `create-match` et `resolve-action`) |
+| `browser-path.py` corrigé | Deux FAIL au premier run qui étaient le contrôle et pas le jeu : il envoyait `endTurn` à un Striker qui devait d'abord choisir sa place (écart 58, 2H.12). Il répond désormais à la popup par la place 1, puis Dodge (le chrono ne bouge pas), puis `endTurn` |
+| Ce qui reste | Les URL de préversion sont derrière la protection SSO de Vercel (302), voulu. `site_url` de l'Auth à `localhost:5173`, sans effet en mot de passe, à changer par propreté sur son mot. Le smoke ne tourne pas contre Vercel (le crochet est `DEV` seulement, voulu). La bande passante Hobby est de 100 Go par mois, 13 Mo par premier chargement |
+| Fonctions | Inchangées, `resolve-action` v24 et `create-match` v22, moteur 10 |
+
+**Porte franchie le soir même** : « tout s'est bien passé. c'est parfait. » Il a joué sa partie
+sur l'URL, sans Vite. Au passage, **son mot de passe était perdu** : le tableau de bord Supabase
+n'offre que l'envoi d'un e-mail de récupération, inutile sans page pour le traiter, donc le fil
+principal l'a remplacé par l'API admin (`PUT /auth/v1/admin/users/<id>`, clé service) et l'a
+affiché une fois en chat. **Deux trous notés pour la phase 8, avant qu'un ami ne joue** : pas de
+« mot de passe oublié » et pas de changement de mot de passe dans l'application. Ensuite la coop
+(phase 7, A10 d'abord), demain.

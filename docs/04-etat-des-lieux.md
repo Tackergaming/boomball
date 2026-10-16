@@ -1434,7 +1434,21 @@ bundle, et deux fonctions qui écrivent avec la clé service.
 `montigny-8072`. **Rien n'est connecté à GitHub et il ne faut pas le faire** : l'intégration donnerait
 à Vercel un accès en lecture sur tout le dépôt, dont `campagne-vault/`, `context/` et le `CLAUDE.md`
 racine. Le projet se créera et se déploiera par l'API, en envoyant les fichiers construits, sans que
-Vercel voie jamais le dépôt.
+Vercel voie jamais le dépôt. **Fait le 2026-10-16 au soir, sur son mot « passons au déploiement
+vercel »** : `scripts/deploy-vercel.mjs` a créé le projet `boomball` par `POST /v10/projects`
+(sans `link`, vérifié après coup), envoyé les 82 fichiers de `client/dist/` (11,9 Mo) par
+`POST /v2/files` avec leur SHA-1, puis créé le déploiement par `POST /v13/deployments` sans
+framework ni build, avec un `vercel.json` qui réécrit tout chemin vers `index.html` et met les
+`assets/` hachés en cache immuable. Le premier déploiement d'un projet neuf est production :
+**le jeu est à `https://boomball.vercel.app`**, prêt en 10 s. Vérifié : l'écran de connexion
+rendu sous Playwright sans un avertissement console, le `glb` servi en `model/gltf-binary`, un
+chemin profond qui rend l'application, et `browser-path.py` **ALL GREEN** avec
+`ORIGIN=https://boomball.vercel.app`, après une correction du contrôle lui-même, qui envoyait un
+`endTurn` à un Striker qui devait d'abord choisir sa place (écart 58, depuis 2H.12) : il répond
+maintenant à la popup par la place 1, puis Dodge, puis `endTurn`. Les URL de préversion
+(`boomball-<hash>-...vercel.app`) sont derrière la protection SSO de Vercel (302), seul l'alias
+de production est public. `site_url` de l'Auth est toujours `http://localhost:5173`, sans effet
+en mot de passe sans email, à changer par propreté quand Jérôme le voudra.
 
 **L'équilibrage est clos, et il a été rouvert deux fois pour de bonnes raisons.** La section « Le lot
 4 » liste les leviers déjà mesurés sur le terrain horizontal et ce qu'ils valent. La section sur le

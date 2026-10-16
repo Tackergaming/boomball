@@ -8,10 +8,16 @@
 > client** (annulable tant que ses pas ne sont pas consommés, envoyé avec la marche qui en a
 > besoin), la foule dès l'ouverture de l'écran, « Select your champion » retiré, et la latence du
 > round 2 lue en base sans être reproduite. Rien dans le moteur, rien à redéployer. **Porte
-> franchie le même jour** (« aucun, tout va bien ») et sa réponse sur la latence : elle est dans
-> la requête `choosePlace` place 3, après son clic, à mesurer. 2H.29 (`03fe9db`) et 2H.30 sont
-> commitées par `/save` et poussées sur sa demande. La mesure de la latence puis le
-> redéploiement du client sont la suite.
+> franchie le même jour** (« aucun, tout va bien »). 2H.29 (`03fe9db`) et 2H.30 (`ba58f4c`) sont
+> commitées et poussées. **Récrit le même soir dans le chat suivant** : la latence est mesurée
+> (`00` C31 point 1 : toute requête coûte 2,1 s parce que la fonction tourne à `us-east-1` pour
+> une base à Paris, l'IA et le démarrage à froid hors de cause) et **Jérôme la laisse tomber** ;
+> puis, sur son mot « passons au déploiement vercel », **le client est en ligne pour la première
+> fois à `https://boomball.vercel.app`** par `scripts/deploy-vercel.mjs`, projet Vercel
+> `boomball` sans lien Git, vérifié par `curl`, Playwright et `browser-path.py`, **et sa partie
+> en ligne a franchi la porte** (« tout s'est bien passé. c'est parfait. »). Son mot de passe
+> perdu a été remplacé par l'API admin, d'où deux trous notés pour la phase 8. Le soir est
+> commité et poussé par `/save` ; la suite est la coop, phase 7, A10 d'abord.
 > À coller tel quel comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
@@ -59,8 +65,9 @@ match (2H.28) : le propriétaire, depuis l'écran de match ou le hub, avec confi
 n'a pas de résultat (mon choix B) ; les mots de la confirmation relus par moi. C30 la phase 6
 (2H.29) : la 3D par défaut pour tout le monde, le porteur marqué d'un faisceau doré, l'effectif
 fixe de sept noms tiré au premier match et jamais renommé, l'adversaire qui les évite. C31 mes
-cinq retours après mes deux matchs sur 2H.29 (2H.30) : la latence au round 2 (lue en base, non
-reproduite, QUESTION POSÉE À MOI : avant la popup ou après mon clic ?), la réplique de KO à la
+cinq retours après mes deux matchs sur 2H.29 (2H.30) : la latence au round 2 (MESURÉE le 16 au
+soir : 2,1 s par requête, la fonction à us-east-1 pour une base à Paris, pas l'IA ; JE LA LAISSE
+TOMBER, rien ne change), la réplique de KO à la
 place de celle du coup qui tue, LE DASH TENU côté client (« Dash · held », annulable tant
 qu'aucune marche n'a dépassé mes pieds de base, envoyé avec celle qui en a besoin ; proposition
 du fil principal, à relire par moi), la foule dès l'ouverture de l'écran, « Select your
@@ -77,8 +84,10 @@ jour), ENGINE_VERSION 10, **MOTEUR 10 EN LIGNE depuis le 2026-10-16 sur mon feu 
 redéployées le soir pour 2H.27 (v22, v20), 2H.28 (v23, v21) puis 2H.29 : resolve-action v24,
 create-match v22** (npm run deploy:function après set -a && . ../.env && set +a, depuis
 boomball/) ; 2H.30 ne touche pas les fonctions, rien à redéployer ; les matchs du moteur 9 sont
-archivés par le client. Le client en ligne n'est PAS redéployé depuis 2H.14 (mon feu vert, pas
-encore). 719 tests verts sur 36 fichiers, typecheck racine, scripts, e2e et client verts, le
+archivés par le client. LE CLIENT EST EN LIGNE DEPUIS LE 2026-10-16 AU SOIR À
+https://boomball.vercel.app (scripts/deploy-vercel.mjs, projet Vercel boomball créé par l'API
+sans lien Git, premier client jamais en ligne : le compte ne portait aucun projet avant, la
+phrase « le client en ligne est à 2H.14 » des reprises précédentes était fausse). 719 tests verts sur 36 fichiers, typecheck racine, scripts, e2e et client verts, le
 client bundle. Sur 2H.30, smoke 2D vert en 47,7 s (le tour 3 tient le Dash, l'annule, le tient
 et le dépense par une marche de neuf cases, captures 11-turn-3-dash-held.png et
 12-turn-3-moved.png de e2e/out/2026-10-16T15-18-19/) ; e2e:board3d vert en 8,0 min au second
@@ -94,10 +103,14 @@ cb618e32, c3867408 sont du moteur 9 et ne se rejouent plus avec le dépôt au mo
 diffère) ; e0d9b642 (2H.29, star, 30 à 20) est du moteur 10 et se rejoue ; c5cb20f6 est
 abandonné par moi au round 2. 2e30f587 n'est PAS à analyser. Tout jusqu'à 2H.28 est commité et
 poussé (1b2422a) ; 2H.29 est commitée en local par /save (03fe9db), pas poussée ; 2H.30 N'EST
-PAS COMMITÉE : vérifier git status et git log origin/main..main en premier et me le dire, me
-proposer /save ou /commit puis le push. Les migrations 0008 et 0009 sont APPLIQUÉES par moi le
-16 au soir (vérifiées avant et après en lecture, consignées en 04). Le client en ligne est à
-2H.14. Les fichiers de 2H.30 : client/src/match/dashHold.ts et dashHold.test.ts (nouveaux),
+commitée et poussée (ba58f4c). CE QUI N'EST PAS COMMITÉ, du 16 au soir : scripts/measure-latency.ts
+(nouveau), scripts/deploy-vercel.mjs (nouveau), supabase/checks/browser-path.py (corrigé pour
+l'écart 58 : place 1, Dodge, endTurn), docs 00 (C31 point 1, la mesure et ma décision), 04
+(l'hébergement fait), 07 (A2 fait, entrée « Le client en ligne » en §10), 08 (en-tête, ligne de
+§5), le skill boomball, ce fichier : vérifier git status et git log origin/main..main en premier
+et me le dire, me proposer /save ou /commit puis le push. Les migrations 0008 et 0009 sont
+APPLIQUÉES par moi le 16 au soir (vérifiées avant et après en lecture, consignées en 04). Les
+fichiers de 2H.30 : client/src/match/dashHold.ts et dashHold.test.ts (nouveaux),
 match/announcer.ts, match/sound.ts et sound.test.ts, match/useMatch.ts, match/ActionBar.tsx,
 screens/Match.tsx, e2e/smoke.spec.ts, docs 00 (C31), 07 §10 (2H.30), 08 (en-tête et §5, ligne
 2H.30), le skill boomball, docs/matches/2026-10-16-e0d9b642 et 2026-10-16-c5cb20f6 (dumps de
@@ -338,8 +351,9 @@ WebP et les MP3 le sont. boomball/scripts/blender/__pycache__/ n'est pas à comm
 NOTÉ LE 2026-10-16, À GARDER DANS CHAQUE RÉÉCRITURE DE CE FICHIER.
 Ma partie 2e30f587 n'est pas à analyser : je l'ai ouverte pour une capture d'écran puis laissée
 tourner sans jouer, sa relecture qui s'arrête au round 2 n'est pas un bug à chercher. Le client en
-ligne ne se redéploie pas encore : il reste pas mal de changements d'interface en partie et hors
-partie. Fonctionnalités à implémenter dans des chats à venir, à cadrer avec moi avant toute
+ligne se redéploie par node scripts/deploy-vercel.mjs --production depuis boomball/, après npm run
+build dans client/, SUR MON FEU VERT SEULEMENT (sans --production c'est une préversion derrière le
+SSO Vercel, qui ne change rien pour personne). Fonctionnalités à implémenter dans des chats à venir, à cadrer avec moi avant toute
 ligne de code : choisir son niveau de ligue quand les niveaux d'en dessous sont déjà débloqués
 (FAIT, 2H.27) ; le mode multijoueur ; annuler un match en cours et en sortir (FAIT, 2H.28) ;
 d'autres à voir. Le modèle de Giff riggé (squelette et clips de course et de batte) est livré
@@ -349,38 +363,46 @@ d'autres à voir. Le modèle de Giff riggé (squelette et clips de course et de 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI LE 2026-10-16 AU SOIR : (1) mes trois fonctionnalités sans
 le multijoueur : la ligue au choix (2H.27, codée), annuler un match en cours et en sortir
 (2H.28, codée) ; (2) la phase 6 de 07 : la 3D par défaut, la 2D sous l'interrupteur, le
-briefing (2H.29, codée, porte franchie sur l'effectif et le porteur) ; (3) le client redéployé
-sur mon feu vert, par l'API Vercel, jamais le dépôt GitHub ; (4) la coop, phase 7 de 07, A10
-d'abord (persist non atomique dans resolve-action), migration des invitations, lobby à
-plusieurs sièges ; (5) la phase 8, le déploiement pour un ami (deploy-vercel.mjs n'existe pas
-encore), /security-review par moi.
+briefing (2H.29, codée, porte franchie sur l'effectif et le porteur) ; (3) le client en ligne
+par l'API Vercel, jamais le dépôt GitHub (FAIT le 16 au soir, https://boomball.vercel.app) ;
+(4) la coop, phase 7 de 07, A10 d'abord (persist non atomique dans resolve-action), migration
+des invitations, lobby à plusieurs sièges ; (5) la phase 8, le déploiement pour un ami (le
+script existe, reste site_url de l'Auth, la bande passante Hobby, un ami qui crée un compte),
+/security-review par moi.
 
-LA TÂCHE : MESURER LA LATENCE DE LA POPUP DE PLACE, PUIS LE REDÉPLOIEMENT DU CLIENT.
-1. Vérifier git status et git log origin/main..main avant toute chose ; 2H.29 et 2H.30 sont
-   commitées par /save le 16 (voir git log) et poussées sur ma demande (« /save /commit et
-   push ») : vérifier que origin/main..main est vide et me le dire. Détail en 07 §10 (entrées
-   2H.29 et 2H.30), 00 C30 et C31. La porte de 2H.30 est franchie (« aucun, tout va bien »).
-2. La latence (00 C31 point 1, ma réponse du 16) : après mon clic sur la place 3, la popup
-   reste, rien pendant de longues secondes, puis les Strikers de l'IA jouent. L'attente est dans
-   la requête choosePlace qui joue les deux Strikers avant moi. MESURER avant toute ligne,
-   jamais une supposition : la durée de la requête côté client (horodatage autour de
-   submitAction dans useMatch.sendMany, ou la trace réseau d'un spec qui choisit la place 3, le
-   smoke choisit 1, Close puis 2) et côté fonction (live-match.ts contre les fonctions en ligne
-   avec un chrono par requête, ou les journaux de la fonction dans le tableau de bord Supabase,
-   l'API de gestion refusant function_edge_logs et edge_logs sur analytics/endpoints/logs).
-   Trois pistes : le démarrage à froid après une minute sans requête, le plan de tour des deux
-   Strikers sous Deno (2,7 ms par décision en Node, limite CPU courte en Edge), l'écriture du lot
-   en base. Me présenter les chiffres, puis cadrer la parade avec moi.
-3. Puis le redéploiement du client sur mon feu vert, par l'API Vercel (deploy-vercel.mjs n'existe
-   pas encore, à écrire : POST /v13/deployments avec les fichiers de client/dist/, jamais de
-   dépôt lié), puis la coop (phase 7, A10 d'abord).
-4. Le Dash tenu est validé par ma partie ; s'il me gêne un jour, l'alternative est une action
+LA TÂCHE : CADRER LA COOP AVEC MOI (PHASE 7 DE 07, A10 D'ABORD), PUIS LA CODER.
+1. Vérifier git status et git log origin/main..main avant toute chose et me le dire : le soir
+   du 16 (le client en ligne, la mesure de latence, browser-path.py corrigé, les docs) est
+   commité et poussé par /save. Les quatre fichiers du vault et les non suivis MARGO.md,
+   theodo.md, assets/source/, __pycache__ ne sont pas à nous ; check_vault.py signale MARGO.md
+   et theodo.md (pas de frontmatter), c'est connu et c'est à moi.
+2. La porte du client en ligne est franchie (« tout s'est bien passé. c'est parfait. »). Si un
+   jour quelque chose cloche en ligne et pas en local, lire d'abord la console du navigateur et
+   les en-têtes (Playwright MCP sur https://boomball.vercel.app), jamais une supposition. Le
+   smoke ne tourne pas contre Vercel : le crochet n'existe qu'en DEV, c'est voulu. Mon compte
+   est tackergamingrss@gmail.com ; mon mot de passe a été remplacé le 16 par l'API admin parce
+   que le jeu n'a ni « mot de passe oublié » ni changement de mot de passe : DEUX TROUS pour la
+   phase 8, à cadrer avec moi avant qu'un ami ne joue, pas avant la coop sauf si je le demande.
+3. La latence est tranchée : « on laisse tomber, ce n'est pas grave ». Ne la rouvre pas. Les
+   chiffres et l'explication (la géographie : la fonction tourne à us-east-1 parce que ma
+   machine sort par Newark, la base est à Paris ; x-region: eu-west-3 donnerait 0,84 s au lieu
+   de 2,1 s) sont en 00 C31 point 1 si je change d'avis ; le script scripts/measure-latency.ts
+   les refait en dix minutes.
+4. La coop, phase 7 de 07, EST LA TÂCHE DE CE CHAT : A10 d'abord (le persist de resolve-action n'est pas atomique :
+   insert des événements, upsert du snapshot, update du match en trois requêtes ; une fonction
+   SQL en une transaction, qui réduirait aussi les allers-retours), puis la migration des
+   invitations et le lobby à plusieurs sièges. À CADRER AVEC MOI AVANT TOUTE LIGNE : questions
+   en chat, une ou deux par message, reformuler avant de coder. Points déjà notés : plusieurs
+   humains d'un même rôle n'ont pas de popup de place (écart 58 à relire), le chrono par siège,
+   qui est propriétaire et qui peut abandonner (2H.28 ne connaît que le propriétaire).
+5. Le Dash tenu est validé par ma partie ; s'il me gêne un jour, l'alternative est une action
    undoDash dans le moteur, ENGINE_VERSION 11 et un redéploiement, à cadrer avec moi.
-5. Une capture par changement d'écran, le smoke 2D relancé si Match.tsx, Feed.tsx, Board.tsx ou
+6. Une capture par changement d'écran, le smoke 2D relancé si Match.tsx, Feed.tsx, Board.tsx ou
    ActionBar.tsx bougent ; ni le son ni la foule ne se capturent : le crochet audio(), crowd(),
-   lastSaid().
-6. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
-7. Les fonctionnalités à venir (le multijoueur, d'autres à voir) restent à cadrer avec moi, une
+   lastSaid(). Tout changement du client visible en ligne passe par npm run build puis
+   deploy-vercel.mjs --production sur mon feu vert.
+7. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
+8. Les fonctionnalités à venir (le multijoueur, d'autres à voir) restent à cadrer avec moi, une
    par une.
 
 Ce qu'il faut savoir tout de suite.

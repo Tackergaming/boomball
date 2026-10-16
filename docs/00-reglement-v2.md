@@ -2666,6 +2666,34 @@ jsonb`. `useAccount` lit `roster` ; `TeamHub.tsx` l'affiche par poste. 713 tests
    démarrage à froid de la fonction après une minute sans requête, le plan de tour des deux
    Strikers sous Deno (2,7 ms par décision en Node, la limite de temps CPU d'une fonction Edge
    est courte), ou l'écriture du lot en base.
+
+   **Mesuré le 2026-10-16 au chat suivant** (fil principal, Fable 5.1), par
+   `scripts/measure-latency.ts` : un joueur jetable, le même échafaudage que `live-match.ts`, un
+   Striker humain qui choisit toujours la dernière place offerte (la requête qui joue les deux
+   Strikers de l'IA avant lui), un chrono autour de chaque requête, une minute d'attente avant
+   chaque popup, et aux rounds pairs une requête sans travail (`orders: []`) juste avant la
+   place, pour lire le démarrage à froid à part du travail. **Aucune des trois pistes n'est la
+   cause.** Les deux Strikers coûtent 30 à 155 ms en Node sur le même plateau ; le démarrage à
+   froid ajoute 0,4 s au plus (2,5 s médiane après une minute d'attente contre 2,1 s à chaud) ;
+   et une requête qui n'écrit qu'une ligne coûte autant qu'un `endTurn` à onze tours d'IA et
+   soixante-dix événements. **Toute requête `resolve-action` coûte 1,6 à 2,7 s, un `pass` à un
+   événement compris** (médiane 2,1 s sur 34 actions chaudes), avec un pic isolé à 6,9 s sur une
+   place chaude et légère. **La cause est géographique**, lue dans les en-têtes : la base est à
+   `eu-west-3` (Paris) et la fonction a tourné à `us-east-1` (`x-sb-edge-region`), parce que
+   Supabase place la fonction au plus près de l'appelant et que la machine de Jérôme sort sur
+   Internet par un point Cloudflare de Newark (`colo=EWR`, `loc=US` au `cdn-cgi/trace`) ; la
+   fonction enchaîne huit allers-retours vers la base (l'Auth, quatre lectures, trois écritures,
+   plus la diffusion Realtime), chacun transatlantique. **Épinglée à Paris par l'en-tête
+   `x-region: eu-west-3`** sur la requête (même script, `--region eu-west-3`, la fonction
+   confirmée à `eu-west-3`) : **0,84 s médiane à chaud** (0,74 à 1,37 s) contre 2,1 s, la place à
+   chaud 0,85 s contre 2,08 s, la place après une minute d'attente 1,45 s contre 2,55 s, le
+   démarrage à froid 0,6 s. Les journaux des fonctions restent illisibles par l'API de gestion
+   (`logs.all` retiré, `function_edge_logs` « does not exist » sur `logs`). La parade est à
+   cadrer avec Jérôme : l'en-tête côté client ne touche pas aux fonctions ; moins
+   d'allers-retours dans la fonction (une lecture et une écriture en RPC, ce qui est aussi A10)
+   les touche ; et le point de sortie de sa machine est à lui de dire. **Tranché par Jérôme le
+   même soir : « on laisse tomber le problème de latence, ce n'est pas grave. »** Rien ne change,
+   ni au client ni aux fonctions ; les chiffres restent ici et le script reste dans `scripts/`.
 2. **La réplique de KO plutôt que celle du coup.** Ses mots : « quand un coup de batte (swing
    ou att op) tue un personnage, on devrait entendre la réplique de ko plutôt que la réplique
    du coup de batte ». Constat dans `motion.ts` et `Match.tsx` : le coup qui touche pose `hit`

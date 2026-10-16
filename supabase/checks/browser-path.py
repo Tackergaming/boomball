@@ -198,14 +198,19 @@ try:
     turn = state.get("turn") or {}
     unit_id = turn.get("unitId")
     check("it is the human's turn on arrival", bool(unit_id), f"unit {unit_id}")
-    status, played, headers = call("POST", "/functions/v1/resolve-action", jwt,
-                                   {"matchId": match_id, "unitId": unit_id,
-                                    "action": {"kind": "endTurn"}})
-    allowed = {k.lower(): v for k, v in headers.items()}.get("access-control-allow-origin")
-    ok = status == 200 and played.get("accepted")
-    check("resolve-action accepted a turn", ok,
-          f"status {status}" + ("" if ok else f" {played}"))
-    check("resolve-action reply carries CORS", allowed in ("*", ORIGIN), f"origin {allowed}")
+
+    # Since 2H.12 (ecart 58) a human Striker or Breaker first chooses its place
+    # in its role, and the door refuses any other action until it has. The
+    # place prompt is what the browser shows on arrival, so the check answers
+    # it the way the browser does: place 1, which opens the turn in the same
+    # reply. A Trajector or a Bulwark has no prompt and skips this.
+    if turn.get("placing") is not None:
+        status, placed, headers = call("POST", "/functions/v1/resolve-action", jwt,
+                                       {"matchId": match_id, "unitId": unit_id,
+                                        "action": {"kind": "choosePlace", "place": 1}})
+        ok = status == 200 and placed.get("accepted")
+        check("resolve-action accepted the place choice (ecart 58)", ok,
+              f"status {status}" + ("" if ok else f" {placed}"))
 
     # -- The turn clock belongs to the turn, not to the request ---------------
     # A turn is several requests, walk, act, walk again, end, and each one used
@@ -216,19 +221,29 @@ try:
     first = (row or [{}])[0].get("turn_deadline")
     check("a human turn carries a deadline", bool(first), f"{first}")
 
+    # Dodge spends the Action without ending the turn, so the same unit is
+    # still on the clock afterwards and the deadline must not have moved.
+    status, played, headers = call("POST", "/functions/v1/resolve-action", jwt,
+                                   {"matchId": match_id, "unitId": unit_id,
+                                    "action": {"kind": "dodge"}})
+    allowed = {k.lower(): v for k, v in headers.items()}.get("access-control-allow-origin")
+    ok = status == 200 and played.get("accepted")
+    check("resolve-action accepted a turn action", ok,
+          f"status {status}" + ("" if ok else f" {played}"))
+    check("resolve-action reply carries CORS", allowed in ("*", ORIGIN), f"origin {allowed}")
+    status, row, _ = call("GET", f"/rest/v1/matches?id=eq.{match_id}&select=turn_deadline", jwt)
+    second = (row or [{}])[0].get("turn_deadline")
+    check("acting again inside the same turn does not restart the clock",
+          second == first, f"{first} then {second}")
+
     later = call("GET", f"/rest/v1/match_state?match_id=eq.{match_id}&select=snapshot", jwt)[1]
     turn = (later[0]["snapshot"].get("turn") or {}) if later else {}
-    if turn.get("unitId"):
-        # Dodge spends the Action without ending the turn, so the same unit is
-        # still on the clock afterwards and the deadline must not have moved.
-        status, again, _ = call("POST", "/functions/v1/resolve-action", jwt,
-                                {"matchId": match_id, "unitId": turn["unitId"],
-                                 "action": {"kind": "dodge"}})
-        check("a second action inside the turn is accepted", status == 200, f"status {status}")
-        status, row, _ = call("GET", f"/rest/v1/matches?id=eq.{match_id}&select=turn_deadline", jwt)
-        second = (row or [{}])[0].get("turn_deadline")
-        check("acting again inside the same turn does not restart the clock",
-              second == first, f"{first} then {second}")
+    if turn.get("unitId") == unit_id and turn.get("placing") is None:
+        status, ended, _ = call("POST", "/functions/v1/resolve-action", jwt,
+                                {"matchId": match_id, "unitId": unit_id,
+                                 "action": {"kind": "endTurn"}})
+        check("ending the turn is accepted", status == 200 and ended.get("accepted"),
+              f"status {status}")
 
     # -- Orders to AI team-mates ----------------------------------------------
     # The channel `ai/orders.ts` describes as most of what a solo player does,
