@@ -16,7 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { AllyOrder } from '../../../ai/orders.js';
 import type { Action } from '../../../engine/actions.js';
 import type { MatchEvent } from '../../../engine/events.js';
-import type { Role } from '../../../engine/stats.js';
+import type { Role, Tier } from '../../../engine/stats.js';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -113,11 +113,16 @@ async function callFunction<T>(name: string, body: unknown): Promise<T | Refused
   }
 }
 
+/**
+ * Opens a match. `tier` is the league the player chose in the lobby (2H.27,
+ * `00` C28): the battery's own Tier or one below it, the server refuses above.
+ */
 export function createMatch(
   teamId: string,
   seats: readonly SeatRequest[],
+  tier: Tier,
 ): Promise<CreateMatchReply> {
-  return callFunction<CreateMatchReply>('create-match', { teamId, seats });
+  return callFunction<CreateMatchReply>('create-match', { teamId, seats, tier });
 }
 
 export function submitAction(

@@ -111,7 +111,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     db.from('match_state').select('seq, snapshot').eq('match_id', matchId).single(),
     db
       .from('matches')
-      .select('arena_id, turn_deadline, team_id, orders, engine_version')
+      .select('arena_id, turn_deadline, team_id, orders, engine_version, tier')
       .eq('id', matchId)
       .single(),
   ]);
@@ -204,7 +204,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     (order) => !(order.kind === 'callForPass' && opened.has(order.receiverId) && !added.includes(order)),
   );
   await persist(db, matchId, snapshot.seq, step, step.events, standingOrders);
-  await recordResult(db, match.team_id as string, state, step.session.state);
+  await recordResult(db, match.team_id as string, match.tier as string, state, step.session.state);
 
   // Realtime carries the same batch the caller gets back, so the other two
   // clients and the acting one converge on one sequence of events.
@@ -271,12 +271,19 @@ function validOrder(raw: unknown, state: MatchState, ownUnitId: string): AllyOrd
 async function recordResult(
   db: ReturnType<typeof createClient>,
   teamId: string,
+  matchTier: string,
   before: MatchState,
   after: MatchState,
 ): Promise<void> {
   if (before.phase === 'finished' || after.phase !== 'finished') return;
   // The human side is always A: `create-match` seats every human there.
   if (after.result?.winner !== 'A') return;
+  // A win counts only at the battery's own Tier (2H.27, `00` C28 point 2,
+  // Jérôme: a win below it is a win, not a rung). The battery's Tier is read
+  // now, not at kick-off: it is what the ladder stands at when the whistle
+  // blows that matters. One read, at full time only.
+  const { data: team } = await db.from('teams').select('tier').eq('id', teamId).single();
+  if (team && team.tier !== matchTier) return;
   await db.rpc('record_team_win', { team: teamId });
 }
 

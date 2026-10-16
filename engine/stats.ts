@@ -22,6 +22,22 @@ export type Role = (typeof ROLES)[number];
 export const TIERS = ['rookie', 'veteran', 'star'] as const;
 export type Tier = (typeof TIERS)[number];
 
+/** Whether `value` names a Tier: what a request body sends is a string, not a Tier. */
+export function isTier(value: unknown): value is Tier {
+  return typeof value === 'string' && (TIERS as readonly string[]).includes(value);
+}
+
+/**
+ * Whether a battery that stands at `reached` may open a match at `requested`
+ * (2H.27, `00` C28): at its own Tier or any below, never above. The Tier a
+ * match is played at is the difficulty of both sides, so a Rookie battery
+ * asking for Star would field Star against Star in its first match. Rookie is
+ * always allowed: there is nothing below it.
+ */
+export function tierAllowed(requested: Tier, reached: Tier): boolean {
+  return TIERS.indexOf(requested) <= TIERS.indexOf(reached);
+}
+
 export interface RoleStats {
   readonly hp: number;
   readonly ac: number;

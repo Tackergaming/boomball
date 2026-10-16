@@ -150,6 +150,10 @@ export function TeamHub({
             );
           })}
         </div>
+        <p style={{ margin: '12px 0 0', fontSize: 12, lineHeight: 1.7, color: 'var(--text-faint)' }}>
+          Once a level is reached, the lobby lets you play it again. Only wins at your own level
+          climb the ladder.
+        </p>
       </section>
 
       <section style={{ padding: '0 32px' }}>
@@ -234,7 +238,8 @@ function FoundTeam({ userId, onCreated }: { userId: string; onCreated: () => voi
         </h1>
         <p style={{ color: 'var(--text-dim)', fontSize: 13, lineHeight: 1.6, marginTop: 10 }}>
           A battery starts at Rookie and climbs by winning. {TIER_WINS_VETERAN} wins make Veteran, {TIER_WINS_STAR} make Star,
-          and the house always fields your own Tier against you.
+          and the house fields the league you play at against you. Once a level is reached, the
+          lobby lets you play it again; only wins at your own level climb the ladder.
         </p>
 
         <label className="label" htmlFor="team" style={{ display: 'block', marginTop: 20 }}>

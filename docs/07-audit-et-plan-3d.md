@@ -1855,3 +1855,26 @@ sweep.**
 
 **Sa partie, le même soir** : « tout est parfait ». Porte franchie, et il ouvre le point sur ce
 qu'il reste à faire.
+
+### Sous-phase 2H.27, « la ligue au choix », codée le 2026-10-16 au soir, porte ouverte
+
+Par le fil principal (Fable 5.1), seul, à partir de `00` C28. Le point sur la suite, dont il a
+validé l'ordre : ses trois fonctionnalités sans le multijoueur (ligue au choix, annuler et
+quitter un match), la phase 6, le client redéployé, puis la coop (phase 7, A10 d'abord) et la
+phase 8. La ligue est la première. Rien dans le moteur ni dans l'IA, `ENGINE_VERSION` toujours
+10, pas de migration, **les deux fonctions à redéployer sur son feu vert**, **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| La règle | Une batterie joue à son Tier ou en dessous, jamais au-dessus (`tierAllowed` dans `engine/stats.ts`) ; une victoire ne compte que jouée au Tier de la batterie (sa réponse : « non »), `recordResult` compare `matches.tier` à `teams.tier` au sifflet final |
+| `create-match` | Lit `body.tier`, absent = le Tier de la batterie, invalide ou au-dessus refusé ; le match porte le Tier joué |
+| Le lobby | Section « League · your battery is Veteran », trois boutons, le palier de la batterie sélectionné par défaut, les paliers en dessous jouables, ceux au-dessus grisés et `disabled` avec « · 3 wins » / « · 6 wins » ; la phrase dessous dit où les victoires comptent ; le header dit « Veteran battery · playing Rookie ». Dessin validé par lui en chat |
+| Le hub | Une phrase sous l'échelle et une dans le formulaire : « Once a level is reached, the lobby lets you play it again. Only wins at your own level climb the ladder » |
+| Tests | Trois de plus dans `lobby.test.ts` ; **708 sur 35 fichiers contre 705** ; typecheck racine, scripts, e2e et client verts ; les deux fonctions bundlent |
+| Harnais | Smoke 2D **vert en 39,7 s** avec la section affirmée (trois boutons, un sélectionné, celui du Tier de la batterie, les verrouillés `disabled`) et la capture du lobby ; un premier smoke avait repris le match e2e en cours sans passer par le lobby, le playthrough l'a fini (38 s), le second smoke a ouvert un match par le lobby |
+| Captures lues | `02-lobby.png` : « League · your battery is Star », les trois boutons ouverts, Star sélectionné, « Star is where your wins count ». E2E Battery est Star (23 victoires), donc l'état grisé des paliers au-dessus ne se voit pas sur cette capture ; il est couvert par `disabled` et `data-locked` dans le code, à voir sur une batterie rookie |
+| En ligne | **`resolve-action` v22, `create-match` v20, redéployées le 2026-10-16 au soir sur son feu vert**, moteur 10 inchangé ; smoke 2D **vert en 35,5 s** sur les fonctions redéployées |
+| Commit | Son `/commit` du même soir |
+
+**Ce qui attend Jérôme** : une partie en dessous de son palier : le compteur de victoires ne
+doit pas bouger, et le lobby doit être clair. Puis le cadrage d'annuler et quitter un match.

@@ -32,6 +32,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
 import { ENGINE_VERSION } from '../../../engine/constants.ts';
+import { isTier, tierAllowed, type Tier } from '../../../engine/stats.ts';
 import { toArenaSpec } from '../../../server/arenaRow.ts';
 import { openLobbyMatch, type SeatRequest } from '../../../server/lobby.ts';
 
@@ -78,7 +79,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const callerId = auth?.user?.id;
   if (!callerId) return refuse('not signed in', 401);
 
-  let body: { teamId?: string; seats?: unknown; arenaId?: string };
+  let body: { teamId?: string; seats?: unknown; arenaId?: string; tier?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -92,13 +93,20 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  // The Tier comes from here and nowhere else.
+  // The battery's Tier comes from here and nowhere else. Since 2H.27 (`00`
+  // C28) the client may ask to play at it or below it, never above: a Rookie
+  // battery still cannot field Star in its first match. Absent, the match is
+  // played at the battery's Tier, as it always was.
   const { data: team } = await db
     .from('teams')
     .select('id, owner, tier')
     .eq('id', teamId)
     .single();
   if (!team) return refuse('no such team', 404);
+  const reached = team.tier as Tier;
+  if (body.tier !== undefined && !isTier(body.tier)) return refuse('there is no such league');
+  const tier: Tier = body.tier === undefined ? reached : body.tier;
+  if (!tierAllowed(tier, reached)) return refuse(`your battery has not reached ${tier}`, 403);
 
   // Everyone taking a seat must belong to the team, the caller included. Read
   // the roster once and answer both questions from it.
@@ -138,7 +146,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const seed = freshSeed();
   const opened = openLobbyMatch(toArenaSpec(arenaRow), {
     callerId,
-    tier: team.tier as 'rookie' | 'veteran' | 'star',
+    tier,
     seats,
     seed,
     now: Date.now(),
@@ -153,7 +161,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
     .insert({
       team_id: teamId,
       arena_id: arenaId,
-      tier: team.tier,
+      // The Tier played, which `resolve-action` compares to the battery's at
+      // full time: a win below it is a win, not a rung (C28 point 2).
+      tier,
       phase: state.phase,
       round: state.round,
       rng_seed: seed,

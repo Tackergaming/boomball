@@ -2448,3 +2448,64 @@ que la source de `h1` est arrêtée et `lastSaid` inchangé. `Match.tsx` : le co
 `sayOf` seulement. Le crochet ne bouge pas, `lastSaid()` suffit à lire ce que l'annonceur a
 dit. 705 tests sur 35 fichiers (704 avant), typecheck racine, scripts, e2e et client verts,
 smoke 2D vert en 42 s ; rien à redéployer.
+
+## C28. Décisions du 2026-10-16 au soir, **sous-phase 2H.27, la ligue au choix**
+
+> Écrites par le fil principal (Fable 5.1) après le point sur ce qu'il reste à faire, dont Jérôme
+> a validé l'ordre : ses trois fonctionnalités sans le multijoueur, la phase 6, le client
+> redéployé, puis la coop. La première est « choisir son niveau de ligue quand les niveaux d'en
+> dessous sont déjà débloqués », notée le 16 à midi. Rien dans le moteur ni dans l'IA,
+> `ENGINE_VERSION` reste 10, **les deux fonctions à redéployer sur son feu vert**, aucune
+> constante de `00` ne bouge.
+
+**Ce que le code faisait.** Le Tier d'une batterie (rookie, veteran, star) est une colonne
+calculée en base depuis `wins` (`TIER_WINS_VETERAN` 3, `TIER_WINS_STAR` 6). Le client ne
+l'envoyait jamais : `create-match` le lisait en base « et nulle part ailleurs », pour qu'un
+client ne puisse pas aligner des Star à son premier match. Le Tier s'applique aux deux camps :
+c'est la difficulté de la partie. Une victoire incrémentait `wins` quel que soit le Tier joué.
+Le lobby affichait le Tier sans rien à choisir.
+
+1. **La ligue se choisit dans le lobby, jamais au-dessus de son palier.** Une batterie veteran
+   joue rookie ou veteran, une star les trois. Le client envoie le Tier choisi, `create-match`
+   l'accepte s'il est inférieur ou égal au Tier de la batterie et refuse sinon ; absent, il lit
+   le Tier de la batterie, comme avant. Le match porte le Tier joué (`matches.tier`).
+2. **Une victoire ne compte que jouée au palier de la batterie.** Ses mots : « la réponse à la
+   question est non ». Sinon une veteran monterait star en battant des rookies. `resolve-action`
+   compare au sifflet final le Tier du match au Tier de la batterie et n'appelle
+   `record_team_win` que s'ils sont égaux. Jouer en dessous est un entraînement ou un plaisir.
+3. **L'humain doit comprendre qu'il peut choisir.** Ses mots : « il faut que dans l'interface
+   l'humain comprenne qu'il peut sélectionner son niveau de ligue ». Dessin validé par lui : une
+   section « League » dans le panneau du siège, entre la Position et le bouton Start, trois
+   boutons sur le modèle des rôles, le palier de la batterie sélectionné par défaut, les paliers
+   en dessous cliquables, les paliers au-dessus grisés avec le nombre de victoires qu'il faut
+   (une batterie rookie voit donc dès son premier match que la ligue se choisira) ; une phrase
+   sous les boutons qui dit où les victoires comptent ; le header dit « Veteran battery ·
+   playing Rookie » quand on joue en dessous ; une phrase de plus sous l'échelle du hub.
+
+**Ce que ces décisions rouvrent.** `server/lobby.ts` (une fonction pure `tierAllowed`),
+`create-match`, `resolve-action` (`recordResult`), `client/src/lib/supabase.ts`, `Lobby.tsx`,
+`TeamHub.tsx`, le smoke. Pas de migration. Les fonctions en ligne ignorent le champ tant
+qu'elles ne sont pas redéployées : le choix n'a d'effet qu'après son feu vert.
+
+**Comment 2H.27 est codée** (le 2026-10-16 au soir, fil principal Fable 5.1, aucun sous-agent).
+`engine/stats.ts` : `isTier(value)` lit un Tier dans un corps de requête, `tierAllowed(requested,
+reached)` compare les index de `TIERS`, rookie toujours permis. `create-match` : `body.tier`
+absent lit le Tier de la batterie, invalide refuse « there is no such league », au-dessus
+refuse 403 « your battery has not reached star » ; le Tier joué passe à `openLobbyMatch` et dans
+`matches.tier`. `resolve-action` : la ligne du match lit aussi `tier` ; `recordResult(db,
+teamId, matchTier, before, after)` lit `teams.tier` au sifflet final seulement et n'appelle
+`record_team_win` que si les deux Tiers sont égaux ; le Tier de la batterie est lu au sifflet, pas
+au coup d'envoi, parce que c'est l'échelle du moment qui compte. `client/src/lib/supabase.ts` :
+`createMatch(teamId, seats, tier)`. `Lobby.tsx` : `tier` en état, `team.tier` par défaut ; la
+section « League · your battery is Veteran », trois boutons `data-league`, `data-selected`,
+`data-locked`, les verrouillés `disabled` à 45 % d'opacité et suffixés « · 3 wins » ou « · 6
+wins » (`WINS_FOR` depuis `TIER_WINS_VETERAN` et `TIER_WINS_STAR`) ; la phrase `league-blurb`
+change selon que le palier choisi est celui de la batterie ou en dessous ; la ligne du header
+`lobby-tier-line` dit « Veteran battery · playing Rookie » en dessous. `TeamHub.tsx` : une
+phrase sous l'échelle et une dans le formulaire de création. `lobby.test.ts` : trois tests de
+plus (`tierAllowed` sur les neuf paires, `isTier`, le match ouvert au Tier demandé porte ce
+Tier sur chaque unité). `smoke.spec.ts` : trois boutons, un seul sélectionné, celui du Tier lu
+dans la ligne du header, déverrouillé ; chaque bouton verrouillé est `disabled`. Les deux
+fonctions bundlent (`npm run build:function`). 708 tests sur 35 fichiers (705 avant), smoke 2D
+vert en 39,7 s par le lobby. **Redéployées le 2026-10-16 au soir sur son feu vert :
+`resolve-action` v22, `create-match` v20, moteur 10 inchangé**, smoke 2D vert en 35,5 s dessus.

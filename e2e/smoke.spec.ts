@@ -74,6 +74,19 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   } else {
     await toLobby.click();
     await expect(page.getByRole('heading', { name: 'Drop into the silo' })).toBeVisible();
+    // The league (2H.27, `00` C28): three buttons, exactly one selected, and
+    // it is the battery's own Tier; every league above it is locked. The
+    // battery's Tier is read off the header line, which names it first.
+    const leagues = page.locator('[data-league]');
+    await expect(leagues).toHaveCount(3);
+    await expect(page.locator('[data-league][data-selected="true"]')).toHaveCount(1);
+    const tierLine = await page.getByTestId('lobby-tier-line').innerText();
+    const reached = tierLine.split(' ')[0]!.toLowerCase();
+    await expect(page.locator(`[data-league="${reached}"]`)).toHaveAttribute('data-selected', 'true');
+    await expect(page.locator(`[data-league="${reached}"]`)).toHaveAttribute('data-locked', 'false');
+    for (const locked of await page.locator('[data-league][data-locked="true"]').all()) {
+      await expect(locked).toBeDisabled();
+    }
     await shots.take('lobby');
     await page.getByRole('button', { name: 'Start match' }).click();
   }

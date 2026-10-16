@@ -10,8 +10,37 @@
 import { describe, expect, it } from 'vitest';
 
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
+import { isTier, tierAllowed } from '../engine/stats.js';
 import { isHuman } from '../engine/types.js';
 import { openLobbyMatch, type LobbyRequest, type SeatRequest } from './lobby.js';
+
+describe('the league a battery may play at (2H.27, C28)', () => {
+  it('allows its own Tier and every one below, never one above', () => {
+    expect(tierAllowed('rookie', 'rookie')).toBe(true);
+    expect(tierAllowed('veteran', 'rookie')).toBe(false);
+    expect(tierAllowed('star', 'rookie')).toBe(false);
+    expect(tierAllowed('rookie', 'veteran')).toBe(true);
+    expect(tierAllowed('veteran', 'veteran')).toBe(true);
+    expect(tierAllowed('star', 'veteran')).toBe(false);
+    expect(tierAllowed('rookie', 'star')).toBe(true);
+    expect(tierAllowed('star', 'star')).toBe(true);
+  });
+
+  it('reads a Tier off a request body and nothing else', () => {
+    expect(isTier('veteran')).toBe(true);
+    expect(isTier('Veteran')).toBe(false);
+    expect(isTier('')).toBe(false);
+    expect(isTier(2)).toBe(false);
+    expect(isTier(undefined)).toBe(false);
+  });
+
+  it('opens the match at the Tier it is asked for', () => {
+    const result = open(SOLO, { tier: 'star' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.opening.kickoff.units.every((unit) => unit.tier === 'star')).toBe(true);
+  });
+});
 
 const T0 = 1_700_000_000_000;
 

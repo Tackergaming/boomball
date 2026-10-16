@@ -16,10 +16,16 @@
 
 import { useEffect, useState } from 'react';
 
-import { TEAM_SIZE } from '../../../engine/constants.js';
-import { TEAM_COMPOSITION, type Role } from '../../../engine/stats.js';
+import { TEAM_SIZE, TIER_WINS_STAR, TIER_WINS_VETERAN } from '../../../engine/constants.js';
+import { TEAM_COMPOSITION, TIERS, tierAllowed, type Role, type Tier } from '../../../engine/stats.js';
 import { createMatch, supabase } from '../lib/supabase.js';
 import type { Team } from '../lib/useAccount.js';
+
+/** The wins that open each league, mirroring the generated column on `teams`. */
+const WINS_FOR: Record<Tier, number> = { rookie: 0, veteran: TIER_WINS_VETERAN, star: TIER_WINS_STAR };
+
+/** The league's name as the buttons wear it. */
+const cap = (tier: Tier) => tier[0]!.toUpperCase() + tier.slice(1);
 
 const ROLE_BLURB: Record<Role, string> = {
   striker: 'Takes the shot. Best arm on the field and the thinnest hide of the three that matter.',
@@ -42,6 +48,11 @@ export function Lobby({
   onBack: () => void;
 }) {
   const [role, setRole] = useState<Role>('striker');
+  // The league the match is played at (2H.27, `00` C28): the battery's own
+  // Tier by default, any league below it on a click, never one above. The
+  // server checks the same rule; the greyed buttons are so the player sees
+  // from the first match that the league will be theirs to choose.
+  const [tier, setTier] = useState<Tier>(team.tier);
   const [name, setName] = useState(displayName);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,9 +105,11 @@ export function Lobby({
       } catch (saveFailure) {
         console.warn('the character name was not saved', saveFailure);
       }
-      const reply = await createMatch(team.id, [
-        { profileId: userId, role, characterName: name.trim() },
-      ]);
+      const reply = await createMatch(
+        team.id,
+        [{ profileId: userId, role, characterName: name.trim() }],
+        tier,
+      );
       if (!reply.accepted) {
         setError(reply.reason);
         return;
@@ -133,8 +146,9 @@ export function Lobby({
           <p className="display" style={{ margin: 0, fontSize: 22 }}>
             {team.name}
           </p>
-          <p className="label" style={{ margin: '3px 0 0' }}>
-            {team.tier} · 1 named seat · {TEAM_SIZE * 2 - 1} house Giff
+          <p className="label" style={{ margin: '3px 0 0' }} data-testid="lobby-tier-line">
+            {cap(team.tier)} battery{tier !== team.tier ? ` · playing ${cap(tier)}` : ''} · 1 named seat ·{' '}
+            {TEAM_SIZE * 2 - 1} house Giff
           </p>
         </div>
       </header>
@@ -170,6 +184,37 @@ export function Lobby({
             ))}
           </div>
           <p style={S.blurb}>{ROLE_BLURB[role]}</p>
+
+          <p className="label" style={{ marginTop: 22 }}>
+            League · your battery is {cap(team.tier)}
+          </p>
+          <div style={S.roles}>
+            {TIERS.map((t) => {
+              const open = tierAllowed(t, team.tier);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTier(t)}
+                  disabled={!open}
+                  className={t === tier ? undefined : 'ghost'}
+                  style={{ ...S.roleButton, opacity: open ? 1 : 0.45 }}
+                  data-league={t}
+                  data-selected={t === tier ? 'true' : 'false'}
+                  data-locked={open ? 'false' : 'true'}
+                  title={open ? `Play at ${cap(t)}` : `${WINS_FOR[t]} wins to reach ${cap(t)}`}
+                >
+                  {cap(t)}
+                  {!open && ` · ${WINS_FOR[t]} wins`}
+                </button>
+              );
+            })}
+          </div>
+          <p style={S.blurb} data-testid="league-blurb">
+            {tier === team.tier
+              ? `${cap(tier)} is where your wins count: the house fields ${cap(tier)} against you, and a win here climbs the ladder.`
+              : `A lighter match: the house fields ${cap(tier)} against you. A win at ${cap(tier)} is a win, not a rung on the ladder.`}
+          </p>
 
           {error && <p className="error" style={{ marginTop: 16 }}>{error}</p>}
 

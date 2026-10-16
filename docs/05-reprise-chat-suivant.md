@@ -5,14 +5,17 @@
 > raté et réussi et les attaques d'opp »), l'a confronté au code, précisé en répliques
 > d'annonceur, écrit `00` C27 et codé 2H.26, l'annonceur systématique, plus le bug du but qui ne
 > coupait pas la réplique en cours. Sa partie sur 2H.26 : « tout est parfait », porte franchie,
-> commitée. Le même soir il a demandé le point sur ce qu'il reste à faire. À coller tel quel
-> comme premier message du chat suivant, dans le workspace `jarvis-jdr`.
+> commitée (`fc1fdcc`). Le même soir il a demandé le point sur ce qu'il reste à faire, validé
+> l'ordre (ligue au choix, annuler et quitter un match, phase 6, client redéployé, puis la coop
+> et la phase 8), et la première, **2H.27 la ligue au choix** (`00` C28), est codée, PAS
+> commitée, fonctions à redéployer sur son feu vert. À coller tel quel comme premier message du
+> chat suivant, dans le workspace `jarvis-jdr`.
 
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.26
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.27
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15), §9 la
 parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 63, plus 40 bis,
@@ -46,28 +49,44 @@ L'ÉCART 64 (le rebond d'un tir manqué part de la bouche, jamais sous un joueur
 foules selon la possession, deux annonceurs (54 clips de mes deux packs). C27 le lot du
 2026-10-16 au soir après ma partie sur 2H.25 : l'annonceur systématique (« une réplique à chaque
 coup, mais qu'une », toutes les chances à 1, le délai de 2,5 s fait seul le tri) et le but qui
-coupe la réplique en cours pour de vrai. Chaque passe finit par « comment ... est codée », poids
-par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de C12 à C27.
+coupe la réplique en cours pour de vrai. C28 la ligue au choix (2H.27) : dans le lobby, on joue
+à son palier ou en dessous, jamais au-dessus ; une victoire ne compte que jouée au palier de la
+batterie (ma réponse : « non ») ; l'écran doit montrer qu'on choisit. Chaque passe finit par
+« comment ... est codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de
+C12 à C28.
 07 §10 porte le journal, dont l'entrée 2H.15, qui dit fichier par fichier ce que la 2.5D
 contient, les entrées 2H.16 à 2H.20, la caméra et les gradins, 2H.21 et 2H.22, le jeu vivant.
 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.22.
 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.16 à 2H.26 sont CODÉES (2H.26 le 2026-10-16 au soir), ENGINE_VERSION 10, **MOTEUR 10 EN
-LIGNE depuis le 2026-10-16 sur mon feu vert : resolve-action v21, create-match v19** (npm run
+Où on en est : 2H.16 à 2H.27 sont CODÉES (2H.26 et 2H.27 le 2026-10-16 au soir), ENGINE_VERSION 10, **MOTEUR 10 EN
+LIGNE depuis le 2026-10-16 sur mon feu vert, fonctions redéployées le soir pour 2H.27 :
+resolve-action v22, create-match v20** (npm run
 deploy:function après set -a && . ../.env && set +a, depuis boomball/) ; les matchs du moteur 9
-sont archivés par le client. Le client en ligne n'est PAS redéployé depuis 2H.14 (mon feu vert, pas encore). 705 tests
-verts sur 35 fichiers, typecheck racine, scripts, e2e et client verts. Smoke 2D vert en 42 s sur 2H.26 ; sur 2H.25, playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu) et e2e:board3d vert en 6,4 min (CATCH capturé, le côté de la foule et le clip du coup d'envoi lus par le crochet), rien n'y a bougé depuis. SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE
+sont archivés par le client. Le client en ligne n'est PAS redéployé depuis 2H.14 (mon feu vert, pas encore). 708 tests
+verts sur 35 fichiers, typecheck racine, scripts, e2e et client verts, les deux fonctions bundlent (npm run build:function). Smoke 2D vert en 39,7 s sur 2H.27 (la section League affirmée, capture 02-lobby.png lue ; E2E Battery est Star, l'état grisé des paliers ne s'y voit pas) ; sur 2H.25, playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu) et e2e:board3d vert en 6,4 min (CATCH capturé, le côté de la foule et le clip du coup d'envoi lus par le crochet), rien n'y a bougé depuis. SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE
 CHAUFFER PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN. Le smoke échoue encore quand le
 match e2e atteint le round 10 pendant ses trois tours, le suivant ouvre un nouveau match : vu le
 16 à midi. Mes parties consignées : ab27b827, 7d631b71, cb618e32, c3867408 sont du moteur 9 et ne se
 rejouent plus avec le dépôt au moteur 10 (le rebond diffère). 2e30f587 n'est
-PAS à analyser. Tout jusqu'à 2H.25 est commité (eb7810b). 2H.26
-N'EST PAS COMMITÉE, c'est moi qui tape /commit : vérifier git status en premier et me le dire.
-Les fichiers de 2H.26 : client/src/match/announcer.ts (ANNOUNCER_CHANCE vidée), sound.ts (la
-coupure avant la recherche de ligne dans say), sound.test.ts (un test de plus), screens/Match.tsx
-(le commentaire de sayOf seulement), docs 00 (C27), 07 §10 (2H.26), 08 §5 (ligne 2H.26), et ce
-fichier. Les deux WAV d'annonceur sont dans boomball/assets/source/sounds/ (hors git, 39 Mo).
+PAS à analyser. Tout jusqu'à 2H.27 est commité (voir git log) : vérifier git status en premier
+et me le dire. Les fonctions de 2H.27 sont en ligne (v22, v20, moteur 10 inchangé) : le choix
+de ligue a effet en ligne, le client en ligne ne le montre pas encore (il est à 2H.14).
+Les fichiers de 2H.27 : engine/stats.ts (isTier, tierAllowed), supabase/functions/create-match
+et resolve-action (index.ts), client/src/lib/supabase.ts, screens/Lobby.tsx, screens/TeamHub.tsx,
+server/lobby.test.ts, e2e/smoke.spec.ts, docs 00 (C28), 07 §10 (2H.27), 08 §5 (ligne 2H.27), et
+ce fichier. Les deux WAV d'annonceur sont dans boomball/assets/source/sounds/ (hors git, 39 Mo).
+
+Ce que 2H.27 contient, en quatre phrases, détail en 00 C28 « comment 2H.27 est codée ». Le lobby
+a une section « League · your battery is Star » à trois boutons (data-league, data-selected,
+data-locked), le palier de la batterie sélectionné par défaut, les paliers en dessous jouables,
+ceux au-dessus grisés, disabled et suffixés « · 3 wins » ou « · 6 wins », une phrase dessous qui
+dit où les victoires comptent, et le header dit « Star battery · playing Rookie » en dessous.
+createMatch(teamId, seats, tier) envoie le choix ; create-match lit body.tier (absent = le Tier
+de la batterie, invalide ou au-dessus refusé par isTier et tierAllowed de engine/stats.ts) et le
+match porte le Tier joué. resolve-action lit matches.tier et recordResult lit teams.tier au
+sifflet final : record_team_win seulement si les deux sont égaux. Le hub dit « Once a level is
+reached, the lobby lets you play it again. Only wins at your own level climb the ladder ».
 
 Ce que 2H.26 contient, en trois phrases, détail en 00 C27 « comment 2H.26 est codée ». Toutes
 les chances de l'annonceur sont à 1 (ANNOUNCER_CHANCE est vide, le mécanisme reste) : un coup qui
@@ -242,16 +261,25 @@ le mode multijoueur ; annuler un match en cours et en sortir ; d'autres à voir.
 riggé (squelette et clips de course et de batte) se fait dans un autre chat, sous Blender : ne
 pas toucher au pantin ni à Tokens.tsx ici tant qu'il n'a pas livré son GLB.
 
-LA TÂCHE : MA PARTIE SUR 2H.26, PUIS C28.
-1. Vérifier git status et git diff --cached --stat avant toute chose ; 2H.26 doit avoir été
-   commitée par mon /commit ; sinon me le dire en premier, c'est moi qui le tape.
-2. Le moteur 10 est en ligne ; le client en ligne reste à 2H.14 tant que je ne dis pas de le
-   déployer (jamais le dépôt GitHub sur Vercel).
-3. Ma partie sur 2H.26 avec le son : l'annonceur à chaque coup sans cacophonie, le but qui le
-   coupe, et ce que je n'ai pas encore jugé de 2H.25 : la foule qui change avec la possession,
-   les répliques bien ou mal placées, CATCH et le miss du Spark, le rebond. Mes retours contre
-   le code avant de reformuler ; en chat, une ou deux questions par message ; 00 C28 et 08 §5
-   (ligne 2H.27) avant la première ligne de code.
+L'ORDRE DE LA SUITE, VALIDÉ PAR MOI LE 2026-10-16 AU SOIR : (1) mes trois fonctionnalités sans
+le multijoueur : la ligue au choix (2H.27, codée), puis annuler un match en cours et en sortir
+(à cadrer avec moi, touche la base donc une fonction ou une politique, feu vert à moi) ; (2) la
+phase 6 de 07 : la 3D par défaut, la 2D sous l'interrupteur, le budget d'images par seconde
+mesuré au harnais, le briefing ; (3) le client redéployé sur mon feu vert, par l'API Vercel,
+jamais le dépôt GitHub ; (4) la coop, phase 7 de 07, A10 d'abord (persist non atomique dans
+resolve-action), migration 0008 des invitations, lobby à plusieurs sièges ; (5) la phase 8, le
+déploiement pour un ami (deploy-vercel.mjs n'existe pas encore), /security-review par moi.
+
+LA TÂCHE : MA PARTIE SUR 2H.27, PUIS ANNULER ET QUITTER UN MATCH.
+1. Vérifier git status et git diff --cached --stat avant toute chose ; 2H.27 est commitée par
+   mon /commit du 16 au soir ; si quelque chose traîne, me le dire en premier.
+2. Le moteur 10 est en ligne, les fonctions de 2H.27 aussi (v22, v20) ; le client en ligne reste
+   à 2H.14 tant que je ne dis pas de le déployer (jamais le dépôt GitHub sur Vercel).
+3. Ma partie en dessous de mon palier : le compteur de victoires ne doit
+   pas bouger, et je dis si le lobby est clair. Puis la deuxième fonctionnalité, annuler et
+   quitter un match : me poser mes questions en chat, une ou deux par message (qui peut annuler,
+   que devient le match en base, compte-t-il comme une défaite, retour au hub), reformuler, 00
+   C29 et 08 §5 (ligne 2H.28) avant la première ligne de code.
 4. Une capture par changement d'écran, le smoke 2D relancé si Match.tsx, Feed.tsx ou Board.tsx
    bougent ; ni le son ni la foule ne se capturent : le crochet audio(), crowd(), lastSaid().
 5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
