@@ -875,9 +875,10 @@ function BoardOf({ view, ...props }: { view: '2d' | '3d' } & Parameters<typeof B
  */
 /**
  * The announcer's moment for a cue (2H.25, C26 5), or null when it says
- * nothing: hits, misses, Shoves and blasts are drawn against
- * `ANNOUNCER_CHANCE` inside `say`; knockouts and the Spark always. Goals and
- * Dashes are not commented (Jérôme, 2026-10-16): the goal has his recording.
+ * nothing. Every moment is said whenever the voice is free (2H.26, C27: « une
+ * systématiquement, mais qu'une »); `say` keeps one line at a time. Goals and
+ * Dashes are not commented (Jérôme, 2026-10-16): the goal has his recording,
+ * and still cuts whatever was being said.
  */
 function sayOf(cue: Cue, own: 'A' | 'B', mineId: string | null): AnnouncerCue | null {
   switch (cue.kind) {

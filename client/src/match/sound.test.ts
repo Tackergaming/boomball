@@ -369,4 +369,23 @@ describe('createSounds with a fake AudioContext (2H.25)', () => {
     expect(sounds.lastSaid).toBe('h2.mp3');
     sounds.dispose();
   });
+
+  it('a goal with no line of its own still cuts the line in progress (2H.26)', async () => {
+    const browser = fakeBrowser();
+    const sounds = createSounds({ storage: null, random: draws(0, 0, 0, 0) });
+    browser.gesture();
+    await settle();
+    const ctx = lastCtx!;
+
+    sounds.say('hit');
+    expect(sounds.lastSaid).toBe('h1.mp3');
+    // The fake names a clip by its path under `sounds/`.
+    expect(ctx.live('announcer/h1.mp3')).toHaveLength(1);
+
+    // `goalFoe` is empty in the real manifest (his "and it's a goal" recording speaks).
+    sounds.say('goalFoe');
+    expect(ctx.live('announcer/h1.mp3')).toHaveLength(0);
+    expect(sounds.lastSaid).toBe('h1.mp3');
+    sounds.dispose();
+  });
 });

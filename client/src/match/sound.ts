@@ -97,7 +97,8 @@ export interface Sounds {
    * `ANNOUNCER_LINES[cue]`, at random and never the one said last for that
    * cue when there is another. Dropped when muted, before the first gesture,
    * when the cue has no decoded line, or when another line still holds the
-   * floor, unless the cue is a goal or full time, which cut it.
+   * floor, unless the cue is a goal or full time, which cut it, even with no
+   * line of their own to say (2H.26).
    */
   say(cue: AnnouncerCue): void;
   /** The file of the last line that started, or null. Read by the screen harness, which cannot hear. */
@@ -866,15 +867,18 @@ export function createSounds(options: SoundOptions = {}): Sounds {
       if (disposed || !enabled || !engine) return;
       const { ctx, bus, lines } = engine;
       if (ctx.state !== 'running') return;
-      const decoded = (ANNOUNCER_LINES[cue] as readonly string[]).filter((file) => lines.has(file));
-      if (decoded.length === 0) return;
       const now = ctx.currentTime;
       const gate = admitCue(cue, now, busyUntil);
       if (gate === 'drop') return;
+      // A priority moment cuts the line in progress even when it has nothing
+      // of its own to say: a goal has no line since the 16th (his recording
+      // says it), yet nobody may talk over "and it's a goal" (2H.26, C27).
+      if (gate === 'cut') hush(ctx);
+      const decoded = (ANNOUNCER_LINES[cue] as readonly string[]).filter((file) => lines.has(file));
+      if (decoded.length === 0) return;
       const file = pickLine(decoded, lastByCue.get(cue) ?? null, random);
       const buffer = file === null ? undefined : lines.get(file);
       if (file === null || !buffer) return;
-      if (gate === 'cut') hush(ctx);
       try {
         const at = now + 0.005;
         const out = ctx.createGain();

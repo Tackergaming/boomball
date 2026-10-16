@@ -1835,3 +1835,23 @@ reste à 2H.14. Rien dans l'IA, **pas de sweep.**
 
 **Ce qui attend Jérôme** : relire la répartition des répliques (dans le chat et dans
 `announcer.ts`), `/commit`, puis sa partie avec le son sur le moteur 10 en ligne.
+
+### Sous-phase 2H.26, « l'annonceur systématique », codée le 2026-10-16, porte franchie le même soir (« tout est parfait »)
+
+Par le fil principal (Fable 5.1), seul, à partir de `00` C27 : le retour de Jérôme après sa
+partie sur 2H.25 avec le son, « il manque la plupart des sons sur les swing raté et réussi et
+les attaques d'opp », précisé en répliques d'annonceur, « une systématiquement, mais qu'une ».
+Rien dans le moteur ni dans l'IA, `ENGINE_VERSION` toujours 10, rien à redéployer, **pas de
+sweep.**
+
+| Quoi | État |
+|---|---|
+| La chance | `ANNOUNCER_CHANCE` vidée : coup, raté, Shove et Cracker (sa réponse : « ils passent aussi à systématique ») sont dits à chaque fois que la voix est libre ; le délai de 2,5 s, ou la durée du clip, fait seul le tri, trois attaques d'opportunité dans la seconde donnent une réplique |
+| Le but qui coupe | Bug trouvé en relisant `say` : les listes `goalOwn` et `goalFoe` étant vides depuis C26, le retour « aucune ligne » précédait la coupure, et une réplique parlait par-dessus « and it's a goal ». La coupure passe avant la recherche de ligne |
+| Tests | Un quinzième test dans `sound.test.ts` (un but sans ligne arrête la source en cours) ; **705 sur 35 fichiers contre 704** ; typecheck racine, scripts, e2e et client verts |
+| Harnais | Smoke 2D **vert en 42 s**, relancé parce que `Match.tsx` a bougé (un commentaire) |
+| Captures | Aucune : rien ne change à l'écran, le crochet `lastSaid()` lit l'annonceur |
+| Commit | Attend son `/commit` |
+
+**Sa partie, le même soir** : « tout est parfait ». Porte franchie, et il ouvre le point sur ce
+qu'il reste à faire.

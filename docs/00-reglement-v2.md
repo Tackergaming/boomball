@@ -2404,3 +2404,47 @@ son enregistrement `goal.mp3`, joué par l'échantillon `goal`. Les clés `goalO
 restent vides pour que le but coupe encore la réplique en cours. **Les fonctions sont
 redéployées le 2026-10-16 sur son feu vert : `resolve-action` v21, `create-match` v19, moteur
 10** ; smoke 2D vert en 40,6 s sur les fonctions redéployées, playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu).
+
+## C27. Décisions du 2026-10-16 après sa partie sur 2H.25, **sous-phase 2H.26, l'annonceur systématique**
+
+> Écrites par le fil principal (Fable 5.1) sur le retour de Jérôme en chat le 2026-10-16 après sa
+> partie avec le son sur le moteur 10 en ligne, et sa réponse à une question. Rien dans le
+> moteur, rien dans l'IA, `ENGINE_VERSION` reste 10, rien à redéployer, aucune constante de `00`
+> ne bouge.
+
+1. **Une réplique à chaque coup, mais une seule voix.** Ses mots : « il manque la plupart des
+   sons sur les swing raté et réussi et les attaques d'opp, mais attention à ne pas autoriser
+   que plusieurs se déclenchent si une est déjà en train de tourner », puis, à la question
+   bruitages ou annonceur : « je parlais des répliques de l'annonceur. j'en veux une
+   systématiquement, mais qu'une. comme ça s'il y a 3 att d'op en même temps ou dans la même
+   seconde ou deux, il n'y a qu'une réplique. ça évite la cacophonie. » Constat dans le code :
+   un coup qui touchait n'était commenté qu'à 30 %, un raté à 25 %, un Shove à 25 %, un Cracker à
+   50 % (`ANNOUNCER_CHANCE`), et même le tirage passé, la réplique était jetée si une autre
+   tournait ou avait démarré il y a moins de 2,5 s ; dans un round où les tours de l'IA
+   s'enchaînent toutes les deux secondes, la plupart des coups restaient muets. Le verrou « une
+   voix à la fois » existait déjà (une réplique en cours fait jeter la suivante, jamais de file
+   d'attente). Décidé : **toutes les chances passent à 1**, les coups de batte, les attaques
+   d'opportunité, le Shove et le Cracker compris (sa réponse : « ils passent aussi à
+   systématique ») ; le délai de 2,5 s, ou la durée du clip si elle est plus longue, fait seul
+   le tri, donc trois attaques d'opportunité dans la même seconde donnent une réplique, la
+   première arrivée. Le mécanisme de chance reste dans le code, table vide, pour le jour où un
+   moment redeviendrait bavard.
+2. **Le but coupe la réplique en cours, pour de vrai.** Constat du fil principal en relisant
+   `say` : depuis que les listes `goalOwn` et `goalFoe` sont vides (C26, son « and it's a goal »
+   suffit), `say` sortait sur « aucune ligne » avant d'arriver à la coupure, donc une réplique
+   lancée juste avant un but continuait de parler par-dessus son enregistrement, à l'inverse de
+   ce que C26 affirmait. Corrigé : la coupure se fait avant de chercher une ligne à dire, un
+   moment prioritaire sans ligne fait taire et ne dit rien. Le plancher du délai n'est pas remis
+   à zéro par la coupure : l'annonceur reste muet jusqu'à la fin de la fenêtre déjà ouverte,
+   pendant laquelle joue le son du but.
+
+**Comment 2H.26 est codée** (le 2026-10-16, fil principal Fable 5.1, aucun sous-agent : trois
+fichiers, quelques lignes). `announcer.ts` : `ANNOUNCER_CHANCE` est `{}`, `passesChance` lit 1
+pour tout moment ; `ANNOUNCER_COOLDOWN_MS` 2500 et `admitCue` inchangés. `sound.ts`, `say` :
+`admitCue` puis `hush` si la porte dit `cut`, **avant** le filtre des lignes décodées et le
+retour sur liste vide ; le reste inchangé. `sound.test.ts` : un quinzième test, « a goal with
+no line of its own still cuts the line in progress », qui dit `hit` puis `goalFoe` et affirme
+que la source de `h1` est arrêtée et `lastSaid` inchangé. `Match.tsx` : le commentaire de
+`sayOf` seulement. Le crochet ne bouge pas, `lastSaid()` suffit à lire ce que l'annonceur a
+dit. 705 tests sur 35 fichiers (704 avant), typecheck racine, scripts, e2e et client verts,
+smoke 2D vert en 42 s ; rien à redéployer.

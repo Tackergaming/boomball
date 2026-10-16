@@ -13,8 +13,11 @@
  * meanwhile is dropped, not queued, because a comment that arrives late is
  * about a moment already gone. The three moments that matter more than any
  * other (`ANNOUNCER_PRIORITY`: a goal either way, the final whistle) cut the
- * line in progress instead of waiting. And a frequent moment is only
- * commented some of the time (`ANNOUNCER_CHANCE`), drawn before anything else.
+ * line in progress instead of waiting. A moment may also be commented only
+ * some of the time (`ANNOUNCER_CHANCE`, drawn before anything else); since
+ * 2H.26 (`00` C27) no moment is, Jérôme wanting every bat and every Shove
+ * called, with the busy floor alone keeping three opportunity attacks in one
+ * second down to one line.
  *
  * This file is pure: no Web Audio, no fetch. `sound.ts` loads the clips and
  * plays them; the choices made here are tested in `sound.test.ts`.
@@ -39,7 +42,7 @@ export const ANNOUNCER_LINES = {
   // two and three calls, on 2026-10-16: one word, then the whistle does the job.
   kickoff: ['dragon-02-fight.mp3'],
   suddenDeath: ['dragon-15-sudden-death.mp3', 'dragon-12-death-round.mp3'],
-  // A bat lands on a Giff (one time in three, `ANNOUNCER_CHANCE`).
+  // A bat lands on a Giff, every time the floor is free (2H.26).
   hit: [
     'banter-01-ooh-that-s-gotta-hurt.mp3',
     'banter-05-oh-my-god-that-definitely.mp3',
@@ -105,17 +108,16 @@ export type AnnouncerCue = keyof typeof ANNOUNCER_LINES;
 
 /**
  * How often a moment is commented at all, from 0 to 1; 1 for any cue left out.
- * A frequent moment said every time would wear the lines out in one round: a
- * bat hit, for one, is meant to be commented about one time in three. `say`
- * draws first, before anything else, and drops the comment when the draw is
- * at or above the chance. Filled by the main thread with the manifest.
+ * `say` draws first, before anything else, and drops the comment when the draw
+ * is at or above the chance. 2H.25 had the bat at 0.3, the miss and the Shove
+ * at 0.25, the Cracker at 0.5; after his match Jérôme heard most swings go
+ * uncommented and asked for one line every time, « mais qu'une » (2H.26, `00`
+ * C27). So the table is empty: every moment is said whenever the floor is
+ * free, and the floor (`ANNOUNCER_COOLDOWN_MS`, the clip's own length) is what
+ * turns a burst of attacks into a single line. The mechanism stays for the
+ * day a moment proves too chatty again.
  */
-export const ANNOUNCER_CHANCE: Readonly<Partial<Record<AnnouncerCue, number>>> = {
-  hit: 0.3,
-  miss: 0.25,
-  shove: 0.25,
-  blast: 0.5,
-};
+export const ANNOUNCER_CHANCE: Readonly<Partial<Record<AnnouncerCue, number>>> = {};
 
 /**
  * The draw of `ANNOUNCER_CHANCE`: true when `cue` is to be commented this
