@@ -13,7 +13,7 @@
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.23
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.25
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15), §9 la
 parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 63, plus 40 bis,
@@ -41,43 +41,53 @@ synthétisé, le pantin en attendant un modèle riggé. C25 le lot du 2026-10-16
 sur 2H.22 (« tout me va », la foule baissée à 0,11) : la note « Default initiative · you go
 last » quand la popup de place expire, « Call for the ball » grisé pendant la popup, la passe
 gratuite dite dans le fil et dans match.md, la route sûre proposée au clic, la popup rebornée,
-et les fonctionnalités à venir. Chaque passe finit par « comment ... est
-codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de C12 à C25.
+et les fonctionnalités à venir. C26 le lot du 2026-10-16 après mes matchs sur 2H.23 et le Giff
+riggé (2H.24, close, « les animations sont parfaites ») : le Spark manqué (CATCH puis miss),
+L'ÉCART 64 (le rebond d'un tir manqué part de la bouche, jamais sous un joueur, MOTEUR 10), deux
+foules selon la possession, deux annonceurs (54 clips de mes deux packs). Chaque passe finit par
+« comment ... est codée », poids par poids, À LIRE avant de toucher à ai/. Ne rediscute rien de
+C12 à C26.
 07 §10 porte le journal, dont l'entrée 2H.15, qui dit fichier par fichier ce que la 2.5D
 contient, les entrées 2H.16 à 2H.20, la caméra et les gradins, 2H.21 et 2H.22, le jeu vivant.
 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep de 2H.8 à 2H.22.
 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
 
-Où on en est : 2H.16 à 2H.23 sont CODÉES (2H.23 le 2026-10-16), ENGINE_VERSION toujours 9,
-rien à redéployer côté fonctions, le client en ligne PAS redéployé depuis 2H.14 (mon feu vert, et
-j'ai dit le 16 : pas encore, il reste des changements d'interface en partie et hors partie). Les
-fonctions en ligne restent resolve-action v20 et create-match v18, moteur 9. 689 tests verts sur
-34 fichiers (683 avant 2H.23), typecheck racine, scripts, e2e et client verts. Le harnais 3D,
-npm run e2e:board3d, est vert en 6,5 minutes après 2H.23 sur un Vite dédié (5174). SUR UN VITE
-5174 QUI VIENT DE DÉMARRER, LE CHAUFFER PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN :
-à froid, global-setup.ts rate le champ Email en trente secondes et le run est rouge avant toute
-3D, vu deux fois le 15. Ce qu'il fait : bascule en 3D, silo entier capturé, cellToScreen par la
-caméra, clic à la souris sur la case qu'il désigne et le pion arrive, cadrage rapproché, glisser
-au bouton droit puis roulette, la case suivie se projette ailleurs, le bouton de cadrage la
-ramène, flèche droite tenue, le cadre passe en data-camera="free", « Follow the play » la ramène,
-chaque effet tiré par le crochet dont le mot SWING, le bandeau de but dit par le crochet, le
-bouton son lu (on, off, on), la note « Default initiative · you go last » dite par le crochet
-(capture notice-place), un round de l'IA en slow, retour 2D, zéro erreur console. Le smoke 2D
-(npm run e2e) est vert en 39 s après 2H.23, et le harnais affirme « Call for the ball » grisé à
-chaque popup de place. Ma partie sur le moteur 9 (ab27b827, Striker, 50-0), le match e2e
-7d631b71, ma partie sur 2H.18 (cb618e32, 30-20) et ma partie sur 2H.21 (c3867408, 40-50,
-rejouée sans écart encore le 16 avec le dump-match modifié) sont consignés dans docs/matches/.
-2e30f587 n'est PAS à analyser (ouverte pour une capture, laissée tourner sans jouer). Tout
-jusqu'à 2H.22 et sa correction est commité et poussé (dernier commit 4aec3f8). 2H.23 N'EST PAS
-COMMITÉE, c'est moi qui tape /commit : vérifier git status en premier et me le dire. ATTENTION,
-MON CHAT BLENDER TRAVAILLE DANS LA MÊME COPIE DE TRAVAIL : ses fichiers (Tokens.tsx, scene.ts,
-giffRig.ts, client/public/models/giff-rigged.glb, scripts/blender/, assets/source/README.md) ne
-sont pas à 2H.23, et quatre fichiers portent les deux lots à la fois (fxBridge.ts, testHook.ts,
-Board3D.tsx, e2e/board3d.spec.ts) : commiter quand les deux lots sont finis, ou par git add -p.
-Les fichiers de 2H.23 : sound.ts, useMatch.ts, Match.tsx, Feed.tsx et feed.test.ts, PlacePrompt.tsx
-et placePrompt.test.ts, Briefing.tsx, Board.tsx, Board3D.tsx, fxBridge.ts, testHook.ts,
-scripts/dump-match.ts, e2e/harness.ts, e2e/board3d.spec.ts, docs 00 (C24 note et C25), 07 §10,
-08 §5, et ce fichier.
+Où on en est : 2H.16 à 2H.25 sont CODÉES (2H.25 le 2026-10-16), ENGINE_VERSION 10, **MOTEUR 10 EN
+LIGNE depuis le 2026-10-16 sur mon feu vert : resolve-action v21, create-match v19** (npm run
+deploy:function après set -a && . ../.env && set +a, depuis boomball/) ; les matchs du moteur 9
+sont archivés par le client. Le client en ligne n'est PAS redéployé depuis 2H.14 (mon feu vert, pas encore). 704 tests
+verts sur 35 fichiers, typecheck racine, scripts, e2e et client verts. Smoke 2D vert en 40,6 s sur les fonctions redéployées (playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu)) ; e2e:board3d vert en 6,4 min (CATCH capturé, le côté de la foule et le clip du coup d'envoi lus par le crochet). SUR UN VITE 5174 QUI VIENT DE DÉMARRER, LE
+CHAUFFER PAR DEUX curl (la racine et /src/main.tsx) AVANT LE RUN. Le smoke échoue encore quand le
+match e2e atteint le round 10 pendant ses trois tours, le suivant ouvre un nouveau match : vu le
+16 à midi. Mes parties consignées : ab27b827, 7d631b71, cb618e32, c3867408 sont du moteur 9 et ne se
+rejouent plus avec le dépôt au moteur 10 (le rebond diffère). 2e30f587 n'est
+PAS à analyser. Tout jusqu'à 2H.23 et le Giff riggé est commité (74672c2, ffa4ae9). 2H.25
+N'EST PAS COMMITÉE, c'est moi qui tape /commit : vérifier git status en premier et me le dire.
+Les fichiers de 2H.25 : engine/constants.ts (10), engine/rules/payload.ts, engine/reduce.ts,
+engine/c26.test.ts, engine/c16.test.ts, client/src/match/motion.ts et motion.test.ts, sound.ts
+et sound.test.ts, announcer.ts (nouveau), testHook.ts, screens/Match.tsx, e2e/board3d.spec.ts,
+client/public/sounds/crowd-attack.mp3 et announcer/ (54 MP3, 2,5 Mo), assets/source/README.md,
+docs 00 (C26), 07 §10 (2H.24 et 2H.25), 08 §5, et ce fichier. Les deux WAV d'annonceur sont
+déplacés de context/import/ vers boomball/assets/source/sounds/ (hors git, 39 Mo).
+
+Ce que 2H.25 contient, en sept phrases, détail en 00 C26 « comment 2H.25 est codée ». Le mot
+CATCH monte au-dessus du Trajector à chaque tentative sur le Spark, puis « miss » et son son s'il
+rate. Écart 64 : un tir manqué rebondit depuis la case de bouche visée, d4 cases dans une
+direction au d8, arrêté à la dernière case libre, tournant depuis la face si bloqué, jamais sous
+un joueur (reboundLanding, reboundCell, nearestHatch dans rules/payload.ts, applyShoot),
+ENGINE_VERSION 10. La foule bascule en fondu croisé de 2 s selon la possession : crowd-attack.mp3
+(les vagues de crowd1) quand mon équipe a le ballon, crowd.mp3 sinon, rien quand il est au sol
+(Sounds.setCrowd, Match.tsx lit l'équipe du porteur). L'annonceur : announcer.ts porte vingt
+moments et leurs clips, une chance par moment (hit 0,3, miss 0,25, shove 0,25, dash 0,15, blast
+0,5), un tirage sans répéter la dernière, un délai de 2,5 s, les buts et la fin coupent ;
+Sounds.say(cue), lastSaid ; Match.tsx appelle say par repère 350 ms après le son, le round au
+sifflet, la fin de match en win, loss ou fullTime, « Select your champion » au premier tour,
+« Come on, do something! » à trente secondes. La répartition des clips est relue par moi le 16 : plus de
+commentaire de but (mon « and it's a goal » suffit), plus de Dash, plus d'appel des rounds 2 et
+3, « Fight » seul au coup d'envoi, et huit répliques retirées ; ce qui reste est dans
+announcer.ts. Le crochet a crowd(), lastSaid() et say(cue). Les hooks de
+Match.tsx restent au-dessus du retour anticipé sur state : un effet placé après a planté l'écran
+au harnais.
 
 Ce que 2H.23 contient, en six phrases, détail en 00 C25 « comment 2H.23 est codée ». La foule
 joue à 0,11 (AMBIENCE dans sound.ts). useMatch.expired vaut 'turn', 'place' ou null, jugé sur le
@@ -222,28 +232,20 @@ le mode multijoueur ; annuler un match en cours et en sortir ; d'autres à voir.
 riggé (squelette et clips de course et de batte) se fait dans un autre chat, sous Blender : ne
 pas toucher au pantin ni à Tokens.tsx ici tant qu'il n'a pas livré son GLB.
 
-LA TÂCHE : CE QUE JE DÉCIDE EN OUVRANT LE CHAT. Trois portes possibles, c'est moi qui choisis.
-(a) Les fonctionnalités à venir notées plus haut (le niveau de ligue au choix, le multijoueur,
-annuler et quitter un match), à cadrer une par une en chat avant toute ligne de code : la
-première est à moi de nommer. (b) Le Giff riggé quand mon chat Blender l'a livré : brancher ses
-clips dans la boucle de Board3D à la place du pantin, c'est une sous-phase à part, et c'est moi
-qui dis qu'il est livré. (c) Ma partie sur 2H.23 si j'en veux une, et ma relecture des deux
-phrases anglaises (la note du chrono et la passe gratuite).
-1. Vérifier git status et git diff --cached --stat avant toute chose ; 2H.23 doit avoir été
-   commitée par mon /commit, en séparant les fichiers du chat Blender ; sinon me le dire en
-   premier, c'est moi qui le tape.
-2. Lire mes retours contre le code et les captures avant de reformuler ; les reformuler en
-   chat, une ou deux questions par message si un choix est à moi ; les écrire en 00 (C26) et en
-   08 §5 (ligne 2H.24) avant la première ligne de code ; puis coder, sous-agents sur les
-   fichiers disjoints (Sonnet pour le borné, Opus 5.5 ou Fable 5.1 quand la qualité le réclame),
-   le fil principal sur Board3D.tsx et Match.tsx.
-3. Une capture par changement dans e2e/board3d.spec.ts ou e2e/smoke.spec.ts, lue, en sachant que
-   les effets courts sont figés sous le GL logiciel et que ni le son ni le pantin ne se capturent
-   (lire le DOM, la sonde probe, me demander le reste) ; le smoke 2D relancé si Match.tsx,
-   Feed.tsx ou Board.tsx bougent.
-4. Si je demande le client en ligne : le build est à refaire et à vérifier, le déploiement passe
-   par mon feu vert explicite, jamais le dépôt GitHub sur Vercel.
+LA TÂCHE : MA PARTIE SUR 2H.25, PUIS C27.
+1. Vérifier git status et git diff --cached --stat avant toute chose ; 2H.25 doit avoir été
+   commitée par mon /commit ; sinon me le dire en premier, c'est moi qui le tape.
+2. Le moteur 10 est en ligne ; le client en ligne reste à 2H.14 tant que je ne dis pas de le
+   déployer (jamais le dépôt GitHub sur Vercel).
+3. Ma partie sur 2H.25 avec le son : la foule qui change avec la possession, les deux
+   annonceurs (ce qui est bien placé, ce qui est de trop, ce qui manque, la fréquence), CATCH et
+   le miss du Spark, le rebond. Mes retours contre le code avant de reformuler ; en chat, une ou
+   deux questions par message ; 00 C27 et 08 §5 (ligne 2H.26) avant la première ligne de code.
+4. Une capture par changement d'écran, le smoke 2D relancé si Match.tsx, Feed.tsx ou Board.tsx
+   bougent ; ni le son ni la foule ne se capturent : le crochet audio(), crowd(), lastSaid().
 5. Un sweep seulement si je le demande, un seul par lot, contre 09 §12, seize minutes.
+6. Les fonctionnalités à venir (ligue au choix, multijoueur, annuler et quitter un match) restent
+   à cadrer avec moi, une par une.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -382,7 +384,8 @@ Ce qu'il faut savoir tout de suite.
     arenas.art et le champ art du spec nomment trois JPEG retirés ; substituteEntry et
     substitute_entry restent et ne sont plus lus ; le choix de direction d'un Breaker humain à la
     parade est automatique (gardé en C25 : le rendre à l'humain, c'est le moteur et un
-    redéploiement) ; le fil garde 120 événements (FEED_LIMIT) ; le Spark peut rebondir plusieurs
+    redéploiement) ; le fondu croisé des foules sans compensation de puissance ; le délai de
+    l'annonceur compté depuis le début du clip ; un seul annonceur à la fois ; le fil garde 120 événements (FEED_LIMIT) ; le Spark peut rebondir plusieurs
     rounds dans une poche du terrain ; le test du point 5 dans fifthPass.test.ts fait varier
     idleSwing en place et le remet ; plusieurs humains d'un même rôle (coop) n'ont pas de
     popup, à relire en phase 7 ; un gardien

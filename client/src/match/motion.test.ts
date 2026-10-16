@@ -289,7 +289,7 @@ describe('what a beat flashes (2H.21)', () => {
     expect(words[1]).toMatchObject({ at: path[0], after: 1 });
     expect(words[3]).toMatchObject({ unitId: A2.id, toward: { x: B.x, y: B.y } });
     expect(words[4]).toMatchObject({ unitId: A2.id, toward: { x: base.crackers[0]!.x, y: base.crackers[0]!.y } });
-    expect(Object.values(ACTION_WORDS)).toHaveLength(9);
+    expect(Object.values(ACTION_WORDS)).toHaveLength(10);
   });
 
   it('keeps a word up twice as long at normal as 2H.21 did, longer at slow, not at all at instant (2H.22)', () => {
@@ -353,10 +353,14 @@ describe('what a beat flashes (2H.21)', () => {
       { kind: 'evacuated', unitId: B.id, round: 4 },
       { kind: 'substituteEntered', unitId: B.id, round: 6, at: { x: 7, y: 22 } },
     ]);
-    expect(cues.map((c) => c.kind)).toEqual(['sparkIn', 'sparkCaught', 'exit', 'enter']);
+    expect(cues.map((c) => c.kind)).toEqual(['sparkIn', 'action', 'sparkCaught', 'action', 'miss', 'exit', 'enter']);
     expect(cues[0]!.at).toEqual({ x: 3, y: 20 });
-    expect(cues[1]).toMatchObject({ unitId: A.id, at: { x: A.x, y: A.y } });
-    expect(cues[3]).toMatchObject({ unitId: B.id, at: { x: 7, y: 22 } });
+    // 2H.25, C26 point 2: CATCH rises on every attempt, toward the Spark; the flash follows a catch, the grey miss a failure.
+    expect(cues[1]).toMatchObject({ kind: 'action', text: 'CATCH', unitId: A.id, toward: { x: 3, y: 20 } });
+    expect(cues[2]).toMatchObject({ unitId: A.id, at: { x: A.x, y: A.y } });
+    expect(cues[3]).toMatchObject({ kind: 'action', text: 'CATCH', unitId: A2.id });
+    expect(cues[4]).toMatchObject({ kind: 'miss', text: 'miss', unitId: A2.id });
+    expect(cues[6]).toMatchObject({ unitId: B.id, at: { x: 7, y: 22 } });
   });
 
   it('times a cue at the end of the steps before it, and at zero at instant', () => {

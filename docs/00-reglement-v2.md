@@ -2294,3 +2294,113 @@ quand la position bornée diffère, `placePrompt.test.ts`, trois tests ; une phr
 client verts, smoke 2D vert en 39,3 s, `e2e:board3d` vert en 6,5 min sur le Vite 5174 chauffé,
 captures lues : la popup avec « Call for the ball » grisé, la note « Default initiative · you go
 last » en 3D.
+
+## C26. Décisions du 2026-10-16 après sa partie sur 2H.23 et le Giff riggé, **sous-phase 2H.25, le son et le rebond**
+
+> Écrites par le fil principal (Fable 5.1) sur les retours de Jérôme en chat le 2026-10-16 après
+> ses matchs « après nos changements de son et d'animations 3D », et ses deux réponses à l'outil
+> de questions (le rebond depuis la bouche, crowd1 en attaque). Ses mots d'abord : « les
+> animations sont parfaites. rien à changer ». Le Giff riggé de son chat Blender (commit
+> `ffa4ae9`, sept clips, `giffRig.ts`, `rig_giff.py`) est donc **2H.24, close**, documentée dans
+> `07` §10 d'après le commit. **Un écart de règle, le 64, `ENGINE_VERSION` 10, les deux fonctions
+> à redéployer sur son feu vert.** Rien dans l'IA, aucune constante de `00` ne bouge.
+
+1. **Les animations, closes.** Rien à changer. Le pantin ne reste que pour un corps sans rig (la
+   capsule de repli).
+2. **Le Spark manqué se voit et s'entend.** Ses mots : « il manque le texte au-dessus de la tête
+   quand le trajector rate le ramassage du spark et le son ». Constat : `motion.ts` ne tirait
+   aucun repère d'un `sparkCaught` raté. Décidé, proposition du fil principal : le mot **CATCH**
+   monte au-dessus du Trajector à chaque tentative (dixième mot de `ACTION_WORDS`, visant la case
+   du Spark), puis le flash du Spark s'il réussit, ou **« miss »** en gris sur lui avec le son du
+   coup manqué s'il rate, exactement comme une batte dans le vide.
+3. **Écart 64, le rebond d'un tir manqué part de la bouche.** Ses mots : « après un tir au but,
+   la balle ne devrait jamais revenir directement dans les mains de celui qui a tiré. cette
+   trajectoire de rebond devrait être bannie. » Constat dans le code : depuis le moteur 1 un tir
+   manqué appelait `scatter` **depuis la case du tireur**, d4 cases dans une direction au d8, et
+   quand la première case était bloquée la balle restait sous ses pieds ; le commentaire disait
+   « rebondit sur la bouche », l'animation de 2H.21 aussi (le ballon repart de la bouche), le
+   code non. Décidé, son choix parmi trois : **le rebond part de la case de bouche visée** (la
+   plus proche du tireur, celle que `motion.ts` vise déjà), d4 cases dans une direction au d8,
+   arrêté à la dernière case libre (sol ouvert, personne dessus) ; si la balle ne peut pas
+   quitter la bouche dans cette direction, première case libre autour de la bouche en tournant
+   dans le sens horaire depuis la face tirée, comme l'écart 42 ; le tireur occupe sa case, donc
+   la balle n'y tombe jamais. Elle peut tomber à côté de lui, il a accepté cette option plutôt
+   que « toujours à deux cases au moins ». L'ancien `scatter` depuis le tireur ne sert plus que
+   si les huit cases autour de la bouche sont prises. Les dés se tirent dans le même ordre
+   (d4 puis d8), l'événement `payloadScattered` ne change pas de forme.
+4. **Deux foules selon la possession.** Ses mots : « changeons le son de la foule. nous avons 2
+   fichiers son de foules. l'un devrait être joué quand l'équipe humaine est en attaque, et
+   l'autre quand elle est en défense. ça permettra de la variété sonore. » Décidé, son choix :
+   **les vagues de `crowd1` quand son équipe a le ballon, le fond stable de `crowd2` quand elle
+   ne l'a pas** ; ballon au sol, le fond en cours continue ; bascule en fondu croisé d'environ
+   deux secondes ; même gain 0,11. La boucle d'attaque (`crowd-attack.mp3`, 40 s) est coupée
+   dans la première minute de `crowd1`, la seule stable (−15 à −18 dB, le reste du fichier
+   descend jusqu'à −36), fin fondue sur le début en 1,5 s, ramenée au niveau de `crowd2`.
+5. **Deux annonceurs.** Ses mots : « J'ai déposé 2 nouveaux fichiers dans import, ils
+   contiennent de nombreux commentaires et sons intéressants à prendre. intègre au jeu ceux qui
+   te paraissent bien. [...] fais en sorte que ce ne soit pas toujours le même commentaire pour
+   un swing réussi ou un joueur ko ». Les deux WAV de `context/import/` (`announcer-pack-banter-
+   man`, 2 min 08, et `announcer-pack-dragon`, 1 min 36) sont découpés aux silences par ffmpeg
+   et transcrits par whisper : **26 répliques d'un commentateur sarcastique et 28 mots d'une voix
+   de gorge de jeu de combat**, 54 clips MP3 dans `client/public/sounds/announcer/`, 2,5 Mo. Le
+   mécanisme : une catégorie par moment du match, un tirage au hasard parmi ses répliques sans
+   répéter la dernière, une chance par catégorie pour que les coups de batte ne soient pas tous
+   commentés, un délai de 2,5 s entre deux répliques et jamais deux à la fois, le but et la fin
+   de match coupant la réplique en cours. **La répartition des 54 clips est une proposition du
+   fil principal, à relire par Jérôme** ; elle est dans `client/src/match/announcer.ts` et
+   récapitulée dans le chat du 2026-10-16.
+
+**Ce que ces décisions rouvrent.** Le moteur dans `rules/payload.ts` (`reboundLanding`,
+`reboundCell`, `nearestHatch`) et `reduce.ts` (`applyShoot`) ; `ENGINE_VERSION` 10 ; le client
+dans `motion.ts`, `sound.ts`, `announcer.ts`, `screens/Match.tsx` ; le harnais. Les fonctions à
+redéployer sur le feu vert de Jérôme ; tant qu'elles sont au moteur 9, le harnais tourne avec la
+constante remise à 9 le temps du run. Pas de sweep : rien dans l'IA.
+
+**Comment 2H.25 est codée** (le 2026-10-16, fil principal Fable 5.1, un Sonnet sur `motion.ts`,
+un Opus 5.5 effort élevé sur `sound.ts` et `announcer.ts`). **Écart 64** : `reboundLanding(free,
+hatch, roll, cells)` dans `rules/payload.ts`, pure, roule `cells` pas depuis la bouche dans la
+face `roll` tant que la case est libre, sinon `dropLanding` en tournant depuis la face, `null` si
+rien ; `reboundCell` tire d4 puis d8 et lit le plateau (`isOccupiable` et personne dessus) ;
+`nearestHatch(furnace, from)` est la case de bouche que `motion.ts` vise déjà ; `applyShoot`
+appelle `reboundCell(arena, next, nearestHatch(...), rng) ?? scatter(...)` et log le même
+`payloadScattered` ; **`ENGINE_VERSION` 10**, le test de C16 accepte 9 ou plus ; `c26.test.ts`,
+six tests, dont quatre-vingts graines où aucun raté ne tombe sous le tireur ni sous personne et
+toujours à d4 de la bouche. **Le Spark** : `ACTION_WORDS.sparkCaught = 'CATCH'`, le cas
+`sparkCaught` de `motionAndCues` pose `action` vers la case du Spark puis `sparkCaught` ou
+`miss` ; `soundOf` mappe déjà `miss`. **Les foules** : `AMBIENCE.files = { attack:
+'crowd-attack.mp3', defence: 'crowd.mp3' }`, deux buffers, `Sounds.setCrowd(side)` et `crowd`,
+fondu croisé `CROWD_CROSSFADE` 2 s, côté retenu si le buffer n'est pas encore décodé ;
+`Match.tsx` lit `state.payload.carriedBy`, l'équipe du porteur, et appelle `setCrowd('attack')`
+quand c'est la sienne, `'defence'` sinon, rien quand le ballon est au sol. **L'annonceur** :
+`announcer.ts` porte `ANNOUNCER_LINES` (les clés sont le type `AnnouncerCue` : champion,
+kickoff, round2, round3, suddenDeath, hit, miss, knockout, knockoutOwn, shove, goalOwn, goalFoe,
+sparkIn, spark, dash, blast, clock, win, loss, fullTime), `ANNOUNCER_CHANCE` (hit 0,3, miss 0,25,
+shove 0,25, dash 0,15, blast 0,5, le reste 1), `ANNOUNCER_GAIN` 0,9, `ANNOUNCER_COOLDOWN_MS`
+2500, `ANNOUNCER_PRIORITY` (les buts, la fin, win, loss coupent), `pickLine` sans répéter la
+dernière, `admitCue`, `passesChance` ; `Sounds.say(cue)` joue la ligne décodée sur sa propre
+voix hors des douze des effets, `lastSaid` pour le harnais, `random` injectable dans
+`createSounds` ; `Match.tsx` : `sayOf(cue, own, mineId)` par repère, 350 ms après le son du
+moment (hit, miss et held, push, blast, goal par le camp qui encaisse, sparkIn, sparkCaught,
+exit avec `knockoutOwn` pour son pion, DASH), le round au sifflet plus 700 ms, la fin de match
+plus 1,2 s en win, loss ou fullTime, « Select your champion » au premier bandeau de tour du
+round 1, « Come on, do something! » une fois par tour à trente secondes. Les 54 clips sont
+`client/public/sounds/announcer/<voix>-<nn>-<mots>.mp3`, découpés par ffmpeg (silence sous
+−38 dB pendant 0,35 s) et nommés par whisper (modèle medium). **Le crochet** gagne `crowd()`,
+`lastSaid()` et `say(cue)` ; le spec 3D lit le côté de la foule, dit `kickoff` et affirme un des
+trois clips du coup d'envoi, et capture CATCH. **Les hooks de `Match.tsx` restent au-dessus du
+retour anticipé sur `state`** : un effet placé après a fait planter l'écran au harnais (« Rendered
+more hooks than during the previous render »), corrigé avant la fin du lot. 704 tests sur 35
+fichiers (689 avant), typecheck racine, scripts, e2e et client verts, smoke 2D vert en 31 s,
+vert en 6,4 min (CATCH capturé, le côté de la foule et le clip du coup d'envoi lus par le crochet). Les fonctions en ligne sont encore au moteur 9 : le harnais a tourné avec la
+constante remise à 9, remise à 10 avant le commit.
+
+**Ses décisions du même jour sur l'annonceur, et le moteur 10 en ligne.** Ses mots : « feu vert
+moteur 10 » et « retire les répliques suivantes ». Retirées : « Death match » et « First round »
+(le coup d'envoi ne garde que « Fight »), les appels des rounds 2 et 3, « Sticks and stones »,
+« Human Anatomy 101 », « The feeding tube », « Instant vegetable », le Dash entier (« The zerk »
+et « Killing frenzy » n'y sont plus, ils restent au Shove et au coup), « Rage fuel » partout, et
+**tout commentaire de but** : « on garde le son d'avant qui disait "and it's a goal" », c'est
+son enregistrement `goal.mp3`, joué par l'échantillon `goal`. Les clés `goalOwn` et `goalFoe`
+restent vides pour que le but coupe encore la réplique en cours. **Les fonctions sont
+redéployées le 2026-10-16 sur son feu vert : `resolve-action` v21, `create-match` v19, moteur
+10** ; smoke 2D vert en 40,6 s sur les fonctions redéployées, playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu).

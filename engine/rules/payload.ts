@@ -163,6 +163,65 @@ export function dropLanding(
   return { landing: from, direction: roll };
 }
 
+/**
+ * Where a missed shot comes to rest (écart 64, 2H.25, Jérôme on 2026-10-16: "la
+ * balle ne devrait jamais revenir directement dans les mains de celui qui a
+ * tiré"). Until engine 9 the ball scattered from the shooter's own cell, and
+ * when the first step was blocked it stayed under the shooter's feet: a miss
+ * that handed the ball straight back. The comment said "rebounds off the
+ * hatch"; now the code does. From the hatch cell the shot was aimed at, the
+ * ball rolls `cells` (a d4) in a direction rolled on a d8, and stops at the
+ * last cell it can lie on: open floor with nobody standing on it. When it
+ * cannot leave the hatch that way at all (the first cell is the edge, a crate
+ * or a player), the eight faces are tried clockwise from the rolled one, as a
+ * dropped ball does (écart 42), and the first free cell takes it. The shooter
+ * stands on its cell, so the ball never lands there. Null only when every
+ * cell around the hatch is taken, which no board of fourteen players
+ * produces; the caller then falls back to the old scatter.
+ *
+ * Pure in `reboundLanding` so the faces and the fallback are tested without a
+ * die; `reboundCell` rolls and reads the board.
+ */
+export function reboundLanding(
+  free: (p: Point) => boolean,
+  hatch: Point,
+  roll: number,
+  cells: number,
+): { landing: Point; direction: number } | null {
+  const step = directionFromD8(roll);
+  let landing: Point | null = null;
+  for (let i = 0; i < cells; i++) {
+    const from: Point = landing ?? hatch;
+    const next: Point = { x: from.x + step.x, y: from.y + step.y };
+    if (!free(next)) break;
+    landing = next;
+  }
+  if (landing) return { landing, direction: roll };
+  const around = dropLanding(free, hatch, roll);
+  return around.landing.x === hatch.x && around.landing.y === hatch.y ? null : around;
+}
+
+/** `reboundLanding` on a live board, the dice rolled in the order `scatter` rolls them. */
+export function reboundCell(
+  arena: Arena,
+  state: MatchState,
+  hatch: Point,
+  rng: Rng,
+): { landing: Point; cells: number; direction: number } | null {
+  const cells = rng.die(SCATTER_DIE);
+  const roll = rng.die(8);
+  const free = (p: Point): boolean => inBounds(p) && arena.isOccupiable(p) && !unitAt(state, p.x, p.y);
+  const landed = reboundLanding(free, hatch, roll, cells);
+  return landed ? { ...landed, cells } : null;
+}
+
+/** The hatch cell of `furnace` nearest to `from`: the one a shot from there is aimed at. */
+export function nearestHatch(furnace: Furnace, from: Point): Point {
+  let best = furnace.cells[0]!;
+  for (const cell of furnace.cells) if (distance(from, cell) < distance(from, best)) best = cell;
+  return best;
+}
+
 /** `dropLanding` on a live board: a cell is free when it is open floor with nobody standing on it. */
 export function dropCell(
   arena: Arena,

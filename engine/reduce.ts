@@ -63,6 +63,8 @@ import { cellKey, nearestFreeCell, takenOn } from './rules/placement.js';
 import {
   blockingBulwark,
   dropCell,
+  nearestHatch,
+  reboundCell,
   scatter,
   shotTarget,
   throwRange,
@@ -1077,8 +1079,15 @@ function applyShoot(ctx: TurnCtx): ReduceResult {
   }
 
   if (!outcome.hit) {
-    // A saved or wide shot rebounds off the hatch and stays in play.
-    const landed = scatter(arena, { x: unit.x, y: unit.y }, ctx.rng);
+    // A saved or wide shot rebounds off the hatch and stays in play. Since
+    // écart 64 (2H.25, Jérôme on 2026-10-16) it really does come off the
+    // hatch: a d4 of cells in a d8 direction from the hatch cell the shot was
+    // aimed at, never onto a player, the shooter included. Until engine 9 it
+    // scattered from the shooter's own cell and could stay under its feet.
+    // The old scatter is kept only for a hatch with no free cell around it.
+    const landed =
+      reboundCell(arena, next, nearestHatch(furnace, { x: unit.x, y: unit.y }), ctx.rng) ??
+      scatter(arena, { x: unit.x, y: unit.y }, ctx.rng);
     ctx.log.push({
       kind: 'payloadScattered',
       to: landed.landing,

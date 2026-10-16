@@ -87,6 +87,12 @@ export interface BoomballHook {
   dismissBeat(): void;
   /** Where the audio stands (2H.22): `waiting` before the first gesture, `running` after, `none` before the screen made it. */
   audio(): 'silent' | 'waiting' | 'running' | 'disposed' | 'none';
+  /** Which crowd loop is under the game (2H.25): `attack` when the player's team has the ball. */
+  crowd(): 'attack' | 'defence' | 'none';
+  /** The last announcer clip that started (2H.25), by file name, or null. */
+  lastSaid(): string | null;
+  /** Says a moment on request (2H.25), development only, so the harness can read `lastSaid`. */
+  say(cue: string): void;
   /** A Giff of the 3D scene (2H.22): its rotation, its height and the gesture on it; null in 2D or when unknown. */
   probe(unitId: string): { yaw: number; pitch: number; roll: number; y: number; gesture: string | null; clip: string | null } | null;
   /**

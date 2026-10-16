@@ -112,7 +112,9 @@ export interface Cue {
 
 /**
  * The word an action raises over its actor (2H.22, `00` C24 line 2): Jérôme's
- * seven, plus BAT and DODGE on his answer. The key is the event's kind.
+ * seven, plus BAT and DODGE on his answer, plus CATCH on the Trajector's
+ * attempt at the Spark (2H.25, `00` C26 point 2): ten words. The key is the
+ * event's kind.
  */
 export const ACTION_WORDS = {
   attacked: 'SWING',
@@ -124,6 +126,7 @@ export const ACTION_WORDS = {
   dashed: 'DASH',
   crackerBatted: 'BAT',
   dodging: 'DODGE',
+  sparkCaught: 'CATCH',
 } as const;
 
 /**
@@ -342,7 +345,10 @@ export function motionAndCues(
         cues.push({ kind: 'sparkIn', at: event.at, after: steps.length });
         break;
       case 'sparkCaught':
+        // 2H.25, `00` C26 point 2: CATCH rises on the attempt; a miss shows the grey word, like a missed swing.
+        action(event.unitId, 'sparkCaught', spark);
         if (event.caught) cueOn('sparkCaught', event.unitId);
+        else cueOn('miss', event.unitId, 'miss');
         break;
       case 'scored':
         // The shot's flight set `ball` on the hatch; the embers come when it lands.

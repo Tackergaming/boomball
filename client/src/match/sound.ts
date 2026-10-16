@@ -27,7 +27,30 @@
  * are squeezed rather than clipped. At most `MAX_VOICES` play at once; beyond
  * that a play is dropped, which on a busy round is kinder than a wall of noise.
  * Envelopes ramp to 0.0001, never to 0, which an exponential ramp cannot reach.
+ *
+ * Two crowds and an announcer (2H.25, `00` C26 points 4 and 5). « Changeons le
+ * son de la foule »: the crowd now follows the ball, a loop of waves while the
+ * player's team has it (`attack`) and the steady murmur otherwise (`defence`),
+ * crossfaded over two seconds when possession turns (`setCrowd`). And a voice
+ * comments the match (`say`), drawing from Jérôme's two announcer packs so that
+ * the same moment is not always met with the same line; what is said and when
+ * lives in `announcer.ts`. The announcer has a single voice of its own, outside
+ * the `MAX_VOICES` of the effects: it never speaks over itself, and a busy
+ * round of effects must not silence it on a goal.
  */
+
+import {
+  ANNOUNCER_CHANCE,
+  ANNOUNCER_COOLDOWN_MS,
+  ANNOUNCER_GAIN,
+  ANNOUNCER_LINES,
+  admitCue,
+  passesChance,
+  pickLine,
+  type AnnouncerCue,
+} from './announcer.js';
+
+export type { AnnouncerCue } from './announcer.js';
 
 export type SoundKind =
   | 'swing' // a bat whooshes (before it lands or misses)
@@ -59,9 +82,32 @@ export interface Sounds {
    * `dispose()`. Read by the screen harness, which cannot hear.
    */
   readonly state: 'silent' | 'waiting' | 'running' | 'disposed';
+  /**
+   * Which crowd plays: `attack` while the player's team has the ball, `defence`
+   * otherwise (2H.25, C26 point 4). A change crossfades over `CROWD_CROSSFADE`
+   * seconds; the same side again does nothing. Remembered before the first
+   * gesture, while muted, and while the side's loop is still decoding: the
+   * loop starts on that side as soon as it can.
+   */
+  setCrowd(side: CrowdSide): void;
+  /** The side set last; `defence` at first. */
+  readonly crowd: CrowdSide;
+  /**
+   * Comments a moment of the match (2H.25, C26 point 5): one decoded line of
+   * `ANNOUNCER_LINES[cue]`, at random and never the one said last for that
+   * cue when there is another. Dropped when muted, before the first gesture,
+   * when the cue has no decoded line, or when another line still holds the
+   * floor, unless the cue is a goal or full time, which cut it.
+   */
+  say(cue: AnnouncerCue): void;
+  /** The file of the last line that started, or null. Read by the screen harness, which cannot hear. */
+  readonly lastSaid: string | null;
   /** Removes the window listeners and closes the context, for unmount. */
   dispose(): void;
 }
+
+/** Who has the ball, as the crowd hears it: the player's team (`attack`) or not (`defence`). */
+export type CrowdSide = 'attack' | 'defence';
 
 /** The two storage calls used here, so a test can hand in a plain object. */
 export interface SoundStorage {
@@ -103,8 +149,24 @@ const SAMPLES: Partial<Record<SoundKind, { readonly file: string; readonly gain:
  * points clear of the MP3 encoder's padding at either end, which would click.
  * Gain 0.16 at first; Jérôme heard it a touch too loud on the 16th, so 0.11
  * (about three decibels lower).
+ *
+ * Since 2H.25 (C26 point 4) there are two loops, one per side of possession:
+ * `crowd-attack.mp3`, forty seconds of rising and falling waves for when the
+ * player's team has the ball, and the steady `crowd.mp3` above for when it has
+ * not. Same level, same trim at both ends.
  */
-const AMBIENCE = { file: 'crowd.mp3', gain: 0.11, trim: 0.06 } as const;
+const AMBIENCE = {
+  files: { attack: 'crowd-attack.mp3', defence: 'crowd.mp3' },
+  gain: 0.11,
+  trim: 0.06,
+} as const satisfies { files: Record<CrowdSide, string>; gain: number; trim: number };
+
+/** The first fade-in of the crowd, in seconds: when sound starts or comes back on. */
+const CROWD_FADE_IN = 1.5;
+/** The crossfade between the two crowds when possession turns, in seconds. */
+const CROWD_CROSSFADE = 2;
+/** How fast a line that is cut by a priority one fades out, in seconds: short, but not a click. */
+const ANNOUNCER_CUT = 0.05;
 
 // ---------------------------------------------------------------------------
 // The remembered toggle. Pure, and tested in `sound.test.ts`.
@@ -399,16 +461,84 @@ interface Engine {
   readonly noise: AudioBuffer;
   /** The recordings, by kind, once decoded. */
   readonly samples: Map<SoundKind, AudioBuffer>;
-  /** The crowd's loop once decoded, and its playing source while it plays. */
-  ambience: { buffer: AudioBuffer | null; source: AudioBufferSourceNode | null };
+  /** The announcer's clips, by file name, once decoded. */
+  readonly lines: Map<string, AudioBuffer>;
+  /** The two crowd loops once decoded, and what plays of them. */
+  readonly ambience: Ambience;
 }
 
-/** Starts the crowd under everything, if it is decoded and not already playing. */
-function startAmbience(engine: Engine): void {
-  const { ambience, ctx, bus } = engine;
-  if (!ambience.buffer || ambience.source) return;
+/** One crowd loop sounding: its source and its own gain, for the fades. */
+interface CrowdVoice {
+  readonly side: CrowdSide;
+  readonly source: AudioBufferSourceNode;
+  readonly gain: GainNode;
+}
+
+interface Ambience {
+  /** Each side's loop, once decoded. */
+  readonly buffers: Map<CrowdSide, AudioBuffer>;
+  /** The loop at full level, or rising to it. */
+  playing: CrowdVoice | null;
+  /** Loops on their way out after a crossfade, kept so a stop can cut them too. */
+  readonly fading: Set<CrowdVoice>;
+}
+
+/** Holds a gain where it stands now, so a new ramp starts from there and not from the last scheduled value. */
+function holdGain(param: AudioParam, now: number): void {
+  const value = Math.max(SILENT, param.value);
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(value, now);
+}
+
+/** Lets a loop go: down to silence in `fade` seconds, then stopped and unplugged. */
+function fadeOutCrowd(engine: Engine, voice: CrowdVoice, fade: number): void {
+  const { ctx, ambience } = engine;
+  ambience.fading.add(voice);
   try {
-    const buffer = ambience.buffer;
+    const now = ctx.currentTime;
+    holdGain(voice.gain.gain, now);
+    voice.gain.gain.exponentialRampToValueAtTime(SILENT, now + fade);
+    voice.source.onended = () => {
+      ambience.fading.delete(voice);
+      try {
+        voice.gain.disconnect();
+      } catch {
+        // Already gone with a closed context.
+      }
+    };
+    voice.source.stop(now + fade + 0.05);
+  } catch {
+    // A loop that will not fade: cut it.
+    ambience.fading.delete(voice);
+    cutCrowd(voice);
+  }
+}
+
+/** Stops one loop at once. */
+function cutCrowd(voice: CrowdVoice): void {
+  try {
+    voice.source.stop();
+    voice.source.disconnect();
+    voice.gain.disconnect();
+  } catch {
+    // Already stopped.
+  }
+}
+
+/**
+ * Brings the crowd to `side`, if that side's loop is decoded: nothing when it
+ * already plays, a fade-in of `CROWD_FADE_IN` from silence, or a crossfade of
+ * `CROWD_CROSSFADE` from the other side's loop. When the loop is not decoded
+ * yet, whatever plays goes on, and the caller asks again when it arrives.
+ */
+function syncAmbience(engine: Engine, side: CrowdSide): void {
+  const { ambience, ctx, bus } = engine;
+  if (ambience.playing?.side === side) return;
+  const buffer = ambience.buffers.get(side);
+  if (!buffer) return;
+  const old = ambience.playing;
+  const fade = old ? CROWD_CROSSFADE : CROWD_FADE_IN;
+  try {
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     src.loop = true;
@@ -416,55 +546,72 @@ function startAmbience(engine: Engine): void {
     src.loopEnd = Math.max(AMBIENCE.trim + 1, buffer.duration - AMBIENCE.trim);
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(SILENT, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(AMBIENCE.gain, ctx.currentTime + 1.5);
+    gain.gain.exponentialRampToValueAtTime(AMBIENCE.gain, ctx.currentTime + fade);
     src.connect(gain);
     gain.connect(bus);
     src.start(0, AMBIENCE.trim);
-    ambience.source = src;
+    ambience.playing = { side, source: src, gain };
   } catch {
-    // No crowd, then.
+    // No new crowd, then; the old one, if any, plays on.
+    return;
   }
+  if (old) fadeOutCrowd(engine, old, fade);
 }
 
-/** Stops the crowd, if it plays. The buffer stays for the next start. */
+/** Stops every crowd loop, playing or fading. The buffers stay for the next start. */
 function stopAmbience(engine: Engine): void {
   const { ambience } = engine;
-  if (!ambience.source) return;
-  try {
-    ambience.source.stop();
-    ambience.source.disconnect();
-  } catch {
-    // Already stopped.
-  }
-  ambience.source = null;
+  if (ambience.playing) cutCrowd(ambience.playing);
+  ambience.playing = null;
+  for (const voice of ambience.fading) cutCrowd(voice);
+  ambience.fading.clear();
+}
+
+/** Fetches one file under `public/sounds/` and decodes it; rejects on a missing file or a bad decode. */
+function fetchBuffer(engine: Engine, base: string, path: string): Promise<AudioBuffer> {
+  return fetch(`${base}sounds/${path}`)
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+    .then((bytes) => engine.ctx.decodeAudioData(bytes));
 }
 
 /**
- * Fetches and decodes the recordings into `engine.samples`. Each failure is
- * silent: that kind simply keeps its recipe. Called once the context runs,
- * never before, so no decode is attempted on a suspended context.
+ * Fetches and decodes the recordings into `engine.samples`, the two crowds
+ * into `engine.ambience.buffers` and the announcer's lines into
+ * `engine.lines`. Each failure is silent: that kind simply keeps its recipe,
+ * that crowd stays quiet, that line is never said. Called once the context
+ * runs, never before, so no decode is attempted on a suspended context.
+ * `onAmbience` is called each time a crowd loop arrives.
  */
 function loadSamples(engine: Engine, onAmbience: () => void): void {
   const base = (import.meta.env?.BASE_URL as string | undefined) ?? '/';
-  fetch(`${base}sounds/${AMBIENCE.file}`)
-    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-    .then((bytes) => engine.ctx.decodeAudioData(bytes))
-    .then((buffer) => {
-      engine.ambience.buffer = buffer;
-      onAmbience();
-    })
-    .catch(() => {
-      // Silence under the game, then.
-    });
+  for (const side of ['defence', 'attack'] as const) {
+    fetchBuffer(engine, base, AMBIENCE.files[side])
+      .then((buffer) => {
+        engine.ambience.buffers.set(side, buffer);
+        onAmbience();
+      })
+      .catch(() => {
+        // Silence under the game on that side, then.
+      });
+  }
   for (const [kind, sample] of Object.entries(SAMPLES) as [SoundKind, { file: string; gain: number }][]) {
-    fetch(`${base}sounds/${sample.file}`)
-      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-      .then((bytes) => engine.ctx.decodeAudioData(bytes))
+    fetchBuffer(engine, base, sample.file)
       .then((buffer) => {
         engine.samples.set(kind, buffer);
       })
       .catch(() => {
         // The recipe stays.
+      });
+  }
+  // One fetch per file, even if the manifest lists a file under two cues.
+  const files = new Set<string>(Object.values(ANNOUNCER_LINES as Readonly<Record<string, readonly string[]>>).flat());
+  for (const file of files) {
+    fetchBuffer(engine, base, `announcer/${file}`)
+      .then((buffer) => {
+        engine.lines.set(file, buffer);
+      })
+      .catch(() => {
+        // That line is never said.
       });
   }
 }
@@ -503,14 +650,25 @@ function buildEngine(Ctor: AudioContextCtor): Engine {
   const data = buffer.getChannelData(0);
   for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
 
-  return { ctx, bus: compressor, noise: buffer, samples: new Map(), ambience: { buffer: null, source: null } };
+  return {
+    ctx,
+    bus: compressor,
+    noise: buffer,
+    samples: new Map(),
+    lines: new Map(),
+    ambience: { buffers: new Map(), playing: null, fading: new Set() },
+  };
 }
 
 const GESTURES = ['pointerdown', 'pointerup', 'keydown', 'touchend'] as const;
 
-/** Silent stand-in where there is no Web Audio: it still remembers the toggle. */
+/**
+ * Silent stand-in where there is no Web Audio: it still remembers the toggle
+ * and the crowd's side, and says nothing (`lastSaid` stays null).
+ */
 function silentSounds(storage: SoundStorage | null): Sounds {
   let enabled = readSoundEnabled(storage);
+  let crowd: CrowdSide = 'defence';
   return {
     play() {},
     get enabled() {
@@ -523,16 +681,41 @@ function silentSounds(storage: SoundStorage | null): Sounds {
     get state() {
       return 'silent' as const;
     },
+    setCrowd(side) {
+      crowd = side;
+    },
+    get crowd() {
+      return crowd;
+    },
+    say() {},
+    get lastSaid() {
+      return null;
+    },
     dispose() {},
   };
 }
 
+/** What `createSounds` takes, both for tests. */
+export interface SoundOptions {
+  /** Where the toggle is remembered; the browser's localStorage by default, null for nowhere. */
+  readonly storage?: SoundStorage | null;
+  /** The announcer's dice, in [0, 1): `ANNOUNCER_CHANCE` and the choice of line. `Math.random` by default. */
+  readonly random?: () => number;
+}
+
+/** The line the announcer is saying: its source and its own voice gain, so a goal can cut it. */
+interface Speech {
+  readonly source: AudioBufferSourceNode;
+  readonly out: GainNode;
+}
+
 /**
- * The match's sounds. `storage` is for tests; the browser's localStorage by
- * default. Safe to call anywhere: it makes no AudioContext until a gesture.
+ * The match's sounds. The options are for tests. Safe to call anywhere: it
+ * makes no AudioContext until a gesture.
  */
-export function createSounds(options: { storage?: SoundStorage | null } = {}): Sounds {
+export function createSounds(options: SoundOptions = {}): Sounds {
   const storage = 'storage' in options ? (options.storage ?? null) : defaultStorage();
+  const random = options.random ?? Math.random;
   const Ctor = audioContextCtor();
   if (!Ctor) return silentSounds(storage);
   const ctor: AudioContextCtor = Ctor;
@@ -542,6 +725,31 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
   let disposed = false;
   let voices = 0;
   let listening = false;
+  let crowd: CrowdSide = 'defence';
+  /** The announcer: what it says now, until when it holds the floor, what it said last per cue and overall. */
+  let speech: Speech | null = null;
+  let busyUntil = 0;
+  const lastByCue = new Map<AnnouncerCue, string>();
+  let lastSaid: string | null = null;
+
+  /** Stops the line in progress, quickly faded so the cut does not click. */
+  const hush = (ctx: AudioContext) => {
+    if (!speech) return;
+    const { source, out } = speech;
+    speech = null;
+    try {
+      const now = ctx.currentTime;
+      holdGain(out.gain, now);
+      out.gain.exponentialRampToValueAtTime(SILENT, now + ANNOUNCER_CUT);
+      source.stop(now + ANNOUNCER_CUT + 0.01);
+    } catch {
+      try {
+        source.stop();
+      } catch {
+        // Already stopped.
+      }
+    }
+  };
 
   const unlisten = () => {
     if (!listening) return;
@@ -555,19 +763,20 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
       if (!engine) engine = buildEngine(ctor);
       const { ctx } = engine;
       const made = engine;
-      const crowd = () => {
-        if (enabled && !disposed) startAmbience(made);
+      // Each crowd loop that arrives is offered to the side in force at that moment.
+      const onCrowd = () => {
+        if (enabled && !disposed) syncAmbience(made, crowd);
       };
       if (ctx.state === 'running') {
         unlisten();
-        loadSamples(made, crowd);
+        loadSamples(made, onCrowd);
         return;
       }
       ctx.resume().then(
         () => {
           if (ctx.state === 'running') {
             unlisten();
-            loadSamples(made, crowd);
+            loadSamples(made, onCrowd);
           }
         },
         () => {
@@ -628,15 +837,72 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
     setEnabled(on) {
       enabled = on;
       writeSoundEnabled(on, storage);
-      // The crowd follows the switch at once; the effects follow it at their next play.
-      if (engine) {
-        if (on) startAmbience(engine);
-        else stopAmbience(engine);
+      // The crowd follows the switch at once, on the side in force; the effects
+      // follow it at their next play. Muting also silences the announcer mid-line.
+      if (engine && !disposed) {
+        if (on) syncAmbience(engine, crowd);
+        else {
+          stopAmbience(engine);
+          hush(engine.ctx);
+        }
       }
     },
     get state() {
       if (disposed) return 'disposed' as const;
       return engine && engine.ctx.state === 'running' ? ('running' as const) : ('waiting' as const);
+    },
+    setCrowd(side) {
+      if (side === crowd) return;
+      crowd = side;
+      // A loop not decoded yet starts on this side when it arrives (`onCrowd`).
+      if (engine && enabled && !disposed) syncAmbience(engine, side);
+    },
+    get crowd() {
+      return crowd;
+    },
+    say(cue) {
+      // The draw comes first: a moment not to be commented this time costs nothing more.
+      if (!passesChance(cue, random, ANNOUNCER_CHANCE)) return;
+      if (disposed || !enabled || !engine) return;
+      const { ctx, bus, lines } = engine;
+      if (ctx.state !== 'running') return;
+      const decoded = (ANNOUNCER_LINES[cue] as readonly string[]).filter((file) => lines.has(file));
+      if (decoded.length === 0) return;
+      const now = ctx.currentTime;
+      const gate = admitCue(cue, now, busyUntil);
+      if (gate === 'drop') return;
+      const file = pickLine(decoded, lastByCue.get(cue) ?? null, random);
+      const buffer = file === null ? undefined : lines.get(file);
+      if (file === null || !buffer) return;
+      if (gate === 'cut') hush(ctx);
+      try {
+        const at = now + 0.005;
+        const out = ctx.createGain();
+        out.gain.setValueAtTime(ANNOUNCER_GAIN, at);
+        out.connect(bus);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(out);
+        const mine: Speech = { source, out };
+        source.onended = () => {
+          if (speech === mine) speech = null;
+          try {
+            out.disconnect();
+          } catch {
+            // Already gone with a closed context.
+          }
+        };
+        source.start(at);
+        speech = mine;
+        busyUntil = at + Math.max(ANNOUNCER_COOLDOWN_MS / 1000, buffer.duration);
+        lastByCue.set(cue, file);
+        lastSaid = file;
+      } catch {
+        // A voice that failed to build: that comment is lost, the match goes on.
+      }
+    },
+    get lastSaid() {
+      return lastSaid;
     },
     dispose() {
       if (disposed) return;
@@ -644,6 +910,7 @@ export function createSounds(options: { storage?: SoundStorage | null } = {}): S
       unlisten();
       if (engine) {
         stopAmbience(engine);
+        hush(engine.ctx);
         engine.ctx.close().catch(() => {});
         engine = null;
       }

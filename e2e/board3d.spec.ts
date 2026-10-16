@@ -173,6 +173,8 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
     // 2H.22: the word of an action over its actor, twice as big, aimed at the
     // middle line so the puppet turns to it.
     { name: 'fx-action', request: { kind: 'action', x: stand.x, y: stand.y, text: 'SWING', unitId: stand.id }, after: 110 },
+    // 2H.25 (C26 2): the tenth word, over a Trajector reaching for the Spark.
+    { name: 'fx-catch', request: { kind: 'action', x: stand.x, y: stand.y, text: 'CATCH', unitId: stand.id }, after: 110 },
   ];
   for (const effect of effects) {
     expect(await fx({ ...effect.request, stretch: STRETCH }), `${effect.name} found a board`).toBe(true);
@@ -183,7 +185,8 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
     }
     await page.waitForTimeout(effect.after * STRETCH);
     await shots.take(effect.name);
-    if (effect.request.kind === 'action') {
+    // Only the swing has a clip to read; CATCH (2H.25) is a word alone.
+    if (effect.request.kind === 'action' && effect.request.text === 'SWING') {
       // The swing (2H.22, rigged in 2H.23): the Giff plays its Swing clip at
       // its target. Under software GL a capture cannot catch it (two captures
       // a second apart came back identical while the scene had turned), so the
@@ -247,6 +250,12 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   // now: Jérôme heard nothing on his first game because StrictMode's effect
   // rehearsal had disposed the instance, and the switch alone could not say.
   await page.waitForFunction(() => window.__boomball?.audio() === 'running', undefined, { timeout: 5_000 });
+  // 2H.25: the crowd under the game is one of the two loops, and the announcer
+  // says a line when asked: the clips are fetched and decoded, nothing is heard.
+  expect(['attack', 'defence']).toContain(await page.evaluate(() => window.__boomball!.crowd()));
+  await page.evaluate(() => window.__boomball!.say('kickoff'));
+  await page.waitForFunction(() => window.__boomball?.lastSaid() !== null, undefined, { timeout: 10_000 });
+  expect(await page.evaluate(() => window.__boomball!.lastSaid())).toMatch(/^dragon-(02|09|13)-/);
   // -- 2H.23: the clock notice of a place popup that ran out, said by the hook --
   // Reaching it for real means letting a popup stand two minutes; the hook
   // shows the same block, and the next action sent drops it.

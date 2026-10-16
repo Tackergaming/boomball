@@ -1791,3 +1791,47 @@ riggé sont dans son autre chat, sous Blender, **dans la même copie de travail*
 `/commit` quand le chat Blender a fini ou par `git add -p` sur les quatre fichiers partagés, et
 sa partie quand le Giff riggé sera dans le jeu. Les fonctionnalités à venir sont notées en `05`
 et en `00` C25.
+
+### Sous-phase 2H.24, « le Giff riggé », faite le 2026-10-16 dans un chat parallèle, close
+
+Par un autre chat de Jérôme, sous Blender, pendant que ce fil codait 2H.23 dans la même copie de
+travail ; documentée ici par le fil principal (Fable 5.1) d'après le commit `ffa4ae9`, parce que
+ce chat n'a rien écrit dans les docs. `scripts/blender/rig_giff.py` (Blender 5.2, sans fenêtre)
+construit depuis son GLB un squelette (jambes, hanches, colonne, poitrine, tête, un os `arms` qui
+porte les avant-bras et la batte) et sept clips joués sur place : Idle, Run (vitesse suivant la
+vitesse au sol du pion), Dash (décollage, vol tenu, atterrissage), Swing, Shove, Throw, Hit.
+`client/src/board3d/giffRig.ts` tient un mixeur par pion et mélange les clips par poids ;
+`Tokens.tsx` clone le maillage skinné par pion (`SkeletonUtils`) et enregistre le corps dans
+`link.bodies` ; la boucle de `Board3D.tsx` le pilote (`drive`, `play`, `dash`), et le pantin de
+2H.22 ne fait plus que tourner et pousser un corps riggé, le pantin entier restant pour la capsule
+de repli. La sonde `probe(unitId)` dit le clip qui pèse le plus, et le spec 3D affirme `Swing` au
+coup. Les sources (`giff-rigged.blend`, la vidéo des sept clips) sont dans `assets/source/models/`,
+hors git. **Close par Jérôme le même jour** : « les animations sont parfaites. rien à changer ».
+Dette : ses commentaires de code se nomment « 2H.23 », à corriger en 2H.24 à la prochaine passe
+sur ces fichiers.
+
+### Sous-phase 2H.25, « le son et le rebond », codée le 2026-10-16, porte ouverte
+
+Par le fil principal (Fable 5.1), avec un Sonnet (`motion.ts`) et un Opus 5.5 effort élevé
+(`sound.ts`, `announcer.ts`), à partir de `00` C26 : les retours de Jérôme après ses matchs sur
+2H.23 et le Giff riggé, et ses deux réponses à l'outil de questions. **Un écart de règle, le 64,
+`ENGINE_VERSION` 10 : les deux fonctions sont à redéployer sur son feu vert**, le client en ligne
+reste à 2H.14. Rien dans l'IA, **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| Le Spark manqué | CATCH au-dessus du Trajector à chaque tentative, « miss » et son son s'il rate (`motion.ts`, Sonnet) |
+| Écart 64 | Le rebond d'un tir manqué part de la case de bouche visée, d4 cases au d8, jamais sous un joueur, tournant depuis la face si bloqué (`reboundLanding`, `reboundCell`, `nearestHatch`, `applyShoot`) ; `ENGINE_VERSION` 10 ; `c26.test.ts` 6 tests |
+| Les foules | `crowd-attack.mp3` (40 s coupées dans la première minute de `crowd1`, ramenées au niveau de `crowd2`) quand son équipe a le ballon, `crowd.mp3` sinon, fondu croisé 2 s (`setCrowd`, Opus 5.5) |
+| L'annonceur | 54 clips découpés et transcrits des deux packs de `context/import/` ; vingt moments dans `announcer.ts`, tirage sans répétition, chance par moment, délai 2,5 s, les buts et la fin coupent ; `say`, `lastSaid` (Opus 5.5) ; branché par repère dans `Match.tsx`. **La répartition est une proposition à relire par Jérôme** |
+| Le crochet | `crowd()`, `lastSaid()`, `say(cue)` ; le spec 3D lit le côté de la foule, dit `kickoff` et lit le clip, capture CATCH |
+| Tests | **704 sur 35 fichiers contre 689** ; typecheck racine, scripts, e2e et client verts |
+| Harnais | Smoke 2D **vert en 31 s** sur le Vite 5174 (un run rouge avant, le match e2e arrivé au round 10 pendant ses trois tours, le suivant a ouvert un nouveau match) ; `e2e:board3d` vert en 6,4 min (CATCH capturé, le côté de la foule et le clip du coup d'envoi lus par le crochet) |
+| Captures lues | « CATCH » au-dessus du Giff en 3D ; le clip du coup d'envoi lu par le crochet |
+| Dette | Le fondu croisé des foules sans compensation de puissance (léger creux) ; le délai de l'annonceur part du début du clip ; le côté de foule change avant que la boucle soit décodée au tout premier échange ; un seul annonceur à la fois, pas de duo |
+| Ses coupes | « Death match », « First round », les rounds 2 et 3, « Sticks and stones », « Human Anatomy 101 », « The feeding tube », « Instant vegetable », le Dash, « Rage fuel », et tout commentaire de but (son « and it's a goal » suffit) |
+| En ligne | **`resolve-action` v21, `create-match` v19, moteur 10, déployées le 2026-10-16 sur son feu vert** ; smoke 2D vert en 40,6 s dessus, playthrough vert en 1,6 min jusqu'au sifflet (un premier run rouge juste après le déploiement, relancé, comme déjà vu) ; le client en ligne reste à 2H.14 |
+| Commit | Attend son `/commit` |
+
+**Ce qui attend Jérôme** : relire la répartition des répliques (dans le chat et dans
+`announcer.ts`), `/commit`, puis sa partie avec le son sur le moteur 10 en ligne.

@@ -340,6 +340,7 @@ describe('écart 63, the free pass after a Shove that took the ball (2H.14)', ()
   });
 
   it('is part of engine version 9', () => {
-    expect(ENGINE_VERSION).toBe(9);
+    // Engine 9 brought it; engine 10 (écart 64, 2H.25) keeps it.
+    expect(ENGINE_VERSION).toBeGreaterThanOrEqual(9);
   });
 });

@@ -31,8 +31,9 @@ import { Announce } from '../match/Announce.js';
 import { Banner, type Announcement } from '../match/Banner.js';
 import { Board } from '../match/Board.js';
 import { fxBridge } from '../match/fxBridge.js';
-import { FLOAT_MS } from '../match/motion.js';
-import { createSounds, readSoundEnabled, type SoundKind, type Sounds } from '../match/sound.js';
+import { FLOAT_MS, type Cue } from '../match/motion.js';
+import { createSounds, readSoundEnabled, type AnnouncerCue, type SoundKind, type Sounds } from '../match/sound.js';
+import { ANNOUNCER_LINES } from '../match/announcer.js';
 // The 2.5D board and the whole three.js stack come down only when asked for.
 const Board3D = lazy(() => import('../board3d/Board3D.js').then((m) => ({ default: m.Board3D })));
 import { projectCell } from '../board3d/projection.js';
@@ -133,15 +134,6 @@ export function Match({
     soundsRef.current?.setEnabled(next);
     setSoundOn(next);
   };
-  const motionForSound = match.motion;
-  useEffect(() => {
-    if (!motionForSound || motionForSound.speed === 'instant') return;
-    const timers = motionForSound.cues.flatMap((timed) => {
-      const kind = soundOf(timed.cue.kind, timed.cue.text);
-      return kind ? [setTimeout(() => soundsRef.current?.play(kind), timed.t)] : [];
-    });
-    return () => timers.forEach(clearTimeout);
-  }, [motionForSound]);
 
   const state = match.state;
   const replaying = match.replaying;
@@ -318,6 +310,11 @@ export function Match({
       dismissBeat: match.dismissBeat,
       // 2H.22: where the audio stands, since the harness cannot hear.
       audio: () => soundsRef.current?.state ?? 'none',
+      crowd: () => soundsRef.current?.crowd ?? 'none',
+      lastSaid: () => soundsRef.current?.lastSaid ?? null,
+      say: (cue) => {
+        if (cue in ANNOUNCER_LINES) soundsRef.current?.say(cue as AnnouncerCue);
+      },
       probe: (unitId) => fxBridge.probe?.(unitId) ?? null,
       // 2H.21: an effect on demand, so the harness captures each one on
       // purpose. The mounted board set `fxBridge.fire`; nothing else moves.
@@ -456,9 +453,20 @@ export function Match({
     if (!beat || speed === 'instant') return;
     // The whistles (2H.22): the round opens, the match ends. Both at the
     // beat's start, before anything travels.
+    const roundTimers: ReturnType<typeof setTimeout>[] = [];
     for (const event of beat.events) {
-      if (event.kind === 'roundStarted') soundsRef.current?.play('whistle');
-      else if (event.kind === 'matchEnded') soundsRef.current?.play('fullTime');
+      if (event.kind === 'roundStarted') {
+        soundsRef.current?.play('whistle');
+        // The announcer calls the round after the whistle (2H.25).
+        const cue: AnnouncerCue | null =
+          event.round === 1 ? 'kickoff' : event.round > MATCH_ROUNDS ? 'suddenDeath' : null;
+        if (cue) roundTimers.push(setTimeout(() => soundsRef.current?.say(cue), 700));
+      } else if (event.kind === 'matchEnded') {
+        soundsRef.current?.play('fullTime');
+        const winner = event.result.winner;
+        const cue: AnnouncerCue = winner === 'draw' ? 'fullTime' : winner === own ? 'win' : 'loss';
+        roundTimers.push(setTimeout(() => soundsRef.current?.say(cue), 1200));
+      }
     }
     const name = (id: string) => beat.state.units.find((u) => u.id === id)?.name ?? id;
     const side = (team: 'A' | 'B'): Announcement['tone'] => (team === own ? 'own' : 'foe');
@@ -509,10 +517,52 @@ export function Match({
   useEffect(() => {
     if (!turnBanner || !onClock || turnBannerShown.current === turnBanner) return;
     turnBannerShown.current = turnBanner;
+    // "Select your champion" on the first turn of the match (2H.25).
+    if (state?.round === 1) soundsRef.current?.say('champion');
     // What the replay still had to announce gives way: the board is the
     // player's now, and a queue of old news in front of "your turn" is noise.
     setBanners([{ kind: 'turn', text: `Your turn · ${onClock.name}`, tone: 'own', id: ++bannerId.current }]);
   }, [turnBanner, onClock]);
+
+  // Hooks below stay above the early return on `state`: a hook after it
+  // changes the hook count between renders, which React refuses.
+  const secondsLeft =
+    yours && !replaying && tookControl.current !== null
+      ? Math.min(TURN_TIMER_SECONDS, Math.max(0, TURN_TIMER_SECONDS - Math.floor((now - tookControl.current) / 1000)))
+      : null;
+  const motionForSound = match.motion;
+  useEffect(() => {
+    if (!motionForSound || motionForSound.speed === 'instant') return;
+    const timers = motionForSound.cues.flatMap((timed) => {
+      const kind = soundOf(timed.cue.kind, timed.cue.text);
+      // The announcer (2H.25, C26 5) speaks a beat after the sound of the moment.
+      const said = sayOf(timed.cue, own, mineId);
+      return [
+        ...(kind ? [setTimeout(() => soundsRef.current?.play(kind), timed.t)] : []),
+        ...(said ? [setTimeout(() => soundsRef.current?.say(said), timed.t + 350)] : []),
+      ];
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [motionForSound, own, mineId]);
+
+  // The crowd follows the ball (2H.25, C26 4, Jérôme: "changeons le son de la
+  // foule"): the surging loop while the player's team carries it, the steady
+  // one while the other team does; a loose ball keeps whichever was playing.
+  const carrierTeam = state?.payload.carriedBy
+    ? (state.units.find((u) => u.id === state.payload.carriedBy)?.team ?? null)
+    : null;
+  useEffect(() => {
+    if (!carrierTeam) return;
+    soundsRef.current?.setCrowd(carrierTeam === own ? 'attack' : 'defence');
+  }, [carrierTeam, own]);
+  // "Come on, do something!" once per turn, when the player's clock reaches
+  // thirty seconds (2H.25). Keyed like the banner so a re-render says it once.
+  const clockNagged = useRef<string | null>(null);
+  useEffect(() => {
+    if (!turnBanner || secondsLeft === null || secondsLeft > 30 || clockNagged.current === turnBanner) return;
+    clockNagged.current = turnBanner;
+    soundsRef.current?.say('clock');
+  }, [turnBanner, secondsLeft]);
 
   if (!state) {
     return (
@@ -823,6 +873,37 @@ function BoardOf({ view, ...props }: { view: '2d' | '3d' } & Parameters<typeof B
  * already cracked. Shove, Disengage and Dodge have no sound of their own
  * either: the Shove's thud is the `push` or `held` cue that follows.
  */
+/**
+ * The announcer's moment for a cue (2H.25, C26 5), or null when it says
+ * nothing: hits, misses, Shoves and blasts are drawn against
+ * `ANNOUNCER_CHANCE` inside `say`; knockouts and the Spark always. Goals and
+ * Dashes are not commented (Jérôme, 2026-10-16): the goal has his recording.
+ */
+function sayOf(cue: Cue, own: 'A' | 'B', mineId: string | null): AnnouncerCue | null {
+  switch (cue.kind) {
+    case 'hit':
+      return 'hit';
+    case 'miss':
+    case 'held':
+      return 'miss';
+    case 'push':
+      return 'shove';
+    case 'blast':
+      return 'blast';
+    case 'goal':
+      // The cue's team is the side that conceded.
+      return cue.team === own ? 'goalFoe' : 'goalOwn';
+    case 'sparkIn':
+      return 'sparkIn';
+    case 'sparkCaught':
+      return 'spark';
+    case 'exit':
+      return cue.unitId && cue.unitId === mineId ? 'knockoutOwn' : 'knockout';
+    default:
+      return null;
+  }
+}
+
 function soundOf(kind: string, text: string | undefined): SoundKind | null {
   switch (kind) {
     case 'action':
