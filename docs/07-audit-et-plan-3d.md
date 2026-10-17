@@ -2079,4 +2079,6 @@ reste 11, **rien à redéployer côté fonctions** ; pas de sweep.
 | En ligne | **Le client redéployé le 2026-10-17 soir sur son feu vert** (`dpl_8p89A6GvVMT6qYde22cw4jU1Qg7s`, 83 fichiers, 12,1 Mo, le bundle servi est celui du build) |
 | Dette | `Match.tsx` appelle `onFinished` à chaque rendu une fois la phase finie (plusieurs `refresh()` en vol, sans effet visible) |
 
-**Ce qui attend Jérôme** : sa partie à deux avec une revanche, en ligne, puis la phase 8.
+**Porte franchie le soir même** : sa partie à deux avec une revanche, en ligne (« parfait le bug est
+corrigé »). **Ce qui suit** : la phase 8, le déploiement pour un ami, à cadrer en chat ; et, plus
+tard, à sa demande, une revue de l'interface des matchs comme celle du hub et du lobby.

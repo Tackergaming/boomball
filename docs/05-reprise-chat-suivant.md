@@ -154,8 +154,14 @@ passante Hobby (100 Go par mois, 13 Mo par premier chargement plus 200 Ko de fon
 crée un compte, et DEUX TROUS à cadrer avec moi avant qu'un ami ne joue : pas de « mot de passe
 oublié » ni de changement de mot de passe dans le jeu ; /security-review par moi.
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; MA PARTIE À DEUX sur le client en ligne et mes
-retours ; puis cadrer la phase 8 avec moi, questions en chat, une ou deux par message.
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire (tout est commité et poussé au 17 au soir) ;
+puis **CADRER LA PHASE 8 AVEC MOI**, questions en chat, une ou deux par message, en commençant par
+les deux trous (mot de passe oublié, changement de mot de passe), puis `site_url`, la bande
+passante, le parcours d'un ami qui crée un compte, et ma /security-review (les trois canaux
+Realtime publics y passent). **À SAVOIR POUR PLUS TARD, PAS MAINTENANT : je veux aussi revoir
+l'interface des matchs à un moment donné**, comme on a refait le hub et le lobby en 2H.34
+(maquette cliquable d'abord, puis GO) ; ne l'ouvre pas de toi-même, attends que je le demande,
+mais garde-le en tête quand la phase 8 touche l'écran de match.
 
 Ce qu'il faut savoir tout de suite.
 
