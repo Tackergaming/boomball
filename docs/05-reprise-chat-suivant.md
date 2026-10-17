@@ -1,7 +1,8 @@
 # Prompt de reprise pour le chat suivant
 
-> Récrit le 2026-10-17 par le fil principal (Fable 5.1) à la fin du chat de l'interface d'équipe
-> (2H.34, `00` C33), qui a suivi la coop (2H.31 à 2H.33, `00` C32). Tout ce qui précède est dans
+> Récrit le 2026-10-17 au soir par le fil principal (Fable 5.1) à la fin du chat de l'interface
+> d'équipe (2H.34, `00` C33) et de la limite de présence (2H.35, `00` C34), qui a suivi la coop
+> (2H.31 à 2H.33, `00` C32). Jérôme a franchi la porte de 2H.35 (« parfait le bug est corrigé »). Tout ce qui précède est dans
 > `07` §10, `08` §5 et `00` C1 à C33. À coller tel quel au début du chat suivant.
 
 ---
@@ -32,7 +33,8 @@ retours de ma seconde partie à deux** : la revanche s'ouvrait sans l'invité pa
 messages de présence en cinquante millisecondes faisaient fermer le canal du lobby par le serveur
 (« Client presence rate limit exceeded ») ; `track()` est lissé à un message par demi-seconde, un
 canal fermé est rouvert, le profil ne clignote plus à la relecture, et le bouton du coéquipier dit
-« Click here when you're ready » en grand. Ne rediscute rien de C12 à C34.
+« Click here when you're ready » en grand. **Sa partie à deux avec revanche a franchi la porte le
+soir même** (« parfait le bug est corrigé »). Ne rediscute rien de C12 à C34.
 07 §10 porte le journal (2H.15 la 2.5D fichier par fichier, 2H.16 à 2H.20 la caméra, 2H.21 et
 2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31,
 2H.32, 2H.33, 2H.34, 2H.35). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de
@@ -50,7 +52,8 @@ lecture avant et après, consignée en 04) : les trois messages SQL de 0011 en �
 propriétaire listé une fois par `battery_members` ; `mergeRoll` côté client est devenu inutile,
 à retirer à la prochaine passe sur `roll.ts`. **LE
 CLIENT EN LIGNE (https://boomball.vercel.app) EST CELUI DE 2H.34, REDÉPLOYÉ LE 2026-10-17 SUR MON
-FEU VERT, PUIS CELUI DE 2H.35, REDÉPLOYÉ LE SOIR MÊME SUR MON FEU VERT** (`dpl_56jFmrpJqYmRtyzz4BQZZaYJUnea`, 83 fichiers, 12,1 Mo plus le fond de 198 Ko servi
+FEU VERT, PUIS CELUI DE 2H.35, REDÉPLOYÉ LE SOIR MÊME SUR MON FEU VERT, ET VALIDÉ PAR MA PARTIE
+À DEUX AVEC REVANCHE** (`dpl_56jFmrpJqYmRtyzz4BQZZaYJUnea`, 83 fichiers, 12,1 Mo plus le fond de 198 Ko servi
 en 200) : la coop et la nouvelle interface sont en ligne ; le smoke lancé contre l'URL en ligne
 passe la connexion, le hub, le lobby et atteint le plateau, puis s'arrête sur le crochet
 `window.__boomball`, absent d'un build par construction (ce n'est pas un défaut). Un redéploiement
@@ -145,9 +148,8 @@ l'abandon (migration 0008), 2H.27 la ligue au choix, 2H.25 et 2H.26 le rebond et
 2H.21 à 2H.24 le jeu vivant et le Giff riggé, 2H.16 à 2H.20 la caméra, 2H.15 la 2.5D.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (4) FAITS (ligue et abandon, phase 6, client en
-ligne, coop) ; (4 bis) **2H.34 l'interface d'équipe, CODÉE** ; (5) commit `dbdfd69` et client redéployé, FAITS le 17 ; **MA PARTIE À DEUX** (un ami, ou le
-second compte e2e dans une fenêtre privée) sur la nouvelle interface, et mes retours ; (6) la
-phase 8, le déploiement pour un ami : le script existe, restent `site_url` de l'Auth, la bande
+ligne, coop) ; (4 bis) **2H.34 l'interface d'équipe, CODÉE** ; (5) commit `dbdfd69` et client redéployé, FAITS le 17 ; ma partie à deux avec revanche, FAITE,
+porte franchie ; (6) **LA PHASE 8, LE DÉPLOIEMENT POUR UN AMI, C'EST LÀ QU'ON EST** : le script existe, restent `site_url` de l'Auth, la bande
 passante Hobby (100 Go par mois, 13 Mo par premier chargement plus 200 Ko de fond), un ami qui
 crée un compte, et DEUX TROUS à cadrer avec moi avant qu'un ami ne joue : pas de « mot de passe
 oublié » ni de changement de mot de passe dans le jeu ; /security-review par moi.
