@@ -287,11 +287,16 @@ function roleBlock(state: MatchState, index: number): number[] {
 /**
  * Whether the ladder, about to open the turn at `index`, must first ask a
  * human its place in its role (écart 58, Jérôme on 2026-10-12): the slot is
- * the first turn of a Striker or Breaker block that holds exactly one human,
- * who has not chosen this round, and at least two units of the block are
- * still on the field. Returns the human and the number of places, or null.
- * Two or three humans of one role (the coop, phase 7) keep the order of
- * écart 55 and their kick-off d20: no popup.
+ * the first turn of a Striker or Breaker block that holds a human who has
+ * not chosen this round, and at least two places are on offer. Returns the
+ * human and the number of places, or null.
+ *
+ * **Several humans of one role (écart 65, 2H.33, Jérôme on 2026-10-17):**
+ * the first of them at the kick-off d20 is asked, and the others take the
+ * places right behind it (`placeHumans`), so the places on offer are those
+ * that leave room behind: the active units of the block minus the other
+ * humans. Three Strikers with two humans: first or second. Two Breakers both
+ * human, or three Strikers all human: one order only, no popup.
  */
 export function placementAt(state: MatchState, index: number): { unitId: string; places: number } | null {
   const block = roleBlock(state, index);
@@ -302,14 +307,49 @@ export function placementAt(state: MatchState, index: number): { unitId: string;
     return { slot, unit: state.units.find((u) => u.id === id)! };
   });
   if (!PLACE_ROLES.includes(units[0]!.unit.role)) return null;
-  const humans = units.filter((u) => isHuman(u.unit));
-  if (humans.length !== 1) return null;
-  const human = humans[0]!;
-  if (human.slot.placed || human.unit.status !== 'active') return null;
+  // In block order, which is the d20 order for humans (`teamSlots`).
+  const humans = units.filter((u) => isHuman(u.unit) && u.unit.status === 'active');
+  if (humans.length === 0) return null;
+  const first = humans[0]!;
+  if (first.slot.placed) return null;
   // Only before the block has begun: nobody of it is behind the cursor.
   if (block[0]! < index && units.slice(0, block.indexOf(index)).some((u) => u.unit.status === 'active')) return null;
-  const places = units.filter((u) => u.unit.status === 'active').length;
-  return places >= 2 ? { unitId: human.unit.id, places } : null;
+  const active = units.filter((u) => u.unit.status === 'active').length;
+  const places = active - (humans.length - 1);
+  return places >= 2 ? { unitId: first.unit.id, places } : null;
+}
+
+/**
+ * Écart 65: the first human placed at `place` of its role block, as
+ * `placeHuman` does, then every other active human of the block moved to
+ * right behind it, in their d20 order, all marked as placed. With one human
+ * this is `placeHuman`.
+ */
+export function placeHumans(state: MatchState, index: number, unitId: string, place: number, mark = true): TurnSlot[] {
+  const unitOf = (slot: TurnSlot): Unit | null =>
+    slot.actor.kind === 'unit' ? state.units.find((u) => u.id === (slot.actor as { unitId: string }).unitId) ?? null : null;
+  const others = roleBlock(state, index)
+    .map((i) => state.turnOrder[i]!)
+    .filter((slot) => {
+      const unit = unitOf(slot);
+      return unit !== null && unit.id !== unitId && isHuman(unit) && unit.status === 'active';
+    })
+    .map((slot) => (slot.actor as { unitId: string }).unitId);
+
+  let order = placeHuman(state, index, unitId, place, mark);
+  let after = order.findIndex((s) => s.actor.kind === 'unit' && s.actor.unitId === unitId);
+  if (after < 0) return order;
+  for (const id of others) {
+    const at = order.findIndex((s) => s.actor.kind === 'unit' && s.actor.unitId === id);
+    if (at < 0) continue;
+    const slot: TurnSlot = mark ? { ...order[at]!, placed: true } : order[at]!;
+    const without = order.filter((_, i) => i !== at);
+    // Removing a slot before the anchor shifts the anchor back by one.
+    const insertAt = at < after ? after : after + 1;
+    order = [...without.slice(0, insertAt), slot, ...without.slice(insertAt)];
+    after = insertAt;
+  }
+  return order.map((s, i) => ({ ...s, rank: i + 1 }));
 }
 
 /**

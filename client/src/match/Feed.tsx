@@ -258,6 +258,9 @@ function describe(event: MatchEvent, name: (id: string) => string, free = false)
       return `${name(event.unitId)} plays ${['first', 'second', 'third'][event.place - 1] ?? `number ${event.place}`} of the role this round.`;
     case 'substituteEntered':
       return `${name(event.unitId)} comes on.`;
+    case 'seatYielded':
+      // 2H.33: a team-mate handed the Giff to the house for the rest of the match.
+      return `${name(event.unitId)} is handed to the house for the rest of the match.`;
     case 'scored':
       return `◆ ${event.team === 'A' ? 'Your battery' : 'The house'} scores ${event.points}.`;
     case 'matchEnded':

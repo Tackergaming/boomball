@@ -100,6 +100,16 @@ export interface ChoosePlaceAction {
   readonly place: number;
 }
 
+/**
+ * A human hands its Giff to the house for the rest of the match (2H.33, `00`
+ * C32 point 6, engine version 11). The one action that is not a turn action:
+ * it is accepted at any moment, from the unit's own controller, and the unit
+ * is driven by the AI from then on. Never offered by `legalActions`.
+ */
+export interface YieldSeatAction {
+  readonly kind: 'yieldSeat';
+}
+
 export type Action =
   | MoveAction
   | DashAction
@@ -114,6 +124,7 @@ export type Action =
   | ShootAction
   | BraceAction
   | ChoosePlaceAction
+  | YieldSeatAction
   | EndTurnAction;
 
 export type ActionKind = Action['kind'];

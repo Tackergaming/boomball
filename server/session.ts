@@ -111,6 +111,25 @@ export function submitAction(
   const { state } = session;
 
   if (state.phase === 'finished') return { ok: false, reason: 'the match is over' };
+
+  // A seat handed to the house (2H.33, engine 11) is the one request that
+  // need not wait for the unit's turn: the caller must control the unit, the
+  // engine switches it to the AI, and the AI plays on from wherever the
+  // ladder stands, the yielded unit's own turn included.
+  if (request.action.kind === 'yieldSeat') {
+    const unit = state.units.find((u) => u.id === request.unitId);
+    if (!unit) return { ok: false, reason: `no unit with id ${request.unitId}` };
+    if (unit.controller.kind !== 'human' || unit.controller.humanId !== request.humanId) {
+      return { ok: false, reason: `${request.humanId} does not control ${request.unitId}` };
+    }
+    const result = reduce(arena, state, { unitId: request.unitId, action: request.action });
+    if (!result.ok) return { ok: false, reason: result.reason };
+    return {
+      ok: true,
+      step: advance(arena, { ...session, state: result.state }, [...result.events], now, orders, clockKey(state)),
+    };
+  }
+
   if (!state.turn) return { ok: false, reason: 'no turn is open' };
 
   if (state.turn.unitId !== request.unitId) {

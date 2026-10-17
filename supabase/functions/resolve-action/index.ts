@@ -42,6 +42,7 @@ import { Arena } from '../../../engine/arena.ts';
 import type { Action } from '../../../engine/actions.ts';
 import type { MatchState } from '../../../engine/types.ts';
 import { toArenaSpec } from '../../../server/arenaRow.ts';
+import { isMovedOn, matchColumns, MOVED_ON } from '../../../server/persist.ts';
 import {
   engineVersionRefusal,
   serveAction,
@@ -207,7 +208,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const standingOrders = orders.filter(
     (order) => !(order.kind === 'callForPass' && opened.has(order.receiverId) && !added.includes(order)),
   );
-  await persist(db, matchId, snapshot.seq, step, step.events, standingOrders);
+  // One transaction, one round trip (2H.31, audit line A10). A step that lost
+  // the race to another client's step is refused here, before anything else
+  // is written or broadcast: the loser reads the board again and plays from it.
+  const written = await persist(db, matchId, snapshot.seq, step, standingOrders, now);
+  if (!written.ok) return refuse(written.reason, written.status);
   await recordResult(db, match.team_id as string, match.tier as string, state, step.session.state);
 
   // Realtime carries the same batch the caller gets back, so the other two
@@ -292,51 +297,35 @@ async function recordResult(
 }
 
 /**
- * Appends the batch and refreshes the cache.
+ * Appends the batch and refreshes the cache, in one transaction.
  *
- * `match_events` is the truth and `match_state` is only a cache, so the events
- * go in first: a crash between the two leaves a snapshot that is merely behind,
- * which the next read rebuilds, rather than a snapshot ahead of its own history.
+ * Until 2H.31 this was three requests in a row with no transaction and no
+ * check on `seq` (audit line A10): fine while one client wrote, wrong the day
+ * two did. The SQL function `append_match_step` (migration 0010) locks the
+ * `match_state` row, refuses when `seq` is no longer `lastSeq`, then writes
+ * the events, the snapshot and the match row together. The events still go in
+ * first inside it, for the reason that always held: `match_events` is the
+ * truth and `match_state` only a cache.
+ *
+ * A refusal for the race comes back as a 409 the client reads like any
+ * refusal; any other failure is a 500 with the database's own words.
  */
 async function persist(
   db: ReturnType<typeof createClient>,
   matchId: string,
   lastSeq: number,
   step: SessionStep,
-  events: readonly unknown[],
   orders: readonly AllyOrder[],
-): Promise<void> {
-  const rows = events.map((event, i) => ({
-    match_id: matchId,
-    seq: lastSeq + 1 + i,
-    kind: (event as { kind: string }).kind,
-    payload: event,
-  }));
-
-  if (rows.length > 0) await db.from('match_events').insert(rows);
-
-  const state = step.session.state;
-  await db.from('match_state').upsert({
-    match_id: matchId,
-    seq: lastSeq + rows.length,
-    snapshot: state,
-    updated_at: new Date().toISOString(),
+  now: number,
+): Promise<{ ok: true } | { ok: false; reason: string; status: number }> {
+  const { error } = await db.rpc('append_match_step', {
+    p_match: matchId,
+    p_expected_seq: lastSeq,
+    p_events: step.events,
+    p_snapshot: step.session.state,
+    p_columns: matchColumns(step, orders, now),
   });
-
-  await db
-    .from('matches')
-    .update({
-      phase: state.phase,
-      round: state.round,
-      score_a: state.score.A,
-      score_b: state.score.B,
-      turn_deadline: step.session.turnDeadline
-        ? new Date(step.session.turnDeadline).toISOString()
-        : null,
-      winner: state.result && state.result.winner !== 'draw' ? state.result.winner : null,
-      is_draw: state.result?.winner === 'draw',
-      finished_at: state.phase === 'finished' ? new Date().toISOString() : null,
-      orders,
-    })
-    .eq('id', matchId);
+  if (!error) return { ok: true };
+  if (isMovedOn(error.message)) return { ok: false, reason: MOVED_ON, status: 409 };
+  return { ok: false, reason: `the step could not be written: ${error.message}`, status: 500 };
 }

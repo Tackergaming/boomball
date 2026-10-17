@@ -41,7 +41,7 @@ function shootingState(seed: number, at: Point): MatchState {
 
 describe('écart 64: the rebound comes off the hatch (engine 10)', () => {
   it('bumps the engine version, because the stored matches of engine 9 roll a different ball', () => {
-    expect(ENGINE_VERSION).toBe(10);
+    expect(ENGINE_VERSION).toBeGreaterThanOrEqual(10);
   });
 
   it('rolls d4 cells from the hatch in the d8 direction when the way is free', () => {

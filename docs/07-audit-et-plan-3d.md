@@ -74,11 +74,11 @@ Les lignes vues à l'écran dans ce chat sont marquées « vu ».
 | A3 | `/security-review` | Jérôme la lance | Avant la mise en ligne | Majeur | 0,5 |
 | A4 | **Compteur de victoires** : 1 victoire pour 3 matchs gagnés | `teams.wins`, lu en base | L'ordre des quatre matchs en base colle à l'hypothèse de `04` : seul le dernier, 50-30, a été compté après la migration 0003. Se tranche à la prochaine victoire, humaine ou par script | Majeur | 0,25 |
 | A5 | **Fait le 2026-10-10 en 2H.3.** Crackers mesurés à 6 et à 10 sur le terrain horizontal, tableau dans `09-equilibrage-2H3-2026-10-10.md`, Jérôme a tranché 10 : écart 40 de `00` partie C, `CRACKER_MOVE_CELLS = 10` | `engine/constants.ts`, `00-reglement-v2.md` C4 et C6 | Décision D4 | Clos | 0 |
-| A6 | **La coop à 2 ou 3** : rejoindre une batterie, sièges 2 et 3 du lobby, les tours des autres humains rejoués à l'écran, `useAccount` qui ne trouve une équipe que par `owner` | `client/src/screens/Lobby.tsx`, `TeamHub.tsx`, `lib/useAccount.ts`, `match/useMatch.ts`, une migration | Décision produit verrouillée de `04`, jamais construite, et dans le done (D5) | Majeur | 3 à 4 |
+| A6 | **Fait le 2026-10-17 en 2H.32 et 2H.33** (`00` C32, journal §10) : le code d'invitation et le lobby partagé (migration `0011`), les tours des autres humains rejoués, le coup à la porte par tous, le siège remis à la maison, le spectateur, `coop.spec.ts`. Sa porte : la partie de Jérôme à deux. **La coop à 2 ou 3** : rejoindre une batterie, sièges 2 et 3 du lobby, les tours des autres humains rejoués à l'écran, `useAccount` qui ne trouve une équipe que par `owner` | `client/src/screens/Lobby.tsx`, `TeamHub.tsx`, `lib/useAccount.ts`, `match/useMatch.ts`, deux migrations | Décision produit verrouillée de `04`, et dans le done (D5) | Codé, porte ouverte | 0 |
 | A7 | **Fait le 2026-10-10 en 2H.4**, sous-agent (j) : échelle compacte, tous les échelons visibles sans défiler à 1440 x 900, et « You are up » ou « You play in N » dans l'en-tête. Vu sur capture. **Échelle d'initiative coupée** (vu) : à 1440 x 900 seules quatre rangées sont visibles, le bloc des six alliés de Jérôme est hors de vue sous « Probe », et il faut faire défiler pour savoir quand on rejoue | `client/src/match/Ladder.tsx`, `screens/Match.tsx` grille de droite | Le brief de design demandait que l'échelle dise d'un coup d'œil quand le joueur rejoue | Clos | 0 |
 | A8 | **Sans objet depuis D11** : plus d'ancrage. **Cases sans ancrage jamais montrées** (vu) : le plateau éclaire les cases atteignables mais rien ne distingue celles où finir le tour fait chuter | `client/src/match/Board.tsx` | Le brief de design le demandait, et c'est la règle la plus punitive du sport. L'avertissement `!` n'apparaît qu'après coup | Clos | 0 |
 | A9 | **Fait le 2026-10-10 en 2H.4**, fil principal. Confirmé au harnais : le marqueur de round apparaissait deux fois dans le fil. La diffusion arrive **avant** la réponse HTTP, donc ni « est-il en avance sur ce que je tiens » ni « ma requête l'a réclamé » ne suffisait ; le fil dédoublonne par `fromSeq`, quelle que soit la copie qui arrive la première, et `smoke.spec.ts` l'affirme désormais. **Écho Realtime** : le client s'abonne au canal du match et la fonction diffuse chaque lot, y compris au client qui l'a demandé. Le gestionnaire de diffusion ajoute les événements au fil **et** relit le snapshot, alors que la réponse HTTP les ajoute aussi et lance le rejeu. Lu dans le code, à vérifier à l'écran : lignes du fil en double, et un saut du plateau à l'état final en plein rejeu | `client/src/match/useMatch.ts`, effet `channel(...)` et `send()` | Si confirmé, c'est visible à chaque tour en solo | Clos | 0 |
-| A10 | **Écriture non atomique et erreurs ignorées** dans `persist` : trois écritures séquentielles sans transaction ni vérification de `seq`, et le résultat de l'insert des événements n'est pas lu | `supabase/functions/resolve-action/index.ts` `persist()` | Invisible en solo. En coop, deux requêtes simultanées chargent le même `seq`, la seconde insertion viole la clé primaire sans que personne le sache, et le snapshot est écrasé. À régler avant A6 | Majeur | 1 |
+| A10 | **Fait le 2026-10-17 en 2H.31**, fil principal : migration `0010_append_match_step.sql`, une fonction SQL en une transaction avec verrou `for update` et refus si `seq` a bougé ; `persist` l'appelle en un aller-retour et répond 409 au perdant de la course (`00` C32, journal §10). **Écriture non atomique et erreurs ignorées** dans `persist` : trois écritures séquentielles sans transaction ni vérification de `seq`, et le résultat de l'insert des événements n'est pas lu | `supabase/functions/resolve-action/index.ts` `persist()`, `server/persist.ts` | Invisible en solo. En coop, deux requêtes simultanées chargent le même `seq`, la seconde insertion viole la clé primaire sans que personne le sache, et le snapshot est écrasé. À régler avant A6 | Clos | 0 |
 | A11 | **Fait le 2026-10-10 en 2H.4**, fil principal. Colonne `matches.engine_version` par la migration 0005, appliquée par Jérôme ; `create-match` estampille et ignore les archivés pour la règle du match unique ; `resolve-action` refuse une autre version en 409 avec une raison lisible (`engineVersionRefusal`, testée) ; le client ne reprend jamais un match archivé et le hub en donne le compte. **Aucune version du moteur sur les matchs** : ni `MatchState`, ni les événements, ni `matches` ne portent de version. Un match inachevé en base est rechargé par n'importe quel moteur futur | `supabase/migrations/`, `engine/constants.ts`, les deux fonctions, `client` | Dès que le 2.5D ou la coop touchent au moteur ou aux événements, un match ouvert sur l'ancienne version casse sans message | Clos | 0 |
 | A12 | **Fait le 2026-10-10 en 2H.4**, fil principal. `useAccount` lit `error` sur ses trois lectures et s'arrête à la première qui échoue ; `App` affiche « The silo is not answering » avec le message du serveur à copier et un bouton réessayer. **États d'erreur du chargement** : `useAccount` ignore `error` sur toutes ses lectures. Projet en pause ou réseau coupé, un joueur signé atterrit sur « Raise a battery » comme s'il était nouveau, et le bouton échoue sans explication. Lu dans le code | `client/src/lib/useAccount.ts`, `App.tsx` | C'est exactement l'écran que ses amis auraient vu en septembre | Clos | 0 |
 | A13 | **Écrit le 2026-10-10 en 2H.4**, fil principal : `.github/workflows/supabase-keepalive.yml`, cron quotidien, échec si autre chose que 200. **Attend les deux secrets de dépôt posés par Jérôme et une première exécution manuelle.** **Maintien en vie du projet Supabase** (D7) | `.github/workflows/supabase-keepalive.yml`, secrets du dépôt par Jérôme | Sans lui, pause après sept jours sans trafic, et fenêtre de restauration limitée (90 jours selon les docs, un an selon d'autres pages) | Clos | 0 |
@@ -1978,3 +1978,63 @@ principal l'a remplacé par l'API admin (`PUT /auth/v1/admin/users/<id>`, clé s
 affiché une fois en chat. **Deux trous notés pour la phase 8, avant qu'un ami ne joue** : pas de
 « mot de passe oublié » et pas de changement de mot de passe dans l'application. Ensuite la coop
 (phase 7, A10 d'abord), demain.
+
+### Sous-phase 2H.31, « A10, le persist atomique », codée et en ligne le 2026-10-17, porte ouverte
+
+Par le fil principal (Fable 5.1), sans sous-agent, à partir de `00` C32 : le cadrage de la coop
+en huit réponses de Jérôme, validé en un lot (« GO »), dont 2H.31 est la première sous-phase. Rien
+dans le moteur, rien dans l'IA, `ENGINE_VERSION` toujours 10, **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| Migration `0010_append_match_step.sql` | La fonction SQL `append_match_step(p_match, p_expected_seq, p_events, p_snapshot, p_columns)` en une transaction : verrou `for update` sur la ligne `match_state`, refus « the board moved on » si le `seq` a bougé, insert des événements numérotés depuis `p_expected_seq + 1`, snapshot, les neuf colonnes de `matches` castées depuis `p_columns`. `security definer`, exécutable par `service_role` seulement. **Appliquée par Jérôme le 2026-10-17**, vérifiée en lecture avant et après (fonction, paramètres, droits, comptes de tables inchangés), consignée dans `04` |
+| `server/persist.ts` | Nouveau, pur : `matchColumns(step, orders, now)`, `MOVED_ON`, `isMovedOn` |
+| `resolve-action` | `persist` appelle `db.rpc('append_match_step', ...)` en un aller-retour et rend un résultat ; la course répond 409 avec `MOVED_ON`, tout autre échec 500 avec les mots de la base, avant `recordResult` et la diffusion. A10 close |
+| Tests | **728 sur 38 fichiers contre 719** : quatre dans `server/persist.test.ts`, cinq dans `server/migration0010.test.ts` ; typecheck racine, scripts et e2e verts ; les deux fonctions bundlent |
+| En ligne | **`resolve-action` v25, `create-match` v23, redéployées le 2026-10-17 sur son feu vert**, moteur 10 inchangé |
+| Harnais | Smoke 2D : premier run rouge sur le match e2e repris au round 8 avec un tour expiré, tombé après la troisième marche (le cas connu du sifflet pendant les trois tours) ; second run **vert en 42,1 s** sur un match neuf. Playthrough **vert en 49,4 s**, 17 requêtes humaines, 0 refusée, jusqu'au sifflet |
+| Le second compte e2e | Créé par le fil principal par l'API admin sur son mot, e-mail confirmé, profil « E2E Second », identifiants dans le `.env` sous `BOOMBALL_E2E2_EMAIL` et `BOOMBALL_E2E2_PASSWORD`, jamais affichés. Sans batterie : il rejoint « E2E Battery » par le code d'invitation en 2H.32 |
+
+**Ce qui suit** : 2H.32, la batterie à plusieurs (migration `0011_invites.sql`, le hub, le lobby
+partagé par présence Realtime), puis 2H.33, le match à plusieurs (écart 65, les lots des autres
+rejoués, le coup à la porte par tous, « Hand my Giff to the house », le spectateur,
+`coop.spec.ts`).
+
+### Sous-phase 2H.32, « la batterie à plusieurs », codée et en ligne le 2026-10-17, porte ouverte
+
+Par le fil principal (Fable 5.1), avec un Sonnet effort élevé sur `TeamHub.tsx`, à partir de
+`00` C32 points 1, 2, 3, 4 (les rôles) et 7. Rien dans le moteur, rien dans l'IA,
+`ENGINE_VERSION` toujours 10, **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| Migration `0011_invites.sql` | `teams.invite_code` (8 hexadécimaux, unique, défaut qui remplit l'existant), `join_team(code)`, `rotate_invite_code(team)`, `battery_members(team)` en `security definer` pour `authenticated`. **Appliquée par Jérôme le 2026-10-17**, vérifiée avant et après, consignée dans `04`. Défaut connu : le propriétaire listé deux fois quand il a sa propre ligne, fusionné côté client (`mergeRoll`), à corriger à la prochaine migration |
+| `useAccount` | Toutes les batteries du joueur (RLS, sans filtre), la choisie gardée dans `localStorage` (`pickTeam`), `chooseTeam`, `members` ; `roll.ts` pur |
+| Le hub (Sonnet) | Switcher de batteries, « The roll » (code, Copy, New code, membres, Remove, Leave this battery), « Join another battery », l'abandon au propriétaire seul, le formulaire de code sous « Raise a battery » |
+| Le lobby partagé | Présence Realtime sur `lobby:<teamId>`, un siège par présent, les rôles pleins grisés, « Ready », « Start match » au propriétaire quand tous sont prêts, la ligue à lui, `started` diffusé ; `lobbySeats.ts` pur |
+| `create-match` | Refuse un appelant qui n'est pas le propriétaire (403) |
+| Tests | **741 sur 41 fichiers contre 728** ; typecheck racine, scripts, e2e et client verts ; fonctions et client bundlent |
+| En ligne | **`resolve-action` v26, `create-match` v24, redéployées le 2026-10-17 sur son feu vert** ; le client en ligne n'est pas redéployé (sur son feu vert, après 2H.33) |
+| Harnais | Smoke 2D **vert en 39,1 s** ; `e2e/coop.spec.ts` nouveau (`npm run e2e:coop`) **vert en 18,7 s**, deux contextes, le second compte e2e membre de « E2E Battery » : les deux se voient dans le lobby, le second prend Breaker et coche Ready, le propriétaire démarre, les deux atteignent le plateau avec deux humains côté A, le propriétaire quitte |
+
+**Ce qui suit** : 2H.33, le match à plusieurs (écart 65, les lots des autres rejoués, le coup à
+la porte par tous, « Hand my Giff to the house », le spectateur, l'abandon vu par les autres).
+
+### Sous-phase 2H.33, « le match à plusieurs », codée et en ligne le 2026-10-17, porte ouverte
+
+Par le fil principal (Fable 5.1), avec un Sonnet effort élevé sur les tests du moteur et du
+serveur, à partir de `00` C32 points 4 (la popup), 5, 6 et 8. Rien dans l'IA ; **le moteur gagne
+l'écart 65 et l'action `yieldSeat`, `ENGINE_VERSION` 11** ; pas de migration ; **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| Écart 65 | `placementAt` interroge le premier humain du rôle au d20, places = actifs moins les autres humains ; `placeHumans` met les autres juste derrière ; pas de popup quand un seul ordre existe |
+| Le siège remis à la maison | `yieldSeat` hors tour dans `reduce` et `submitAction`, `seatYielded`, le pion passe à l'IA, la maison prend la dernière place pendant une popup, l'IA joue le tour s'il était ouvert ; `dump-match` et le fil le lisent |
+| Le client | Les lots des autres rejoués animés (`playForeign`) ; « Waiting for X · 1:12 » chez tous ; le coup à la porte par tout siège cinq secondes après l'échéance (`coopClock.ts`) ; « Leave the match » au propriétaire, « Hand my Giff to the house » au coéquipier (`YieldPrompt.tsx`), « Back to the hub » et « Watching » au spectateur ; l'abandon diffusé aux autres |
+| Tests | **759 sur 44 fichiers contre 741** ; typecheck racine, scripts, e2e et client verts ; fonctions et client bundlent |
+| En ligne | **`resolve-action` v27, `create-match` v25, moteur 11, redéployées le 2026-10-17 sur son feu vert** ; aucun match du moteur 10 n'était ouvert. Le client en ligne reste à redéployer sur son feu vert |
+| Harnais | `e2e:coop` **vert en 37,5 s** : le second client voit le tour du propriétaire arriver, le propriétaire lit « Waiting for Second Giff », le second remet son Giff et passe en spectateur, le propriétaire quitte et le second revient au hub ; smoke 2D **vert en 41,5 s** ; playthrough **vert en 1,1 min**, 23 requêtes, 0 refusée |
+| Dette | Le nom du joueur sur la plaque des autres pions humains ; le bandeau « Your turn » qui reste après un siège remis ; un spectateur ne frappe pas ; `battery_members` et le propriétaire en double |
+
+**Ce qui attend Jérôme** : une partie à deux, lui et un ami (ou le second compte e2e dans une
+fenêtre privée), sur le client redéployé à son feu vert ; puis la phase 8.

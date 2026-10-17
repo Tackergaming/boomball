@@ -41,6 +41,8 @@ import { projectCell } from '../board3d/projection.js';
 import { Briefing, hasBeenBriefed } from '../match/Briefing.js';
 import { PlacePrompt } from '../match/PlacePrompt.js';
 import { AbandonPrompt } from '../match/AbandonPrompt.js';
+import { YieldPrompt } from '../match/YieldPrompt.js';
+import { clockText, secondsLeft as clockSecondsLeft, teammateKnockDue } from '../match/coopClock.js';
 import { Feed } from '../match/Feed.js';
 import { Ladder } from '../match/Ladder.js';
 import { TurnStrip } from '../match/TurnStrip.js';
@@ -52,14 +54,21 @@ export function Match({
   matchId,
   userId,
   teamName,
+  isOwner,
   onFinished,
   onLeft,
 }: {
   matchId: string;
   userId: string;
   teamName: string;
+  /** Whether this player owns the battery: the owner alone abandons (2H.28), a team-mate hands over (2H.33). */
+  isOwner: boolean;
   onFinished: () => void;
-  /** The owner abandoned the match from here (2H.28, `00` C29): back to the hub, no result. */
+  /**
+   * Back to the hub without a result: the owner abandoned the match from
+   * here (2H.28, `00` C29), or was told the owner did, or a spectator left
+   * (2H.33).
+   */
   onLeft: () => void | Promise<void>;
 }) {
   // The human always plays team A: `createMatch` seats every human there.
@@ -312,6 +321,32 @@ export function Match({
     knocked.current = key;
     void send({ kind: 'endTurn' });
   }, [yours, replaying, match.busy, match.deadline, match.skew, now, onClock?.id, send]);
+
+  /**
+   * A team-mate's knock (2H.33, `00` C32 point 5): a seated human whose turn it
+   * is not knocks five seconds after the other human's deadline, so a sleeping
+   * laptop cannot hold the match. The server settles the expiry on any
+   * request; a refusal here only means the player, or another team-mate, got
+   * there first. A spectator has no seat and cannot knock.
+   */
+  const teammateKnocked = useRef<string | null>(null);
+  useEffect(() => {
+    if (PATIENT) return;
+    if (yours || !mineId || !onClock || !isHuman(onClock) || replaying || match.busy) return;
+    if (!teammateKnockDue(match.deadline, match.skew, now)) return;
+    const key = `${onClock.id}@${match.deadline}`;
+    if (teammateKnocked.current === key) return;
+    teammateKnocked.current = key;
+    void match.knock(onClock.id);
+  }, [yours, mineId, onClock, replaying, match, now]);
+
+  // The owner abandoned the match while this client watched (2H.33).
+  useEffect(() => {
+    if (match.abandonedByOwner) void onLeft();
+  }, [match.abandonedByOwner, onLeft]);
+
+  /** The confirmation before handing the Giff to the house (2H.33). */
+  const [yielding, setYielding] = useState(false);
 
   /**
    * The test hook, development only and compiled away otherwise.
@@ -801,8 +836,21 @@ export function Match({
               >
                 Your turn · {left ?? TURN_TIMER_SECONDS}s
               </span>
+            ) : onClock && isHuman(onClock) && onClock.id !== mineId ? (
+              // Another human's clock, read by everybody (2H.33, C32 point 5).
+              <span className="label" data-testid="waiting-for" style={{ color: 'var(--brass)' }}>
+                Waiting for {onClock.name}
+                {clockSecondsLeft(match.deadline, match.skew, now) !== null
+                  ? ` · ${clockText(clockSecondsLeft(match.deadline, match.skew, now)!)}`
+                  : ''}
+              </span>
             ) : (
               <span className="label">{onClock ? `${onClock.name} is up` : 'Resolving'}</span>
+            )}
+            {mineId === null && state.phase !== 'finished' && (
+              <span className="label" data-testid="watching" style={{ color: 'var(--text-faint)' }}>
+                Watching · no seat in this match
+              </span>
             )}
 
             <button
@@ -863,21 +911,63 @@ export function Match({
               >
                 {soundOn ? '♪ Sound on' : 'Sound off'}
               </button>
-              <button
-                className="ghost"
-                style={S.speed}
-                data-testid="leave-match"
-                onClick={() => setLeaving(true)}
-                disabled={leaving}
-                title="Abandon this match: no result, back to the hub"
-              >
-                Leave the match
-              </button>
+              {isOwner ? (
+                <button
+                  className="ghost"
+                  style={S.speed}
+                  data-testid="leave-match"
+                  onClick={() => setLeaving(true)}
+                  disabled={leaving}
+                  title="Abandon this match for everybody: no result, back to the hub"
+                >
+                  Leave the match
+                </button>
+              ) : mineId !== null ? (
+                <button
+                  className="ghost"
+                  style={S.speed}
+                  data-testid="hand-over"
+                  onClick={() => setYielding(true)}
+                  disabled={yielding}
+                  title="Hand your Giff to the house for the rest of the match, and keep watching"
+                >
+                  Hand my Giff to the house
+                </button>
+              ) : (
+                <button
+                  className="ghost"
+                  style={S.speed}
+                  data-testid="watch-leave"
+                  onClick={() => void onLeft()}
+                  title="Back to the hub; the match goes on without you"
+                >
+                  Back to the hub
+                </button>
+              )}
             </div>
           </div>
           {leaving && (
             <div style={S.leaving}>
-              <AbandonPrompt matchId={matchId} onAbandoned={onLeft} onKeep={() => setLeaving(false)} />
+              <AbandonPrompt
+                matchId={matchId}
+                onAbandoned={async () => {
+                  // The others are told before this client leaves the channel.
+                  await match.announceAbandoned();
+                  await onLeft();
+                }}
+                onKeep={() => setLeaving(false)}
+              />
+            </div>
+          )}
+          {yielding && mineId !== null && (
+            <div style={S.leaving}>
+              <YieldPrompt
+                onYield={async () => {
+                  await match.sendAs(mineId, { kind: 'yieldSeat' });
+                  setYielding(false);
+                }}
+                onKeep={() => setYielding(false)}
+              />
             </div>
           )}
 

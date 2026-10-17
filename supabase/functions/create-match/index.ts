@@ -120,6 +120,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
   members.add(team.owner as string);
 
   if (!members.has(callerId)) return refuse('you are not on this team', 403);
+  // The owner alone opens the battery's matches (2H.32, `00` C32 point 3,
+  // Jérôme: the owner alone has "Start match"). A member who wants a match of
+  // their own raises their own battery.
+  if (callerId !== (team.owner as string)) return refuse('only the owner of the battery starts its matches', 403);
   for (const seat of seats) {
     if (!seat || !members.has(seat.profileId)) {
       return refuse(`${seat?.profileId ?? 'that player'} is not on this team`, 403);

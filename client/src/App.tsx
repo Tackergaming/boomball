@@ -62,6 +62,7 @@ export function App() {
         matchId={account.live.id}
         userId={account.userId}
         teamName={account.team?.name ?? 'Your battery'}
+        isOwner={!!account.team && account.team.owner === account.userId}
         onFinished={async () => {
           setAtTheBoard(false);
           await account.refresh();
@@ -94,6 +95,7 @@ export function App() {
       <Lobby
         userId={account.userId}
         team={account.team}
+        members={account.members}
         displayName={name}
         onOpened={async () => {
           await account.refresh();
@@ -108,6 +110,8 @@ export function App() {
     <TeamHub
       userId={account.userId}
       team={account.team}
+      teams={account.teams}
+      members={account.members}
       displayName={name}
       live={account.live}
       archived={account.archived}
@@ -116,6 +120,8 @@ export function App() {
       onAbandoned={() => account.refresh()}
       onCreated={() => void account.refresh()}
       onEnterLobby={() => setWhere('lobby')}
+      onChooseTeam={(teamId) => account.chooseTeam(teamId)}
+      onRollChanged={() => account.refresh()}
     />
   );
 }

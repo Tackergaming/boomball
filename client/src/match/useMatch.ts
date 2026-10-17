@@ -43,6 +43,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import type { AllyOrder } from '../../../ai/orders.js';
 import type { Action } from '../../../engine/actions.js';
@@ -114,6 +115,23 @@ export interface MatchView {
    * the walk that needs it).
    */
   sendMany: (actions: readonly Action[]) => Promise<void>;
+  /**
+   * Sends one action for a named unit rather than the unit on the clock
+   * (2H.33): the yield of a seat, which the engine takes at any moment.
+   * Throws on a refusal, so a prompt can show the reason.
+   */
+  sendAs: (unitId: string, action: Action) => Promise<void>;
+  /**
+   * A team-mate's knock at the door (2H.33, C32 point 5): an `endTurn` for the
+   * unit on the clock, sent when its deadline is well gone, so the server
+   * settles the expiry. A refusal is read as "somebody else got there first"
+   * and the board is simply read again; nothing is shown.
+   */
+  knock: (unitId: string) => Promise<void>;
+  /** The owner abandoned the match while this client watched (2H.33). */
+  abandonedByOwner: boolean;
+  /** Tells the other clients of the match that the owner abandoned it. */
+  announceAbandoned: () => Promise<void>;
   /** Posts standing orders to AI team-mates. Spends no turn. */
   order: (orders: readonly AllyOrder[]) => Promise<void>;
   dismissRefusal: () => void;
@@ -239,6 +257,9 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   const speedRef = useRef(speed);
   const skipRef = useRef(false);
   const liveRef = useRef(true);
+  const [abandonedByOwner, setAbandonedByOwner] = useState(false);
+  /** The match channel, kept so this client can speak on it too (2H.33). */
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
     liveRef.current = true;
@@ -346,31 +367,6 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     };
   }, [matchId]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel(`match:${matchId}`)
-      .on('broadcast', { event: 'events' }, (message) => {
-        const payload = message.payload as { fromSeq?: number; events?: MatchEvent[] };
-        const from = payload.fromSeq ?? 0;
-        // Our own batch comes back in the HTTP reply as well, possibly after
-        // this. A batch already in the feed, or behind what we hold, is nothing.
-        if (seenRef.current.has(from) || from <= seqRef.current) return;
-        seenRef.current.add(from);
-        if (payload.events) {
-          setFeed((old) => [...old, ...payload.events!].slice(-FEED_LIMIT));
-        }
-        // Our own batch, echoed ahead of our reply: the reply replays it and
-        // re-reads the board at the end. Re-reading here instead showed the
-        // final positions before the replay had begun (retour 1 de 2H.5).
-        if (inFlightRef.current > 0) return;
-        void load();
-      })
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [matchId, load]);
 
   const skip = useCallback(() => {
     skipRef.current = true;
@@ -434,6 +430,65 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   );
 
   /**
+   * A batch somebody else produced, walked beat by beat like our own (2H.33,
+   * `00` C32: a team-mate sees the other humans' turns animated). Only when
+   * it follows exactly what this client holds; a gap, or a replay already
+   * running, falls back to reading the board, which is what solo always did.
+   */
+  const playForeign = useCallback(
+    async (from: number, events: readonly MatchEvent[]) => {
+      const board = stateRef.current;
+      if (!board || from !== seqRef.current + 1 || events.length === 0) {
+        await load();
+        return;
+      }
+      seqRef.current = from + events.length - 1;
+      inFlightRef.current += 1;
+      try {
+        await play(board, events);
+      } finally {
+        inFlightRef.current -= 1;
+      }
+    },
+    [load, play],
+  );
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`match:${matchId}`)
+      .on('broadcast', { event: 'events' }, (message) => {
+        const payload = message.payload as { fromSeq?: number; events?: MatchEvent[] };
+        const from = payload.fromSeq ?? 0;
+        // Our own batch comes back in the HTTP reply as well, possibly after
+        // this. A batch already in the feed, or behind what we hold, is nothing.
+        if (seenRef.current.has(from) || from <= seqRef.current) return;
+        seenRef.current.add(from);
+        if (payload.events) {
+          setFeed((old) => [...old, ...payload.events!].slice(-FEED_LIMIT));
+        }
+        // Our own batch, echoed ahead of our reply: the reply replays it and
+        // re-reads the board at the end. Re-reading here instead showed the
+        // final positions before the replay had begun (retour 1 de 2H.5).
+        if (inFlightRef.current > 0) return;
+        void playForeign(from, payload.events ?? []);
+      })
+      // The owner left (2H.28) while this client watched: it is told rather
+      // than left on a board nobody can write to (2H.33).
+      .on('broadcast', { event: 'abandoned' }, () => setAbandonedByOwner(true))
+      .subscribe();
+    channelRef.current = channel;
+
+    return () => {
+      channelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [matchId, playForeign]);
+
+  const announceAbandoned = useCallback(async () => {
+    await channelRef.current?.send({ type: 'broadcast', event: 'abandoned', payload: { matchId } });
+  }, [matchId]);
+
+  /**
    * The first read of the match, and the opening replay when there is one.
    * Counted as in flight so the broadcast handler leaves the board alone
    * while the house's opening is being walked, as for any replay.
@@ -461,7 +516,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
    * refusal, a lost reply or a board with no turn stops the run there.
    */
   const sendMany = useCallback(
-    async (actions: readonly Action[]) => {
+    async (actions: readonly Action[], asUnitId: string | null = null, quiet = false) => {
       if (busy || actions.length === 0) return;
 
       setBusy(true);
@@ -475,7 +530,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
       try {
         for (const action of actions) {
           const before = stateRef.current;
-          const unitId = before?.turn?.unitId;
+          const unitId = asUnitId ?? before?.turn?.unitId;
           if (!before || !unitId) return;
           const sentAt = Date.now();
           let reply = await submitAction(matchId, unitId, action);
@@ -509,10 +564,15 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
           }
 
           if (!reply.accepted) {
-            setRefusal(reply.reason);
-            // A refusal usually means a stale board, so read it again rather than
-            // leaving the player looking at the position that produced it.
+            // A quiet request (a team-mate's knock, 2H.33) is refused when
+            // somebody else settled the turn first: nothing to show, the
+            // board is read again. Otherwise a refusal usually means a stale
+            // board, so read it again rather than leaving the player looking
+            // at the position that produced it; a named unit's request (the
+            // yield) throws so its prompt can show the reason.
+            if (!quiet) setRefusal(reply.reason);
             await load();
+            if (asUnitId && !quiet) throw new Error(reply.reason);
             return;
           }
 
@@ -534,12 +594,13 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
           // the turn. It is news, not an error, and the screen says so.
           // Which turn it spent is read off the board it was sent from: a place
           // still to choose means the clock chose it, last.
-          if ('expired' in reply && reply.expired) setExpired(before.turn?.placing != null ? 'place' : 'turn');
+          if ('expired' in reply && reply.expired && !quiet) setExpired(before.turn?.placing != null ? 'place' : 'turn');
           await play(before, reply.events);
         }
       } catch (failure) {
+        if (asUnitId && !quiet) throw failure;
         console.error('the turn could not be sent', failure);
-        setRefusal('the turn could not be sent. Check your connection and try again.');
+        if (!quiet) setRefusal('the turn could not be sent. Check your connection and try again.');
       } finally {
         inFlightRef.current -= 1;
         setBusy(false);
@@ -548,6 +609,8 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     [matchId, busy, load, play],
   );
   const send = useCallback((action: Action) => sendMany([action]), [sendMany]);
+  const sendAs = useCallback((unitId: string, action: Action) => sendMany([action], unitId), [sendMany]);
+  const knock = useCallback((unitId: string) => sendMany([{ kind: 'endTurn' }], unitId, true), [sendMany]);
 
   /**
    * Orders go through the same door and come back with nothing to replay, so
@@ -585,7 +648,11 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     setSpeed,
     skip,
     send,
-    sendMany,
+    sendMany: (actions: readonly Action[]) => sendMany(actions),
+    sendAs,
+    knock,
+    abandonedByOwner,
+    announceAbandoned,
     order,
     dismissRefusal: () => setRefusal(null),
     dismissBeat: () => setBeat(null),

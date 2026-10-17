@@ -65,11 +65,8 @@ export type ResolveActionReply =
     }
   | Refused;
 
-export interface SeatRequest {
-  profileId: string;
-  role: Role;
-  characterName?: string;
-}
+export type { SeatRequest } from './supabase-types.js';
+import type { SeatRequest } from './supabase-types.js';
 
 /**
  * `functions.invoke` swallows the body of a non-2xx reply, and a refusal *is*
@@ -139,6 +136,76 @@ export async function abandonMatch(matchId: string): Promise<{ ok: true } | { ok
   } catch (failure) {
     console.error('the match could not be abandoned', failure);
     return { ok: false, reason: 'could not reach the server. Check your connection and try again.' };
+  }
+}
+
+/** A refusal of a battery write, in the server's own words. */
+export type BatteryResult<T> = { ok: true; value: T } | { ok: false; reason: string };
+
+async function rpcResult<T>(name: string, args: Record<string, unknown>, what: string): Promise<BatteryResult<T>> {
+  try {
+    const { data, error } = await supabase.rpc(name, args);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true, value: data as T };
+  } catch (failure) {
+    console.error(`${what} failed`, failure);
+    return { ok: false, reason: 'could not reach the server. Check your connection and try again.' };
+  }
+}
+
+/**
+ * Joins the battery whose invite code this is (2H.32, `00` C32 point 7). The
+ * SQL function `join_team` finds the battery, refuses an unknown code and the
+ * owner's own battery, and inserts the membership; joining twice is a no-op.
+ * Returns the battery's id.
+ */
+export function joinTeam(code: string): Promise<BatteryResult<string>> {
+  return rpcResult<string>('join_team', { code }, 'joining the battery');
+}
+
+/** Renews the invite code of a battery the caller owns. Returns the new code. */
+export function rotateInviteCode(teamId: string): Promise<BatteryResult<string>> {
+  return rpcResult<string>('rotate_invite_code', { team: teamId }, 'renewing the code');
+}
+
+/**
+ * Leaves a battery (the caller's own row) or removes a member (the owner's
+ * right): one delete, allowed by the `team_members_write` policy for both.
+ */
+export async function removeMembership(teamId: string, profileId: string): Promise<BatteryResult<null>> {
+  try {
+    const { error } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('team_id', teamId)
+      .eq('profile_id', profileId);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true, value: null };
+  } catch (failure) {
+    console.error('the membership could not be removed', failure);
+    return { ok: false, reason: 'could not reach the server. Check your connection and try again.' };
+  }
+}
+
+/**
+ * Remembers the seat a member takes: role and character name, on their own
+ * `team_members` row (policy `team_members_write`). The owner has no row of
+ * their own on their battery and is not written here.
+ */
+export async function saveSeatPreference(
+  teamId: string,
+  profileId: string,
+  role: Role,
+  characterName: string,
+): Promise<void> {
+  try {
+    const { error } = await supabase.from('team_members').upsert(
+      { team_id: teamId, profile_id: profileId, preferred_role: role, character_name: characterName.trim() || null },
+      { onConflict: 'team_id,profile_id' },
+    );
+    if (error) console.warn('the seat preference was not saved', error);
+  } catch (failure) {
+    console.warn('the seat preference was not saved', failure);
   }
 }
 

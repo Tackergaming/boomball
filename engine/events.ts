@@ -33,6 +33,11 @@ export type MatchEvent =
   | { readonly kind: 'placeOffered'; readonly unitId: UnitId; readonly round: number; readonly places: number }
   /** The place taken, 1 first. A clock that runs out takes the last (`server/session.ts`). */
   | { readonly kind: 'placeChosen'; readonly unitId: UnitId; readonly place: number }
+  /**
+   * A human handed its Giff to the house (2H.33, engine version 11): the unit
+   * is the AI's from here. `humanId` says whose seat it was.
+   */
+  | { readonly kind: 'seatYielded'; readonly unitId: UnitId; readonly humanId: string }
   | {
       readonly kind: 'moved';
       readonly unitId: UnitId;

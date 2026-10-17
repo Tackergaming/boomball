@@ -2763,3 +2763,252 @@ allumé, puis « Giff dashes. Giff moves 9 cells. » et « 35 ft left » ; `e2e:
 8,0 min** au second run, le premier tombé sur l'attente du bandeau de tour après le round de
 l'adversaire (cas connu des bandeaux en file sous PATIENT), sans aucun avertissement
 d'AudioContext dans sa trace : le contexte créé à l'ouverture de l'écran passe le harnais.
+
+## C32. Décisions du 2026-10-17, **la coop, phase 7 de `07` : sous-phases 2H.31, 2H.32 et 2H.33**
+
+> Écrites par le fil principal (Fable 5.1) sur les huit réponses de Jérôme en chat le 2026-10-17,
+> une ou deux questions par message, reformulées puis validées en un lot (« GO ») avant la
+> première ligne de code. C'est l'étape 4 de l'ordre qu'il a validé le 16 au soir : la coop,
+> A10 d'abord. Un écart de règle, le 65, qui révise l'écart 58 pour plusieurs humains d'un même
+> rôle ; le reste est du serveur, de la base et de l'écran. **`ENGINE_VERSION` reste 10 en 2H.31
+> et 2H.32 ; 2H.33 porte `ENGINE_VERSION` 11** (l'événement `seatYielded`), qui archive les
+> matchs ouverts du moteur 10 au redéploiement. Aucune constante de `00` ne bouge, rien dans l'IA.
+
+**Ce que le code savait déjà faire**, lu avant de poser la première question : le moteur accepte
+trois humains sur l'équipe A, les ordonne au d20 dans un même rôle et ne pose pas de popup de
+place à un rôle qui compte deux humains ou plus ; `team_members` et `match_participants`
+existent depuis la première migration ; `create-match` exige que chaque siège soit membre et
+que l'appelant soit assis ; `resolve-action` vérifie que l'appelant pilote l'unité ; la
+diffusion Realtime existe mais un coéquipier relit le plateau en silence, sans animation.
+
+**Les huit réponses de Jérôme, dans l'ordre des questions.**
+
+1. **Plusieurs batteries par joueur** (son « a »). Un joueur possède une batterie et peut en
+   rejoindre d'autres ; le hub lui montre la liste et il choisit celle du soir. Un ami qui a monté
+   sa batterie en solo ne la perd pas pour venir jouer chez Jérôme.
+2. **Un lobby partagé où chacun choisit son rôle** et où tout le monde se voit, plutôt que le
+   propriétaire qui compose seul (le plan de `07`). Présence Realtime sur `lobby:<teamId>` : rien
+   n'est écrit en base avant l'ouverture du match.
+3. **Qui démarre.** Chaque membre présent a son siège dès qu'il est dans le lobby, choisit son
+   nom et son rôle, coche « Ready ». Le propriétaire seul voit « Start match », actif quand tous
+   les présents sont prêts ; il démarre seul si personne d'autre n'est là ; la ligue (C28) reste
+   à lui. Pas de siège spectateur dans le lobby : qui ne joue pas le quitte.
+4. **Deux humains du même rôle, oui**, dans la limite de la composition (un rôle se grise quand
+   ses places sont prises, le premier arrivé garde le sien). **Et la popup leur revient**, ses
+   mots : « la popup pour le premier humain du rôle et l'autre derrière lui ». C'est l'écart 65.
+5. **Le chrono et le coup à la porte.** Chaque tour humain a déjà son chrono propre (`clockKey`,
+   2H.13). Tous les clients du match affichent le chrono de celui qui joue (« Waiting for Marc ·
+   1:12 ») et **frappent à la porte cinq secondes après l'échéance**, pour laisser le joueur sur
+   l'horloge frapper lui-même ; le serveur règle l'expiration en Dodge quel que soit celui qui
+   frappe, comme aujourd'hui. Son « oui ».
+6. **Quitter un match à plusieurs**, son « b » : un coéquipier peut **remettre son Giff à l'IA**
+   pour le reste du match (« Hand my Giff to the house », confirmation en place), tout de suite,
+   sans que les autres attendent ses tours expirer. Le propriétaire garde seul l'abandon pour
+   tous (C29). Une action hors tour dans la couche serveur, l'événement `seatYielded`,
+   `ENGINE_VERSION` 11.
+7. **L'invitation**, son « oui » : `teams.invite_code` unique, affiché au propriétaire dans son
+   hub avec un renouvellement si le code a fuité ; un ami le tape dans son hub sous « Join a
+   battery with a code », `join_team(code)` l'ajoute sans approbation ; le propriétaire peut
+   retirer un membre, un membre peut quitter une batterie, sans effet sur les matchs joués.
+8. **Un membre non assis entre en spectateur**, son « b » : l'écran de match sans pion à lui,
+   animé, sans barre d'actions, et il en sort quand il veut.
+
+| # | Règle v2 | Règle décidée | Raison | État |
+|---|---|---|---|---|
+| 65 | Écart 58 : la popup de place ne vient que si le rôle compte **un seul** humain ; plusieurs humains du même rôle jouent après les IA du rôle dans l'ordre du d20, sans popup | **Dans un rôle à deux ou trois humains, le premier au d20 du coup d'envoi reçoit la popup et choisit sa place ; les autres humains du rôle se placent juste derrière lui, dans l'ordre du d20, sans popup.** Les places offertes sont celles qui laissent de la place derrière : trois Strikers dont deux humains, le premier choisit 1 ou 2 ; deux Breakers tous deux humains, ou trois Strikers tous humains, un seul ordre est possible et il n'y a pas de popup. Chrono expiré ou popup fermée : il joue à la dernière place possible, les autres derrière lui, comme l'écart 58. Le Trajector et le Bulwark, seuls de leur rôle, ne changent pas | Jérôme, le 2026-10-17 : « la popup pour le premier humain du rôle et l'autre derrière lui » | **Fait en 2H.33**, `placementAt` et `placeHumans` dans `engine/initiative.ts`, `applyChoosePlace` dans `reduce.ts` ; la forme des événements ne change pas, `ENGINE_VERSION` 11 pour `seatYielded` ; dix tests dans `engine/c32.test.ts` |
+
+**Les trois sous-phases, validées en un lot.**
+
+- **2H.31, A10, le persist atomique.** Migration `0010_append_match_step.sql` : une fonction SQL
+  en une transaction, insert des événements, upsert du snapshot, update du match, qui refuse si
+  `match_state.seq` n'est plus celui que la fonction avait lu. `persist` l'appelle en un
+  aller-retour et répond 409 « the board moved on » au perdant, que le client traite comme un
+  refus ordinaire et relit le plateau. Rien dans le moteur.
+- **2H.32, la batterie à plusieurs.** Migration `0011_invites.sql` : `teams.invite_code`,
+  `join_team(code)`, `leave_team(team)`, `remove_member(team, profile)` en `security definer`
+  bornés sur `auth.uid()`. Le hub : le code et son renouvellement, « Join a battery with a
+  code », la liste des membres avec retrait, quitter une batterie rejointe, la liste des
+  batteries où l'on joue et le choix de celle du soir ; `useAccount` lit les équipes par `owner`
+  ou par `team_members`. Le lobby partagé par présence Realtime ; `create-match` reçoit les
+  sièges présents.
+- **2H.33, le match à plusieurs.** L'écart 65 ; les lots diffusés par les autres rejoués animés
+  par `play()` ; le chrono de celui qui joue chez tous et le coup à la porte par tous à cinq
+  secondes ; « Hand my Giff to the house » (`seatYielded`, `ENGINE_VERSION` 11) ; le spectateur ;
+  les pions des autres humains avec leur nom de joueur dans la plaque ; `coop.spec.ts` à deux
+  contextes Playwright dans le même match, avec un second compte e2e.
+
+**Trois faits posés par le fil principal, vus par Jérôme.** La présence et la diffusion Realtime
+sont sur des canaux publics : quiconque connaît l'identifiant d'une batterie peut écouter la liste
+du lobby ; c'est déjà le cas du canal des matchs depuis 2H.4, noté en dette pour la
+`/security-review` de la phase 8. `ENGINE_VERSION` 11 archive les matchs ouverts du moteur 10 au
+redéploiement de 2H.33. Le second compte e2e est créé par le fil principal par l'API admin, sur
+son mot (« crée le second compte e2e toi même et dépose-le dans le fichier env »), identifiants
+dans le `.env` sous `BOOMBALL_E2E2_EMAIL` et `BOOMBALL_E2E2_PASSWORD`, jamais affichés.
+
+**Comment 2H.31 est codée** (le 2026-10-17, fil principal Fable 5.1, aucun sous-agent).
+`supabase/migrations/0010_append_match_step.sql` : `append_match_step(p_match uuid,
+p_expected_seq integer, p_events jsonb, p_snapshot jsonb, p_columns jsonb) returns integer`,
+`plpgsql`, `security definer`, `set search_path = public` ; `select seq ... for update` sur la
+ligne `match_state` (le second appelant attend le premier puis lit son `seq`), « no such match »
+(`P0002`) sans ligne, « the board moved on: expected seq %, found % » (`P0001`) si le `seq` a
+bougé ; les événements insérés par `jsonb_array_elements ... with ordinality` à
+`p_expected_seq + ordinality`, le snapshot et `updated_at` mis à jour, les neuf colonnes de
+`matches` castées depuis `p_columns` (`phase`, `round`, `score_a`, `score_b`, `turn_deadline`,
+`winner`, `is_draw`, `finished_at`, `orders`) ; `revoke` de `public`, `anon` et `authenticated`,
+`grant execute` à `service_role`, comme `record_team_win`. `server/persist.ts`, pur :
+`matchColumns(step, orders, now)` calcule ces neuf colonnes depuis un `SessionStep` (le
+`finished_at` est `now`), `MOVED_ON` est la phrase du client, `isMovedOn(message)` lit le refus.
+`resolve-action` : `persist(db, matchId, lastSeq, step, orders, now)` appelle
+`db.rpc('append_match_step', ...)` et rend `{ ok }` ou `{ ok: false, reason, status }` ; le
+gestionnaire répond `refuse(reason, 409)` sur la course et `500` avec les mots de la base sur tout
+autre échec, **avant** `recordResult` et la diffusion. Le client ne change pas : un 409 est une
+réponse `accepted: false` que `useMatch.sendMany` affiche et suit d'une relecture du plateau, comme
+tout refus. Tests : `server/persist.test.ts` (quatre : la ligne d'un match en cours, le
+vainqueur et `finished_at`, le nul, la lecture du refus) et `server/migration0010.test.ts` (cinq :
+la signature, le verrou et le refus, les trois écritures et les neuf colonnes, les droits, pas
+d'`engine_version`). **728 tests sur 38 fichiers** (719 avant), typecheck racine, scripts et e2e
+verts, les deux fonctions bundlent. **Migration `0010` appliquée par Jérôme le 2026-10-17**
+(`/supabase-migrate`), vérifiée en lecture avant (fonction absente ; 126 matchs dont 4 en cours,
+99 188 événements, 126 snapshots, `seq` max 1025) et après (présente, cinq paramètres, `security
+definer`, `integer`, droits `postgres` et `service_role` ; les mêmes comptes). **Redéployées le
+même jour sur son feu vert : `resolve-action` v25, `create-match` v23**, moteur 10 inchangé.
+Smoke 2D : un premier run rouge sur le match e2e ouvert, repris au round 8 avec un tour expiré
+(captures `04-place-prompt-round-8`, `05-after-expired-turn`) et tombé après la troisième
+marche, le cas connu du match qui atteint le sifflet pendant les trois tours ; le second run,
+qui ouvre un match neuf par le lobby, **vert en 42,1 s**. Playthrough **vert en 49,4 s**, 17
+requêtes humaines, 0 refusée, jusqu'au sifflet : chaque action du match est passée par
+`append_match_step`.
+
+**Comment 2H.32 est codée** (le 2026-10-17, fil principal Fable 5.1 ; **un Sonnet effort élevé
+sur `TeamHub.tsx`** sur brief fermé, relu par le fil principal). **La base**,
+`supabase/migrations/0011_invites.sql` : `teams.invite_code text not null unique` à défaut
+`upper(substr(md5(gen_random_uuid()::text), 1, 8))`, qui remplit les batteries existantes à
+l'ajout de la colonne ; `join_team(code)` (`security definer`, `auth.uid()` seul, le code lu
+sans tirets ni casse, « no battery has this code », « this is your own battery », insertion dans
+`team_members` avec `preferred_role` `striker` par défaut, `on conflict do nothing`, rend l'id) ;
+`rotate_invite_code(team)` (le propriétaire seul) ; `battery_members(team)` (le propriétaire
+depuis `teams` puis les lignes de `team_members`, jointes à `profiles`, derrière
+`is_team_member`, parce que `profiles_read_self` cache tout profil sauf le sien) ; les trois
+ouvertes à `authenticated`, fermées à `anon`. Quitter et retirer un membre sont un `delete` sur
+`team_members` sous la politique `team_members_write` de 0001, sans fonction. **Un défaut connu
+de `battery_members`** : le propriétaire revient deux fois dès que le lobby a mémorisé son siège
+sur sa propre ligne (ce que `Lobby.tsx` fait depuis 2H.4) ; `mergeRoll` dans
+`client/src/lib/roll.ts` fusionne les deux lignes côté client, la fonction SQL sera corrigée
+dans la prochaine migration qui s'ouvre. **Le compte**, `client/src/lib/useAccount.ts` :
+`teams` lu sans filtre (la RLS `teams_read_member` rend la batterie possédée et les rejointes),
+trié possédée d'abord ; `team` est celle choisie, `pickTeam` (la mémorisée dans
+`localStorage` sous `boomball.team`, sinon la possédée, sinon la première), `chooseTeam(id)`
+relit ses matchs et son effectif ; `members` par `battery_members`. `client/src/lib/roll.ts`
+porte `pickTeam` et `mergeRoll`, purs, hors du client Supabase. **Les aides**,
+`client/src/lib/supabase.ts` : `joinTeam(code)`, `rotateInviteCode(teamId)`,
+`removeMembership(teamId, profileId)` (quitter et retirer), `saveSeatPreference(teamId,
+profileId, role, name)` ; `SeatRequest` sorti dans `supabase-types.ts` pour les modules purs.
+**Le hub**, `TeamHub.tsx` (Sonnet) : le switcher « Your batteries » quand il y en a plus d'une
+(`battery-switch`, `data-team-id`, `data-selected`) ; « Abandon this match » au propriétaire
+seul ; la section « The roll » entre l'échelle et la composition : pour le propriétaire le code
+en « C906 · 8FD2 » (`invite-code`, `data-code`), « Copy » et « New code » (`new-code`), pour
+tous la liste (`member-row`, `data-profile-id`, la mention owner, le rôle et le nom gardés,
+« (you) »), « Remove » en deux clics pour le propriétaire (`remove-member`), « Leave this
+battery » en deux clics pour un membre (`leave-battery`) ; « Join another battery » en bas du
+hub et « Or join a battery with a code » sous « Raise a battery » (`join-code`, `join-button`).
+**Le lobby partagé**, `client/src/screens/Lobby.tsx`, fil principal : le canal
+`lobby:<teamId>` avec la présence à la clé `userId` (un rechargement remplace au lieu de
+doubler), `track` de mon siège à l'abonnement et à chaque changement (nom, rôle, `ready`, et
+la ligue sur le siège du propriétaire) ; `sync` reconstruit la liste, un siège par joueur (la
+dernière méta d'une clé) ; `broadcast` `started` fait recharger le compte des autres. Mon siège :
+nom (`seat-name`), rôle (`data-role`, `data-taken` quand les autres ont pris toutes les places,
+le rôle tenu retombe sur le premier libre), « Ready » (`ready`, `data-ready`) pour un membre,
+figé une fois prêt ; le propriétaire est prêt par construction et a seul « Start match »
+(`start-match`), actif quand chaque autre présent est prêt (`waiting-on` sinon) ; les membres
+lisent « Giff starts the match » (`owner-starts`) et la ligue grisée ; la colonne « In the
+lobby » (`seats`, `seat-row`, `data-profile-id`, `data-ready`) et les places prises par rôle.
+`client/src/screens/lobbySeats.ts`, pur : `openRoles`, `canStart`, `seatRequests` (le
+propriétaire premier, les noms coupés). Au démarrage `saveSeatPreference` pour le propriétaire,
+`createMatch(team.id, seatRequests(everyone), tier)`, puis `started` diffusé avant de quitter le
+canal. **La fonction**, `create-match` : refus 403 « only the owner of the battery starts its
+matches » quand l'appelant n'est pas `teams.owner`. **Tests** : `client/src/screens/lobby.test.ts`
+(quatre), `client/src/lib/roll.test.ts` (trois), `server/migration0011.test.ts` (six) ; **741
+tests sur 41 fichiers** (728 avant), typecheck racine, scripts, e2e et client verts, les deux
+fonctions bundlent, le client bundle. **Migration `0011` appliquée par Jérôme le 2026-10-17**,
+vérifiée en lecture avant (2 batteries, 2 membres, colonne et fonctions absentes) et après (la
+colonne, deux codes distincts bien formés, les trois fonctions avec `authenticated`, `postgres`,
+`service_role`, 2 et 2 inchangés). **Redéployées le même jour sur son feu vert :
+`resolve-action` v26, `create-match` v24**, moteur 10 inchangé. **Le second compte e2e a rejoint
+« E2E Battery » par son code** (script jetable : connexion par mot de passe, `join_team` en tant
+que joueur, `battery_members` relu : le propriétaire, E2E Second). **Harnais** : smoke 2D
+**vert en 39,1 s** (un premier run rouge sur le propriétaire listé deux fois par
+`battery_members`, clé React en double, corrigé par `mergeRoll`) ; nouveau `e2e/coop.spec.ts`
+(`@coop`, `npm run e2e:coop`, hors de `npm run e2e`) **vert en 18,7 s** : le propriétaire
+abandonne le match e2e en cours s'il y en a un, entre au lobby ; le second compte se connecte
+par l'écran dans un second contexte, voit son hub sans code et avec « Leave this battery », les
+deux lignes de l'effectif, entre au lobby ; **les deux voient deux sièges**, « Start match »
+grisé et « Waiting on E2E Second » chez le propriétaire, « Giff starts the match » chez le
+second ; le second prend Breaker, se nomme « Second Giff », coche Ready ; le propriétaire voit
+les deux prêts, le bouton s'allume, « 2 named seats » ; il démarre ; **les deux clients
+atteignent le plateau**, deux unités humaines côté A dont « Second Giff », le second a son pion ;
+le propriétaire quitte le match pour laisser la batterie propre. Captures lues : les deux lobbies
+(`02-lobby-owner-both-ready`, `02-lobby-second-ready`) et le plateau du second avec « Second
+Giff » sixième de l'échelle. **Dette** : la liste du lobby est sur un canal public (voir plus
+haut) ; un membre non assis ne voit pas encore le match en spectateur (2H.33) ; l'écran du
+second ne sait pas encore que le propriétaire a abandonné (2H.33).
+
+**Comment 2H.33 est codée** (le 2026-10-17, fil principal Fable 5.1 ; **un Sonnet effort élevé
+sur les tests `engine/c32.test.ts` et `server/yield.test.ts`** sur brief fermé, relus par le fil
+principal). **L'écart 65**, `engine/initiative.ts` : `placementAt` lit les humains actifs du bloc
+dans l'ordre du bloc, qui est l'ordre du d20 (`teamSlots`), interroge le premier non encore placé,
+et offre `actifs − (humains − 1)` places, deux au moins sinon pas de popup ; `placeHumans(state,
+index, unitId, place, mark)` pose le premier par `placeHuman` puis insère chaque autre humain juste
+derrière lui, dans l'ordre du d20, tous marqués `placed` ; `applyChoosePlace` dans `reduce.ts`
+l'appelle à la place de `placeHuman` (qui reste pour `offerPlace`). L'expiration prend la dernière
+place offerte comme avant, les autres derrière. La forme des événements ne change pas. **Le siège
+remis à la maison** : `YieldSeatAction` (`engine/actions.ts`, jamais proposée par
+`legalActions`), l'événement `seatYielded { unitId, humanId }` (`engine/events.ts`),
+`applyYieldSeat` dans `reduce.ts`, appelé par `reduce` **avant** toute vérification de tour :
+l'unité doit exister et être humaine, son contrôleur devient `{ kind: 'ai' }` ; si elle est sur
+l'horloge avec une place à choisir, la maison prend la dernière (`applyChoosePlace`) ; si elle est
+sur l'horloge en plein tour, le tour reste ouvert et c'est la boucle d'IA de l'appelant qui le
+joue ; rien d'autre ne change, ni case, ni PV, ni ballon. **`ENGINE_VERSION` 11.**
+`server/session.ts`, `submitAction` : `yieldSeat` est accepté hors tour, du contrôleur de l'unité
+seulement (« X does not control Y » sinon), puis `advance` avec la clé d'horloge d'avant, donc un
+chrono neuf pour l'humain suivant ; `serveAction` règle d'abord une expiration, jamais les deux.
+`scripts/dump-match.ts` reconstruit `yieldSeat` depuis `seatYielded` et l'écrit « X is handed to
+the house » ; le fil (`Feed.tsx`) dit « X is handed to the house for the rest of the match ». **Le
+client**, `match/useMatch.ts` : `playForeign(from, events)` rejoue par `play()` un lot diffusé
+qui suit exactement le plateau tenu (`from === seqRef + 1`), relit le plateau sinon, compté en
+vol pendant le rejeu ; `sendMany(actions, asUnitId, quiet)` envoie pour une unité nommée
+(`sendAs`, qui jette sur un refus pour que la confirmation l'affiche) ou en silence (`knock`, un
+`endTurn` pour l'unité sur l'horloge, dont le refus ne s'affiche pas) ; le canal porte aussi
+`abandoned` (`abandonedByOwner`, `announceAbandoned`). `match/coopClock.ts`, pur :
+`teammateKnockDue` (cinq secondes après l'échéance, corrigées du décalage), `secondsLeft`,
+`clockText`. `screens/Match.tsx` : la prop `isOwner` ; « Waiting for X · 1:12 »
+(`waiting-for`) quand un autre humain est sur l'horloge, pour tous ; le coup à la porte d'un
+coéquipier assis (`teammateKnocked`, jamais sous `PATIENT`, jamais pour un spectateur qui n'a pas
+de siège et que `resolve-action` refuserait) ; « Leave the match » au propriétaire seul, « Hand my
+Giff to the house » (`hand-over`) pour un coéquipier assis avec `YieldPrompt.tsx` (`yield-prompt`,
+`yield-yes`, `yield-no`), « Back to the hub » (`watch-leave`) et « Watching · no seat in this
+match » (`watching`) pour un spectateur ; l'abandon du propriétaire est diffusé avant de quitter,
+et un client qui le reçoit revient au hub. `App.tsx` passe `isOwner`. **Tests** :
+`engine/c32.test.ts` (dix : le premier au d20 interrogé avec deux places, l'ordre après la place 1
+et la place 2, le second jamais interrogé, deux Breakers humains et trois Strikers humains sans
+popup, l'expiration, `yieldSeat` par `reduce` hors tour, sur une IA, pendant la popup, jamais dans
+`legalActions`), `server/yield.test.ts` (six : le refus d'un autre humain, le siège remis hors
+tour sans toucher au chrono, sur l'horloge l'IA joue le tour et le chrono suivant est neuf,
+jamais pendant une expiration, le refus après coup), `client/src/match/coopClock.test.ts`
+(deux) ; **759 tests sur 44 fichiers** (741 avant), typecheck racine, scripts, e2e et client
+verts, les deux fonctions bundlent, le client bundle. **Redéployées le 2026-10-17 sur son feu
+vert : `resolve-action` v27, `create-match` v25, moteur 11** ; aucun match du moteur 10 n'était
+ouvert, rien d'archivé de neuf ; `e0d9b642` (moteur 10) ne se rejoue plus avec le dépôt.
+**Harnais sur les fonctions redéployées** : `e2e:coop` **vert en 37,5 s** (un premier run rouge
+sur le spec lui-même : `isVisible` n'attend pas le briefing, remplacé par `waitFor` comme dans
+le smoke) : le propriétaire joue son tour, le second client le voit arriver sans rien demander
+(`04-second-saw-owner-turn`) ; au tour du second, le propriétaire lit « Waiting for Second Giff ·
+1:59 » (`05-owner-waiting-for-second`), le second reçoit sa popup à deux places (deux Breakers,
+un humain), clique « Hand my Giff to the house », confirme (`05-hand-over-prompt`), passe en
+spectateur (« Watching · no seat in this match », « Back to the hub », `06-second-watching`), le
+propriétaire voit le pion devenu IA ; le propriétaire quitte et le second revient à son hub
+(`07-second-hub-after-owner-left`). Smoke 2D **vert en 41,5 s**, playthrough **vert en 1,1
+min**, 23 requêtes humaines, 0 refusée. **Laissé, en dette** : le nom du joueur sur la plaque des
+autres pions humains (les plaques portent le nom du Giff et l'échelle dit qui est humain) ; le
+bandeau « Your turn » d'avant un siège remis reste affiché le temps de sa durée ; un spectateur
+ne frappe pas à la porte ; `battery_members` liste encore le propriétaire deux fois (fusionné
+côté client).

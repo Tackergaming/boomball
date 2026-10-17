@@ -51,7 +51,7 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * the server stamps it on `matches` and refuses a mismatch, and the client
  * archives what it cannot play.
  */
-export const ENGINE_VERSION = 10;
+export const ENGINE_VERSION = 11;
 
 // -- The penalty box (écart 53) --------------------------------------------
 

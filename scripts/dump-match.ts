@@ -376,6 +376,10 @@ function nextAction(unit: UnitId, current: MatchState): Action | null {
         // Écart 58: the human's place in its role, engine version 7.
         if (e.unitId === unit) return { kind: 'choosePlace', place: e.place };
         continue;
+      case 'seatYielded':
+        // 2H.33, engine version 11: the human handed the Giff to the house.
+        if (e.unitId === unit) return { kind: 'yieldSeat' };
+        continue;
       case 'turnStarted':
         // Somebody else's turn began before this unit did anything we can
         // name: the turn ended without a `turnEnded`, which only a mover
@@ -493,6 +497,8 @@ function line(e: MatchEvent): string | null {
       return `${nm(e.unitId)} is asked its place in its role, out of ${e.places}`;
     case 'placeChosen':
       return `${nm(e.unitId)} takes place ${e.place} of its role`;
+    case 'seatYielded':
+      return `${nm(e.unitId)} is handed to the house`;
     case 'moved':
       return `${nm(e.unitId)} moves ${e.path.length} to (${e.to.x}, ${e.to.y})`;
     case 'dashed':

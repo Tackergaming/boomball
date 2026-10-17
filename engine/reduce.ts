@@ -34,7 +34,7 @@ import {
 } from './constants.js';
 import type { MatchEvent } from './events.js';
 import { directionFromD8, distance, lineTo, stepCostFeet, type Point } from './geometry.js';
-import { buildTurnOrder, placeHuman, placementAt, promoteBulwark } from './initiative.js';
+import { buildTurnOrder, placeHuman, placeHumans, placementAt, promoteBulwark } from './initiative.js';
 import { Rng } from './rng.js';
 import {
   attackMode,
@@ -110,6 +110,10 @@ interface TurnCtx extends Ctx {
 export function reduce(arena: Arena, state: MatchState, command: Command): ReduceResult {
   if (state.phase === 'finished') return { ok: false, reason: 'the match is over' };
 
+  // A seat handed to the house (2H.33) is not a turn action: it is accepted
+  // at any moment, on the clock or not, from the unit's own controller.
+  if (command.action.kind === 'yieldSeat') return applyYieldSeat(arena, state, command.unitId);
+
   const turn = state.turn;
   if (!turn) return { ok: false, reason: 'no turn is in progress' };
   if (turn.unitId !== command.unitId) {
@@ -168,7 +172,36 @@ function apply(arena: Arena, state: MatchState, unit: Unit, action: Action): Red
       return applyEndTurn(arena, state, unit);
     case 'choosePlace':
       return { ok: false, reason: 'no place is being chosen' };
+    case 'yieldSeat':
+      // Handled before the turn checks in `reduce`; unreachable here.
+      return { ok: false, reason: 'a seat is yielded outside the turn' };
   }
+}
+
+/**
+ * A human hands its Giff to the house for the rest of the match (2H.33, `00`
+ * C32 point 6, Jérôme's "b", engine version 11). The unit's controller becomes
+ * the AI's; `seatYielded` says so. If the unit was being asked its place in
+ * its role, the house takes the last, as a clock that ran out would, and the
+ * ladder moves on; if the unit was on the clock, the turn stays open and the
+ * caller's AI loop plays it. Nothing else changes: the unit keeps its cell,
+ * its hit points and its ball.
+ */
+function applyYieldSeat(arena: Arena, state: MatchState, unitId: UnitId): ReduceResult {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit) return { ok: false, reason: `no unit with id ${unitId}` };
+  if (unit.controller.kind !== 'human') return { ok: false, reason: `${unit.name} is already the house's` };
+
+  const log: MatchEvent[] = [{ kind: 'seatYielded', unitId, humanId: unit.controller.humanId }];
+  const yielded: Unit = { ...unit, controller: { kind: 'ai' } };
+  const next = replaceUnit(state, yielded);
+
+  if (next.turn?.unitId === unitId && next.turn.placing != null) {
+    const placed = applyChoosePlace(arena, next, yielded, next.turn.placing);
+    if (!placed.ok) return placed;
+    return { ok: true, state: placed.state, events: [...log, ...placed.events] };
+  }
+  return { ok: true, state: next, events: log };
 }
 
 /** Seals a handler's result, writing the RNG cursor back into the state. */
@@ -1376,9 +1409,10 @@ function applyChoosePlace(arena: Arena, state: MatchState, unit: Unit, place: nu
     return { ok: false, reason: `place ${place} is not on offer: 1 to ${places}` };
   }
   const log: MatchEvent[] = [{ kind: 'placeChosen', unitId: unit.id, place }];
+  // Écart 65 (2H.33): the other humans of the role, if any, go right behind.
   const placed: MatchState = {
     ...state,
-    turnOrder: placeHuman(state, state.turnIndex, unit.id, place),
+    turnOrder: placeHumans(state, state.turnIndex, unit.id, place),
     turn: null,
   };
   if (place === 1) return { ok: true, state: beginTurn(placed, unit, log), events: log };
