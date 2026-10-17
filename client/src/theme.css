@@ -844,6 +844,27 @@ button.bb-role[aria-pressed='true'] svg {
   gap: 10px;
 }
 
+/* The team-mate's one job in the lobby (Jérôme, 2026-10-17: "trop discret, pas
+   éclairé"): the full primary button, lit until it is clicked. */
+button.bb-ready-call {
+  width: 100%;
+  font-size: 16px;
+  padding: 13px 16px;
+  letter-spacing: 0.1em;
+  box-shadow: 0 0 0 1px rgb(60 224 240 / 60%), 0 0 18px 2px rgb(60 224 240 / 35%);
+  animation: bb-ready-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes bb-ready-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgb(60 224 240 / 60%), 0 0 18px 2px rgb(60 224 240 / 35%);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgb(60 224 240 / 90%), 0 0 30px 8px rgb(60 224 240 / 55%);
+  }
+}
+
 .bb-badge {
   font-family: var(--display);
   font-weight: 800;
@@ -967,6 +988,7 @@ button.bb-role[aria-pressed='true'] svg {
 
 @media (prefers-reduced-motion: reduce) {
   .bb-seat.arrive,
+  button.bb-ready-call,
   .bb-badge.wait,
   .bb-note.wait {
     animation: none;

@@ -2061,3 +2061,22 @@ le moteur ni dans l'IA, `ENGINE_VERSION` reste 11, **rien à redéployer côté 
 | Dette | Les trois canaux Realtime publics (phase 8) ; `create-match` et `abandon_match` disent encore « battery » jusqu'à un redéploiement ; un run coop rouge une fois sur la présence, non reproduit |
 
 **Ce qui attend Jérôme** : sa partie à deux sur la nouvelle interface, en ligne, puis la phase 8.
+
+### Sous-phase 2H.35, « la limite de présence et le bouton Ready », codée le 2026-10-17 soir, porte ouverte
+
+Par le fil principal (Fable 5.1), seul, à partir de `00` C34 : les deux retours de Jérôme après sa
+seconde partie à deux sur le client redéployé. Rien dans le moteur ni en base, `ENGINE_VERSION`
+reste 11, **rien à redéployer côté fonctions** ; pas de sweep.
+
+| Quoi | État |
+|---|---|
+| Le bug | La revanche s'ouvrait sans le coéquipier qui attendait dans le lobby (`86df1770`, un siège, après `7cfc5976` à deux). Cause tracée dans les trames Realtime : trois `track` de présence en cinquante millisecondes font répondre « Client presence rate limit exceeded » et **fermer le canal pour de bon** ; le canal vivant dans `App` depuis 2H.34, le lobby suivant était muet |
+| Le correctif | `useLobbyChannel` : un message de présence au plus par 500 ms, le dernier état, jamais deux fois le même ; un canal fermé par le serveur rouvert une seconde après, siège redit ; `useAccount` ne fait plus clignoter le profil à la relecture |
+| Le bouton | « Click here when you're ready », plein, pleine largeur, auréole cyan qui pulse jusqu'au clic |
+| Le spec | `e2e/rematch.spec.ts` (`@coop`) : la séquence rapide du lobby, un match entier à deux joué par le cerveau de la maison, « Play again » des deux côtés, les deux sièges de retour, la revanche à deux ; **vert en 1,8 min**, et il reproduisait le défaut avant le correctif |
+| Tests | **771**, inchangés ; typecheck racine, scripts, e2e et client verts |
+| Harnais | `e2e:coop` **vert en 2,3 min** (deux specs), smoke 2D **vert en 24 s** |
+| Dette | `Match.tsx` appelle `onFinished` à chaque rendu une fois la phase finie (plusieurs `refresh()` en vol, sans effet visible) |
+
+**Ce qui attend Jérôme** : le feu vert du client en ligne, puis sa partie à deux avec une
+revanche, puis la phase 8.

@@ -299,13 +299,14 @@ export function Lobby({
                   <span className="bb-badge owner">You start the match</span>
                 ) : (
                   <button
-                    className={ready ? 'bb-small' : 'ghost bb-small'}
+                    className={ready ? 'ghost bb-small' : 'bb-ready-call'}
                     onClick={toggleReady}
                     aria-pressed={ready}
                     data-testid="ready"
                     data-ready={ready ? 'true' : 'false'}
+                    title={ready ? 'Click again to change your seat' : 'The owner starts once everyone has clicked'}
                   >
-                    {ready ? `Ready · waiting for ${ownerName}` : 'Ready'}
+                    {ready ? `Ready · waiting for ${ownerName}` : "Click here when you're ready"}
                   </button>
                 )}
               </div>

@@ -3138,3 +3138,76 @@ the other n Giff » porte une ombre pour se lire sur la porte éclairée.
 laisse pas un membre démarrer) ; `abandon_match` dit encore « battery » (même raison) ; dans la barre
 du membre, « Giff picks the league » et « Giff starts the match » se répètent ; `mergeRoll` reste
 côté client, inutile depuis `0012`, à retirer à la prochaine passe sur `roll.ts`.
+
+## C34. Décisions du 2026-10-17 soir, **la limite de présence et le bouton Ready, sous-phase 2H.35**
+
+> Écrites par le fil principal (Fable 5.1) sur les deux retours de Jérôme après sa seconde partie à
+> deux, sur le client redéployé avec 2H.34. Aucun écart de règle, rien dans le moteur, rien en
+> base, `ENGINE_VERSION` reste 11, rien à redéployer côté fonctions.
+
+**Ses deux retours, dans ses mots.** « Une fois dans le lobby et que l'invité a choisi son rôle,
+il n'est pas clair qu'il faut cliquer sur le bouton Ready. C'est trop discret, pas éclairé, et le
+texte devrait plutôt dire "Click here when you're ready" ». Et : « une fois un match terminé, si
+on en recommence un en cliquant Play again, l'invité n'est plus dans le jeu malgré qu'il soit dans
+le lobby en train d'attendre et toujours inscrit à l'équipe. Là il y a un bug ».
+
+**Le bug, lu en base puis reproduit.** Ses deux matchs du soir sur « Shrapnel oath » : `7cfc5976`
+(13:55 UTC) a deux sièges, Tacker Striker et E2E Second Trajector, joué jusqu'au bout, 40 à 30 ;
+`86df1770` (14:08), la revanche, **un seul siège**, abandonné au round 1. Le propriétaire a donc
+démarré sans voir son coéquipier dans le lobby. Un spec Playwright à deux contextes qui joue un
+match entier avec le cerveau de la maison sur les deux sièges puis clique « Play again » des deux
+côtés (`e2e/rematch.spec.ts`) a reproduit le défaut du premier coup, et une sonde qui trace les
+trames Realtime des deux clients a donné la cause : **« Client presence rate limit exceeded »**.
+Trois messages `track` de présence en cinquante millisecondes (un rôle, un nom, un Ready ; ou le
+nom d'affichage qui passe par « » le temps d'une relecture du compte ; ou un `track` suivi de
+l'`untrack` du départ) font répondre au serveur Realtime une erreur système **et fermer le canal
+pour de bon** (`phx_close`). Le siège quitte le lobby des autres, le client n'entend plus aucune
+diffusion, et comme le canal du lobby vit dans `App` depuis 2H.34 pour toute la soirée, **le lobby
+suivant de ce joueur est muet** : son `track` tombe sur un canal fermé, le propriétaire ne le voit
+pas, démarre seul, et le `started` ne lui parvient pas, d'où « en train d'attendre ». Avant 2H.34
+le lobby ouvrait un canal neuf à chaque entrée, ce qui masquait la fermeture.
+
+**Les décisions, prises par le fil principal et montrées à Jérôme.**
+
+1. **`track()` est lissé** : un message de présence au plus toutes les 500 ms (`TRACK_GAP_MS`),
+   le premier part tout de suite, les suivants portent le dernier état, rien n'est envoyé deux
+   fois à l'identique, et un `untrack` n'est envoyé que si un siège avait été dit. Taper un nom
+   coûte un message par demi-seconde, pas un par touche.
+2. **Un canal fermé par le serveur est rouvert** une seconde plus tard (`CLOSED`, `CHANNEL_ERROR`
+   ou `TIMED_OUT` dans le rappel de `subscribe`, hors de notre propre fermeture), le siège redit à
+   l'abonnement ; l'instance fermée du même topic est démontée d'abord, parce que
+   `supabase.channel()` rend l'instance existante et empilerait les gestionnaires.
+3. **Le profil ne clignote plus** : `useAccount.load` ne remet `profile` à `undefined` que pour
+   un utilisateur qu'il n'a pas encore lu (`loadedForRef`) ; une relecture du même joueur garde le
+   nom à l'écran, donc le siège ne change pas pendant un `refresh()`.
+4. **Le bouton Ready** du coéquipier devient le bouton plein, pleine largeur, auréolé de cyan qui
+   pulse (`bb-ready-call`, éteint sous `prefers-reduced-motion`), avec ses mots :
+   « Click here when you're ready » ; une fois cliqué il redevient discret, « Ready · waiting for
+   X ». Le test id `ready` ne change pas.
+
+**Comment 2H.35 est codée** (le 2026-10-17, fil principal Fable 5.1, aucun sous-agent).
+`client/src/lib/useLobbyChannel.ts` : `flush` (compare le siège courant au dernier envoyé en
+JSON, envoie `track` ou `untrack`, date l'envoi), `track` (bord d'attaque immédiat, puis une
+minuterie au plus par `TRACK_GAP_MS`), `epoch` qui relance l'effet, le démontage d'un canal
+résiduel du même topic avant `open()`, le drapeau `disposed` pour ne pas rouvrir pendant notre
+propre démontage. `client/src/lib/useAccount.ts` : `loadedForRef`. `client/src/screens/Lobby.tsx`
+et `theme.css` : le bouton. **`e2e/rematch.spec.ts`**, nouveau, étiqueté `@coop` et joué par
+`npm run e2e:coop` : le propriétaire et le second dans le lobby, le second prend Breaker, se nomme
+et se dit prêt dans la même seconde (la séquence qui déclenchait la limite), un match entier à
+deux joué par `chooseAction` sur les deux sièges (30 et 31 requêtes), « full time » sur les deux
+écrans, « Play again » des deux côtés, **les deux sièges de retour dans les deux lobbies**, le
+second prêt, la revanche ouverte avec deux humains dont « Second Giff », puis abandonnée pour
+laisser l'équipe propre. **771 tests** (inchangés), typecheck racine, scripts, e2e et client verts.
+**Harnais** : `e2e:coop` **vert en 2,3 min** (les deux specs : 22 s et 1,8 min), smoke 2D **vert
+en 24 s** ; la sonde des trames rejouée après le correctif montre un `track` par changement espacé
+d'une demi-seconde, aucune erreur système, aucun `phx_close` du lobby, et le second qui atteint le
+plateau. Captures lues : le lobby de la revanche côté second avec le bouton éclairé et la carte du
+propriétaire de retour (`02-rematch-lobby-second`).
+
+**Laissé, en dette.** `Match.tsx` appelle `onFinished` à chaque rendu tant que la phase est
+« finished », parce que `App` lui passe une fonction neuve à chaque rendu : plusieurs
+`refresh()` en vol à la fin d'un match, sans effet visible depuis que le profil ne clignote plus ;
+à borner un jour par un `useRef`. Le canal du match (`useMatch`) n'a pas de présence et ne risque
+pas cette limite ; ses `send` de diffusion restent peu nombreux. La limite exacte du serveur n'est
+pas publiée dans la réponse : trois messages en cinquante millisecondes l'ont franchie, un par
+demi-seconde ne la franchit pas.

@@ -151,6 +151,8 @@ export function useAccount(): Account {
   const [failure, setFailure] = useState<string | null>(null);
   /** The team id the player last chose, so a refresh keeps it. */
   const chosenRef = useRef<string | null>(rememberedTeam());
+  /** The user whose profile was last read, so a refresh of the same one keeps it on screen. */
+  const loadedForRef = useRef<string | null>(null);
 
   /** The matches and the roll of one team. Returns false when a read failed. */
   const loadTeam = useCallback(async (mine: Team): Promise<boolean> => {
@@ -209,7 +211,12 @@ export function useAccount(): Account {
       // never sees it beside a `null` profile left over from the signed-out
       // state. That pairing is what sent `App` to insert a profile that existed,
       // and the 409 it got back was the unexplained failure on every sign-in.
-      setProfile(undefined);
+      // Only for a user the hook has not read yet: on a refresh of the same
+      // player the profile stays, or the display name flickers to "" for a
+      // render, the lobby tracks the seat twice in a row, and the presence
+      // rate limit closes the channel (2H.35, `00` C34).
+      if (loadedForRef.current !== id) setProfile(undefined);
+      loadedForRef.current = id;
 
       const { data: profileRow, error: profileError } = await supabase
         .from('profiles')

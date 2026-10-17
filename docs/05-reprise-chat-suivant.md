@@ -8,7 +8,7 @@
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.34
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.35
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15, la 6 par 2H.29,
 la 7 par 2H.31 à 2H.33, et 2H.34 est l'interface d'équipe qui a suivi ma première soirée de
 coop), §9 la parallélisation.
@@ -27,24 +27,30 @@ et LAISSÉE TOMBER), C32 la coop (cadrée en huit réponses de moi, codée en tr
 cliquable que j'ai validée et quinze points validés en un lot** : le hub en une bande d'appel et
 deux colonnes, vivant (canal `team:<id>`, présence du lobby lue depuis App) ; le lobby « The
 bench » en trois cartes de siège ; mon image de la foule devant le silo en fond ; Battery devenu
-Team partout à l'écran ; la migration 0012. Ne rediscute rien de C12 à C33.
+Team partout à l'écran ; la migration 0012. **C34 est 2H.35, codée le 2026-10-17 soir sur mes deux
+retours de ma seconde partie à deux** : la revanche s'ouvrait sans l'invité parce que trois
+messages de présence en cinquante millisecondes faisaient fermer le canal du lobby par le serveur
+(« Client presence rate limit exceeded ») ; `track()` est lissé à un message par demi-seconde, un
+canal fermé est rouvert, le profil ne clignote plus à la relecture, et le bouton du coéquipier dit
+« Click here when you're ready » en grand. Ne rediscute rien de C12 à C34.
 07 §10 porte le journal (2H.15 la 2.5D fichier par fichier, 2H.16 à 2H.20 la caméra, 2H.21 et
 2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31,
-2H.32, 2H.33, 2H.34). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de
+2H.32, 2H.33, 2H.34, 2H.35). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de
 sweep depuis 2H.8. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te
 surprend.
 
-Où on en est : **2H.34 est CODÉE le 2026-10-17, `ENGINE_VERSION` toujours 11, rien à redéployer
+Où on en est : **2H.34 et 2H.35 sont CODÉES le 2026-10-17, `ENGINE_VERSION` toujours 11, rien à redéployer
 côté fonctions (`resolve-action` v27, `create-match` v25, moteur 11 en ligne depuis le 17).**
 771 tests verts sur 45 fichiers, typecheck racine, scripts, e2e et client verts, le client
-bundle. Smoke 2D vert en 27 s, `npm run e2e:coop` vert en 20 s, `e2e:board3d` vert en 7,8 min, sur la
-nouvelle interface.
+bundle. Smoke 2D vert en 24 s, `npm run e2e:coop` vert en 2,3 min (deux specs depuis 2H.35 :
+`coop.spec.ts` 22 s et `rematch.spec.ts` 1,8 min, qui joue un match entier à deux puis la
+revanche), `e2e:board3d` vert en 7,8 min (lancé sur 2H.34, rien du plateau n'a bougé depuis).
 **LA MIGRATION 0012 (`0012_team_wording.sql`) EST APPLIQUÉE PAR MOI LE 2026-10-17** (vérifiée en
 lecture avant et après, consignée en 04) : les trois messages SQL de 0011 en « team », le
 propriétaire listé une fois par `battery_members` ; `mergeRoll` côté client est devenu inutile,
 à retirer à la prochaine passe sur `roll.ts`. **LE
 CLIENT EN LIGNE (https://boomball.vercel.app) EST CELUI DE 2H.34, REDÉPLOYÉ LE 2026-10-17 SUR MON
-FEU VERT** (`dpl_56jFmrpJqYmRtyzz4BQZZaYJUnea`, 83 fichiers, 12,1 Mo plus le fond de 198 Ko servi
+FEU VERT ; 2H.35 N'EST EN LIGNE QUE SI J'AI DONNÉ LE FEU VERT EN FIN DE CHAT, VÉRIFIER DANS 07 §10** (`dpl_56jFmrpJqYmRtyzz4BQZZaYJUnea`, 83 fichiers, 12,1 Mo plus le fond de 198 Ko servi
 en 200) : la coop et la nouvelle interface sont en ligne ; le smoke lancé contre l'URL en ligne
 passe la connexion, le hub, le lobby et atteint le plateau, puis s'arrête sur le crochet
 `window.__boomball`, absent d'un build par construction (ce n'est pas un défaut). Un redéploiement
@@ -108,12 +114,14 @@ lobby », « Raise a team », « Team name », « The bench », `leave-team`). R
 redéploiement des fonctions les messages « only the owner of the battery starts its matches »
 (create-match) et « ...can abandon its match » (abandon_match), que l'écran ne laisse pas voir.
 
+**Dette de 2H.35** : `Match.tsx` appelle `onFinished` à chaque rendu une fois la phase finie
+(plusieurs `refresh()` en vol, sans effet visible), à borner par un `useRef`.
+
 **Dette de 2H.34** : les trois canaux Realtime (`team:`, `lobby:`, le match) sont publics,
 pour ma /security-review de la phase 8 ; « Giff picks the league » et « Giff starts the match »
 se répètent dans la barre du membre ; `mergeRoll` reste côté client, inutile une fois 0012
-appliquée ; un run `e2e:coop` rouge une fois sur la présence (le siège du second disparu du
-lobby du propriétaire après son Ready), non reproduit par une sonde qui a tracé les trames ni par
-le run suivant, à surveiller ; le nom du joueur sur la plaque des autres pions humains (dette de
+appliquée ; le run `e2e:coop` rouge une fois sur la présence le 17 après-midi était déjà la limite de
+présence de C34, expliqué et corrigé en 2H.35 ; le nom du joueur sur la plaque des autres pions humains (dette de
 2H.33) ; le bandeau « Your turn » qui reste sa durée après un siège remis ; un spectateur ne
 frappe pas à la porte ; `e0d9b642` (moteur 10) et tous les matchs antérieurs ne se rejouent plus.
 
@@ -209,7 +217,9 @@ Ce qu'il faut savoir tout de suite.
    série de remplacements, un script Python écrit dans le scratchpad, lancé avec python -I.
    Jamais Html de drei. La caméra ne passe pas par OrbitControls. Le corps du pion est le Giff
    riggé (giffRig.ts). Les hooks de Match.tsx restent au-dessus du retour anticipé sur state.
-   Un module client testé par vitest n'importe jamais lib/supabase.ts (il jette sans son
+   **La présence Realtime est limitée en débit par le serveur et la sanction est la fermeture du
+   canal** (C34) : jamais un `track` par touche ni par rendu, toujours par `useLobbyChannel.track`,
+   qui lisse à un message par demi-seconde et rouvre un canal fermé. Un module client testé par vitest n'importe jamais lib/supabase.ts (il jette sans son
    environnement) : les parties pures vivent à côté (lobbySeats.ts, roll.ts, coopClock.ts).
    `supabase.channel(topic)` rend l'instance existante d'un même topic : ne jamais tenir deux
    fois le même canal dans deux composants, c'est pour ça que le lobby est dans App.
@@ -237,7 +247,7 @@ Ce qu'il faut savoir tout de suite.
     réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 65 de 00
-    partie C, et C11 à C33 en entier. Dette connue, outre celle de 2H.34 et de la coop ci-dessus :
+    partie C, et C11 à C34 en entier. Dette connue, outre celle de 2H.34 et de la coop ci-dessus :
     arenas.art et le champ art nomment trois JPEG retirés ; substituteEntry non lu ; la parade du
     Breaker humain automatique ; le fondu croisé des foules sans compensation ; le délai de
     l'annonceur compté depuis le début du clip ; une réplique en cours jette le KO d'un coup
