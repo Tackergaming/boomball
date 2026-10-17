@@ -50,7 +50,7 @@ lecture avant et après, consignée en 04) : les trois messages SQL de 0011 en �
 propriétaire listé une fois par `battery_members` ; `mergeRoll` côté client est devenu inutile,
 à retirer à la prochaine passe sur `roll.ts`. **LE
 CLIENT EN LIGNE (https://boomball.vercel.app) EST CELUI DE 2H.34, REDÉPLOYÉ LE 2026-10-17 SUR MON
-FEU VERT ; 2H.35 N'EST EN LIGNE QUE SI J'AI DONNÉ LE FEU VERT EN FIN DE CHAT, VÉRIFIER DANS 07 §10** (`dpl_56jFmrpJqYmRtyzz4BQZZaYJUnea`, 83 fichiers, 12,1 Mo plus le fond de 198 Ko servi
+FEU VERT, PUIS CELUI DE 2H.35, REDÉPLOYÉ LE SOIR MÊME SUR MON FEU VERT** (`dpl_56jFmrpJqYmRtyzz4BQZZaYJUnea`, 83 fichiers, 12,1 Mo plus le fond de 198 Ko servi
 en 200) : la coop et la nouvelle interface sont en ligne ; le smoke lancé contre l'URL en ligne
 passe la connexion, le hub, le lobby et atteint le plateau, puis s'arrête sur le crochet
 `window.__boomball`, absent d'un build par construction (ce n'est pas un défaut). Un redéploiement

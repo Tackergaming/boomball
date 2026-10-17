@@ -2076,7 +2076,7 @@ reste 11, **rien à redéployer côté fonctions** ; pas de sweep.
 | Le spec | `e2e/rematch.spec.ts` (`@coop`) : la séquence rapide du lobby, un match entier à deux joué par le cerveau de la maison, « Play again » des deux côtés, les deux sièges de retour, la revanche à deux ; **vert en 1,8 min**, et il reproduisait le défaut avant le correctif |
 | Tests | **771**, inchangés ; typecheck racine, scripts, e2e et client verts |
 | Harnais | `e2e:coop` **vert en 2,3 min** (deux specs), smoke 2D **vert en 24 s** |
+| En ligne | **Le client redéployé le 2026-10-17 soir sur son feu vert** (`dpl_8p89A6GvVMT6qYde22cw4jU1Qg7s`, 83 fichiers, 12,1 Mo, le bundle servi est celui du build) |
 | Dette | `Match.tsx` appelle `onFinished` à chaque rendu une fois la phase finie (plusieurs `refresh()` en vol, sans effet visible) |
 
-**Ce qui attend Jérôme** : le feu vert du client en ligne, puis sa partie à deux avec une
-revanche, puis la phase 8.
+**Ce qui attend Jérôme** : sa partie à deux avec une revanche, en ligne, puis la phase 8.
