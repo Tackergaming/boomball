@@ -262,11 +262,11 @@ function describe(event: MatchEvent, name: (id: string) => string, free = false)
       // 2H.33: a team-mate handed the Giff to the house for the rest of the match.
       return `${name(event.unitId)} is handed to the house for the rest of the match.`;
     case 'scored':
-      return `◆ ${event.team === 'A' ? 'Your battery' : 'The house'} scores ${event.points}.`;
+      return `◆ ${event.team === 'A' ? 'Your team' : 'The house'} scores ${event.points}.`;
     case 'matchEnded':
       return event.result.winner === 'draw'
         ? 'Full time. Drawn.'
-        : `Full time. ${event.result.winner === 'A' ? 'Your battery' : 'The house'} takes it.`;
+        : `Full time. ${event.result.winner === 'A' ? 'Your team' : 'The house'} takes it.`;
     default:
       return null;
   }

@@ -112,7 +112,7 @@ async function callFunction<T>(name: string, body: unknown): Promise<T | Refused
 
 /**
  * Opens a match. `tier` is the league the player chose in the lobby (2H.27,
- * `00` C28): the battery's own Tier or one below it, the server refuses above.
+ * `00` C28): the team's own Tier or one below it, the server refuses above.
  */
 export function createMatch(
   teamId: string,
@@ -124,7 +124,7 @@ export function createMatch(
 
 /**
  * Abandons a match (2H.28, `00` C29): the SQL function `abandon_match` checks
- * that the caller owns the battery and that the match is neither finished nor
+ * that the caller owns the team and that the match is neither finished nor
  * already abandoned, then stamps `abandoned_at`. No result is written, the
  * ladder does not move. The reason comes back in the server's own words.
  */
@@ -139,7 +139,7 @@ export async function abandonMatch(matchId: string): Promise<{ ok: true } | { ok
   }
 }
 
-/** A refusal of a battery write, in the server's own words. */
+/** A refusal of a team write, in the server's own words. */
 export type BatteryResult<T> = { ok: true; value: T } | { ok: false; reason: string };
 
 async function rpcResult<T>(name: string, args: Record<string, unknown>, what: string): Promise<BatteryResult<T>> {
@@ -154,22 +154,22 @@ async function rpcResult<T>(name: string, args: Record<string, unknown>, what: s
 }
 
 /**
- * Joins the battery whose invite code this is (2H.32, `00` C32 point 7). The
- * SQL function `join_team` finds the battery, refuses an unknown code and the
- * owner's own battery, and inserts the membership; joining twice is a no-op.
- * Returns the battery's id.
+ * Joins the team whose invite code this is (2H.32, `00` C32 point 7). The
+ * SQL function `join_team` finds the team, refuses an unknown code and the
+ * owner's own team, and inserts the membership; joining twice is a no-op.
+ * Returns the team's id.
  */
 export function joinTeam(code: string): Promise<BatteryResult<string>> {
-  return rpcResult<string>('join_team', { code }, 'joining the battery');
+  return rpcResult<string>('join_team', { code }, 'joining the team');
 }
 
-/** Renews the invite code of a battery the caller owns. Returns the new code. */
+/** Renews the invite code of a team the caller owns. Returns the new code. */
 export function rotateInviteCode(teamId: string): Promise<BatteryResult<string>> {
   return rpcResult<string>('rotate_invite_code', { team: teamId }, 'renewing the code');
 }
 
 /**
- * Leaves a battery (the caller's own row) or removes a member (the owner's
+ * Leaves a team (the caller's own row) or removes a member (the owner's
  * right): one delete, allowed by the `team_members_write` policy for both.
  */
 export async function removeMembership(teamId: string, profileId: string): Promise<BatteryResult<null>> {
@@ -190,7 +190,7 @@ export async function removeMembership(teamId: string, profileId: string): Promi
 /**
  * Remembers the seat a member takes: role and character name, on their own
  * `team_members` row (policy `team_members_write`). The owner has no row of
- * their own on their battery and is not written here.
+ * their own on their team and is not written here.
  */
 export async function saveSeatPreference(
   teamId: string,

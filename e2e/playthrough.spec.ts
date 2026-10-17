@@ -27,7 +27,7 @@ test('@playthrough plays the open match to the final whistle', async ({ page }, 
 
   await prefer2D(page);
   await page.goto('/');
-  const toLobby = page.getByRole('button', { name: 'To the lobby' });
+  const toLobby = page.getByRole('button', { name: 'Enter the lobby' });
   const resume = page.getByRole('button', { name: 'Back to the silo' });
   // `.first()`: both buttons are on the hub while a match runs, one of them disabled.
   await expect(resume.or(toLobby).first()).toBeVisible({ timeout: 30_000 });

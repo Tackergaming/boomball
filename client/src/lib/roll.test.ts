@@ -1,5 +1,5 @@
 /**
- * The roll with the owner listed once (2H.32), and which battery the hub opens on.
+ * The roll with the owner listed once (2H.32), and which team the hub opens on.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -28,7 +28,7 @@ const team = (id: string, ownerId: string): Team => ({
   id, name: id, wins: 0, tier: 'rookie', owner: ownerId, roster: null, invite_code: 'ABCDEF12',
 });
 
-describe('the battery the hub opens on (2H.32)', () => {
+describe('the team the hub opens on (2H.32)', () => {
   it('prefers the remembered one, then the owned one, then the first joined', () => {
     const mine = team('mine', 'j');
     const other = team('other', 'a');

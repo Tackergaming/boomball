@@ -55,13 +55,13 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
 
   await prefer2D(page);
   await page.goto('/');
-  const raise = page.getByRole('heading', { name: 'Raise a battery' });
-  const toLobby = page.getByRole('button', { name: 'To the lobby' });
+  const raise = page.getByRole('heading', { name: 'Raise a team' });
+  const toLobby = page.getByRole('button', { name: 'Enter the lobby' });
   const resume = page.getByRole('button', { name: 'Back to the silo' });
   await expect(raise.or(toLobby).first()).toBeVisible({ timeout: 30_000 });
 
   if (await raise.isVisible()) {
-    await page.getByLabel('Battery name').fill('E2E Battery');
+    await page.getByLabel('Team name').fill('E2E Battery');
     await page.getByRole('button', { name: 'Raise it' }).click();
     await expect(toLobby).toBeVisible({ timeout: 30_000 });
   }
@@ -74,10 +74,10 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
     await resume.click();
   } else {
     await toLobby.click();
-    await expect(page.getByRole('heading', { name: 'Drop into the silo' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The bench' })).toBeVisible();
     // The league (2H.27, `00` C28): three buttons, exactly one selected, and
-    // it is the battery's own Tier; every league above it is locked. The
-    // battery's Tier is read off the header line, which names it first.
+    // it is the team's own Tier; every league above it is locked. The
+    // team's Tier is read off the header line, which names it first.
     const leagues = page.locator('[data-league]');
     await expect(leagues).toHaveCount(3);
     await expect(page.locator('[data-league][data-selected="true"]')).toHaveCount(1);

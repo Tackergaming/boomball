@@ -1,5 +1,5 @@
 /**
- * Who is signed in, which batteries they are on, and whether a match is waiting.
+ * Who is signed in, which teams they are on, and whether a match is waiting.
  *
  * One hook rather than a store, because the whole shape is a handful of rows
  * and the screens that need them are never mounted at the same time.
@@ -9,13 +9,13 @@
  *
  * **Every read reports its failure** (audit line A12). It used to ignore
  * `error` on all four, so a project in pause or a network down landed a signed
- * player on "Raise a battery" as if they were new, and the button then failed
+ * player on "Raise a team" as if they were new, and the button then failed
  * without a word. That is the screen Jérôme's friends would have seen in
  * September. A failed read now stops the load and names itself in `failure`,
  * and `App` shows it with a way to try again.
  *
- * **Several batteries per player since 2H.32** (`00` C32 point 1, Jérôme's
- * "a"): a player owns at most one battery and may have joined others through
+ * **Several teams per player since 2H.32** (`00` C32 point 1, Jérôme's
+ * "a"): a player owns at most one team and may have joined others through
  * an invite code. `teams` is read with no filter, RLS (`teams_read_member`)
  * returns exactly the ones the player is on, and `team` is the one chosen for
  * the evening, kept in `localStorage`, the owned one by default. The match
@@ -34,6 +34,7 @@ import { ENGINE_VERSION } from '../../../engine/constants.js';
 import type { Role } from '../../../engine/stats.js';
 import { mergeRoll, pickTeam } from './roll.js';
 import { supabase } from './supabase.js';
+import { ROLL_EVENT, teamTopic } from './teamChannel.js';
 
 export interface Profile {
   id: string;
@@ -46,13 +47,13 @@ export interface Team {
   wins: number;
   tier: 'rookie' | 'veteran' | 'star';
   owner: string;
-  /** The standing names by slot (2H.29), null until the battery's first match draws them. */
+  /** The standing names by slot (2H.29), null until the team's first match draws them. */
   roster: Record<string, string> | null;
   /** Eight characters a friend types to join (2H.32). Shown to the owner. */
   invite_code: string;
 }
 
-/** One line of the battery's roll, the owner first (2H.32, `battery_members`). */
+/** One line of the team's roll, the owner first (2H.32, `battery_members`). */
 export interface Member {
   profile_id: string;
   display_name: string;
@@ -85,9 +86,9 @@ export interface Account {
    * a profile for every player who signed in: the row was simply not read yet.
    */
   profile: Profile | null | undefined;
-  /** Every battery the player is on, the owned one first. */
+  /** Every team the player is on, the owned one first. */
   teams: Team[];
-  /** The battery chosen for the evening, or null when the player is on none. */
+  /** The team chosen for the evening, or null when the player is on none. */
   team: Team | null;
   /** Picks another of `teams`; kept in `localStorage`, re-reads its matches and members. */
   chooseTeam: (teamId: string) => Promise<void>;
@@ -106,7 +107,11 @@ export interface Account {
    * Set by the first read that fails; the rest of the load is abandoned.
    */
   failure: string | null;
-  refresh: () => Promise<void>;
+  /**
+   * Re-reads everything. With `preferTeamId`, that team becomes the chosen one
+   * (2H.34): joining by code lands on the joined team, not on the old one.
+   */
+  refresh: (preferTeamId?: string) => Promise<void>;
 }
 
 const TEAM_KEY = 'boomball.team';
@@ -147,7 +152,7 @@ export function useAccount(): Account {
   /** The team id the player last chose, so a refresh keeps it. */
   const chosenRef = useRef<string | null>(rememberedTeam());
 
-  /** The matches and the roll of one battery. Returns false when a read failed. */
+  /** The matches and the roll of one team. Returns false when a read failed. */
   const loadTeam = useCallback(async (mine: Team): Promise<boolean> => {
     const [{ data: matches, error: matchesError }, { data: roll, error: rollError }] = await Promise.all([
       supabase
@@ -163,7 +168,7 @@ export function useAccount(): Account {
       return false;
     }
     if (rollError) {
-      setFailure(explain("your battery's roll", rollError));
+      setFailure(explain("your team's roll", rollError));
       return false;
     }
 
@@ -218,14 +223,14 @@ export function useAccount(): Account {
       }
       setProfile((profileRow as Profile | null) ?? null);
 
-      // Every battery the player is on: no filter, RLS answers with the owned
+      // Every team the player is on: no filter, RLS answers with the owned
       // one and the joined ones (2H.32). The owned one is listed first.
       const { data: teamRows, error: teamError } = await supabase
         .from('teams')
         .select('id, name, wins, tier, owner, roster, invite_code')
         .order('created_at', { ascending: true });
       if (teamError) {
-        setFailure(explain('your batteries', teamError));
+        setFailure(explain('your teams', teamError));
         setLoading(false);
         return;
       }
@@ -250,12 +255,46 @@ export function useAccount(): Account {
     [clearTeam, loadTeam],
   );
 
-  const refresh = useCallback(async () => {
-    const { data } = await supabase.auth.getUser();
-    const id = data.user?.id ?? null;
-    setUserId(id);
-    await load(id);
-  }, [load]);
+  const refresh = useCallback(
+    async (preferTeamId?: string) => {
+      if (preferTeamId) {
+        chosenRef.current = preferTeamId;
+        rememberTeam(preferTeamId);
+      }
+      const { data } = await supabase.auth.getUser();
+      const id = data.user?.id ?? null;
+      setUserId(id);
+      await load(id);
+    },
+    [load],
+  );
+
+  /**
+   * The hub stays true without a reload (2H.34). Two signals re-read the
+   * chosen team's matches and roll: the team's channel saying its roll
+   * changed (a friend joined, left, was removed, the code was renewed), and
+   * the tab coming back into view, for everything a message could have missed.
+   */
+  const teamRef = useRef<Team | null>(null);
+  teamRef.current = team;
+  const teamId = team?.id ?? null;
+  useEffect(() => {
+    if (!teamId) return;
+    const again = () => {
+      const current = teamRef.current;
+      if (current && current.id === teamId) void loadTeam(current);
+    };
+    const channel = supabase.channel(teamTopic(teamId));
+    channel.on('broadcast', { event: ROLL_EVENT }, again).subscribe();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') again();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      void supabase.removeChannel(channel);
+    };
+  }, [teamId, loadTeam]);
 
   const chooseTeam = useCallback(
     async (teamId: string) => {

@@ -31,12 +31,12 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
 
   // -- To the match, as the smoke does -----------------------------------------
   await page.goto('/');
-  const raise = page.getByRole('heading', { name: 'Raise a battery' });
-  const toLobby = page.getByRole('button', { name: 'To the lobby' });
+  const raise = page.getByRole('heading', { name: 'Raise a team' });
+  const toLobby = page.getByRole('button', { name: 'Enter the lobby' });
   const resume = page.getByRole('button', { name: 'Back to the silo' });
   await expect(raise.or(toLobby).first()).toBeVisible({ timeout: 30_000 });
   if (await raise.isVisible()) {
-    await page.getByLabel('Battery name').fill('E2E Battery');
+    await page.getByLabel('Team name').fill('E2E Battery');
     await page.getByRole('button', { name: 'Raise it' }).click();
     await expect(toLobby).toBeVisible({ timeout: 30_000 });
   }
@@ -44,7 +44,7 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
     await resume.click();
   } else {
     await toLobby.click();
-    await expect(page.getByRole('heading', { name: 'Drop into the silo' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The bench' })).toBeVisible();
     await page.getByRole('button', { name: 'Start match' }).click();
   }
   await expect(page.getByText('Opening the silo')).toBeHidden({ timeout: 30_000 });

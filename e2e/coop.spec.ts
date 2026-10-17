@@ -3,7 +3,7 @@
  *
  * Tagged `@coop` and left out of `npm run e2e`: it abandons the e2e account's
  * running match to reach the lobby, and abandons the co-op match it opens at
- * the end, so the solo specs find a clean battery. `npm run e2e:coop` runs it.
+ * the end, so the solo specs find a clean team. `npm run e2e:coop` runs it.
  *
  * The owner is the e2e account, signed in by `global-setup.ts`. The second
  * player is the second e2e account (`BOOMBALL_E2E2_EMAIL` and
@@ -58,7 +58,7 @@ test('@coop two players meet in the lobby, open one match, and one hands over', 
     // -- The owner reaches the lobby, abandoning a running match if any ------
     await prefer2D(page);
     await page.goto('/');
-    const toLobby = page.getByRole('button', { name: 'To the lobby' });
+    const toLobby = page.getByRole('button', { name: 'Enter the lobby' });
     const resume = page.getByRole('button', { name: 'Back to the silo' });
     await expect(resume.or(toLobby).first()).toBeVisible({ timeout: 30_000 });
     if (await resume.isVisible()) {
@@ -70,19 +70,30 @@ test('@coop two players meet in the lobby, open one match, and one hands over', 
     await expect(page.getByTestId('member-row')).toHaveCount(2);
     await owner.take('hub-owner');
     await toLobby.click();
-    await expect(page.getByRole('heading', { name: 'Drop into the silo' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The bench' })).toBeVisible();
     await expect(page.getByTestId('seat-row')).toHaveCount(1);
 
-    // -- The second player signs in, lands on the joined battery, enters ------
+    // -- The second player signs in, lands on the joined team, enters ------
     await prefer2D(second);
     await signInSecond(second);
+    // The second account may be on other teams too (Jérôme's own, since his
+    // first coop evening): a fresh browser has no remembered team, so the hub
+    // opens on the first one. Switch to the E2E team when it is not the one
+    // shown (2H.34, the switcher is a menu).
+    await expect(second.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 30_000 });
+    if (!(await second.getByRole('heading', { name: 'E2E Battery' }).isVisible())) {
+      await second.getByTestId('team-switch-open').click();
+      await second.getByRole('menuitem', { name: 'E2E Battery' }).click();
+    }
     await expect(second.getByRole('heading', { name: 'E2E Battery' })).toBeVisible({ timeout: 30_000 });
     await expect(second.getByTestId('invite-code')).toHaveCount(0);
-    await expect(second.getByTestId('leave-battery')).toBeVisible();
+    await expect(second.getByTestId('leave-team')).toBeVisible();
     await expect(second.getByTestId('member-row')).toHaveCount(2);
+    // The owner is already waiting in the lobby, and the hub says so (2H.34).
+    await expect(second.getByTestId('in-lobby')).toBeVisible({ timeout: 15_000 });
     await guest.take('hub-second');
-    await second.getByRole('button', { name: 'To the lobby' }).click();
-    await expect(second.getByRole('heading', { name: 'Drop into the silo' })).toBeVisible();
+    await second.getByRole('button', { name: 'Enter the lobby' }).click();
+    await expect(second.getByRole('heading', { name: 'The bench' })).toBeVisible();
 
     // -- Both see both ---------------------------------------------------------
     await expect(page.getByTestId('seat-row')).toHaveCount(2);

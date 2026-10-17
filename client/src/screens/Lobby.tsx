@@ -1,45 +1,57 @@
 /**
- * Artboard 2c, the shared lobby (2H.32, `00` C32 points 2 and 3).
+ * The bench, the shared lobby (2H.32, rebuilt in 2H.34 on the mockup Jérôme
+ * validated).
  *
- * The drawing showed three seats, an invite link and a per-seat ready state,
- * and only seat one was built because nobody could join a battery. Since 2H.32
- * a friend joins with a code (`TeamHub`), and this screen is where the members
- * meet before a match: **everyone present has a seat**, picks their own name
- * and role, and says they are ready; **the owner alone starts**, when every
- * other present member is ready, and picks the league. Jérôme chose this over
- * the owner composing the party alone: "chacun choisisse son rôle dans un lobby
- * partagé où tout le monde se voit".
+ * Up to three seat cards side by side: mine first, where I name my Giff and
+ * pick my role from four tiles that say how many places are left; then the
+ * team-mates present, with their Giff, their role and whether they are ready;
+ * then empty cards, the first of which carries the invite code for the owner.
+ * A team-mate who sits down arrives with a short animation, once. Below the
+ * cards, what the house fields; at the bottom, a bar with the league, what the
+ * match waits on, and the owner's "Start match".
  *
- * Who is here is **Realtime presence** on `lobby:<teamId>`, keyed by user id so
- * a reload replaces rather than duplicates. Nothing is written to the database
- * until the owner starts: `create-match` receives the seats as this screen
- * shows them at that instant. Closing the tab removes you from the list. When
- * the match opens, the owner broadcasts `started` on the same channel and every
- * other client re-reads its account and lands on the board.
+ * **Everyone present has a seat**, picks their own name and role, and says
+ * they are ready; **the owner alone starts**, when every other present member
+ * is ready, and picks the league. Jérôme chose this over the owner composing
+ * the party alone: "chacun choisisse son rôle dans un lobby partagé où tout le
+ * monde se voit". The owner never ticks "Ready": their click on "Start match"
+ * is their ready, so their seat carries `ready: true` by construction.
  *
- * Solo is unchanged: the owner alone in the lobby sees their own seat and
- * "Start match", exactly as before. The owner never has to tick "Ready": their
- * click on "Start match" is their ready.
- *
- * The positions-left panel is kept and is real, computed from `TEAM_COMPOSITION`
- * minus the roles the present members hold. It is what tells a player that one
- * Bulwark and one Trajector is the whole allowance, ever.
+ * **The channel is `App`'s since 2H.34** (`useLobbyChannel`): this screen only
+ * tracks my seat on it while it is open, withdraws it when it closes, reads
+ * everybody's seats from it, and tells the others when the match opened. The
+ * hub listens to the same channel, which is how it says who is waiting here.
+ * Nothing is written to the database until the owner starts: `create-match`
+ * receives the seats as this screen shows them at that instant.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { TEAM_SIZE, TIER_WINS_STAR, TIER_WINS_VETERAN } from '../../../engine/constants.js';
 import { TIERS, tierAllowed, type Role, type Tier } from '../../../engine/stats.js';
 import { createMatch, saveSeatPreference, supabase } from '../lib/supabase.js';
 import type { Member, Team } from '../lib/useAccount.js';
-import { ROLES, canStart, fielded, openRoles, seatRequests, type Seat } from './lobbySeats.js';
+import type { LobbyLink } from '../lib/useLobbyChannel.js';
+import {
+  ROLES,
+  benchOrder,
+  canStart,
+  formatCode,
+  namedSeats,
+  openCount,
+  openRoles,
+  seatRequests,
+  tierName,
+  type Seat,
+} from './lobbySeats.js';
+import { RoleGlyph } from './RoleGlyph.js';
+import { CopyCode, Shell } from './Shell.js';
 
 /** The wins that open each league, mirroring the generated column on `teams`. */
 const WINS_FOR: Record<Tier, number> = { rookie: 0, veteran: TIER_WINS_VETERAN, star: TIER_WINS_STAR };
 
-/** The league's name as the buttons wear it. */
-const cap = (tier: Tier) => tier[0]!.toUpperCase() + tier.slice(1);
+/** Named seats a bench holds; the house fields the rest. */
+const BENCH_SEATS = 3;
 
 const ROLE_BLURB: Record<Role, string> = {
   striker: 'Takes the shot. Best arm on the field and the thinnest hide of the three that matter.',
@@ -53,6 +65,7 @@ export function Lobby({
   team,
   members,
   displayName,
+  link,
   onOpened,
   onBack,
 }: {
@@ -61,30 +74,32 @@ export function Lobby({
   /** The roll, for the saved role and name of this player. */
   members: Member[];
   displayName: string;
+  /** The lobby channel `App` holds for the chosen team. */
+  link: LobbyLink;
   onOpened: () => Promise<void>;
   onBack: () => void;
 }) {
   const isOwner = team.owner === userId;
   const saved = members.find((member) => member.profile_id === userId) ?? null;
+  const { track, seats } = link;
 
   const [role, setRole] = useState<Role>(saved?.preferred_role ?? 'striker');
   const [name, setName] = useState(saved?.character_name ?? displayName);
   const [ready, setReady] = useState(false);
-  // The league the match is played at (2H.27, `00` C28): the battery's own
-  // Tier by default, any league below it on a click, never one above. The
-  // server checks the same rule; the greyed buttons are so the player sees
-  // from the first match that the league will be theirs to choose. The owner
-  // chooses; the others read it off the owner's seat.
+  // The league the match is played at (2H.27, `00` C28): the team's own Tier
+  // by default, any league below it on a click, never one above. The server
+  // checks the same rule; the greyed buttons are so the player sees from the
+  // first match that the league will be theirs to choose. The owner chooses;
+  // the others read it off the owner's seat.
   const [tier, setTier] = useState<Tier>(team.tier);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Everybody on the channel, this player included, once the first sync came. */
-  const [seats, setSeats] = useState<Seat[] | null>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const openedRef = useRef(false);
+  // Becomes true once the first seats were drawn: a card that mounts after
+  // that is a team-mate arriving, and animates in.
+  const [settled, setSettled] = useState(false);
 
   // The owner's name is kept in their own `team_members` row like a member's
-  // (policy `team_members_write` lets the owner write any row of the battery);
+  // (policy `team_members_write` lets the owner write any row of the team);
   // `battery_members` lists the owner without a row, so it is read here once.
   useEffect(() => {
     if (!isOwner) return;
@@ -120,54 +135,17 @@ export function Lobby({
     [userId, displayName, name, role, ready, isOwner, tier],
   );
 
-  /**
-   * Opened once for this battery, closed with the screen. The `started`
-   * broadcast is how a team-mate learns the owner opened the match: their
-   * account is re-read and `App` puts the board on screen.
-   */
-  useEffect(() => {
-    const channel = supabase.channel(`lobby:${team.id}`, {
-      config: { presence: { key: userId, enabled: true } },
-    });
-    channelRef.current = channel;
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        // A presence entry is the tracked payload plus a `presence_ref` the
-        // library adds; only the payload is kept.
-        // One seat per player: a key may carry two metas for a moment while a
-        // client re-tracks its seat, and the last one is the current one.
-        const all = new Map<string, Seat>();
-        for (const entries of Object.values(channel.presenceState<Seat>())) {
-          for (const entry of entries) {
-            if (typeof entry.profileId !== 'string') continue;
-            const { profileId, displayName, name, role, ready, owner, tier } = entry;
-            all.set(profileId, { profileId, displayName, name, role, ready, owner, ...(tier ? { tier } : {}) });
-          }
-        }
-        setSeats([...all.values()]);
-      })
-      .on('broadcast', { event: 'started' }, () => {
-        if (openedRef.current) return;
-        openedRef.current = true;
-        void onOpened();
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') void channel.track(mine);
-      });
-    return () => {
-      channelRef.current = null;
-      void supabase.removeChannel(channel);
-    };
-    // The seat is tracked again by the effect below whenever it changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [team.id, userId]);
-
   /** Every change of my seat is told to the others. */
   useEffect(() => {
-    const channel = channelRef.current;
-    if (!channel || channel.state !== 'joined') return;
-    void channel.track(mine);
-  }, [mine]);
+    track(mine);
+  }, [track, mine]);
+
+  /** Leaving the screen withdraws the seat; the hub keeps listening. */
+  useEffect(() => () => track(null), [track]);
+
+  useEffect(() => {
+    if (seats !== null && !settled) setSettled(true);
+  }, [seats, settled]);
 
   const others = useMemo(() => (seats ?? []).filter((seat) => seat.profileId !== userId), [seats, userId]);
   const everyone = useMemo(() => {
@@ -176,6 +154,8 @@ export function Lobby({
   }, [seats, userId, mine]);
   const open = useMemo(() => openRoles(others), [others]);
   const ownerSeat = everyone.find((seat) => seat.owner) ?? null;
+  const ownerName =
+    ownerSeat?.displayName ?? members.find((member) => member.is_owner)?.display_name ?? 'the owner';
   const shownTier: Tier = isOwner ? tier : ownerSeat?.tier ?? team.tier;
 
   // A role the others filled while I held it: fall back to the first open one,
@@ -210,11 +190,8 @@ export function Lobby({
         setError(reply.reason);
         return;
       }
-      // Tell the others before leaving the channel: their hub shows the board
-      // on its next read. `removeChannel` in the cleanup would otherwise take
-      // the message with it.
-      openedRef.current = true;
-      await channelRef.current?.send({ type: 'broadcast', event: 'started', payload: { matchId: reply.matchId } });
+      // Tell the others: their account is re-read and the board comes up.
+      await link.announceStarted(reply.matchId);
       // The match exists now. `onOpened` re-reads the account, and App puts the
       // match on screen the moment it sees an unfinished one, which unmounts
       // this component. Still being here afterwards means the row was written
@@ -232,76 +209,159 @@ export function Lobby({
 
   const startable = isOwner && seats !== null && canStart(everyone, userId) && !busy;
   const waitingOn = others.filter((seat) => !seat.ready).map((seat) => seat.displayName);
+  const frozen = ready && !isOwner;
+  const bench = benchOrder(everyone, mine);
+  const empties = Math.max(0, BENCH_SEATS - bench.length);
 
   return (
-    <div style={S.screen}>
-      <div className="hazard" />
-
-      <header style={S.header}>
+    <Shell>
+      <header className="bb-top">
         <div>
           <p className="label" style={{ margin: 0 }}>
-            {everyone.length > 1 ? 'Shared lobby · house fields the rest' : 'No waiting room · house fields both sides'}
+            {team.name} ·{' '}
+            <span data-testid="lobby-tier-line">
+              {tierName(team.tier)}
+              {shownTier !== team.tier ? ` · playing ${tierName(shownTier)}` : ''} · {namedSeats(everyone.length)}
+            </span>
           </p>
-          <h1 className="display" style={{ margin: '4px 0 0', fontSize: 40 }}>
-            Drop into the silo
-          </h1>
+          <h1 className="display">The bench</h1>
         </div>
-        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <p className="display" style={{ margin: 0, fontSize: 22 }}>
-            {team.name}
-          </p>
-          <p className="label" style={{ margin: '3px 0 0' }} data-testid="lobby-tier-line">
-            {cap(team.tier)} battery{shownTier !== team.tier ? ` · playing ${cap(shownTier)}` : ''} ·{' '}
-            {everyone.length} named {everyone.length === 1 ? 'seat' : 'seats'} · {TEAM_SIZE * 2 - everyone.length} house Giff
-          </p>
-        </div>
+        <button className="ghost bb-small" style={{ marginLeft: 'auto' }} onClick={onBack} disabled={busy}>
+          Back to the hub
+        </button>
       </header>
 
-      <div style={S.body}>
-        <section style={S.seat}>
-          <p className="label" style={{ margin: 0, color: 'var(--team-own)' }}>
-            Your seat · name your Giff
-          </p>
+      <div className="bb-bench">
+        {bench.map((seat, i) =>
+          seat.profileId === userId ? (
+            <article
+              key={seat.profileId}
+              className="bb-seat mine"
+              aria-label="Your seat"
+              data-testid="seat-row"
+              data-profile-id={seat.profileId}
+              data-ready={mine.ready ? 'true' : 'false'}
+            >
+              <div className="bb-seat-head">
+                <div className="plate bb-plate bb-plate-own" style={{ width: 46, height: 46, fontSize: 15 }} aria-hidden="true">
+                  {initials(displayName)}
+                </div>
+                <div>
+                  <p className="label" style={{ margin: 0 }}>
+                    Seat 1 · you
+                  </p>
+                  <div className="display bb-seat-who">{displayName}</div>
+                </div>
+              </div>
 
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={40}
-            disabled={ready && !isOwner}
-            placeholder="Leave it blank and the house names you"
-            data-testid="seat-name"
-            style={{ marginTop: 10, fontFamily: 'var(--display)', fontSize: 24, letterSpacing: '.04em' }}
-          />
+              <label className="label" htmlFor="seat-name" style={{ marginBottom: -8 }}>
+                Your Giff's name
+              </label>
+              <input
+                id="seat-name"
+                className="bb-giffname"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={40}
+                disabled={frozen}
+                placeholder="Leave it blank and the house names you"
+                data-testid="seat-name"
+              />
 
-          <p className="label" style={{ marginTop: 22 }}>
-            Position
-          </p>
-          <div style={S.roles}>
-            {ROLES.map((r) => {
-              const free = open.includes(r);
-              return (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRole(r)}
-                  disabled={!free || (ready && !isOwner)}
-                  className={r === role ? undefined : 'ghost'}
-                  style={{ ...S.roleButton, opacity: free ? 1 : 0.45 }}
-                  data-role={r}
-                  data-taken={free ? 'false' : 'true'}
-                  title={free ? ROLE_BLURB[r] : `Every ${r} seat is taken`}
-                >
-                  {r}
-                </button>
-              );
-            })}
-          </div>
-          <p style={S.blurb}>{ROLE_BLURB[role]}</p>
+              <p className="label" style={{ margin: '0 0 -8px' }}>
+                Position
+              </p>
+              <div className="bb-roles">
+                {ROLES.map((r) => {
+                  const free = open.includes(r);
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      className="bb-role"
+                      onClick={() => setRole(r)}
+                      disabled={!free || frozen}
+                      aria-pressed={r === role}
+                      data-role={r}
+                      data-taken={free ? 'false' : 'true'}
+                      title={free ? ROLE_BLURB[r] : `Every ${r} seat is taken`}
+                    >
+                      <RoleGlyph role={r} size={18} />
+                      {r}
+                      <span className="bb-open">{openCount(r, others)} open</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-          <p className="label" style={{ marginTop: 22 }}>
-            League · your battery is {cap(team.tier)}
-          </p>
-          <div style={S.roles}>
+              <div className="bb-status">
+                {isOwner ? (
+                  <span className="bb-badge owner">You start the match</span>
+                ) : (
+                  <button
+                    className={ready ? 'bb-small' : 'ghost bb-small'}
+                    onClick={toggleReady}
+                    aria-pressed={ready}
+                    data-testid="ready"
+                    data-ready={ready ? 'true' : 'false'}
+                  >
+                    {ready ? `Ready · waiting for ${ownerName}` : 'Ready'}
+                  </button>
+                )}
+              </div>
+            </article>
+          ) : (
+            <OtherSeat key={seat.profileId} seat={seat} index={i + 1} arrive={settled} />
+          ),
+        )}
+
+        {Array.from({ length: empties }, (_, k) => {
+          const index = bench.length + k + 1;
+          const first = k === 0;
+          return (
+            <article key={`empty-${index}`} className="bb-seat empty" aria-label="Empty seat" data-testid="seat-empty">
+              <p className="label" style={{ margin: 0 }}>
+                Seat {index} · empty
+              </p>
+              {first ? (
+                <>
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, maxWidth: '26ch' }}>
+                    A team-mate who opens the lobby sits here.{isOwner && ' Give them the code:'}
+                  </p>
+                  {isOwner && (
+                    <>
+                      <div className="display" style={{ fontSize: 26, letterSpacing: '.1em', color: 'var(--brass)' }}>
+                        {formatCode(team.invite_code)}
+                      </div>
+                      <CopyCode code={team.invite_code} onError={setError} />
+                    </>
+                  )}
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, maxWidth: '26ch' }}>
+                  Three named seats at most. The house fields the rest.
+                </p>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
+      <p className="bb-house">
+        The house fields the other {Math.max(0, TEAM_SIZE - everyone.length)} Giff on your side, and all seven of the
+        Scourge.
+      </p>
+
+      {error && (
+        <p className="error" style={{ marginTop: 16 }}>
+          {error}
+        </p>
+      )}
+
+      <div className="bb-bar">
+        <div className="bb-league">
+          <span className="label">League</span>
+          <div className="bb-seg" role="group" aria-label="League">
             {TIERS.map((t) => {
               const allowed = tierAllowed(t, team.tier);
               const clickable = isOwner && allowed;
@@ -311,158 +371,115 @@ export function Lobby({
                   type="button"
                   onClick={() => setTier(t)}
                   disabled={!clickable}
-                  className={t === shownTier ? undefined : 'ghost'}
-                  style={{ ...S.roleButton, opacity: allowed ? 1 : 0.45 }}
+                  aria-pressed={t === shownTier}
                   data-league={t}
                   data-selected={t === shownTier ? 'true' : 'false'}
                   data-locked={allowed ? 'false' : 'true'}
                   title={
-                    !allowed ? `${WINS_FOR[t]} wins to reach ${cap(t)}` : isOwner ? `Play at ${cap(t)}` : 'The owner picks the league'
+                    !allowed
+                      ? `${WINS_FOR[t]} wins to reach ${tierName(t)}`
+                      : isOwner
+                        ? t === team.tier
+                          ? `Play at ${tierName(t)}: a win here climbs the ladder`
+                          : `Play at ${tierName(t)}: a lighter match, a win here is not a rung on the ladder`
+                        : `${ownerName} picks the league`
                   }
                 >
-                  {cap(t)}
+                  {tierName(t)}
                   {!allowed && ` · ${WINS_FOR[t]} wins`}
                 </button>
               );
             })}
           </div>
-          <p style={S.blurb} data-testid="league-blurb">
-            {shownTier === team.tier
-              ? `${cap(shownTier)} is where your wins count: the house fields ${cap(shownTier)} against you, and a win here climbs the ladder.`
-              : `A lighter match: the house fields ${cap(shownTier)} against you. A win at ${cap(shownTier)} is a win, not a rung on the ladder.`}
-            {!isOwner && ' The owner picks the league.'}
-          </p>
+          {!isOwner && <span className="bb-note">{ownerName} picks the league</span>}
+        </div>
 
-          {error && <p className="error" style={{ marginTop: 16 }}>{error}</p>}
+        {isOwner ? (
+          seats === null ? (
+            <span className="bb-note wait">Joining the lobby</span>
+          ) : waitingOn.length > 0 ? (
+            <span className="bb-note" data-testid="waiting-on">
+              Waiting on {waitingOn.join(', ')}
+            </span>
+          ) : everyone.length === 1 ? (
+            <span className="bb-note">Alone in the lobby · the house fills the other seats</span>
+          ) : (
+            <span className="bb-note">Everyone is ready</span>
+          )
+        ) : seats === null ? (
+          <span className="bb-note wait">Joining the lobby</span>
+        ) : ownerSeat ? (
+          <span className="bb-note" data-testid="owner-starts">
+            {ownerSeat.displayName} starts the match
+          </span>
+        ) : (
+          <span className="bb-note" data-testid="owner-starts">
+            The owner is not in the lobby yet
+          </span>
+        )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 24, alignItems: 'center' }}>
-            {isOwner ? (
-              <button onClick={start} disabled={!startable} data-testid="start-match">
-                {busy ? 'Loading the silo' : 'Start match'}
-              </button>
-            ) : (
-              <button onClick={toggleReady} className={ready ? undefined : 'ghost'} data-testid="ready" data-ready={ready ? 'true' : 'false'}>
-                {ready ? 'Ready · waiting for the owner' : 'Ready'}
-              </button>
-            )}
-            <button className="ghost" onClick={onBack} disabled={busy}>
-              Back to the hub
-            </button>
-            {isOwner && seats !== null && waitingOn.length > 0 && (
-              <span className="label" data-testid="waiting-on">
-                Waiting on {waitingOn.join(', ')}
-              </span>
-            )}
-            {!isOwner && ownerSeat && (
-              <span className="label" data-testid="owner-starts">
-                {ownerSeat.displayName} starts the match
-              </span>
-            )}
-            {!isOwner && !ownerSeat && seats !== null && (
-              <span className="label" data-testid="owner-starts">
-                The owner is not in the lobby yet
-              </span>
-            )}
-          </div>
-        </section>
-
-        <aside style={S.aside}>
-          <p className="label" style={{ margin: 0 }}>
-            In the lobby
-          </p>
-          <div style={{ marginTop: 12 }} data-testid="seats">
-            {everyone.map((seat) => (
-              <div key={seat.profileId} style={S.seatRow} data-testid="seat-row" data-profile-id={seat.profileId} data-ready={seat.ready ? 'true' : 'false'}>
-                <div>
-                  <p className="display" style={{ margin: 0, fontSize: 16, color: seat.profileId === userId ? 'var(--team-own)' : undefined }}>
-                    {seat.name.trim() || seat.displayName}
-                    {seat.profileId === userId && <span className="label" style={{ marginLeft: 8 }}>you</span>}
-                    {seat.owner && <span className="label" style={{ marginLeft: 8, color: 'var(--brass)' }}>owner</span>}
-                  </p>
-                  <p className="label" style={{ margin: '3px 0 0' }}>
-                    {seat.displayName} · {seat.role}
-                  </p>
-                </div>
-                <span className="label" style={{ color: seat.ready ? 'var(--team-own)' : 'var(--text-faint)' }}>
-                  {seat.owner ? 'starts' : seat.ready ? 'ready' : 'not ready'}
-                </span>
-              </div>
-            ))}
-            {seats === null && (
-              <p className="label" style={{ margin: '8px 0 0', animation: 'bb-tick 1.4s infinite' }}>
-                Joining the lobby
-              </p>
-            )}
-          </div>
-
-          <p className="label" style={{ margin: '20px 0 0' }}>
-            Positions a side fields
-          </p>
-          <div style={{ marginTop: 12 }}>
-            {ROLES.map((r) => {
-              const taken = everyone.filter((seat) => seat.role === r).length;
-              return (
-                <div key={r} style={S.countRow}>
-                  <span className="label" style={{ color: r === role ? 'var(--team-own)' : undefined }}>
-                    {r}
-                  </span>
-                  <span style={S.count}>
-                    {taken > 0 && <span className="label" style={{ marginRight: 8 }}>{taken} taken ·</span>}
-                    {fielded(r)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <p style={{ ...S.blurb, marginTop: 16 }}>
-            One Bulwark, one Trajector, ever. The {TEAM_SIZE * 2 - everyone.length} other Giff on the field are the house.
-          </p>
-
-          <div style={S.notice}>
-            <p className="label" style={{ margin: 0 }}>
-              Bringing friends
-            </p>
-            <p style={{ ...S.blurb, marginTop: 8 }}>
-              Everyone on your battery who opens this lobby takes a seat. Give them the invite code from
-              the hub. Up to three named seats; the house fields the rest.
-            </p>
-          </div>
-        </aside>
+        {isOwner && (
+          <button className="bb-start" onClick={() => void start()} disabled={!startable} data-testid="start-match">
+            {busy ? 'Loading the silo' : 'Start match'}
+          </button>
+        )}
       </div>
-    </div>
+    </Shell>
   );
 }
 
-const S: Record<string, React.CSSProperties> = {
-  screen: { height: '100%', overflowY: 'auto', background: 'var(--page)' },
-  header: { display: 'flex', alignItems: 'center', gap: 16, padding: '26px 32px 20px' },
-  body: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(520px, 1fr) 340px',
-    gap: 20,
-    padding: '0 32px 32px',
-    alignItems: 'start',
-  },
-  seat: { padding: 24, background: 'var(--panel)', border: '1px solid var(--line)' },
-  roles: { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' },
-  roleButton: { fontSize: 14, padding: '10px 18px' },
-  blurb: { marginTop: 14, fontSize: 12, lineHeight: 1.7, color: 'var(--text-faint)' },
-  aside: { padding: 20, background: 'var(--panel-deep)', border: '1px solid var(--line)' },
-  seatRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
-    padding: '8px 0',
-    borderBottom: '1px solid rgba(43,52,57,.6)',
-  },
-  countRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '7px 0',
-    borderBottom: '1px solid rgba(43,52,57,.6)',
-  },
-  count: { fontFamily: 'var(--display)', fontSize: 19, color: 'var(--brass)' },
-  notice: { marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' },
-};
+/**
+ * A team-mate's card: who they are, their Giff, their role, and where they
+ * stand. `arrive` is read once, when the card mounts: a card that appears
+ * after the first seats were drawn is somebody sitting down.
+ */
+function OtherSeat({ seat, index, arrive }: { seat: Seat; index: number; arrive: boolean }) {
+  const [arrived] = useState(arrive);
+  return (
+    <article
+      className={arrived ? 'bb-seat arrive' : 'bb-seat'}
+      aria-label={`${seat.displayName}'s seat`}
+      data-testid="seat-row"
+      data-profile-id={seat.profileId}
+      data-ready={seat.ready ? 'true' : 'false'}
+    >
+      <div className="bb-seat-head">
+        <div className="plate bb-plate bb-plate-brass" style={{ width: 46, height: 46, fontSize: 15 }} aria-hidden="true">
+          {initials(seat.displayName)}
+        </div>
+        <div>
+          <p className="label" style={{ margin: 0 }}>
+            Seat {index} · {seat.displayName}
+            {seat.owner && ' · owner'}
+          </p>
+          <div className="display bb-seat-who">{seat.displayName}</div>
+        </div>
+      </div>
+      <p className="bb-giffname">{seat.name.trim() || seat.displayName}</p>
+      <div className="bb-rolepick">
+        <RoleGlyph role={seat.role} size={20} />
+        {seat.role}
+      </div>
+      <div className="bb-status">
+        {seat.owner ? (
+          <span className="bb-badge owner">Starts the match</span>
+        ) : seat.ready ? (
+          <span className="bb-badge ready">Ready</span>
+        ) : (
+          <span className="bb-badge wait">Choosing…</span>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function initials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0]!.toUpperCase())
+      .join('') || '?'
+  );
+}

@@ -122,7 +122,7 @@ export function Briefing({ onClose }: { onClose: () => void }) {
           <Item
             mark={<span style={S.shove}>&uarr;</span>}
             title="Your league"
-            body="A battery starts Rookie and climbs by winning: 3 wins Veteran, 6 Star. In the lobby you pick the league to play at, your own or any below it, never above, and the house fields that league against you. Only a win at your own league climbs the ladder. A win below it is a win and nothing more."
+            body="A team starts Rookie and climbs by winning: 3 wins Veteran, 6 Star. In the lobby you pick the league to play at, your own or any below it, never above, and the house fields that league against you. Only a win at your own league climbs the ladder. A win below it is a win and nothing more."
           />
           <Item
             mark={<span style={S.shove}>&times;</span>}

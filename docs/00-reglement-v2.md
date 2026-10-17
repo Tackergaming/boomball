@@ -3012,3 +3012,129 @@ autres pions humains (les plaques portent le nom du Giff et l'échelle dit qui e
 bandeau « Your turn » d'avant un siège remis reste affiché le temps de sa durée ; un spectateur
 ne frappe pas à la porte ; `battery_members` liste encore le propriétaire deux fois (fusionné
 côté client).
+
+## C33. Décisions du 2026-10-17 après-midi, **l'interface d'équipe, sous-phase 2H.34**
+
+> Écrites par le fil principal (Fable 5.1) sur les retours de Jérôme après sa première soirée de
+> coop, le 2026-10-17, puis sur une maquette cliquable qu'il a validée (« ok c'est nettement mieux
+> comme interface », « la maquette et le fond me vont. on part sur ça »), puis sur une liste de
+> quinze points validée en un lot (« tout me va. GO »). **Aucun écart de règle, rien dans le
+> moteur ni dans l'IA, `ENGINE_VERSION` reste 11, rien à redéployer côté fonctions.** Une migration,
+> `0012`, sans schéma. Les règles de C32 ne bougent pas : le propriétaire seul démarre et choisit la
+> ligue, un membre ne joue pas en solo sur l'équipe d'un autre.
+
+**Ses retours, dans ses mots.** « L'interface est vraiment confusing », « plein de choses à l'écran
+dans tous les sens » ; « la fenêtre ne se rafraîchit pas toute seule donc on ne voit pas arriver la
+personne » ; « j'ai été obligé de quitter la battery de e2e pour pouvoir rejoindre celle de tacker
+(ou alors c'est parce que la fenêtre ne s'était pas refresh) » ; « dans le lobby, on ne voit pas
+qu'il y a quelqu'un à part le petit texte à droite » ; « une interface plus lean et facile à
+comprendre et peut-être même avec un peu plus de graphisme dans le même style que l'univers du
+boomball » ; « qu'on enlève le mot Battery et qu'on dise partout Team ».
+
+**Le diagnostic, lu dans le code avant de proposer.** Le hub lisait l'effectif une fois au
+chargement (`useAccount.loadTeam`) et rien ne l'avertissait d'un `join_team` : seul le lobby avait
+une présence Realtime. Après un join réussi, le hub restait sur l'équipe mémorisée dans
+`localStorage` et la nouvelle n'apparaissait que dans un petit switcher « Your batteries » en haut
+de page : le join avait marché, l'écran ne le disait pas, et il a quitté « E2E Battery » pour rien
+(`join_team` ne refuse que le code inconnu et sa propre équipe). Le lobby de 2H.32 avait divergé de
+l'artboard 2c de septembre, qui montrait trois cartes de siège côte à côte : on avait construit un
+grand panneau « ton siège » et une colonne de texte à droite où les autres étaient une ligne en
+mono 11 px.
+
+**Les décisions, les quinze points validés.**
+
+1. Le hub : en-tête avec le blason, le nom, la ligue et ses trois barreaux laiton ; un « Switch
+   team » seulement sur plusieurs équipes.
+2. Une seule bande d'appel : « Enter the lobby », ou « Back to the silo » quand un match tourne,
+   avec « Abandon this match » en fantôme pour le propriétaire.
+3. Colonne Players : une ligne par humain, tag Owner ou rôle, point cyan « In the lobby » en direct,
+   retrait par le propriétaire, « Leave this team » pour un membre.
+4. Carte « Invite a friend » sous les joueurs, pour le propriétaire : code, Copy, New code.
+5. Colonne « Your Giff » : les sept en compact avec un glyphe par rôle. **Gardée sur le hub**, sa
+   réponse à la question posée (« garde les comme ça »).
+6. Pied de page : « Join a team » et son champ ; archivés et abandonnés sur une ligne grise.
+7. **Le hub devient vivant** : un canal `team:<id>` sur lequel on diffuse après un join, un départ,
+   un retrait, un nouveau code, et que chaque hub écoute pour se relire ; l'écoute de la présence du
+   lobby pour le point cyan ; relecture au retour sur l'onglet.
+8. Rejoindre une équipe par code bascule dessus aussitôt.
+9. Le lobby, « The bench » : trois cartes de siège, la mienne avec le champ de nom et quatre tuiles
+   de rôle « n open », celles des autres avec joueur, Giff, rôle et badge Ready, les vides avec le
+   code à copier.
+10. Un siège qui arrive glisse dans sa carte avec un halo ; le compteur de sièges nommés suit.
+11. Barre basse : la ligue en segments pour le propriétaire, lecture seule pour les autres,
+    « Waiting on X », Start match ou Ready.
+12. Le tableau « Positions a side fields » et la notice « Bringing friends » disparaissent.
+13. Le fond : son image en WebP 1920 px dans `client/public/`, le JPEG déplacé vers
+    `assets/source/images/` ; fond fixe, voile haut et bas, panneaux en verre, sur le hub, le lobby
+    et « Raise a team ».
+14. Battery devient Team dans tout texte visible du client, les test ids et les specs e2e. Le nom
+    « E2E Battery » en base ne bouge pas.
+15. Migration `0012` par lui via `/supabase-migrate` : les trois messages SQL en « team », et le
+    propriétaire qui n'est plus listé deux fois par la fonction d'effectif. Rien d'autre en base.
+
+**Trois réponses de plus.** Le redéploiement Vercel attend la fin de 2H.34 plutôt que de mettre en
+ligne l'interface qu'il a trouvée confuse (« on peut attendre »). `07a8ce3`, la coop, est poussé sur
+origin le 2026-10-17 sur son « ok ». Et le fond : il a voulu « une foule de giff en train de faire la
+queue en dehors du silo pour rentrer dans les gradins, un peu comme sur le parking d'un stade » ;
+le fil principal a écrit le prompt Nano Banana (règles du skill `image-prompt` : l'espèce décrite,
+jamais nommée ; pas de vocabulaire de peinture ; le tiers central plus sombre pour l'interface),
+corrigé sur ses trois remarques (le silo couché et non une tour, sa référence de Giff en tunique de
+toile, les spectateurs de dos tournés vers l'entrée), et il a produit l'image dans Flow :
+`Crowd_entering_arena.jpg`, 2752 × 1536, le silo couché, la file cyan à gauche et magenta à droite,
+la porte au centre.
+
+**Comment 2H.34 est codée** (le 2026-10-17, fil principal Fable 5.1 ; **un Opus 5.5 effort élevé
+sur le hub et le lobby** sur brief fermé, relu par le fil principal et vu au harnais ; **un Sonnet
+5.5 effort moyen sur le balayage Battery → Team et les specs e2e**). **Le fil principal** :
+`client/src/lib/teamChannel.ts` (`teamTopic`, `ROLL_EVENT`, `announceTeamChange(teamId)` : envoi
+par `httpSend`, la voie REST sans l'avertissement console que `send()` émet hors abonnement et que
+le harnais compte comme une erreur ; le canal déjà tenu par le hub est réutilisé parce que
+`supabase.channel()` rend l'instance existante d'un même topic) ; `client/src/lib/useLobbyChannel.ts`
+(le canal `lobby:<teamId>` remonté dans `App` pour la durée de l'équipe choisie : présence à la clé
+`userId`, `seatsOf` reconstruit la liste, `track(seat | null)`, `announceStarted`, le broadcast
+`started` écouté par tous, lobby comme hub) ; `useAccount` (`refresh(preferTeamId)` qui mémorise
+l'équipe avant de relire, l'écoute de `team:<id>` sur `roll` et de `visibilitychange` qui relisent
+matchs et effectif, les mots) ; `App.tsx` (`useLobbyChannel`, `link` au lobby, `lobby` et
+`onJoined` au hub, « Your team ») ; la migration `0012_team_wording.sql` (`join_team`,
+`rotate_invite_code`, `battery_members` recréées : « no team has this code », « this is your own
+team », « only the owner of the team can renew its code » ; le propriétaire une fois, premier, avec
+le rôle et le nom de sa propre ligne par `left join`, la seconde sélection exclut `t.owner` ; les
+droits restatés ; **appliquée par Jérôme le 2026-10-17**, vérifiée en lecture avant et après, consignée en 04) et `server/migration0012.test.ts` (six) ; l'image, convertie par Pillow en WebP
+1920 px qualité 78, 198 Ko. **Opus** : `screens/TeamHub.tsx` et `screens/Lobby.tsx` récrits,
+`screens/Shell.tsx` (hazard, fond fixe `/crowd-entering-arena.webp` voilé, colonne de 1120 px,
+`CopyCode`), `screens/RoleGlyph.tsx` (quatre SVG), `lobbySeats.ts` étendu de helpers purs
+(`openCount`, `benchOrder`, `namedSeats`, `alreadyInLobby`, `formatCode`, `cleanCode`,
+`tierName`, `LADDER`, `ladderOf`) et `lobby.test.ts` (dix), `theme.css` (`--glass`,
+`--glass-deep`, le bloc `bb-`, `bb-arrive`, `prefers-reduced-motion`). Le switcher est un menu
+(`team-switch-open` puis `team-switch`) ; `lobby-tier-line` porte « Star · 2 named seats » ; les
+cartes présentes portent `seat-row`, `data-profile-id`, `data-ready`, les vides `seat-empty` ; le
+tag « In the lobby » porte `in-lobby`. **Sonnet** : `Feed.tsx` (« Your team »), `Briefing.tsx`,
+`supabase.ts`, `roll.ts`, les six specs et `global-setup.ts` (« Enter the lobby », « Raise a
+team », « Team name », « The bench », `leave-team`), et dans `coop.spec.ts` l'assertion que le hub
+du second dit que le propriétaire attend déjà dans le lobby. Gardés tels quels : la RPC
+`battery_members`, le type `BatteryResult`, le nom « E2E Battery ». **Tests : 771 sur 45 fichiers**
+(759 avant), typecheck racine, scripts, e2e et client verts, le client bundle. **Harnais sur le
+moteur 11 en ligne** : smoke 2D **vert en 27 s** (captures lues : le hub avec le fond, « 1 on the
+team », le code) ; `e2e:coop` **vert en 20 s** après deux runs rouges qui n'étaient pas du code :
+le second compte e2e **avait quitté « E2E Battery » pendant la soirée de Jérôme** (c'est le « obligé
+de quitter la battery de e2e » de ses retours) et rejoint son équipe « Shrapnel oath » ; le fil
+principal l'a fait rejoindre « E2E Battery » par son code, en tant que joueur, par un script jetable
+(même geste qu'en 2H.32), et le spec bascule désormais sur « E2E Battery » par le menu quand le hub
+du second s'ouvre sur une autre équipe (un navigateur neuf n'a pas d'équipe mémorisée). Un troisième
+run a été rouge une fois sur la présence (le siège du second disparu du lobby du propriétaire après
+son Ready), non reproduit par une sonde Playwright qui a tracé les trames `presence` des deux
+clients (track, diff, le Ready propagé en moins d'une seconde) ni par le run suivant ; noté, à
+surveiller. Captures lues : les deux lobbies à deux sièges (`02-lobby-owner-both-ready`,
+`02-lobby-second-ready`), le hub du second avec « Giff is already in the lobby » et le tag
+« In the lobby » sur le propriétaire (`01-hub-second`). `e2e:board3d` **vert en 7,8 min**, lancé seul : un premier run en parallèle de la suite vitest
+est tombé à 2 images par seconde et a raté le bandeau « Your turn » de 1,2 s ; un second a buté
+sur la connexion (« JWT issued at future », le cas transitoire connu). Deux retouches du fil principal après
+lecture : « 1 open » ne passe plus à la ligne dans la tuile Trajector, la ligne « The house fields
+the other n Giff » porte une ombre pour se lire sur la porte éclairée.
+
+**Laissé, en dette.** Les trois canaux Realtime (`team:`, `lobby:`, le match) sont publics, pour la
+`/security-review` de la phase 8 ; la RPC garde le nom `battery_members` ; `create-match` dit encore
+« only the owner of the battery starts its matches » jusqu'à son prochain redéploiement (l'écran ne
+laisse pas un membre démarrer) ; `abandon_match` dit encore « battery » (même raison) ; dans la barre
+du membre, « Giff picks the league » et « Giff starts the match » se répètent ; `mergeRoll` reste
+côté client, inutile depuis `0012`, à retirer à la prochaine passe sur `roll.ts`.

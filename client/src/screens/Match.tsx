@@ -61,7 +61,7 @@ export function Match({
   matchId: string;
   userId: string;
   teamName: string;
-  /** Whether this player owns the battery: the owner alone abandons (2H.28), a team-mate hands over (2H.33). */
+  /** Whether this player owns the team: the owner alone abandons (2H.28), a team-mate hands over (2H.33). */
   isOwner: boolean;
   onFinished: () => void;
   /**

@@ -21,7 +21,7 @@ test('@abandon leaves the running match with no result', async ({ page }, info) 
 
   await prefer2D(page);
   await page.goto('/');
-  const toLobby = page.getByRole('button', { name: 'To the lobby' });
+  const toLobby = page.getByRole('button', { name: 'Enter the lobby' });
   const resume = page.getByRole('button', { name: 'Back to the silo' });
   await expect(resume.or(toLobby).first()).toBeVisible({ timeout: 30_000 });
 

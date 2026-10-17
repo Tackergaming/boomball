@@ -63,7 +63,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     // Signed in means the hub showed: either the team sheet or, on an account
     // with no team yet, the form that founds one.
     await page
-      .getByRole('button', { name: /^(To the lobby|Raise it|Back to the silo)$/ })
+      .getByRole('button', { name: /^(Enter the lobby|Raise it|Back to the silo)$/ })
       .first()
       .waitFor({ timeout: 30_000 });
 

@@ -5,7 +5,20 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { canStart, fielded, openRoles, seatRequests, type Seat } from './lobbySeats.js';
+import {
+  alreadyInLobby,
+  benchOrder,
+  canStart,
+  cleanCode,
+  fielded,
+  formatCode,
+  ladderOf,
+  namedSeats,
+  openCount,
+  openRoles,
+  seatRequests,
+  type Seat,
+} from './lobbySeats.js';
 
 const seat = (over: Partial<Seat> & { profileId: string }): Seat => ({
   displayName: over.profileId,
@@ -57,5 +70,56 @@ describe('the seats handed to create-match', () => {
       { profileId: 'ana', role: 'bulwark', characterName: '' },
       { profileId: 'kai', role: 'trajector', characterName: 'Pell' },
     ]);
+  });
+});
+
+describe('the bench (2H.34)', () => {
+  it('counts the places left in a role', () => {
+    expect(openCount('striker', [])).toBe(3);
+    expect(openCount('breaker', [seat({ profileId: 'ana', role: 'breaker' })])).toBe(1);
+    expect(openCount('bulwark', [seat({ profileId: 'ana', role: 'bulwark' })])).toBe(0);
+  });
+
+  it('puts my seat first, then the owner, then the others by name', () => {
+    const mine = seat({ profileId: 'me', displayName: 'Zed' });
+    const order = benchOrder(
+      [
+        seat({ profileId: 'kai', displayName: 'Kai' }),
+        seat({ profileId: 'me', displayName: 'Zed', name: 'stale' }),
+        seat({ profileId: 'jerome', displayName: 'Tacker', owner: true }),
+        seat({ profileId: 'ana', displayName: 'Ana' }),
+      ],
+      mine,
+    );
+    expect(order.map((s) => s.profileId)).toEqual(['me', 'jerome', 'ana', 'kai']);
+    expect(order[0]).toBe(mine);
+  });
+
+  it('says how many named seats', () => {
+    expect(namedSeats(1)).toBe('1 named seat');
+    expect(namedSeats(2)).toBe('2 named seats');
+  });
+});
+
+describe('the hub (2H.34)', () => {
+  it('names who is already in the lobby', () => {
+    expect(alreadyInLobby([])).toBeNull();
+    expect(alreadyInLobby(['Marc'])).toBe('Marc is already in the lobby');
+    expect(alreadyInLobby(['Marc', 'Ana'])).toBe('Marc and Ana are already in the lobby');
+    expect(alreadyInLobby(['Marc', 'Ana', 'Kai'])).toBe('Marc, Ana and Kai are already in the lobby');
+  });
+
+  it('reads a code four and four, and cleans what a player typed', () => {
+    expect(formatCode('C9064Q2A')).toBe('C906 · 4Q2A');
+    expect(cleanCode(' kx7m-4q2a ')).toBe('KX7M4Q2A');
+  });
+
+  it('climbs the ladder three rungs at a time', () => {
+    expect(ladderOf(0)).toEqual({ tier: 'rookie', next: { tier: 'veteran', at: 3 }, rungs: [false, false, false] });
+    expect(ladderOf(1).rungs).toEqual([true, false, false]);
+    expect(ladderOf(3)).toEqual({ tier: 'veteran', next: { tier: 'star', at: 6 }, rungs: [false, false, false] });
+    expect(ladderOf(5).rungs).toEqual([true, true, false]);
+    expect(ladderOf(6)).toEqual({ tier: 'star', next: null, rungs: [true, true, true] });
+    expect(ladderOf(40).tier).toBe('star');
   });
 });

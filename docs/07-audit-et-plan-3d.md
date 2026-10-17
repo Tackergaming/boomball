@@ -2038,3 +2038,27 @@ l'écart 65 et l'action `yieldSeat`, `ENGINE_VERSION` 11** ; pas de migration ; 
 
 **Ce qui attend Jérôme** : une partie à deux, lui et un ami (ou le second compte e2e dans une
 fenêtre privée), sur le client redéployé à son feu vert ; puis la phase 8.
+
+### Sous-phase 2H.34, « l'interface d'équipe », codée le 2026-10-17, porte ouverte
+
+Par le fil principal (Fable 5.1), un Opus 5.5 effort élevé sur le hub et le lobby, un Sonnet 5.5
+effort moyen sur les mots et les specs, à partir de `00` C33 : les retours de Jérôme après sa
+première soirée de coop, une maquette cliquable validée, quinze points validés en un lot. Rien dans
+le moteur ni dans l'IA, `ENGINE_VERSION` reste 11, **rien à redéployer côté fonctions** ; migration
+`0012` sans schéma ; **pas de sweep.**
+
+| Quoi | État |
+|---|---|
+| Le hub | Une bande d'appel (« Enter the lobby » ou « Back to the silo »), Players avec « In the lobby » en direct, « Invite a friend », « Your Giff » en compact avec glyphes, « Join a team » en pied, « Switch team » en menu, « Raise a team » |
+| Le hub vivant | `team:<id>` (`announceTeamChange` par REST après join, départ, retrait, nouveau code ; `useAccount` relit), la présence du lobby lue depuis `App` (`useLobbyChannel`), relecture au retour sur l'onglet, `refresh(teamId)` bascule sur l'équipe rejointe |
+| Le lobby | « The bench » : trois cartes de siège, tuiles de rôle « n open », badges Ready, siège vide avec le code, arrivée animée, barre basse avec la ligue en segments et Start match ou Ready ; le canal n'est plus au lobby mais à `App`, le lobby `track` son siège et le retire en partant |
+| Le fond | `client/public/crowd-entering-arena.webp` (198 Ko, de son `Crowd_entering_arena.jpg` déplacé dans `assets/source/images/`), fixe, voilé, panneaux en verre, sur le hub, le lobby et « Raise a team » |
+| Les mots | Battery → Team dans tout texte visible, les test ids (`leave-team`, `team-switch`) et les specs ; la RPC `battery_members`, le type `BatteryResult` et le nom « E2E Battery » restent |
+| Migration | `0012_team_wording.sql` : les trois messages en « team », le propriétaire une fois dans `battery_members` (sa propre ligne repliée par `left join`) ; six tests ; **appliquée par Jérôme le 2026-10-17**, vérifiée en lecture avant et après (04) |
+| Tests | **771 sur 45 fichiers contre 759** ; typecheck racine, scripts, e2e et client verts ; le client bundle |
+| Harnais | Smoke 2D **vert en 27 s** ; `e2e:coop` **vert en 20 s** (après la remise du second compte e2e sur « E2E Battery », qu'il avait quittée pendant la soirée de Jérôme, et le spec qui bascule d'équipe par le menu) ; `e2e:board3d` **vert en 7,8 min** seul (rouge une fois lancé en même temps que vitest, à 2 images par seconde) |
+| Dette | Les trois canaux Realtime publics (phase 8) ; `create-match` et `abandon_match` disent encore « battery » jusqu'à un redéploiement ; un run coop rouge une fois sur la présence, non reproduit |
+
+**Ce qui attend Jérôme** : commiter, donner le feu vert
+du client en ligne (`npm run build` dans `client/`, `node scripts/deploy-vercel.mjs --production`),
+puis sa partie à deux sur la nouvelle interface, puis la phase 8.

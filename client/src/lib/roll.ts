@@ -1,5 +1,5 @@
 /**
- * The pure part of the account (2H.32): which battery the hub opens on, and the
+ * The pure part of the account (2H.32): which team the hub opens on, and the
  * roll with each player listed once. Out of `useAccount.ts` so vitest can load
  * it without the Supabase client, which refuses to be imported without its
  * environment.
@@ -8,7 +8,7 @@
 import type { Member, Team } from './useAccount.js';
 
 /**
- * Which of the player's batteries to show: the remembered one if they are still
+ * Which of the player's teams to show: the remembered one if they are still
  * on it, else the one they own, else the first joined.
  */
 export function pickTeam(teams: readonly Team[], userId: string, remembered: string | null): Team | null {
