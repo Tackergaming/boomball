@@ -2057,8 +2057,7 @@ le moteur ni dans l'IA, `ENGINE_VERSION` reste 11, **rien à redéployer côté 
 | Migration | `0012_team_wording.sql` : les trois messages en « team », le propriétaire une fois dans `battery_members` (sa propre ligne repliée par `left join`) ; six tests ; **appliquée par Jérôme le 2026-10-17**, vérifiée en lecture avant et après (04) |
 | Tests | **771 sur 45 fichiers contre 759** ; typecheck racine, scripts, e2e et client verts ; le client bundle |
 | Harnais | Smoke 2D **vert en 27 s** ; `e2e:coop` **vert en 20 s** (après la remise du second compte e2e sur « E2E Battery », qu'il avait quittée pendant la soirée de Jérôme, et le spec qui bascule d'équipe par le menu) ; `e2e:board3d` **vert en 7,8 min** seul (rouge une fois lancé en même temps que vitest, à 2 images par seconde) |
+| En ligne | **Le client redéployé le 2026-10-17 sur son feu vert** (`deploy-vercel.mjs --production`, 83 fichiers, 12,1 Mo, le fond servi), après le commit `dbdfd69` ; le smoke contre l'URL en ligne passe connexion, hub, lobby et plateau, puis s'arrête sur le crochet absent d'un build, par construction. Les fonctions ne bougent pas |
 | Dette | Les trois canaux Realtime publics (phase 8) ; `create-match` et `abandon_match` disent encore « battery » jusqu'à un redéploiement ; un run coop rouge une fois sur la présence, non reproduit |
 
-**Ce qui attend Jérôme** : commiter, donner le feu vert
-du client en ligne (`npm run build` dans `client/`, `node scripts/deploy-vercel.mjs --production`),
-puis sa partie à deux sur la nouvelle interface, puis la phase 8.
+**Ce qui attend Jérôme** : sa partie à deux sur la nouvelle interface, en ligne, puis la phase 8.

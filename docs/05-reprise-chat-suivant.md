@@ -43,10 +43,13 @@ nouvelle interface.
 lecture avant et après, consignée en 04) : les trois messages SQL de 0011 en « team », le
 propriétaire listé une fois par `battery_members` ; `mergeRoll` côté client est devenu inutile,
 à retirer à la prochaine passe sur `roll.ts`. **LE
-CLIENT EN LIGNE (https://boomball.vercel.app) EST ENCORE CELUI DU 16 AU SOIR (2H.30)** : il ne
-connaît ni la coop ni la nouvelle interface ; il se redéploie par npm run build dans client/
-puis node scripts/deploy-vercel.mjs --production depuis boomball/, SUR MON FEU VERT SEULEMENT,
-et j'ai dit qu'on attendait la fin de 2H.34 pour le faire. Vérifier git status et git log
+CLIENT EN LIGNE (https://boomball.vercel.app) EST CELUI DE 2H.34, REDÉPLOYÉ LE 2026-10-17 SUR MON
+FEU VERT** (`dpl_56jFmrpJqYmRtyzz4BQZZaYJUnea`, 83 fichiers, 12,1 Mo plus le fond de 198 Ko servi
+en 200) : la coop et la nouvelle interface sont en ligne ; le smoke lancé contre l'URL en ligne
+passe la connexion, le hub, le lobby et atteint le plateau, puis s'arrête sur le crochet
+`window.__boomball`, absent d'un build par construction (ce n'est pas un défaut). Un redéploiement
+se fait par npm run build dans client/ puis node scripts/deploy-vercel.mjs --production depuis
+boomball/, SUR MON FEU VERT SEULEMENT. Vérifier git status et git log
 origin/main..main en premier et me le dire (`07a8ce3`, la coop, est poussé ; 2H.34 est à
 commiter si je ne l'ai pas fait avec /commit en fin de chat), me proposer /save (ou /commit)
 puis le push. Les fichiers de 2H.34 : client/src/lib/teamChannel.ts et useLobbyChannel.ts
@@ -134,14 +137,14 @@ l'abandon (migration 0008), 2H.27 la ligue au choix, 2H.25 et 2H.26 le rebond et
 2H.21 à 2H.24 le jeu vivant et le Giff riggé, 2H.16 à 2H.20 la caméra, 2H.15 la 2.5D.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (4) FAITS (ligue et abandon, phase 6, client en
-ligne, coop) ; (4 bis) **2H.34 l'interface d'équipe, CODÉE** ; (5) **le commit, le redéploiement du client sur mon feu vert, puis MA PARTIE À DEUX** (un ami, ou le
+ligne, coop) ; (4 bis) **2H.34 l'interface d'équipe, CODÉE** ; (5) commit `dbdfd69` et client redéployé, FAITS le 17 ; **MA PARTIE À DEUX** (un ami, ou le
 second compte e2e dans une fenêtre privée) sur la nouvelle interface, et mes retours ; (6) la
 phase 8, le déploiement pour un ami : le script existe, restent `site_url` de l'Auth, la bande
 passante Hobby (100 Go par mois, 13 Mo par premier chargement plus 200 Ko de fond), un ami qui
 crée un compte, et DEUX TROUS à cadrer avec moi avant qu'un ami ne joue : pas de « mot de passe
 oublié » ni de changement de mot de passe dans le jeu ; /security-review par moi.
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; me demander le feu vert pour redéployer le client en ligne ; puis MA PARTIE À DEUX et mes
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; MA PARTIE À DEUX sur le client en ligne et mes
 retours ; puis cadrer la phase 8 avec moi, questions en chat, une ou deux par message.
 
 Ce qu'il faut savoir tout de suite.
