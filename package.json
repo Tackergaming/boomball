@@ -9,13 +9,15 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts && tsc --noEmit -p e2e",
     "sweep": "vitest run --config vitest.sweep.config.ts",
+    "export:db": "node scripts/export-db.mjs",
     "build:function": "node scripts/build-edge-function.mjs",
     "deploy:function": "node scripts/deploy-edge-function.mjs",
-    "e2e": "playwright test -c e2e/playwright.config.ts --grep-invert \"@playthrough|@board3d|@abandon|@coop\"",
+    "e2e": "playwright test -c e2e/playwright.config.ts --grep-invert \"@playthrough|@board3d|@abandon|@coop|@account\"",
     "e2e:playthrough": "playwright test -c e2e/playwright.config.ts --grep @playthrough",
     "e2e:board3d": "playwright test -c e2e/playwright.config.ts --grep @board3d",
     "e2e:abandon": "playwright test -c e2e/playwright.config.ts --grep @abandon",
-    "e2e:coop": "playwright test -c e2e/playwright.config.ts --grep @coop"
+    "e2e:coop": "playwright test -c e2e/playwright.config.ts --grep @coop",
+    "e2e:account": "playwright test -c e2e/playwright.config.ts --grep @account"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

@@ -162,6 +162,14 @@ export function SignIn({ onDone }: { onDone: () => void }) {
           >
             {mode === 'in' ? 'No account yet' : 'I already have an account'}
           </button>
+
+          {mode === 'in' && (
+            // No mail path exists, by choice (`00` C35 point 1): a forgotten
+            // password is reset by Jérôme, by hand, and the screen says so.
+            <p className="label" style={S.forgot} data-testid="forgot-note">
+              Forgot your password? Ask Jérôme on Discord, he resets it.
+            </p>
+          )}
         </form>
       </div>
 
@@ -232,5 +240,12 @@ const S: Record<string, React.CSSProperties> = {
     padding: 26,
     background: 'rgba(11,15,18,.82)',
     border: '1px solid var(--line)',
+  },
+  forgot: {
+    margin: '16px 0 0',
+    textAlign: 'center',
+    lineHeight: 1.6,
+    textTransform: 'none',
+    letterSpacing: '.04em',
   },
 };

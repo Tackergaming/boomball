@@ -26,6 +26,7 @@ import { pathTo, safePathTo, safeReachableCells } from '../../../engine/rules/mo
 import { isHuman } from '../../../engine/types.js';
 import { arena } from '../lib/arena.js';
 import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
+import { webglAvailable } from '../lib/webgl.js';
 import { ActionBar, type Pending } from '../match/ActionBar.js';
 import { Announce } from '../match/Announce.js';
 import { Banner, type Announcement } from '../match/Banner.js';
@@ -107,7 +108,11 @@ export function Match({
    * choice is kept on this browser. The harness poses 2D itself before it
    * enters, because its cells and tokens are DOM.
    */
+  // A browser with no WebGL gets the flat board and no way to the other one
+  // (phase 8, `00` C35 point 8): the 2.5D board cannot mount without it.
+  const [hasWebgl] = useState(() => webglAvailable());
   const [view, setView] = useState<'2d' | '3d'>(() => {
+    if (!hasWebgl) return '2d';
     try {
       // 3D by default for everyone since 2H.29 (`00` C30 point 1); "Back to 2D" is remembered.
       return localStorage.getItem('boomball.view') === '2d' ? '2d' : '3d';
@@ -116,6 +121,7 @@ export function Match({
     }
   });
   const toggleView = () => {
+    if (!hasWebgl) return;
     const next = view === '2d' ? '3d' : '2d';
     setView(next);
     try {
@@ -896,10 +902,16 @@ export function Match({
                 className="ghost"
                 style={{ ...S.speed, color: 'var(--brass)', borderColor: 'var(--brass-dim)' }}
                 data-testid="view-toggle"
+                data-webgl={hasWebgl ? 'yes' : 'no'}
                 onClick={toggleView}
-                title="The same match, flat from above or in three quarters"
+                disabled={!hasWebgl}
+                title={
+                  hasWebgl
+                    ? 'The same match, flat from above or in three quarters'
+                    : 'This browser cannot open WebGL, so the match is shown flat from above'
+                }
               >
-                {view === '2d' ? 'See it in 3D' : 'Back to 2D'}
+                {!hasWebgl ? 'No 3D here' : view === '2d' ? 'See it in 3D' : 'Back to 2D'}
               </button>
               <button
                 className="ghost"

@@ -2082,3 +2082,34 @@ reste 11, **rien à redéployer côté fonctions** ; pas de sweep.
 **Porte franchie le soir même** : sa partie à deux avec une revanche, en ligne (« parfait le bug est
 corrigé »). **Ce qui suit** : la phase 8, le déploiement pour un ami, à cadrer en chat ; et, plus
 tard, à sa demande, une revue de l'interface des matchs comme celle du hub et du lobby.
+
+
+### Sous-phase 2H.36, « la phase 8, premier lot : le compte, la revue, l'export », codée le 2026-10-17 soir, porte ouverte
+
+Par le fil principal (Fable 5.1), à partir de `00` C35 : la phase 8 cadrée en chat, huit points
+validés par Jérôme en un lot. **Un Sonnet 5.5 effort moyen** sur `scripts/export-db.mjs`, **un
+Opus 5.5 effort élevé** pour la revue de sécurité du jeu entier (`docs/10-revue-securite-2026-10-17.md`),
+tous deux sur brief fermé et relus par le fil principal. Rien dans le moteur ni dans l'IA,
+`ENGINE_VERSION` reste 11, rien en base ; pas de sweep.
+
+| Quoi | État |
+|---|---|
+| Le cadrage | Mot de passe oublié manuel par Jérôme (pas de SMTP, le mailer intégré plafonne à deux par heure) ; menu « Account » ; `site_url` ; bande passante sans suite ; inscriptions ouvertes ; la revue d'abord ; l'export ; Firefox et sans WebGL. Détail en `00` C35 |
+| `site_url` | **Changé le soir même sur son feu vert**, par l'API de gestion : `https://boomball.vercel.app`, la liste des redirections avec cette URL et `localhost:5173`. Lu avant et après |
+| Le menu | `screens/AccountMenu.tsx` : « Account ▾ » dans l'en-tête du hub et au-dessus de « Raise a team », « Signed in as X », « Change password » (deux fois, six caractères, sans l'ancien), « Sign out » (ce navigateur seulement) ; `changePassword` et `signOut` dans `lib/supabase.ts` |
+| Un défaut trouvé | La reconnexion dans la même page insérait un profil existant (deux 409) : `useAccount.load(null)` remet `loadedForRef` à `null` |
+| La connexion | « Forgot your password? Ask Jérôme on Discord, he resets it. » sous le formulaire |
+| Sans WebGL | **Page noire** dans un Chromium à `--disable-3d-apis` (three jetait dans le canvas, rien ne l'attrapait). `lib/webgl.ts`, `webglAvailable()` ; `Match.tsx` ouvre en 2D et le bouton de vue dit « No 3D here ». Rejoué : le plateau plat, zéro erreur |
+| Firefox | Firefox 157 par Playwright : hub, lobby, plateau 3D à 119 images par seconde, « Back to 2D », zéro erreur à nous |
+| L'export | `scripts/export-db.mjs` (Sonnet), `npm run export:db`, sept tables et un manifeste dans `boomball/backups/<date>/`, ignoré par git ; `--events` pour les coups. Lancé une fois : 3 profils, 2 équipes, 4 membres, 157 matchs |
+| Le modèle | `client/public/models/giff-boomball.glb` retiré (identique à la source, lu par personne) |
+| La revue | **Aucun bloquant**, `rls-check.py` 24 sur 24, aucun secret dans git, un seul JWT dans le bundle. **M1** `team_members_write` laisse tout connecté s'insérer dans toute équipe par UUID ; **M2** le moteur accepte des coordonnées non entières dans un chemin (prouvé) ; **M3** les canaux Realtime publics et ce qu'ils permettent, SQL de la migration proposée en §3 du rapport. Six mineurs, quatorze notes, l'état de C1 à C20 en §4 |
+| Tests | **771**, inchangés ; typecheck racine, scripts, e2e et client verts ; le client bundle |
+| Harnais | Smoke 2D **vert en 33 s**, `e2e:coop` **vert en 2,2 min**, `e2e:account` (nouveau, `@account`) **vert en 7,4 s**, `e2e:board3d` **vert en 6,4 min** (lancé seul) |
+| Maintien en vie | A13 tourne : exécution verte du workflow `supabase-keepalive` vue par Jérôme le 2026-10-17 à 12:53 |
+| En ligne | Rien de redéployé : le client en ligne reste celui de 2H.35. Le menu « Account », la ligne de connexion et le repli sans WebGL attendent son feu vert |
+
+**Porte ouverte** : le rapport de revue à lire par Jérôme et ses corrections à trancher (2H.37 :
+M1 et m1 en une migration, M2 et le redéploiement de `resolve-action`, puis M3 avec le client et
+les deux fonctions ensemble), le client à redéployer sur son feu vert, puis un ami qui crée un
+compte et joue sans lui.

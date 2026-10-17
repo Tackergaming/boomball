@@ -424,6 +424,66 @@ button.bb-small {
   text-align: left;
 }
 
+/* The Account menu (phase 8): the name, the password form, sign out. */
+.bb-account {
+  min-width: 260px;
+}
+
+.bb-account-name {
+  margin: 4px 6px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bb-account-name span {
+  color: var(--text);
+}
+
+.bb-account-done {
+  margin: 0 6px 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--team-own);
+}
+
+.bb-account-form {
+  display: grid;
+  gap: 6px;
+  padding: 4px 6px 6px;
+}
+
+.bb-account-form input {
+  font-size: 14px;
+  padding: 9px 11px;
+}
+
+.bb-account-hint {
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+.bb-account-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.bb-account-row button {
+  flex: 1;
+  text-align: center;
+}
+
+/* The first screen has no header: the menu sits above the card, right. */
+.bb-found-top {
+  display: flex;
+  justify-content: flex-end;
+  width: min(560px, 100%);
+  margin: 0 auto 10px;
+}
+
 /* The one call to action on the hub. */
 .bb-cta {
   display: flex;

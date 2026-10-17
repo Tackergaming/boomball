@@ -134,6 +134,12 @@ export function App() {
       abandoned={account.abandoned}
       lobby={lobby.seats}
       onResume={() => setAtTheBoard(true)}
+      onSignedOut={() => {
+        // The auth listener in `useAccount` clears the user; this only makes
+        // sure the next player on this browser starts on the hub.
+        setWhere('hub');
+        setAtTheBoard(false);
+      }}
       onAbandoned={() => account.refresh()}
       onCreated={() => void account.refresh()}
       onJoined={(teamId) => account.refresh(teamId)}

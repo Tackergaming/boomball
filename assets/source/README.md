@@ -7,7 +7,7 @@ Le jeu ne lit jamais ce dossier : il lit les dérivés, qui eux sont commités.
 |---|---|
 | `images/le gradin cyan.jpg`, `le gradin magenta.jpg`, `la rambarde.jpg` (Nano Banana Pro) | `client/src/board3d/textures/stand-cyan.webp`, `stand-magenta.webp`, `barrier.webp` |
 | `images/Giff-boomball-2d.jpg` | rien encore |
-| `models/giff-boomball.glb` (export trimesh, sans squelette) | `client/public/models/giff-rigged.glb` depuis le 2026-10-16 : riggé et animé par `scripts/blender/rig_giff.py` (Blender 5.2, sans fenêtre), sept clips. L'ancienne copie `client/public/models/giff-boomball.glb` n'est plus lue |
+| `models/giff-boomball.glb` (export trimesh, sans squelette) | `client/public/models/giff-rigged.glb` depuis le 2026-10-16 : riggé et animé par `scripts/blender/rig_giff.py` (Blender 5.2, sans fenêtre), sept clips. L'ancienne copie `client/public/models/giff-boomball.glb` a été retirée du client le 2026-10-17 (phase 8), la source reste ici |
 | `models/giff-rigged.blend`, `models/giff-rigged-clips.mp4` | rien : la scène Blender du rig, pour l'ouvrir à la main, et la vidéo des sept clips |
 | `sounds/swing.wav`, `goal.wav`, `explosion cracker.wav` | `client/public/sounds/swing.mp3`, `goal.mp3`, `blast.mp3` (ffmpeg, mp3 q4) |
 | `sounds/jetpack1.aiff` (trois bursts, 12 s) | `client/public/sounds/dash.mp3` : le deuxième burst, 4,00 à 5,60 s, fondu de sortie 300 ms (le Dash, les Giff ont des jetpacks) |

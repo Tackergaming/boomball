@@ -199,6 +199,11 @@ export function useAccount(): Account {
       setFailure(null);
 
       if (!id) {
+        // Signed out: the next sign-in on this browser, even of the same
+        // player, must read the profile afresh, or the render that learns the
+        // user id sees it beside this `null` and `App` inserts a profile that
+        // exists (a 409, seen the first time "Sign out" existed, phase 8).
+        loadedForRef.current = null;
         setProfile(null);
         setTeams([]);
         setTeam(null);

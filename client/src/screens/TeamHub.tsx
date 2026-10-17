@@ -32,6 +32,7 @@ import { joinTeam, removeMembership, rotateInviteCode, supabase } from '../lib/s
 import { announceTeamChange } from '../lib/teamChannel.js';
 import type { LiveMatch, Member, Team } from '../lib/useAccount.js';
 import { AbandonPrompt } from '../match/AbandonPrompt.js';
+import { AccountMenu } from './AccountMenu.js';
 import { alreadyInLobby, cleanCode, formatCode, ladderOf, tierName, type Seat } from './lobbySeats.js';
 import { RoleGlyph } from './RoleGlyph.js';
 import { CopyCode, Shell } from './Shell.js';
@@ -51,11 +52,13 @@ export function TeamHub({
   team,
   teams,
   members,
+  displayName,
   live,
   archived,
   abandoned,
   lobby,
   onResume,
+  onSignedOut,
   onAbandoned,
   onCreated,
   onJoined,
@@ -80,6 +83,8 @@ export function TeamHub({
   /** Who sits in the lobby of the chosen team, from the shared channel; null until the first sync. */
   lobby: Seat[] | null;
   onResume: () => void;
+  /** After "Sign out" in the Account menu: the app forgets where it was. */
+  onSignedOut: () => void;
   /** The running match was abandoned from here: the account is re-read. */
   onAbandoned: () => void | Promise<void>;
   /** After raising a team: the account is re-read. */
@@ -102,7 +107,17 @@ export function TeamHub({
       .then(({ data }) => setStats((data ?? []) as StatRow[]));
   }, []);
 
-  if (!team) return <FoundTeam userId={userId} onCreated={onCreated} onJoined={onJoined} />;
+  if (!team) {
+    return (
+      <FoundTeam
+        userId={userId}
+        displayName={displayName}
+        onCreated={onCreated}
+        onJoined={onJoined}
+        onSignedOut={onSignedOut}
+      />
+    );
+  }
 
   const isOwner = team.owner === userId;
   const ladder = ladderOf(team.wins);
@@ -145,6 +160,7 @@ export function TeamHub({
         </div>
 
         {teams.length > 1 && <TeamSwitch team={team} teams={teams} onChooseTeam={onChooseTeam} />}
+        <AccountMenu displayName={displayName} onSignedOut={onSignedOut} />
       </header>
 
       {live ? (
@@ -606,12 +622,16 @@ function JoinWithCode({
 /** The very first screen a new player sees after signing in. */
 function FoundTeam({
   userId,
+  displayName,
   onCreated,
   onJoined,
+  onSignedOut,
 }: {
   userId: string;
+  displayName: string;
   onCreated: () => void;
   onJoined: (teamId: string) => void | Promise<void>;
+  onSignedOut: () => void;
 }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -646,6 +666,9 @@ function FoundTeam({
 
   return (
     <Shell center>
+      <div className="bb-found-top">
+        <AccountMenu displayName={displayName} onSignedOut={onSignedOut} />
+      </div>
       <div className="bb-glass bb-found">
         <form onSubmit={submit}>
           <p className="label" style={{ margin: 0, color: 'var(--team-own)' }}>

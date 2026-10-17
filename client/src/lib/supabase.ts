@@ -209,6 +209,38 @@ export async function saveSeatPreference(
   }
 }
 
+/**
+ * Changes the signed-in player's password (phase 8, `00` C35 point 2). The
+ * project does not ask for the old one; the session is the proof. The server
+ * keeps the six-character floor, so a refusal comes back in its words.
+ */
+export async function changePassword(password: string): Promise<BatteryResult<null>> {
+  try {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true, value: null };
+  } catch (failure) {
+    console.error('the password could not be changed', failure);
+    return { ok: false, reason: 'could not reach the server. Check your connection and try again.' };
+  }
+}
+
+/**
+ * Signs out of this browser only (`scope: 'local'`): a friend who also plays
+ * from a second machine keeps that session, and the e2e run that exercises
+ * this button does not revoke the session its other specs hold.
+ */
+export async function signOut(): Promise<BatteryResult<null>> {
+  try {
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true, value: null };
+  } catch (failure) {
+    console.error('signing out failed', failure);
+    return { ok: false, reason: 'could not reach the server. Check your connection and try again.' };
+  }
+}
+
 export function submitAction(
   matchId: string,
   unitId: string,

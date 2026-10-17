@@ -1,18 +1,16 @@
 # Prompt de reprise pour le chat suivant
 
-> Récrit le 2026-10-17 au soir par le fil principal (Fable 5.1) à la fin du chat de l'interface
-> d'équipe (2H.34, `00` C33) et de la limite de présence (2H.35, `00` C34), qui a suivi la coop
-> (2H.31 à 2H.33, `00` C32). Jérôme a franchi la porte de 2H.35 (« parfait le bug est corrigé »). Tout ce qui précède est dans
-> `07` §10, `08` §5 et `00` C1 à C33. À coller tel quel au début du chat suivant.
+> Récrit le 2026-10-17 au soir par le fil principal (Fable 5.1) à la fin du chat qui a cadré la
+> phase 8 et codé son premier lot, 2H.36. À coller tel quel au début du chat suivant.
 
 ---
 
 On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
 Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.35
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.36
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15, la 6 par 2H.29,
-la 7 par 2H.31 à 2H.33, et 2H.34 est l'interface d'équipe qui a suivi ma première soirée de
-coop), §9 la parallélisation.
+la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et la limite de présence, 2H.36 le
+premier lot de la phase 8), §9 la parallélisation.
 Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 65, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 à C16 les passes suivantes de l'IA (chacune finit par « comment ...
@@ -23,154 +21,109 @@ l'annonceur systématique, C28 la ligue au choix, C29 annuler et quitter un matc
 (3D par défaut, porteur, effectif fixe), C31 mes cinq retours (le Dash tenu, la latence MESURÉE
 et LAISSÉE TOMBER), C32 la coop (cadrée en huit réponses de moi, codée en trois sous-phases le
 2026-10-17 : 2H.31 A10 et la migration 0010, 2H.32 la batterie à plusieurs et la migration 0011,
-2H.33 le match à plusieurs, l'écart 65, `ENGINE_VERSION` 11). **C33 est l'interface d'équipe,
-2H.34, codée le 2026-10-17 après-midi sur mes retours de ma première soirée de coop, une maquette
-cliquable que j'ai validée et quinze points validés en un lot** : le hub en une bande d'appel et
-deux colonnes, vivant (canal `team:<id>`, présence du lobby lue depuis App) ; le lobby « The
-bench » en trois cartes de siège ; mon image de la foule devant le silo en fond ; Battery devenu
-Team partout à l'écran ; la migration 0012. **C34 est 2H.35, codée le 2026-10-17 soir sur mes deux
-retours de ma seconde partie à deux** : la revanche s'ouvrait sans l'invité parce que trois
-messages de présence en cinquante millisecondes faisaient fermer le canal du lobby par le serveur
-(« Client presence rate limit exceeded ») ; `track()` est lissé à un message par demi-seconde, un
-canal fermé est rouvert, le profil ne clignote plus à la relecture, et le bouton du coéquipier dit
-« Click here when you're ready » en grand. **Sa partie à deux avec revanche a franchi la porte le
-soir même** (« parfait le bug est corrigé »). Ne rediscute rien de C12 à C34.
+2H.33 le match à plusieurs, l'écart 65, `ENGINE_VERSION` 11), C33 l'interface d'équipe (2H.34,
+le hub et le lobby « The bench » sur une maquette validée, Battery devenu Team, migration 0012),
+C34 la limite de présence Realtime et le bouton Ready (2H.35 : `track()` lissé à un message par
+demi-seconde, canal fermé rouvert). **C35 EST LA PHASE 8, CADRÉE EN CHAT LE 2026-10-17 SOIR, HUIT
+POINTS VALIDÉS PAR MOI EN UN LOT, ET « COMMENT 2H.36 EST CODÉE »** : mot de passe oublié MANUEL
+par moi (pas de SMTP, le mailer intégré plafonne à deux e-mails par heure, choix assumé, l'écran
+de connexion dit « Forgot your password? Ask Jérôme on Discord, he resets it. ») ; le menu
+« Account » dans l'en-tête du hub (nom, « Change password » avec le nouveau deux fois SANS
+l'ancien, « Sign out » de ce navigateur seulement) ; `site_url` et la liste des redirections de
+l'Auth sur `https://boomball.vercel.app`, FAIT sur mon feu vert ; la bande passante Hobby classée
+sans suite et l'ancien `giff-boomball.glb` retiré du client ; les inscriptions OUVERTES pour
+l'instant (`disable_signup` les fermera sans code) ; la revue de sécurité d'abord, par un agent
+Opus 5.5 effort élevé parce que `/security-review` ne relit que la diff en attente ; l'export
+`npm run export:db` ; Firefox vérifié vert et le repli sans WebGL (page noire trouvée et
+corrigée, « No 3D here »). Ne rediscute rien de C12 à C35.
 07 §10 porte le journal (2H.15 la 2.5D fichier par fichier, 2H.16 à 2H.20 la caméra, 2H.21 et
-2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31,
-2H.32, 2H.33, 2H.34, 2H.35). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de
-sweep depuis 2H.8. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te
-surprend.
+2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31 à
+2H.36). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
+2H.8. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend.
+**LIS AUSSI boomball/docs/10-revue-securite-2026-10-17.md EN ENTIER** : c'est le rapport de la
+revue de sécurité du jeu entier, rendu par l'agent Opus 5.5 et relu par le fil principal (M1 et
+M2 vérifiés dans le code). C'est la matière de 2H.37.
 
-Où on en est : **2H.34 et 2H.35 sont CODÉES le 2026-10-17, `ENGINE_VERSION` toujours 11, rien à redéployer
-côté fonctions (`resolve-action` v27, `create-match` v25, moteur 11 en ligne depuis le 17).**
-771 tests verts sur 45 fichiers, typecheck racine, scripts, e2e et client verts, le client
-bundle. Smoke 2D vert en 24 s, `npm run e2e:coop` vert en 2,3 min (deux specs depuis 2H.35 :
-`coop.spec.ts` 22 s et `rematch.spec.ts` 1,8 min, qui joue un match entier à deux puis la
-revanche), `e2e:board3d` vert en 7,8 min (lancé sur 2H.34, rien du plateau n'a bougé depuis).
-**LA MIGRATION 0012 (`0012_team_wording.sql`) EST APPLIQUÉE PAR MOI LE 2026-10-17** (vérifiée en
-lecture avant et après, consignée en 04) : les trois messages SQL de 0011 en « team », le
-propriétaire listé une fois par `battery_members` ; `mergeRoll` côté client est devenu inutile,
-à retirer à la prochaine passe sur `roll.ts`. **LE
-CLIENT EN LIGNE (https://boomball.vercel.app) EST CELUI DE 2H.34, REDÉPLOYÉ LE 2026-10-17 SUR MON
-FEU VERT, PUIS CELUI DE 2H.35, REDÉPLOYÉ LE SOIR MÊME SUR MON FEU VERT, ET VALIDÉ PAR MA PARTIE
-À DEUX AVEC REVANCHE** (`dpl_56jFmrpJqYmRtyzz4BQZZaYJUnea`, 83 fichiers, 12,1 Mo plus le fond de 198 Ko servi
-en 200) : la coop et la nouvelle interface sont en ligne ; le smoke lancé contre l'URL en ligne
-passe la connexion, le hub, le lobby et atteint le plateau, puis s'arrête sur le crochet
-`window.__boomball`, absent d'un build par construction (ce n'est pas un défaut). Un redéploiement
-se fait par npm run build dans client/ puis node scripts/deploy-vercel.mjs --production depuis
-boomball/, SUR MON FEU VERT SEULEMENT. Vérifier git status et git log
-origin/main..main en premier et me le dire (`07a8ce3`, la coop, est poussé ; 2H.34 est à
-commiter si je ne l'ai pas fait avec /commit en fin de chat), me proposer /save (ou /commit)
-puis le push. Les fichiers de 2H.34 : client/src/lib/teamChannel.ts et useLobbyChannel.ts
-(nouveaux), useAccount.ts, App.tsx, screens/TeamHub.tsx, Lobby.tsx, lobbySeats.ts (+test),
-Shell.tsx et RoleGlyph.tsx (nouveaux), theme.css, match/Feed.tsx, Briefing.tsx, screens/Match.tsx
-(un commentaire), lib/supabase.ts, roll.ts (+test), les six specs e2e et global-setup.ts,
-client/public/crowd-entering-arena.webp (nouveau), assets/source/images/Crowd_entering_arena.jpg
-(mon image, déplacée depuis client/public/), supabase/migrations/0012 et
-server/migration0012.test.ts (nouveaux), docs 00 (C33), 04, 07 (§10), 08 (en-tête, §5), le skill
-boomball, ce fichier. Les quatre fichiers du vault modifiés hors de nos sessions et les non
-suivis MARGO.md, theodo.md, assets/source/ (mon JPEG de la foule y reste non suivi comme les
-autres sources, seul le WebP de client/public/ est commité), scripts/blender/__pycache__/ ne sont pas à
-nous : ne les commite pas sans mon feu vert ; check_vault.py signale MARGO.md et theodo.md,
-c'est connu et c'est à moi.
+Où on en est : **2H.36 EST CODÉE LE 2026-10-17 SOIR, `ENGINE_VERSION` toujours 11, rien à
+redéployer côté fonctions (`resolve-action` v27, `create-match` v25, moteur 11 en ligne depuis
+le 17).** 771 tests verts sur 45 fichiers, typecheck racine, scripts, e2e et client verts, le
+client bundle. Smoke 2D vert en 33 s, `npm run e2e:coop` vert en 2,2 min (deux specs),
+`npm run e2e:account` (nouveau, `@account`, hors de `npm run e2e`) vert en 7,4 s,
+`e2e:board3d` **vert en 6,4 min** (lancé seul). **LE CLIENT EN LIGNE (https://boomball.vercel.app) EST ENCORE CELUI DE
+2H.35** : le menu « Account », la ligne « Ask Jérôme », le repli sans WebGL et le modèle retiré
+attendent MON FEU VERT pour un redéploiement (npm run build dans client/, déjà fait et vert, puis
+node scripts/deploy-vercel.mjs --production depuis boomball/). Vérifier git status et git log
+origin/main..main en premier et me le dire : au 17 au soir tout était commité et poussé jusqu'à
+`0e7e734` ; **2H.36 est à commiter si je ne l'ai pas fait avec /commit ou /save en fin de chat**.
+Les fichiers de 2H.36 : client/src/screens/AccountMenu.tsx (nouveau), client/src/lib/webgl.ts
+(nouveau), lib/supabase.ts (`changePassword`, `signOut`), lib/useAccount.ts (`load(null)` remet
+`loadedForRef` à `null`), App.tsx (`onSignedOut`), screens/TeamHub.tsx (le menu dans l'en-tête et
+au-dessus de « Raise a team »), screens/SignIn.tsx (la ligne), screens/Match.tsx (`hasWebgl`, le
+bouton « No 3D here »), theme.css (`bb-account-*`, `bb-found-top`), e2e/account.spec.ts
+(nouveau), package.json (`e2e:account`, `export:db`, `@account` exclu de `e2e`),
+scripts/export-db.mjs (nouveau, Sonnet), client/public/models/giff-boomball.glb (SUPPRIMÉ),
+assets/source/README.md, le .gitignore racine (`boomball/backups/`), docs 00 (C35), 07 (§10), 08
+(en-tête, §5), 10 (nouveau, le rapport), le skill boomball, ce fichier. Les quatre fichiers du
+vault modifiés hors de nos sessions et les non suivis MARGO.md, theodo.md, assets/source/ (mes
+sources, non suivies), scripts/blender/__pycache__/ ne sont pas à nous : ne les commite pas sans
+mon feu vert ; check_vault.py signale MARGO.md et theodo.md, c'est connu et c'est à moi.
+`boomball/backups/` est ignoré par git et contient les codes d'invitation : jamais dans un
+dossier partagé.
 
-Ce que 2H.34 contient, détail en 00 C33.
+**Ce que la revue a trouvé, en bref** (détail dans 10, ne pas le réinventer). Verdict : aucun
+bloquant, un ami peut jouer sans moi dans la pièce ; `rls-check.py` 24 sur 24 ; aucun secret dans
+git ni dans l'historique ; un seul JWT dans le bundle, la clé anon. Trois majeurs, tous contre un
+ami malveillant ou un ancien membre, jamais un inconnu (les UUID ne sont exposés nulle part) :
+**M1** la politique `team_members_write` de `0001_init.sql` ne regarde pas `team_id` à
+l'insertion, n'importe quel connecté s'insère dans toute équipe dont il connaît l'UUID, un membre
+retiré revient en une requête ; correction, une migration d'environ 25 lignes (insert réservé au
+propriétaire pour sa propre ligne, les amis n'entrent que par `join_team` ; update sur sa ligne
+avec des privilèges de colonne qui figent `team_id` ; delete inchangé), sans redéploiement.
+**M2** `validatePath` dans `engine/rules/movement.ts` ne vérifie jamais qu'une coordonnée est
+entière, `cellAt` rend `undefined` pour `x = 2.5` et une chaîne est stockée telle quelle ; prouvé
+contre le vrai moteur ; correction, `Number.isInteger` en tête de boucle, un `path` tableau, une
+`action` objet à `kind` chaîne dans `resolve-action`, un test, `ENGINE_VERSION` inchangé,
+`resolve-action` à redéployer (v28). **M3** les trois canaux Realtime publics, avec ce qu'ils
+permettent (un `abandoned` forgé éjecte tout le monde, un faux lot `events` rejoue de faux buts,
+une fausse présence bloque le départ) ; correction en §3 du rapport, SQL complet d'une migration
+« canaux privés » (politiques sur `realtime.messages`, déclencheurs `realtime.send` pour `team:*`
+et l'abandon, plus aucun client n'écrit sur `team:*` ni `match:*`), `private: true` côté client
+et dans les deux fonctions (monter leur supabase-js 2.45.4), **après M1 seulement, client et
+fonctions redéployés ensemble hors soirée de jeu**, puis couper l'accès public dans le dashboard
+Realtime. Six mineurs : m1 le propriétaire écrit `wins` donc son Tier (trois lignes de
+privilèges de colonne) ; m2 le code d'invitation lisible par tout membre (accepter) ; m3 la
+présence mensongère d'un membre (accepter) ; m4 la réouverture du canal du lobby sans plafond, à
+plafonner AVEC M3 ; m5 les messages Postgres recopiés (laisser) ; m6 plusieurs équipes par
+propriétaire (un index unique si j'y tiens). Quatorze notes, dont n8 : passer le minimum à 8
+caractères ne coûte rien, et couper les inscriptions une fois mes amis inscrits est la seule
+mesure qui ferme vraiment la porte.
 
-**Le hub.** En-tête (blason, nom, ligue avec trois barreaux laiton, « Switch team » en menu
-`team-switch-open` puis `team-switch` seulement sur plusieurs équipes) ; une bande d'appel
-« Enter the lobby » (ou « Back to the silo » et « Abandon this match » pour le propriétaire
-quand un match tourne) avec « X is already in the lobby » en direct ; colonne Players (une ligne
-par humain `member-row`, tag Owner ou rôle, tag cyan « In the lobby » `in-lobby`, retrait en deux
-clics, « Leave this team » `leave-team`) ; carte « Invite a friend » (code `invite-code`, Copy,
-New code) ; colonne « Your Giff » (les sept, glyphe par rôle, stats en bulle) ; pied de page
-« Join a team » (`join-code`, `join-button`) et la ligne archivés et abandonnés
-(`abandoned-note`, commence par le nombre). **Le hub est vivant** : `lib/teamChannel.ts`
-(`announceTeamChange(teamId)` par `httpSend`, REST, jamais `send()` hors abonnement qui écrit
-un avertissement console que le harnais compte comme une erreur ; appelé après join, départ,
-retrait, nouveau code) et `useAccount` qui relit matchs et effectif sur `roll` et au retour sur
-l'onglet ; `refresh(teamId)` bascule sur l'équipe rejointe. **Le canal de présence du lobby vit
-dans App** (`lib/useLobbyChannel.ts`, `LobbyLink { seats, track, announceStarted }`) pour la durée
-de l'équipe choisie : le hub lit qui attend, le lobby `track` son siège à chaque changement et le
-retire en partant (`track(null)`), le broadcast `started` est entendu par tous (un membre sur le
-hub voit le match tourner, un membre au lobby atterrit sur le plateau).
+L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (5) FAITS (ligue et abandon, phase 6, client en
+ligne, coop, interface d'équipe, ma partie à deux avec revanche) ; (6) la phase 8 : **le cadrage
+et 2H.36 FAITS** ; restent **2H.37, les corrections de la revue, que JE TRANCHE sur le rapport**,
+le redéploiement du client sur mon feu vert, et un ami qui crée un compte et joue sans moi.
 
-**Le lobby, « The bench ».** Trois cartes : la mienne (`seat-row`, bord cyan, champ `seat-name`,
-quatre tuiles `data-role` / `data-taken` avec « n open », figées pour un membre une fois Ready),
-celles des autres (`seat-row`, `data-ready`, joueur, Giff, rôle, badge Ready / « Choosing… » /
-« Starts the match », arrivée animée `bb-arrive` seulement pour un siège qui arrive après le
-premier dessin), les vides (`seat-empty`, le code à copier pour le propriétaire). La ligne
-`lobby-tier-line` dit « Star · 2 named seats ». La barre basse : la ligue en segments
-(`data-league`, `data-selected`, `data-locked`), « Waiting on X » / « Alone in the lobby » /
-« Everyone is ready » pour le propriétaire (`waiting-on`), « X starts the match »
-(`owner-starts`) pour un membre, « Start match » (`start-match`) ou « Ready » (`ready`,
-`data-ready`). « Back to the hub » en haut à droite. Le flux de `start()` est inchangé
-(saveSeatPreference, createMatch, `link.announceStarted`, onOpened).
-
-**Le fond.** `Shell.tsx` : hazard, `/crowd-entering-arena.webp` fixe (198 Ko, WebP 1920 px
-qualité 78 de mon JPEG 2752 × 1536) avec voile haut et bas et vignettage, colonne de 1120 px,
-panneaux en verre (`--glass`, `--glass-deep`, flou derrière). Sur le hub, le lobby et « Raise a
-team ».
-
-**Les mots.** Battery → Team dans tout texte visible, les test ids et les specs (« Enter the
-lobby », « Raise a team », « Team name », « The bench », `leave-team`). Restent : la RPC
-`battery_members`, le type `BatteryResult`, le nom « E2E Battery » en base, et jusqu'au prochain
-redéploiement des fonctions les messages « only the owner of the battery starts its matches »
-(create-match) et « ...can abandon its match » (abandon_match), que l'écran ne laisse pas voir.
-
-**Dette de 2H.35** : `Match.tsx` appelle `onFinished` à chaque rendu une fois la phase finie
-(plusieurs `refresh()` en vol, sans effet visible), à borner par un `useRef`.
-
-**Dette de 2H.34** : les trois canaux Realtime (`team:`, `lobby:`, le match) sont publics,
-pour ma /security-review de la phase 8 ; « Giff picks the league » et « Giff starts the match »
-se répètent dans la barre du membre ; `mergeRoll` reste côté client, inutile une fois 0012
-appliquée ; le run `e2e:coop` rouge une fois sur la présence le 17 après-midi était déjà la limite de
-présence de C34, expliqué et corrigé en 2H.35 ; le nom du joueur sur la plaque des autres pions humains (dette de
-2H.33) ; le bandeau « Your turn » qui reste sa durée après un siège remis ; un spectateur ne
-frappe pas à la porte ; `e0d9b642` (moteur 10) et tous les matchs antérieurs ne se rejouent plus.
-
-**Un fait de données à connaître** : le second compte e2e (`BOOMBALL_E2E2_EMAIL`,
-`BOOMBALL_E2E2_PASSWORD`, affiché « E2E Second ») est maintenant membre de DEUX équipes, « E2E
-Battery » (remis dessus par le fil principal le 17 par `join_team` en tant que joueur, après
-qu'il l'avait quittée pendant ma soirée) et « Shrapnel oath », MON équipe (compte
-tackergamingrss@gmail.com). `coop.spec.ts` bascule sur « E2E Battery » par le menu quand son hub
-s'ouvre ailleurs. Ne le retire pas de mon équipe sans me le demander.
-
-Ce que la coop contient, en bref (détail en 00 C32, ne pas rediscuter). 2H.31, A10 :
-`append_match_step` en une transaction, 409 « the board moved on » au perdant d'une course.
-2H.32 : plusieurs équipes par joueur, le code d'invitation (`teams.invite_code`, `join_team`,
-renouvelable), le lobby partagé par présence, `create-match` au propriétaire seul (UN MEMBRE NE
-JOUE PAS EN SOLO SUR MON ÉQUIPE, il monte la sienne). 2H.33 : l'écart 65 (`placementAt`,
-`placeHumans`), `yieldSeat` / `seatYielded`, « Hand my Giff to the house », « Waiting for X ·
-1:12 » chez tous, le coup à la porte par tout siège à cinq secondes (`coopClock.ts`), le
-spectateur, l'abandon diffusé (`abandoned`). Les sous-phases d'avant : 2H.30 le Dash tenu côté
-client (`dashHold.ts`), 2H.29 la 3D par défaut et l'effectif fixe (migration 0009), 2H.28
-l'abandon (migration 0008), 2H.27 la ligue au choix, 2H.25 et 2H.26 le rebond et l'annonceur,
-2H.21 à 2H.24 le jeu vivant et le Giff riggé, 2H.16 à 2H.20 la caméra, 2H.15 la 2.5D.
-
-L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (4) FAITS (ligue et abandon, phase 6, client en
-ligne, coop) ; (4 bis) **2H.34 l'interface d'équipe, CODÉE** ; (5) commit `dbdfd69` et client redéployé, FAITS le 17 ; ma partie à deux avec revanche, FAITE,
-porte franchie ; (6) **LA PHASE 8, LE DÉPLOIEMENT POUR UN AMI, C'EST LÀ QU'ON EST** : le script existe, restent `site_url` de l'Auth, la bande
-passante Hobby (100 Go par mois, 13 Mo par premier chargement plus 200 Ko de fond), un ami qui
-crée un compte, et DEUX TROUS à cadrer avec moi avant qu'un ami ne joue : pas de « mot de passe
-oublié » ni de changement de mot de passe dans le jeu ; /security-review par moi.
-
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire (tout est commité et poussé au 17 au soir) ;
-puis **CADRER LA PHASE 8 AVEC MOI**, questions en chat, une ou deux par message, en commençant par
-les deux trous (mot de passe oublié, changement de mot de passe), puis `site_url`, la bande
-passante, le parcours d'un ami qui crée un compte, et ma /security-review (les trois canaux
-Realtime publics y passent). **À SAVOIR POUR PLUS TARD, PAS MAINTENANT : je veux aussi revoir
-l'interface des matchs à un moment donné**, comme on a refait le hub et le lobby en 2H.34
-(maquette cliquable d'abord, puis GO) ; ne l'ouvre pas de toi-même, attends que je le demande,
-mais garde-le en tête quand la phase 8 touche l'écran de match.
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; me proposer /save (ou /commit) puis le
+push si 2H.36 n'est pas commitée ; **me proposer le redéploiement du client** (2H.36 n'a rien
+côté fonctions) et le faire sur mon feu vert, puis vérifier l'URL en ligne (curl, la page de
+connexion avec la ligne « Ask Jérôme ») ; puis **ME FAIRE TRANCHER 2H.37 EN CHAT, une ou deux
+questions par message** : l'ordre proposé est M1 et m1 en une migration 0013 (par moi via
+/supabase-migrate, avec les contrôles ajoutés à `rls-check.py`), M2 avec un test et
+`resolve-action` v28 sur mon feu vert, puis M3 avec m4 en une migration 0014 et un redéploiement
+client plus fonctions ensemble, hors soirée de jeu, `e2e:coop` vert et une partie à deux ; m2,
+m3, m5 à accepter, m6 et n8 à mon choix. Ensuite l'ami. **À SAVOIR POUR PLUS TARD, PAS
+MAINTENANT : je veux aussi revoir l'interface des matchs à un moment donné**, comme on a refait le
+hub et le lobby en 2H.34 (maquette cliquable d'abord, puis GO) ; ne l'ouvre pas de toi-même,
+attends que je le demande.
 
 Ce qu'il faut savoir tout de suite.
 
 1. Sous-agents comme en 08 §9 : Sonnet pour le facile et le borné, effort précisé, fichiers
    disjoints, brief fermé ; Opus 5.5 ou Fable 5.1 pour ce qui réclame de la qualité (le hub et
-   le lobby de 2H.34 sont d'un Opus 5.5 effort élevé sur brief fermé, relus au harnais). Toute
-   matière que tu me présentes nomme son auteur, agent ou fil principal. Dès que tu as une liste
-   d'actions pour moi, donne-la numérotée, une action exacte par ligne, et dis ce qui se passe
-   ensuite.
+   le lobby de 2H.34 sont d'un Opus 5.5 effort élevé sur brief fermé ; la revue de 2H.36 aussi,
+   relue au code par le fil principal). Toute matière que tu me présentes nomme son auteur, agent
+   ou fil principal. Dès que tu as une liste d'actions pour moi, donne-la numérotée, une action
+   exacte par ligne, et dis ce qui se passe ensuite.
 
 2. Quand j'explique un concept, pose tes questions en chat, une ou deux par message, et reformule
    avant de coder. Pour une interface, une maquette cliquable en artifact avant le code a très
@@ -192,32 +145,39 @@ Ce qu'il faut savoir tout de suite.
    ne se rejouent plus. 2e30f587 n'est PAS à analyser.
 
 5. Toute migration passe par moi via /supabase-migrate (il n'y a pas de registre : 0001 à 0012
-   sont appliquées, dit 04), tout redéploiement par mon feu vert explicite. Chaque
-   match porte engine_version ; une fonction qui lit une autre version refuse en 409, le client
-   archive. Les écritures destructives en base passent par moi ; la lecture passe (un script
-   jetable dans le scratchpad qui poste un select à l'API de gestion fait l'affaire ; un script
-   Node qui importe @supabase/supabase-js doit être copié dans client/ le temps de tourner, le
-   scratchpad ne résout pas le paquet). Faire jouer ou rejoindre le compte e2e n'est pas
-   destructif.
+   sont appliquées, dit 04 ; la prochaine est 0013), tout redéploiement par mon feu vert explicite.
+   Chaque match porte engine_version ; une fonction qui lit une autre version refuse en 409, le
+   client archive. Les écritures destructives en base passent par moi ; la lecture passe (un
+   script jetable dans le scratchpad qui poste un select à l'API de gestion fait l'affaire ; un
+   script Node qui importe @supabase/supabase-js doit être copié dans client/ le temps de tourner,
+   le scratchpad ne résout pas le paquet). La configuration Auth se lit et s'écrit par l'API de
+   gestion (`/v1/projects/{ref}/config/auth`, PATCH), l'écriture sur mon feu vert. Faire jouer ou
+   rejoindre le compte e2e n'est pas destructif. `npm run export:db` est une lecture.
 
 6. Le harnais : npm run e2e en 18 à 55 s, e2e:playthrough en 15 à 70 s, e2e:board3d en 6 à 10
-   min, e2e:abandon en 10 s, e2e:coop en 20 à 40 s (hors de npm run e2e ; il abandonne le match
-   e2e en cours pour atteindre le lobby, et abandonne le match coop qu'il ouvre). **Ne lance
-   jamais npm test et e2e:board3d en même temps** : à 2 fps sous GL logiciel le bandeau « Your
-   turn » de 1,2 s est raté et le spec tombe (vu le 17, vert seul). Le crochet window.__boomball
-   (DEV seulement) : fx(), audio(), crowd(), lastSaid(), probe(), clickCell, act, legalSummary ;
-   `yours` du crochet est faux derrière le briefing (utiliser waitFor sur « Into the silo »,
-   jamais isVisible). waitForPlayableTurn répond à la popup à l'écran. Le smoke échoue si le
-   match e2e atteint le round 10 pendant ses trois tours (le suivant en ouvre un neuf) ou si le
-   Giff e2e est cerné (npm run e2e:abandon). Juste après un déploiement la connexion de
-   global-setup.ts peut expirer une fois : relancer. Si mon npm run dev occupe 5173 sans le
-   crochet : VITE_BOOMBALL_HOOK=1 VITE_BOOMBALL_PATIENT=1 npx vite --port 5174 --strictPort
-   depuis boomball/client en arrière-plan, chauffer par deux curl, BASE_URL=http://localhost:5174,
-   le tuer après (netstat -ano, taskkill). Le spec 3D admet deux avertissements console qui ne
-   sont pas à nous (THREE.Clock, GL logiciel) ; toute autre ligne le fait échouer, y compris
-   l'avertissement de `send()` hors abonnement. Pour lire ce que le harnais a envoyé : la trace
-   Playwright de e2e/test-results/ ; pour voir la présence Realtime, une sonde Playwright qui
-   écoute `page.on('websocket')` et filtre les trames `presence` (faite le 17, supprimée).
+   min, e2e:abandon en 10 s, e2e:coop en 2 à 3 min (deux specs, hors de npm run e2e ; il
+   abandonne le match e2e en cours pour atteindre le lobby, et abandonne le match coop qu'il
+   ouvre), e2e:account en 8 s (hors de npm run e2e : il change le mot de passe du compte e2e et le
+   remet dans un `finally` ; s'il casse entre les deux, le compte garde l'original suivi de
+   `-tmp`, à remettre à la main). **Ne lance jamais npm test et e2e:board3d en même temps** : à
+   2 fps sous GL logiciel le bandeau « Your turn » de 1,2 s est raté et le spec tombe. Le crochet
+   window.__boomball (DEV seulement) : fx(), audio(), crowd(), lastSaid(), probe(), clickCell,
+   act, legalSummary ; `yours` du crochet est faux derrière le briefing (utiliser waitFor sur
+   « Into the silo », jamais isVisible). waitForPlayableTurn répond à la popup à l'écran. Le smoke
+   échoue si le match e2e atteint le round 10 pendant ses trois tours (le suivant en ouvre un
+   neuf ; une sonde qui joue le match e2e le fait avancer, c'est arrivé le 17) ou si le Giff e2e
+   est cerné (npm run e2e:abandon). Juste après un déploiement la connexion de global-setup.ts
+   peut expirer une fois : relancer. Si mon npm run dev occupe 5173 sans le crochet :
+   VITE_BOOMBALL_HOOK=1 VITE_BOOMBALL_PATIENT=1 npx vite --port 5174 --strictPort depuis
+   boomball/client en arrière-plan, chauffer par deux curl, BASE_URL=http://localhost:5174, le
+   tuer après (netstat -ano, taskkill). Le spec 3D admet deux avertissements console qui ne sont
+   pas à nous (THREE.Clock, GL logiciel) ; toute autre ligne le fait échouer, y compris
+   l'avertissement de `send()` hors abonnement. Firefox est installé pour Playwright
+   (`firefox-1555`) ; une passe navigateur est une sonde jetable dans scripts/ (connexion par
+   l'écran, hub, lobby ou reprise, briefing, plateau, console lue), supprimée après ; un Chromium
+   sans WebGL se lance avec `--disable-3d-apis`. Pour lire ce que le harnais a envoyé : la trace
+   Playwright de e2e/test-results/ (vidée à chaque run) ; pour voir la présence Realtime, une
+   sonde Playwright qui écoute `page.on('websocket')` et filtre les trames `presence`.
 
 7. useMatch.load porte un compteur de génération, ne l'enlève pas ; useMatch.stateRef est écrit
    partout où setState l'est ; sendMany(actions, asUnitId, quiet) porte sendAs et knock. Le
@@ -226,11 +186,15 @@ Ce qu'il faut savoir tout de suite.
    Jamais Html de drei. La caméra ne passe pas par OrbitControls. Le corps du pion est le Giff
    riggé (giffRig.ts). Les hooks de Match.tsx restent au-dessus du retour anticipé sur state.
    **La présence Realtime est limitée en débit par le serveur et la sanction est la fermeture du
-   canal** (C34) : jamais un `track` par touche ni par rendu, toujours par `useLobbyChannel.track`,
-   qui lisse à un message par demi-seconde et rouvre un canal fermé. Un module client testé par vitest n'importe jamais lib/supabase.ts (il jette sans son
+   canal** (C34) : jamais un `track` par touche ni par rendu, toujours par `useLobbyChannel.track`.
+   Un module client testé par vitest n'importe jamais lib/supabase.ts (il jette sans son
    environnement) : les parties pures vivent à côté (lobbySeats.ts, roll.ts, coopClock.ts).
    `supabase.channel(topic)` rend l'instance existante d'un même topic : ne jamais tenir deux
-   fois le même canal dans deux composants, c'est pour ça que le lobby est dans App.
+   fois le même canal dans deux composants, c'est pour ça que le lobby est dans App. **`signOut`
+   est à `scope: 'local'`** (ce navigateur) : un `global` révoquerait les sessions des autres
+   specs du run. **`useAccount.load(null)` remet `loadedForRef` à `null`**, sinon une reconnexion
+   dans la même page insère un profil existant (409). **`webglAvailable()`** est demandé une fois
+   par page dans `Match.tsx` : sans WebGL, 2D forcée et bouton « No 3D here ».
 
 8. L'initiative (écart 51) est un ordre sans comptes ; un humain Trajector ou Bulwark joue en
    dernier de son rôle (écart 55) ; un humain Striker ou Breaker choisit sa place (écart 58), et
@@ -245,31 +209,45 @@ Ce qu'il faut savoir tout de suite.
 9. Les interdits ne changent pas. Jamais le dépôt GitHub sur Vercel. Jamais le .env ni une clé
    dans un commit. Le règlement de table du vault est figé. Ne lis jamais design/Boomball
    Interface.html en entier (ses images sont compressées dans le bundle, inextractibles par une
-   regex base64 ; le gabarit s'extrait par la commande du design/README.md).
+   regex base64 ; le gabarit s'extrait par la commande du design/README.md). Mon jeton GitHub du
+   .env n'a pas le droit de lire les Actions ni les secrets du dépôt : pour le maintien en vie,
+   c'est moi qui regarde l'onglet Actions (vert le 17 à 12:53).
 
 10. Les commandes. Depuis boomball/ : npm test (771), npm run typecheck, npm run sweep, npm run
-    e2e, e2e:playthrough, e2e:board3d, e2e:abandon, e2e:coop, npm run build:function. Depuis
-    boomball/client/ : npm run dev sur http://localhost:5173 (jamais 127.0.0.1), npm run build,
-    npm run typecheck. Depuis la racine : python boomball/supabase/checks/rls-check.py et
-    browser-path.py, python .claude/scripts/check_drift.py. Le cwd de l'outil Bash se
-    réinitialise entre deux appels : chemins absolus, ou npm --prefix.
+    e2e, e2e:playthrough, e2e:board3d, e2e:abandon, e2e:coop, e2e:account, npm run build:function,
+    npm run export:db. Depuis boomball/client/ : npm run dev sur http://localhost:5173 (jamais
+    127.0.0.1), npm run build, npm run typecheck. Depuis la racine : python
+    boomball/supabase/checks/rls-check.py et browser-path.py, python .claude/scripts/check_drift.py.
+    Le cwd de l'outil Bash se réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 65 de 00
-    partie C, et C11 à C34 en entier. Dette connue, outre celle de 2H.34 et de la coop ci-dessus :
-    arenas.art et le champ art nomment trois JPEG retirés ; substituteEntry non lu ; la parade du
-    Breaker humain automatique ; le fondu croisé des foules sans compensation ; le délai de
-    l'annonceur compté depuis le début du clip ; une réplique en cours jette le KO d'un coup
-    suivant ; la coupure par un but ne libère pas le plancher ; FEED_LIMIT 120 ; le Spark peut
-    rebondir plusieurs rounds dans une poche ; un gardien peut marcher jusqu'à côté d'un receveur
-    marqué pour une passe d'une case ; le Shove d'un Bulwark n'est borné que par l'adjacence ; le
-    Dash tenu n'existe que côté client ; en 3D, l'orientation du modèle, le noir sous la lèvre
-    avant, l'orbite remise à la vue fixe au retour du 2D, la borne de suivi à l'azimut zéro, la
-    roulette en vue large, le pan sous Ctrl interrompu au-dessus de la minicarte, la largeur
-    garantie à l'inclinaison de départ, la répétition de la foule en vue large, l'effacement des
-    gradins jugé sur la hauteur, la retenue en boîte, les captures des effets courts figées sous
-    le GL logiciel, le ballon qui ne disparaît pas dans la bouche, pas d'étincelles en 2D, les
-    commentaires « 2H.23 » de Tokens.tsx ; les quatre fichiers du vault modifiés hors de nos
-    sessions, à moi de décider.
+    partie C, et C11 à C35 en entier. Dette connue, outre la revue : `Match.tsx` appelle
+    `onFinished` à chaque rendu une fois la phase finie (à borner par un `useRef`) ; « Giff picks
+    the league » et « Giff starts the match » se répètent dans la barre du membre ; `mergeRoll`
+    reste côté client, inutile depuis 0012 ; la RPC garde le nom `battery_members` et
+    `create-match` et `abandon_match` disent encore « battery » jusqu'au prochain redéploiement ;
+    le nom du joueur sur la plaque des autres pions humains ; le bandeau « Your turn » qui reste sa
+    durée après un siège remis ; un spectateur ne frappe pas à la porte ; `e0d9b642` (moteur 10)
+    et tous les matchs antérieurs ne se rejouent plus ; arenas.art et le champ art nomment trois
+    JPEG retirés ; substituteEntry non lu ; la parade du Breaker humain automatique ; le fondu
+    croisé des foules sans compensation ; le délai de l'annonceur compté depuis le début du clip ;
+    une réplique en cours jette le KO d'un coup suivant ; la coupure par un but ne libère pas le
+    plancher ; FEED_LIMIT 120 ; le Spark peut rebondir plusieurs rounds dans une poche ; un
+    gardien peut marcher jusqu'à côté d'un receveur marqué pour une passe d'une case ; le Shove
+    d'un Bulwark n'est borné que par l'adjacence ; le Dash tenu n'existe que côté client ; en 3D,
+    l'orientation du modèle, le noir sous la lèvre avant, l'orbite remise à la vue fixe au retour
+    du 2D, la borne de suivi à l'azimut zéro, la roulette en vue large, le pan sous Ctrl
+    interrompu au-dessus de la minicarte, la largeur garantie à l'inclinaison de départ, la
+    répétition de la foule en vue large, l'effacement des gradins jugé sur la hauteur, la retenue
+    en boîte, les captures des effets courts figées sous le GL logiciel, le ballon qui ne
+    disparaît pas dans la bouche, pas d'étincelles en 2D, les commentaires « 2H.23 » de
+    Tokens.tsx ; n14 du rapport, le roster écrit avant la validation des sièges ; les quatre
+    fichiers du vault modifiés hors de nos sessions, à moi de décider.
 
-12. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte,
+12. Un fait de données : le second compte e2e (`BOOMBALL_E2E2_EMAIL`, `BOOMBALL_E2E2_PASSWORD`,
+    affiché « E2E Second ») est membre de DEUX équipes, « E2E Battery » et « Shrapnel oath », MON
+    équipe (compte tackergamingrss@gmail.com). `coop.spec.ts` bascule sur « E2E Battery » par le
+    menu quand son hub s'ouvre ailleurs. Ne le retire pas de mon équipe sans me le demander.
+
+13. Arrête-toi pour qu'on change de chat dès qu'on est à la moitié de la fenêtre de contexte,
     après avoir récrit ce fichier.

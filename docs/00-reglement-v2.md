@@ -3211,3 +3211,122 @@ propriétaire de retour (`02-rematch-lobby-second`).
 pas cette limite ; ses `send` de diffusion restent peu nombreux. La limite exacte du serveur n'est
 pas publiée dans la réponse : trois messages en cinquante millisecondes l'ont franchie, un par
 demi-seconde ne la franchit pas.
+
+## C35. Décisions du 2026-10-17 soir, **la phase 8, le déploiement pour un ami, cadrée en chat**
+
+> Écrites par le fil principal (Fable 5.1) sur les réponses de Jérôme en chat le 2026-10-17 au
+> soir, une ou deux questions par message, reformulées en un lot de huit points puis validées
+> (« oui bonne idée »). C'est l'étape 6 de l'ordre qu'il a validé le 16 au soir, la phase 8 de
+> `07` §7. **Aucun écart de règle, rien dans le moteur ni dans l'IA, rien dans les deux
+> fonctions, `ENGINE_VERSION` reste 11.** Pas de migration dans le premier lot ; la revue de
+> sécurité en appellera une si les canaux Realtime passent en privé.
+
+**Ce que la configuration Auth disait**, lue par l'API de gestion avant la première question :
+aucun SMTP configuré, donc le mailer intégré de Supabase, plafonné à deux e-mails par heure,
+hors production selon Supabase lui-même ; `site_url` à `http://localhost:5173` et la liste des
+redirections vide ; confirmation d'e-mail désactivée (C2 de `07`), inscriptions ouvertes, six
+caractères minimum, pas de captcha ; le changement de mot de passe d'un joueur connecté ne
+demande pas de ré-authentification. Donc **changer son mot de passe** coûte un écran et zéro
+infrastructure, et **« mot de passe oublié »** coûte un e-mail qu'aucune voie propre n'envoie.
+
+**Les huit points validés, dans ses mots quand il en a eu.**
+
+1. **Mot de passe oublié : manuel, par Jérôme** (son « a »). L'écran de connexion dit en une
+   ligne, sous le formulaire : l'ami le demande à Jérôme sur Discord, qui lui remet un mot de
+   passe temporaire par l'API admin (le geste du 16 octobre), et l'ami le change en jeu. Le vrai
+   parcours par e-mail, avec un fournisseur SMTP et une page de réinitialisation, est réservé au
+   jour où le cercle s'élargit ; le mailer intégré à deux par heure est exclu.
+2. **Un menu « Account » dans l'en-tête du hub** : le nom du joueur, « Change password » avec le
+   nouveau mot de passe saisi deux fois, sans l'ancien (« le nouveau deux fois suffit »), six
+   caractères minimum comme à l'inscription ; et « Sign out », qui n'existait nulle part.
+3. **`site_url` à `https://boomball.vercel.app`**, et la liste des redirections autorisées avec
+   cette URL et `localhost:5173` pour le serveur de développement. **Fait le soir même sur son
+   feu vert**, par l'API de gestion, lu avant et après ; rien d'autre n'a bougé.
+4. **La bande passante Hobby est classée sans suite** : les 13 Mo sont le poids du dossier
+   construit, un premier chargement part avec le code, le Giff riggé, les textures et le fond,
+   les visites suivantes presque rien (cache immuable sur `assets/`), les 100 Go par mois sont
+   hors d'atteinte d'un cercle d'amis. L'ancien modèle `client/public/models/giff-boomball.glb`,
+   identique à sa source dans `assets/source/models/` et lu par aucun code, est retiré du client.
+5. **Les inscriptions restent ouvertes** (« ouvertes pour l'instant »). Le jour où il le voudra,
+   `disable_signup` dans la configuration Auth les ferme sans une ligne de code.
+6. **La revue de sécurité d'abord** (« la revue d'abord »), sur le code tel qu'il est, puis ses
+   corrections en un lot, les trois canaux Realtime (`team:`, `lobby:`, le match) rendus privés
+   compris, par des politiques sur `realtime.messages` et `private: true` côté client, soit une
+   migration 0013 par lui. **Comme `/security-review` ne relit que les changements en attente sur
+   la branche**, la relecture du jeu entier est confiée à un agent Opus 5.5 effort élevé sur
+   brief fermé, rapport écrit dans `docs/`, relu par le fil principal ; la commande reste pour la
+   diff du lot de corrections.
+7. **Les sauvegardes** (A23 de l'audit, jamais faite, aucune sur le plan gratuit) : un script
+   `scripts/export-db.mjs` qui écrit les profils, les équipes, les membres et les matchs joués en
+   JSON dans un dossier ignoré par git, lancé à la main quand il le veut.
+8. **Firefox et un navigateur sans WebGL** : un contrôle, pas du code, sauf s'il tombe.
+
+**Deux faits vérifiés en cadrant.** Le maintien en vie du projet Supabase (A13) tourne : Jérôme
+a vu une exécution verte du workflow `supabase-keepalive` le 2026-10-17 à 12:53. Le dépôt
+`Tackergaming/jarvis-jdr` est privé, lu par l'API GitHub.
+
+**Le parcours d'un ami**, inchangé et validé : il reçoit l'URL, clique « No account yet », tape
+e-mail, mot de passe et nom, pas d'e-mail de confirmation, arrive sur « Raise a team » avec
+« Or join a team with a code » dessous, et le code de Jérôme le pose sur son équipe.
+
+**Comment 2H.36, le premier lot de la phase 8, est codée** (le 2026-10-17 soir, fil principal
+Fable 5.1 ; **un Sonnet 5.5 effort moyen sur `scripts/export-db.mjs`** sur brief fermé, lancé et
+relu par le fil principal ; la revue de sécurité par un agent Opus 5.5 effort élevé, rapport en
+`docs/10-revue-securite-2026-10-17.md`). **Le menu**, `client/src/screens/AccountMenu.tsx`,
+nouveau : le bouton « Account ▾ » (`account-open`) dessiné comme le switcher d'équipe, à sa
+droite dans l'en-tête du hub, et au-dessus de la carte « Raise a team » pour un joueur sans
+équipe (`bb-found-top`) ; le menu (`account-menu`) dit « Signed in as X », puis « Change
+password » (`change-password`) qui déplie le formulaire (`password-form`, `new-password`,
+`new-password-again`, « The two do not match » `password-mismatch`, « At least 6 characters »,
+`save-password` grisé tant que les deux ne sont pas égales et longues de six, `cancel-password`),
+« Password changed. » (`password-changed`) une fois fait, et « Sign out » (`sign-out`) ; fermer
+le menu oublie ce qui était tapé. `client/src/lib/supabase.ts` : `changePassword(password)` par
+`supabase.auth.updateUser`, `signOut()` par `supabase.auth.signOut({ scope: 'local' })`, ce
+navigateur seulement, pour qu'un ami connecté sur deux machines garde l'autre et que le harnais
+ne révoque pas la session de ses autres specs ; les deux rendent un `BatteryResult`. `TeamHub.tsx`
+reçoit `onSignedOut`, `App.tsx` y remet `where` sur le hub et quitte le plateau, l'écouteur
+d'`useAccount` fait le reste. **Un défaut trouvé par la première exécution de la spec** :
+`useAccount.load(null)` laissait `loadedForRef` sur l'ancien joueur, donc une reconnexion du
+même joueur dans la même page gardait le profil à `null` le temps d'un rendu, et `App` insérait
+un profil qui existait (deux 409 sur `profiles`) ; `load(null)` remet `loadedForRef` à `null`.
+**L'écran de connexion**, `SignIn.tsx` : « Forgot your password? Ask Jérôme on Discord, he
+resets it. » (`forgot-note`) sous le formulaire, en mode connexion seulement. **Firefox et sans
+WebGL** (point 8) : une sonde Playwright jetable (connexion, hub, lobby ou reprise, briefing,
+plateau) a joué le jeu dans Firefox 157 (hub, lobby, le plateau 3D rendu à 119 images par
+seconde, « Back to 2D » qui marche, zéro erreur à nous, un cookie Cloudflare refusé qui n'est
+pas à nous) et dans un Chromium lancé avec `--disable-3d-apis` : **page noire**, three jetait
+« Error creating WebGL context » dans le canvas sans qu'une limite d'erreur l'attrape. Corrigé :
+`client/src/lib/webgl.ts`, `webglAvailable()` (un contexte `webgl2` ou `webgl` d'essai, rendu
+aussitôt, demandé une fois par page) ; `Match.tsx` ouvre en 2D quand il n'y en a pas et le
+bouton de vue, grisé, dit « No 3D here » (`data-webgl`). Rejoué : le plateau plat, zéro erreur.
+**L'export**, `scripts/export-db.mjs` (Sonnet) : lit le `.env` comme `apply-migration.mjs`,
+pose un `select` par table à l'API de gestion, écrit `profiles`, `teams`, `team_members`,
+`matches`, `match_participants`, `arenas`, `role_stats` et un `manifest.json` dans
+`boomball/backups/<date-heure>/`, ignoré par git (le `.gitignore` racine), `--events` ajoute
+`match_events` et `match_state` par pages de 5 000 ; `npm run export:db` ; lancé une fois : 3
+profils, 2 équipes, 4 membres, 157 matchs, 173 participants. Le dossier contient les codes
+d'invitation, raison de plus pour qu'il reste hors git. **Le harnais** : `e2e/account.spec.ts`
+(`@account`, `npm run e2e:account`, hors de `npm run e2e`) change le mot de passe du compte e2e
+en un temporaire, se déconnecte, vérifie la ligne « Ask Jérôme », se voit refuser l'ancien mot
+de passe, entre avec le nouveau, remet l'original et le prouve par une nouvelle connexion, avec
+un `finally` qui remet l'original si quelque chose casse entre les deux ; le 400 du refus et sa
+ligne de console sont les seuls admis. Le modèle `giff-boomball.glb` retiré du client. **771
+tests** (inchangés), typecheck racine, scripts, e2e et client verts, le client bundle. **Harnais sur le moteur 11 en
+ligne** : smoke 2D **vert en 33 s** (un premier run rouge sur le match e2e arrivé au sifflet pendant ses trois tours,
+le cas connu, parce que la sonde Firefox l'avait fait avancer), `e2e:coop` **vert en 2,2 min** (deux specs),
+`e2e:account` **vert en 7,4 s** après un premier run rouge sur les deux 409 décrits plus haut.
+
+**La revue de sécurité**, `docs/10-revue-securite-2026-10-17.md`, par l'agent Opus 5.5 effort élevé, relue par le
+fil principal (M1 et M2 vérifiés dans le code : la politique `team_members_write` de `0001_init.sql` ne regarde pas
+`team_id` à l'insertion, et `validatePath` ne vérifie jamais qu'une coordonnée est entière, `cellAt` rend
+`undefined` pour `x = 2.5`). **Verdict : aucun bloquant, un ami peut jouer sans Jérôme dans la pièce** ; `rls-check.py`
+24 sur 24 ; aucun secret dans git ni dans l'historique, un seul JWT dans le bundle, la clé anon. Trois majeurs, tous
+contre un ami malveillant ou un ancien membre, jamais un inconnu : **M1** n'importe quel connecté s'insère dans
+toute équipe dont il connaît l'UUID (un membre retiré revient en une requête) ; **M2** le moteur accepte des
+coordonnées non entières ou en chaîne dans un chemin, prouvé contre le vrai moteur, un joueur qui forge sa requête
+traverse les obstacles et l'écrit dans `match_events` ; **M3** les canaux Realtime publics, avec ce qu'ils
+permettent (un `abandoned` forgé éjecte tout le monde, un faux lot `events` rejoue de faux buts, une fausse présence
+bloque le départ), à corriger après M1 seulement. Six mineurs (le propriétaire écrit `wins` donc son Tier ; le code
+d'invitation lisible par tout membre ; la présence mensongère d'un membre ; la réouverture du canal sans plafond ;
+les messages Postgres recopiés ; plusieurs équipes par propriétaire) et quatorze notes. **Les corrections sont le
+lot suivant, 2H.37, à trancher par Jérôme sur le rapport.**
