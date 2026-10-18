@@ -30,6 +30,13 @@ export interface PathRejected {
 
 export type PathVerdict = PathAccepted | PathRejected;
 
+/** An object with two integer coordinates: what a cell is, and all it is. */
+function isCell(step: unknown): step is Point {
+  if (typeof step !== 'object' || step === null) return false;
+  const { x, y } = step as { x?: unknown; y?: unknown };
+  return Number.isInteger(x) && Number.isInteger(y);
+}
+
 /** Cost in feet of a path leaving `from`. The origin is not part of the path. */
 export function pathCostFeet(from: Point, path: readonly Point[]): number {
   let cost = 0;
@@ -53,6 +60,12 @@ export function validatePath(
   path: readonly Point[],
   budgetFeet: number,
 ): PathVerdict {
+  // The path comes off the wire as the player's client sent it. Before 2H.37
+  // (security review of 2026-10-17, M2) nothing here checked that a step was a
+  // cell at all: `cellAt` on `x = 2.5` reads `undefined`, which is not an
+  // obstacle, and the occupancy keys never match a half cell, so a forged
+  // path walked through walls and units and was written to the match for good.
+  if (!Array.isArray(path)) return { ok: false, reason: 'the path is not a list of cells' };
   if (path.length === 0) return { ok: false, reason: 'the path is empty' };
 
   const occupied = occupiedCells(state, unit.id);
@@ -61,6 +74,9 @@ export function validatePath(
   let cost = 0;
 
   for (const step of path) {
+    if (!isCell(step)) {
+      return { ok: false, reason: 'a step of the path is not a cell' };
+    }
     if (!inBounds(step)) {
       return { ok: false, reason: `${cellName(step)} is off the pitch` };
     }

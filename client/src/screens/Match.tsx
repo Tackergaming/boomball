@@ -346,10 +346,13 @@ export function Match({
     void match.knock(onClock.id);
   }, [yours, mineId, onClock, replaying, match, now]);
 
-  // The owner abandoned the match while this client watched (2H.33).
+  // The owner abandoned the match while this client watched (2H.33). Since
+  // 2H.37 the database says it to everyone on the channel, the owner included:
+  // the owner's own screen is already leaving through its prompt and does not
+  // leave twice.
   useEffect(() => {
-    if (match.abandonedByOwner) void onLeft();
-  }, [match.abandonedByOwner, onLeft]);
+    if (match.abandonedByOwner && !leaving) void onLeft();
+  }, [match.abandonedByOwner, leaving, onLeft]);
 
   /** The confirmation before handing the Giff to the house (2H.33). */
   const [yielding, setYielding] = useState(false);
@@ -963,8 +966,7 @@ export function Match({
               <AbandonPrompt
                 matchId={matchId}
                 onAbandoned={async () => {
-                  // The others are told before this client leaves the channel.
-                  await match.announceAbandoned();
+                  // The others are told by `abandon_match` itself (2H.37).
                   await onLeft();
                 }}
                 onKeep={() => setLeaving(false)}

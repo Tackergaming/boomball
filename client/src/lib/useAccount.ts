@@ -296,7 +296,8 @@ export function useAccount(): Account {
       const current = teamRef.current;
       if (current && current.id === teamId) void loadTeam(current);
     };
-    const channel = supabase.channel(teamTopic(teamId));
+    // Private (2H.37): the members hear it, the database writes it.
+    const channel = supabase.channel(teamTopic(teamId), { config: { private: true } });
     channel.on('broadcast', { event: ROLL_EVENT }, again).subscribe();
     const onVisible = () => {
       if (document.visibilityState === 'visible') again();

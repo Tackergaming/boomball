@@ -24,6 +24,13 @@ which is the same 204 it gives a write that worked. Every write check below
 therefore reads the row back with the service role and asserts on what the
 database kept. The first version of this file asserted on the status code and
 reported a passing schema as broken.
+
+**A column grant does answer 403**, unlike a policy: since 0013 (2026-10-18,
+security review M1 and m1) the owner's write of `wins` and a self-insert into
+another team's `team_members` are refused by Postgres itself, and those checks
+read the status and the row both. Until 0013 is applied, the `team_members`
+section and the m1 checks fail: that is the point of running this before and
+after.
 """
 import json
 import os
@@ -179,12 +186,89 @@ def run(alice_id, bob_id, alice, bob, made):
     check("bob cannot bump her wins", 0, (body or [{}])[0].get("wins"))
 
     status, _ = call("PATCH", "/rest/v1/teams?id=eq." + team["id"], alice, body={"tier": "star"})
-    check("nobody writes the generated tier by hand", 400, status)
-    call("PATCH", "/rest/v1/teams?id=eq." + team["id"], alice, body={"wins": 6})
+    # 400 from the generated column, or 403 from the column grant since 0013:
+    # either way the hand-written tier is refused.
+    check("nobody writes the generated tier by hand", True, status in (400, 403))
+    # Since 0013 (m1) `wins` is the server's column: written here with the
+    # service role, as `record_team_win` does, and refused to the owner. The
+    # column grant answers 403 outright, unlike a policy, which matches nothing.
+    as_service("PATCH", "/rest/v1/teams?id=eq." + team["id"], body={"wins": 6})
     _, body = as_service("GET", "/rest/v1/teams?id=eq." + team["id"] + "&select=wins,tier")
     check("six wins derive the star tier", ("star", 6),
           ((body or [{}])[0].get("tier"), (body or [{}])[0].get("wins")))
-    call("PATCH", "/rest/v1/teams?id=eq." + team["id"], alice, body={"wins": 0})
+    status, _ = call("PATCH", "/rest/v1/teams?id=eq." + team["id"], alice, body={"wins": 99})
+    _, body = as_service("GET", "/rest/v1/teams?id=eq." + team["id"] + "&select=wins")
+    check("alice cannot bump her own wins (m1)", (403, 6), (status, (body or [{}])[0].get("wins")))
+    status, _ = call("POST", "/rest/v1/teams", alice,
+                     body={"owner": alice_id, "name": "Head Start", "wins": 6})
+    check("alice cannot found a team with wins already in it (m1)", 403, status)
+    call("PATCH", "/rest/v1/teams?id=eq." + team["id"], alice, body={"name": "The Powder Kegs II"})
+    _, body = as_service("GET", "/rest/v1/teams?id=eq." + team["id"] + "&select=name")
+    check("alice still renames her team", "The Powder Kegs II", (body or [{}])[0].get("name"))
+    as_service("PATCH", "/rest/v1/teams?id=eq." + team["id"], body={"wins": 0})
+
+    print("== team_members: the team decides who sits on it (0013, M1) ==")
+    seat = {"team_id": team["id"], "profile_id": bob_id, "preferred_role": "striker"}
+    status, _ = call("POST", "/rest/v1/team_members", bob, body=seat)
+    _, body = as_service("GET", "/rest/v1/team_members?team_id=eq." + team["id"]
+                         + "&profile_id=eq." + bob_id + "&select=profile_id")
+    check("bob cannot seat himself on alice's team by her UUID (M1)", (403, 0),
+          (status, len(body or [])))
+    status, _ = call("POST", "/rest/v1/team_members", alice, body=seat)
+    check("the owner cannot press-gang a player either (M1)", 403, status)
+    status, _ = call("POST", "/rest/v1/team_members", alice,
+                     body={"team_id": team["id"], "profile_id": alice_id,
+                           "preferred_role": "bulwark", "character_name": "Alice"})
+    check("alice saves her own seat on her team", 201, status)
+
+    _, body = call("GET", "/rest/v1/teams?id=eq." + team["id"] + "&select=invite_code", alice)
+    code = (body or [{}])[0].get("invite_code")
+    status, body = call("POST", "/rest/v1/rpc/join_team", bob, body={"code": code})
+    check("bob joins through the code, the one door left", (200, team["id"]), (status, body))
+
+    # Bob's own team, to have somewhere to move his row to. Opened with the
+    # service role so the test stays about team_members.
+    status, body = as_service("POST", "/rest/v1/teams",
+                              body={"owner": bob_id, "name": "Bob's Own"},
+                              extra={"Prefer": "return=representation"})
+    if status != 201:
+        raise SystemExit("no second team to carry on with")
+    made["team_bob"] = body[0]["id"]
+    own_row = "/rest/v1/team_members?team_id=eq." + team["id"] + "&profile_id=eq." + bob_id
+    status, _ = call("PATCH", own_row, bob, body={"team_id": made["team_bob"]})
+    _, body = as_service("GET", own_row + "&select=profile_id")
+    check("bob cannot move his row to another team (M1, trigger)", (403, 1),
+          (status, len(body or [])))
+    call("PATCH", own_row, bob, body={"preferred_role": "breaker"})
+    _, body = as_service("GET", own_row + "&select=preferred_role")
+    check("bob changes his own seat", "breaker", (body or [{}])[0].get("preferred_role"))
+    # The lobby's exact write: supabase-js `.upsert(row, { onConflict })` is a
+    # POST with these two headers, and it names the keys in the payload. This
+    # is the call column privileges on team_members would have broken.
+    status, _ = call("POST", "/rest/v1/team_members?on_conflict=team_id,profile_id", bob,
+                     body={"team_id": team["id"], "profile_id": bob_id,
+                           "preferred_role": "breaker", "character_name": "Bob"},
+                     extra={"Prefer": "resolution=merge-duplicates"})
+    # PostgREST answers 200 on the update path of an upsert, 201 on the insert.
+    _, body = as_service("GET", own_row + "&select=character_name")
+    check("the lobby's upsert of his own seat still passes", (200, "Bob"),
+          (status, (body or [{}])[0].get("character_name")))
+    alice_row = "/rest/v1/team_members?team_id=eq." + team["id"] + "&profile_id=eq." + alice_id
+    call("PATCH", alice_row, bob, body={"character_name": "Not Alice"})
+    _, body = as_service("GET", alice_row + "&select=character_name")
+    check("bob cannot edit alice's seat", "Alice", (body or [{}])[0].get("character_name"))
+
+    call("DELETE", own_row, bob)
+    _, body = as_service("GET", own_row + "&select=profile_id")
+    check("bob leaves the team", 0, len(body or []))
+    status, _ = call("POST", "/rest/v1/team_members", bob, body=seat)
+    _, body = as_service("GET", own_row + "&select=profile_id")
+    check("a player who left cannot come back without the code (M1)", (403, 0),
+          (status, len(body or [])))
+    call("POST", "/rest/v1/rpc/join_team", bob, body={"code": code})
+    call("DELETE", own_row, alice)
+    _, body = as_service("GET", own_row + "&select=profile_id")
+    check("the owner removes a member", 0, len(body or []))
 
     print("== match tables: read through team membership, written by nobody ==")
     status, body = as_service(
@@ -249,6 +333,8 @@ def main():
             as_service("DELETE", "/rest/v1/matches?id=eq." + made["match"])
         if "team" in made:
             as_service("DELETE", "/rest/v1/teams?id=eq." + made["team"])
+        if "team_bob" in made:
+            as_service("DELETE", "/rest/v1/teams?id=eq." + made["team_bob"])
         as_service("DELETE", "/auth/v1/admin/users/" + alice_id)
         as_service("DELETE", "/auth/v1/admin/users/" + bob_id)
 

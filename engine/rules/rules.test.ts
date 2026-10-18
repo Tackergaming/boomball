@@ -54,6 +54,34 @@ describe('path validation', () => {
     expect(verdict).toEqual({ ok: true, costFeet: 10 });
   });
 
+  it('refuses a step that is not a whole cell, through walls or not (M2)', () => {
+    // The proof of the security review of 2026-10-17: from (2, 14), the
+    // half-cells (2.5, 13) and (2.5, 12) sit over two obstacle cells of the
+    // left cover, and `cellAt` read `undefined` for them, not 'obstacle'.
+    const mover = unitAt(2, 14);
+    const alone = emptyFieldWith(mover);
+    expect(arena.isSolid({ x: 2, y: 13 })).toBe(true);
+    expect(arena.isSolid({ x: 2, y: 12 })).toBe(true);
+    const half = validatePath(arena, alone, mover, [{ x: 2.5, y: 13 }, { x: 2.5, y: 12 }], MOVE_SPEED_FEET);
+    expect(half.ok).toBe(false);
+    expect(half.ok === false && half.reason).toMatch(/not a cell/);
+
+    // A coordinate sent as a string was accepted and stored as a string.
+    const asString = [{ x: '3' as unknown as number, y: 14 }];
+    const stringy = validatePath(arena, alone, mover, asString, MOVE_SPEED_FEET);
+    expect(stringy.ok).toBe(false);
+    expect(stringy.ok === false && stringy.reason).toMatch(/not a cell/);
+
+    // And a path that is not a list at all, before `length` is ever read.
+    const notAList = validatePath(arena, alone, mover, { length: 1 } as unknown as Point[], MOVE_SPEED_FEET);
+    expect(notAList.ok).toBe(false);
+    expect(notAList.ok === false && notAList.reason).toMatch(/not a list/);
+
+    // The whole-cell neighbour of the same walk is still refused for the right reason.
+    const wall = validatePath(arena, alone, mover, [{ x: 2, y: 13 }], MOVE_SPEED_FEET);
+    expect(wall.ok === false && wall.reason).toMatch(/obstacle/);
+  });
+
   it('refuses a jump between cells that do not touch', () => {
     const verdict = validatePath(arena, field, unit, [{ x: 7, y: 24 }], MOVE_SPEED_FEET);
     expect(verdict.ok).toBe(false);

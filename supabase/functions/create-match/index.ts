@@ -28,7 +28,7 @@
  * nothing until `npm run deploy:function` runs.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.113.0';
 
 import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
 import { ENGINE_VERSION } from '../../../engine/constants.ts';
@@ -239,12 +239,20 @@ Deno.serve(async (request: Request): Promise<Response> => {
   }
 
   // The same batch the caller gets back, so a team-mate already watching the
-  // lobby sees the kick-off without polling.
-  await db.channel(`match:${matchId}`).send({
-    type: 'broadcast',
-    event: 'events',
-    payload: { matchId, fromSeq: 0, events },
-  });
+  // lobby sees the kick-off without polling. The channel is private (2H.37,
+  // migration 0015) and this client is never joined to it, so the message goes
+  // over REST with the service key, which RLS does not read. A broadcast that
+  // fails must not fail a match that is already written: the players read the
+  // board on their next action, as they always did.
+  try {
+    await db.channel(`match:${matchId}`, { config: { private: true } }).httpSend('events', {
+      matchId,
+      fromSeq: 0,
+      events,
+    });
+  } catch (failure) {
+    console.error('the kick-off could not be broadcast', failure);
+  }
 
   // `serverNow` rides along for the same reason it does on `resolve-action`:
   // the turn deadline is the server's clock, and a browser has to know how far

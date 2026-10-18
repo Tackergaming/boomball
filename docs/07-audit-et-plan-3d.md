@@ -2113,3 +2113,23 @@ tous deux sur brief fermé et relus par le fil principal. Rien dans le moteur ni
 M1 et m1 en une migration, M2 et le redéploiement de `resolve-action`, puis M3 avec le client et
 les deux fonctions ensemble), le client à redéployer sur son feu vert, puis un ami qui crée un
 compte et joue sans lui.
+
+### Sous-phase 2H.37, « les corrections de la revue de sécurité », codée et en ligne le 2026-10-18, porte ouverte
+
+Par le fil principal (Fable 5.1) seul, à partir de `00` C36 : les quatre lots tranchés par Jérôme
+en chat le matin même, une ou deux questions par message, chacun appliqué, déployé et prouvé
+avant le suivant. Rien dans l'IA, `ENGINE_VERSION` reste 11, la forme de l'état ne change pas,
+aucun match archivé ; pas de sweep. Le commit `22564ca` de 2H.36 poussé en début de chat, CI verte
+vue par Jérôme, puis le client de 2H.36 mis en ligne sur son feu vert avant les corrections.
+
+| Quoi | État |
+|---|---|
+| M1, m1 | `0013_team_members_guard.sql` (trois politiques à la place de `team_members_write`, le déclencheur `team_members_pin_keys`, les privilèges de colonne sur `teams`) et `0014_team_members_insert_member.sql` (la politique d'insertion élargie à `is_team_member`, parce que le `with check` d'insert s'évalue avant le conflit d'un upsert : 37 sur 38 au premier passage), **appliquées par Jérôme**. `rls-check.py` de 24 à **38 contrôles, 38 sur 38** ; les deux failles prouvées en direct avant 0013. `e2e:coop` vert en 4,3 min |
+| M2 | `validatePath` refuse un faux tableau et tout pas non entier (`isCell`) ; `ACTION_KINDS` et `isActionShaped` dans `engine/actions.ts` ; `resolve-action` refuse en 400 une action mal formée. Deux tests. **`resolve-action` v28**, smoke vert en 42,6 s, sondes : le 400 neuf sur quatre actions mal formées, « a step of the path is not a cell » sur le match e2e |
+| M3, m4 | `0015_private_channels.sql` **appliquée par Jérôme** (`can_hear_channel`, deux politiques sur `realtime.messages`, les déclencheurs `roll`, `abandon_match` qui diffuse) ; `private: true` sur les trois canaux, `announceAbandoned` et `announceTeamChange` supprimées, `lib/channelReopen.ts` (cinq réouvertures, jamais sur un refus) ; fonctions en supabase-js 2.113.0 et `httpSend` privé. **`resolve-action` v29, `create-match` v26**, puis `e2e:coop` vert en 4,3 min et `e2e:abandon` en 13 s en local contre les fonctions privées, puis **client redéployé**. Sondes : jointures privées `ok` sur le client en ligne ; un étranger connecté refusé ; `private_only` à vrai sur son feu vert, un sujet public refusé même à un membre |
+| Mineurs | m2, m3, m5 acceptés ; **m6** : `0016_one_team_per_owner.sql` écrite, **à appliquer par Jérôme** ; **n8** au prochain lot client (les deux écrans disent « 6 ») |
+| Tests | **777 sur 47 fichiers** (771 plus `actions.test.ts`, un test de `rules.test.ts`, `channelReopen.test.ts`) ; typecheck racine, scripts, e2e et client verts |
+| En ligne | Client de 2H.37 sur `https://boomball.vercel.app`, moteur 11, `resolve-action` v29, `create-match` v26, projet Realtime en privé seulement |
+
+**Porte ouverte** : sa partie à deux sur les canaux privés, 0016 à appliquer, puis un ami qui
+crée un compte et joue sans lui.

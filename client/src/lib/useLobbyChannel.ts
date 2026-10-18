@@ -30,12 +30,20 @@
  * here: `track()` sends at most one presence message every `TRACK_GAP_MS`,
  * the latest state, nothing twice; and a channel the server closes is opened
  * again a second later, seat re-tracked.
+ *
+ * **Private since 2H.37** (security review M3): the members of the team hear
+ * it and speak on it, nobody else, by policies on `realtime.messages`
+ * (migration 0015). A presence forged by an outsider used to be a seat that
+ * blocked the start. And the reopening is bounded (m4, `channelReopen.ts`):
+ * a player the owner removed is refused the join and must not knock every
+ * second all evening; any other closure is retried a handful of times.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import type { Seat } from '../screens/lobbySeats.js';
+import { shouldReopen } from './channelReopen.js';
 import { supabase } from './supabase.js';
 
 export const lobbyTopic = (teamId: string): string => `lobby:${teamId}`;
@@ -76,6 +84,8 @@ export function useLobbyChannel(
   const [seats, setSeats] = useState<Seat[] | null>(null);
   /** Bumped when the server closed the channel: the effect opens a new one. */
   const [epoch, setEpoch] = useState(0);
+  /** How many times this lobby's channel was opened again after the server closed it (m4). */
+  const reopensRef = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
   /** The seat to (re)track whenever the channel is joined, null when withdrawn. */
   const seatRef = useRef<Seat | null>(null);
@@ -102,6 +112,11 @@ export function useLobbyChannel(
     else void channel.untrack();
   }, []);
 
+  // A new lobby (another team, another player) starts its count of reopenings afresh.
+  useEffect(() => {
+    reopensRef.current = 0;
+  }, [teamId, userId]);
+
   useEffect(() => {
     setSeats(null);
     sentRef.current = null;
@@ -120,7 +135,7 @@ export function useLobbyChannel(
     const open = () => {
       if (disposed) return;
       const channel = supabase.channel(topic, {
-        config: { presence: { key: userId, enabled: true } },
+        config: { private: true, presence: { key: userId, enabled: true } },
       });
       channelRef.current = channel;
       channel
@@ -129,7 +144,7 @@ export function useLobbyChannel(
           const matchId = (payload as { matchId?: unknown } | undefined)?.matchId;
           onStartedRef.current(typeof matchId === 'string' ? matchId : '');
         })
-        .subscribe((status) => {
+        .subscribe((status, error) => {
           if (disposed) return;
           if (status === 'SUBSCRIBED') {
             // A fresh join, or a rejoin after the socket came back: the
@@ -140,11 +155,15 @@ export function useLobbyChannel(
           }
           // CLOSED by the server (the presence rate limit), CHANNEL_ERROR or
           // TIMED_OUT: the channel is dead and the library will not revive a
-          // closed one. Open another, once, after a breath.
+          // closed one. Open another, once, after a breath, unless the server
+          // refused the join or this lobby has had its share (m4).
           if (reopen) return;
+          if (!shouldReopen(reopensRef.current, error)) return;
           reopen = setTimeout(() => {
             reopen = null;
-            if (!disposed) setEpoch((was) => was + 1);
+            if (disposed) return;
+            reopensRef.current += 1;
+            setEpoch((was) => was + 1);
           }, REOPEN_DELAY_MS);
         });
     };

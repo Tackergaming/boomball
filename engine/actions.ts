@@ -129,6 +129,37 @@ export type Action =
 
 export type ActionKind = Action['kind'];
 
+/**
+ * The kinds that exist, as a value, for the doors that read an action off the
+ * wire (2H.37, security review M2): `resolve-action` refuses a body whose
+ * `kind` is not one of these before the engine sees it. `satisfies` keeps the
+ * list exhaustive: a new Action without its line here does not compile.
+ */
+export const ACTION_KINDS = {
+  move: true,
+  dash: true,
+  dodge: true,
+  disengage: true,
+  attack: true,
+  shove: true,
+  batCracker: true,
+  catchSpark: true,
+  grabPayload: true,
+  pass: true,
+  shoot: true,
+  brace: true,
+  choosePlace: true,
+  yieldSeat: true,
+  endTurn: true,
+} as const satisfies Record<ActionKind, true>;
+
+/** Whether a value off the wire has the shape of an Action: an object with a known `kind`. */
+export function isActionShaped(raw: unknown): raw is Action {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const { kind } = raw as { kind?: unknown };
+  return typeof kind === 'string' && Object.hasOwn(ACTION_KINDS, kind);
+}
+
 export interface Command {
   readonly unitId: string;
   readonly action: Action;

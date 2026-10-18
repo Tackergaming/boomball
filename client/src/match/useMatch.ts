@@ -43,7 +43,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import type { AllyOrder } from '../../../ai/orders.js';
 import type { Action } from '../../../engine/actions.js';
@@ -128,10 +127,8 @@ export interface MatchView {
    * and the board is simply read again; nothing is shown.
    */
   knock: (unitId: string) => Promise<void>;
-  /** The owner abandoned the match while this client watched (2H.33). */
+  /** The owner abandoned the match while this client watched (2H.33). Said by the database since 2H.37. */
   abandonedByOwner: boolean;
-  /** Tells the other clients of the match that the owner abandoned it. */
-  announceAbandoned: () => Promise<void>;
   /** Posts standing orders to AI team-mates. Spends no turn. */
   order: (orders: readonly AllyOrder[]) => Promise<void>;
   dismissRefusal: () => void;
@@ -259,7 +256,6 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   const liveRef = useRef(true);
   const [abandonedByOwner, setAbandonedByOwner] = useState(false);
   /** The match channel, kept so this client can speak on it too (2H.33). */
-  const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
     liveRef.current = true;
@@ -454,8 +450,12 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   );
 
   useEffect(() => {
+    // Private since 2H.37 (security review M3): heard by the members of the
+    // team that plays the match, written by the Edge Functions and by
+    // `abandon_match`, never by a client. A forged `events` batch or a forged
+    // `abandoned` used to be taken at face value by everyone on the topic.
     const channel = supabase
-      .channel(`match:${matchId}`)
+      .channel(`match:${matchId}`, { config: { private: true } })
       .on('broadcast', { event: 'events' }, (message) => {
         const payload = message.payload as { fromSeq?: number; events?: MatchEvent[] };
         const from = payload.fromSeq ?? 0;
@@ -473,20 +473,15 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
         void playForeign(from, payload.events ?? []);
       })
       // The owner left (2H.28) while this client watched: it is told rather
-      // than left on a board nobody can write to (2H.33).
+      // than left on a board nobody can write to (2H.33). `abandon_match`
+      // sends this from the database (2H.37).
       .on('broadcast', { event: 'abandoned' }, () => setAbandonedByOwner(true))
       .subscribe();
-    channelRef.current = channel;
 
     return () => {
-      channelRef.current = null;
       void supabase.removeChannel(channel);
     };
   }, [matchId, playForeign]);
-
-  const announceAbandoned = useCallback(async () => {
-    await channelRef.current?.send({ type: 'broadcast', event: 'abandoned', payload: { matchId } });
-  }, [matchId]);
 
   /**
    * The first read of the match, and the opening replay when there is one.
@@ -652,7 +647,6 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     sendAs,
     knock,
     abandonedByOwner,
-    announceAbandoned,
     order,
     dismissRefusal: () => setRefusal(null),
     dismissBeat: () => setBeat(null),

@@ -3330,3 +3330,100 @@ bloque le départ), à corriger après M1 seulement. Six mineurs (le propriétai
 d'invitation lisible par tout membre ; la présence mensongère d'un membre ; la réouverture du canal sans plafond ;
 les messages Postgres recopiés ; plusieurs équipes par propriétaire) et quatorze notes. **Les corrections sont le
 lot suivant, 2H.37, à trancher par Jérôme sur le rapport.**
+
+## C36. Décisions du 2026-10-18, **les corrections de la revue de sécurité, sous-phase 2H.37, dans le code et en ligne le même jour**
+
+> Écrites par le fil principal (Fable 5.1) sur les réponses de Jérôme en chat le 2026-10-18 au
+> matin, une ou deux questions par message, dans l'ordre qu'il avait validé la veille : M1 et
+> m1, puis M2, puis M3 et m4, puis les mineurs restants. **Aucun écart de règle, rien dans
+> l'IA, `ENGINE_VERSION` reste 11.** Le moteur ne change que par un garde d'entrée, la forme de
+> l'état ne bouge pas, aucun match n'est archivé.
+
+**Ses décisions.**
+
+1. **M1, figer `team_id`, option A** : un déclencheur `before update` sur `team_members`
+   plutôt que les privilèges de colonne du rapport. La raison, trouvée en préparant la
+   migration : l'upsert de `saveSeatPreference` (supabase-js, `on conflict do update set` sur
+   toutes les colonnes envoyées, clés comprises) aurait été refusé par un privilège de colonne
+   même sans changer la valeur ; le déclencheur ne refuse que ce qui change. Le reste de M1 tel
+   quel : insertion réservée, suppression inchangée. **m1** par privilèges de colonne sur
+   `teams`, qui ne gênent rien.
+2. **M2 tout de suite, `resolve-action` v28 dans la foulée**, sans attendre M3 : une seule
+   fonction, moteur inchangé, la seule brèche dans « le moteur est la seule porte ».
+3. **M3 et m4 le même matin**, la fenêtre sans partie : migration 0015 (le SQL de §3 du rapport,
+   repris tel quel), fonctions puis client redéployés, `private_only` sur le projet.
+4. **m2, m3, m5 acceptés** comme le rapport le conseille. **m6 oui** : un index unique, migration
+   0016, à appliquer quand il veut. **n8 au prochain lot client** : le minimum à 8 caractères se
+   change par l'API de gestion en une ligne, mais l'écran d'inscription et le menu Account disent
+   « At least 6 characters », donc ça part avec le prochain redéploiement client (l'interface des
+   matchs, quand il l'ouvrira). Les inscriptions restent ouvertes, à sa main.
+
+**Comment 2H.37 est codée** (le 2026-10-18, fil principal Fable 5.1 seul, pas de sous-agent : les
+quatre lots étaient séquentiels et chacun dépendait d'une migration appliquée par Jérôme).
+
+**M1 et m1, migrations 0013 et 0014.** `0013_team_members_guard.sql` : `team_members_write`
+tombe, trois politiques la remplacent (`team_members_insert_owner`, `team_members_update_self`,
+`team_members_delete`), le déclencheur `team_members_pin_keys` refuse en 42501 tout changement
+de `team_id` ou de `profile_id` ; sur `teams`, `revoke insert, update from authenticated` puis
+`grant insert (owner, name)` et `grant update (name)`. **Appliquée, 37 sur 38** : la sauvegarde
+de siège d'un membre tombait en 403, parce que Postgres évalue le `with check` de la politique
+**insert** sur la ligne proposée **avant** de chercher le conflit, donc aussi sur le chemin update
+d'un upsert ; le commentaire de 0013 avait ce fait à l'envers. `0014_team_members_insert_member.sql`
+remplace la politique d'insertion par `profile_id = auth.uid() and is_team_member(team_id)` : un
+membre ne peut « insérer » que la ligne qu'il a déjà, un inconnu ou un retiré est refusé, un
+nouveau n'entre que par `join_team`. **`rls-check.py` passe de 24 à 38 contrôles**, et le contrôle
+« six wins derive the star tier », qui testait la faille m1 comme une fonctionnalité, écrit
+désormais en service. Lancé avant 0013 il prouvait les deux failles en direct (bob assis seul chez
+alice en 201, sa ligne déplacée en 204, les `wins` d'alice à 99), ce que la revue n'avait pas pu
+faire ; après 0014, **38 sur 38**, `e2e:coop` vert en 4,3 min sur la base migrée. Zéro ligne
+client, zéro fonction.
+
+**M2, moteur et `resolve-action` v28.** `validatePath` (`engine/rules/movement.ts`) refuse un
+`path` qui n'est pas un tableau avant d'en lire la longueur, et en tête de boucle tout pas qui
+n'est pas un objet à deux coordonnées entières (`isCell`, `Number.isInteger`, une chaîne est
+rejetée) ; un test de `rules.test.ts` rejoue la preuve du rapport, `(2.5, 13), (2.5, 12)` par-dessus
+deux obstacles, le `x` en chaîne et le faux tableau. `engine/actions.ts` gagne `ACTION_KINDS`, la
+liste des kinds comme valeur, tenue exhaustive par `satisfies Record<ActionKind, true>`, et
+`isActionShaped` (`actions.test.ts`, qui vérifie aussi que `toString` n'est pas un kind :
+`Object.hasOwn`, jamais `in`). `resolve-action` refuse en 400 « action must be an object with a
+known kind » avant d'ouvrir la base ; un `kind` inconnu faisait un 500 par `reduce`. **774 tests**,
+`resolve-action` **v28** déployée, smoke vert en 42,6 s, et deux sondes jetables avec le jeton du
+compte e2e : quatre actions mal formées reçoivent le 400 neuf ; sur le vrai match e2e, le chemin
+`(2.5, 13)` et le `x` en chaîne reçoivent « a step of the path is not a cell ».
+
+**M3 et m4, migration 0015, fonctions v29 et v26, client.** Vérifié avant d'écrire :
+`realtime.send(payload, event, topic, private default true)` existe dans le projet **et rattrape
+ses propres erreurs** (`raise warning` lu dans sa définition), aucune politique sur
+`realtime.messages`, `private_only` du projet à `null` et posable par l'API de gestion.
+`0015_private_channels.sql` : `channel_uuid`, `can_hear_channel` (membres de l'équipe, et pour
+`match:*` les membres de l'équipe qui le joue), `boomball_channels_read` (select aux membres),
+`boomball_lobby_write` (insert des clients sur `lobby:*` seulement, présence et diffusion), les
+déclencheurs `team_members_roll` et `teams_code_roll` qui disent `roll` sur `team:*` depuis la
+base (le joiner et le partant ne sont pas membres au moment d'écrire, donc aucun client ne
+pourrait plus le dire en privé), `abandon_match` récrite avec le mot « team » et un `realtime.send`
+de `abandoned` sur `match:*`. **Client** : `private: true` sur les trois canaux ;
+`announceAbandoned` (`useMatch.ts`, `Match.tsx`) et `announceTeamChange` (`TeamHub.tsx`,
+`teamChannel.ts` réduit au sujet et au nom d'événement) supprimées ; **m4** dans
+`lib/channelReopen.ts`, pur et testé : `REOPEN_LIMIT` cinq réouvertures par lobby, jamais sur un
+refus d'autorisation (`isAuthorisationRefusal`, qui lit « Unauthorized », « permissions »,
+« forbidden », « not allowed » dans le message), le compteur remis à zéro quand l'équipe ou le
+joueur change ; un détail que le rapport n'avait pas vu, l'abandon dit par la base revient aussi
+au propriétaire, dont l'écran est déjà en train de partir par sa confirmation : `!leaving` dans
+l'effet de `Match.tsx`. **Fonctions** : supabase-js monté de 2.45.4 à 2.113.0 (la version du
+client), diffusion sur `match:*` par `httpSend` explicite avec `private: true` (le `send()` hors
+abonnement de 2.113 écrit un avertissement), dans un `try/catch` : une diffusion ratée ne casse
+jamais un pas déjà écrit. **777 tests sur 47 fichiers.** **L'ordre de bascule a bougé d'un cran**
+par rapport au rapport : un client privé n'entend plus des fonctions publiques, donc `e2e:coop` ne
+pouvait pas valider en local avant le redéploiement des fonctions. Fait : 0015 par Jérôme ;
+fonctions redéployées (`resolve-action` v29, `create-match` v26) ; `e2e:coop` **vert en 4,3 min**
+et `e2e:abandon` **vert en 13 s** en local, client privé contre fonctions privées ; client
+redéployé ; sonde sur le client en ligne, jointures `team:` et `lobby:` en `private: true`
+répondues `ok`, zéro erreur ; sonde négative, un compte jetable connecté mais étranger refusé sur
+les deux sujets avec « Unauthorized: You do not have permissions to read from this Channel
+topic », la formule que `channelReopen.ts` reconnaît ; puis `private_only` à vrai sur son feu
+vert, relu, un membre sur un sujet public refusé par « PrivateOnly: This project only allows
+private channels », le même en privé `SUBSCRIBED`.
+
+**Ce qui reste de la revue** : 0016 (m6) à appliquer par Jérôme ; n8 au prochain lot client ;
+n12 (le secret JWT dans un transcript) et n14 (le roster écrit avant la validation des sièges)
+restent de la dette connue ; C11, C13, C15 du tableau §4 du rapport restent ouverts ou à jour.

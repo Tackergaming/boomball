@@ -13,8 +13,9 @@
  *
  * Who is in the lobby comes from the lobby channel `App` holds (`lobby`); the
  * hub only listens and never takes a seat. Every write to the roll (joining,
- * leaving, removing, a new code) is followed by `announceTeamChange`, so the
- * other hubs on the team re-read it.
+ * leaving, removing, a new code) is announced on the team's channel by the
+ * database itself (triggers of migration 0015, 2H.37), so the other hubs on
+ * the team re-read it; this screen re-reads its own after the write.
  *
  * Two honest reductions, kept from the earlier sheet: no career figures,
  * because nothing counts them between matches, and no bench, which is match
@@ -29,7 +30,6 @@ import { useEffect, useId, useState, type FormEvent } from 'react';
 import { MATCH_ROUNDS, TIER_WINS_STAR, TIER_WINS_VETERAN } from '../../../engine/constants.js';
 import { TEAM_COMPOSITION, type Role, type Tier } from '../../../engine/stats.js';
 import { joinTeam, removeMembership, rotateInviteCode, supabase } from '../lib/supabase.js';
-import { announceTeamChange } from '../lib/teamChannel.js';
 import type { LiveMatch, Member, Team } from '../lib/useAccount.js';
 import { AbandonPrompt } from '../match/AbandonPrompt.js';
 import { AccountMenu } from './AccountMenu.js';
@@ -384,7 +384,6 @@ function ThePlayers({
         setError(result.reason);
         return;
       }
-      await announceTeamChange(team.id);
       await onRollChanged();
     } finally {
       setBusy(false);
@@ -401,7 +400,6 @@ function ThePlayers({
         return;
       }
       setConfirming(null);
-      await announceTeamChange(team.id);
       await onRollChanged();
     } finally {
       setBusy(false);
@@ -554,7 +552,6 @@ function JoinWithCode({
       }
       const joined = result.value;
       setCode('');
-      await announceTeamChange(joined);
       await onJoined(joined);
     } catch (failure) {
       console.error('the team could not be joined', failure);

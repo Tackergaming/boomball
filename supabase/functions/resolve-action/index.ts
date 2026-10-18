@@ -34,12 +34,12 @@
  * to a local `Date.now()` costs a player their turn on any machine that drifts.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.113.0';
 
 import { CORS_HEADERS, preflight } from '../_shared/cors.ts';
 import type { AllyOrder } from '../../../ai/orders.ts';
 import { Arena } from '../../../engine/arena.ts';
-import type { Action } from '../../../engine/actions.ts';
+import { isActionShaped, type Action } from '../../../engine/actions.ts';
 import type { MatchState } from '../../../engine/types.ts';
 import { toArenaSpec } from '../../../server/arenaRow.ts';
 import { isMovedOn, matchColumns, MOVED_ON } from '../../../server/persist.ts';
@@ -101,6 +101,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (!matchId) return refuse('matchId is required');
   if (!ordersOnly && (!unitId || !action)) {
     return refuse('matchId, unitId and action are required');
+  }
+  // The shape of the action is checked here, at the door, and its content by
+  // the engine (2H.37, security review M2). Before this an unknown `kind` fell
+  // through `reduce` to a 500, and the engine took the fields as typed: a
+  // half-cell path walked through walls (see `validatePath`).
+  if (!ordersOnly && !isActionShaped(action)) {
+    return refuse('action must be an object with a known kind');
   }
 
   // The service role client does the writing. RLS has no write policy on the
@@ -216,12 +223,17 @@ Deno.serve(async (request: Request): Promise<Response> => {
   await recordResult(db, match.team_id as string, match.tier as string, state, step.session.state);
 
   // Realtime carries the same batch the caller gets back, so the other two
-  // clients and the acting one converge on one sequence of events.
-  await db.channel(`match:${matchId}`).send({
-    type: 'broadcast',
-    event: 'events',
-    payload: { fromSeq, events: step.events },
-  });
+  // clients and the acting one converge on one sequence of events. Private
+  // channel since 2H.37 (migration 0015): REST with the service key, which
+  // RLS does not read; a failed broadcast never fails a step already written.
+  try {
+    await db.channel(`match:${matchId}`, { config: { private: true } }).httpSend('events', {
+      fromSeq,
+      events: step.events,
+    });
+  } catch (failure) {
+    console.error('the step could not be broadcast', failure);
+  }
 
   return reply({
     accepted: true,
