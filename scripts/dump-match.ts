@@ -15,7 +15,7 @@
  * Read-only against the database. The service key is read from the
  * environment, never printed:
  *
- *     set -a && . ../.env && set +a                        # from boomball/
+ *     set -a && . ./.env && set +a                         # from the workspace root
  *     node scripts/run-ts.mjs scripts/dump-match.ts --list
  *     node scripts/run-ts.mjs scripts/dump-match.ts [--match <id>] [--out <dir>]
  *
@@ -44,7 +44,7 @@ const SERVICE = need('SUPABASE_BOOMBALL_SERVICE_ROLE_KEY');
 function need(name: string): string {
   const value = process.env[name];
   if (!value) {
-    console.error(`${name} is missing. From boomball/: set -a && . ../.env && set +a`);
+    console.error(`${name} is missing. From the workspace root: set -a && . ./.env && set +a`);
     process.exit(1);
   }
   return value;

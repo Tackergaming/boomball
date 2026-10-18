@@ -21,7 +21,7 @@ Not a vitest test, for the same reason as `rls-check.py`: it needs a live
 project and a network round trip, and the suite under `npm test` runs in
 milliseconds and must stay that way. Standard library only, nothing to install.
 
-    python boomball/supabase/checks/browser-path.py       # from the workspace root
+    python supabase/checks/browser-path.py                # from the workspace root
 
 Reads SUPABASE_BOOMBALL_URL, SUPABASE_BOOMBALL_ANON_KEY and
 SUPABASE_BOOMBALL_SERVICE_ROLE_KEY. When they are not already in the
@@ -53,7 +53,7 @@ def load_workspace_env():
     )
     if all(name in os.environ for name in wanted):
         return
-    path = Path(__file__).resolve().parents[3] / ".env"
+    path = Path(__file__).resolve().parents[2] / ".env"
     if not path.is_file():
         return
     for line in path.read_text(encoding="utf-8").splitlines():

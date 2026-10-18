@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.83",
+        "--browser",
+        "chrome",
+        "--viewport-size",
+        "1440x900",
+        "--caps",
+        "vision",
+        "--output-dir",
+        "e2e/out"
+      ]
+    }
+  }
+}

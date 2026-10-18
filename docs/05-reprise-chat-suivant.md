@@ -1,10 +1,10 @@
-On reprend Boomball, le jeu vidéo. Il vit dans boomball/ dans ce workspace.
-Charge le skill boomball, puis lis EN ENTIER boomball/docs/08-plan-terrain-horizontal.md :
+On reprend Boomball, le jeu vidéo. Il vit à la racine de ce workspace.
+Charge le skill boomball, puis lis EN ENTIER docs/08-plan-terrain-horizontal.md :
 c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.37
 est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15, la 6 par 2H.29,
 la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et la limite de présence, 2H.36 le
 premier lot de la phase 8, 2H.37 les corrections de la revue de sécurité), §9 la parallélisation.
-Lis ensuite la partie C de boomball/docs/00-reglement-v2.md : les écarts 27 à 65, plus 40 bis,
+Lis ensuite la partie C de docs/00-reglement-v2.md : les écarts 27 à 65, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 à C16 les passes suivantes de l'IA (chacune finit par « comment ...
 est codée », À LIRE avant de toucher à ai/), C17 la passe gratuite au gardien tranchée (elle
@@ -48,12 +48,10 @@ WebGL. **Le projet Realtime est en `private_only`** : tout nouveau canal doit ê
 `private: true` ET avoir une politique sur `realtime.messages`, sinon la jointure est refusée.
 Migrations appliquées : 0001 à 0015. **0016 (`teams_one_per_owner`, l'index unique de m6) est
 ÉCRITE ET PAS APPLIQUÉE** : me la proposer par /supabase-migrate. Vérifier git status et git log
-origin/main..main en premier et me le dire : au 18 au matin tout était commité par /save en fin de
-chat ; **le commit de 2H.37 est à pousser si je ne l'ai pas fait**. Les quatre fichiers du vault
-modifiés hors de nos sessions et les non suivis MARGO.md, theodo.md, assets/source/ (mes
-sources, non suivies), scripts/blender/__pycache__/ ne sont pas à nous : ne les commite pas sans
-mon feu vert ; check_vault.py signale MARGO.md et theodo.md, c'est connu et c'est à moi.
-`boomball/backups/` est ignoré par git et contient les codes d'invitation : jamais dans un
+origin/main..main en premier et me le dire : le 18 octobre, Boomball a déménagé de jarvis-jdr
+dans ce workspace, avec son historique (voir HISTORY.md). assets/source/ (mes sources) est
+ignoré par git : ne le commite jamais.
+`backups/` est ignoré par git et contient les codes d'invitation : jamais dans un
 dossier partagé.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (5) FAITS (ligue et abandon, phase 6, client en
@@ -82,7 +80,7 @@ Ce qu'il faut savoir tout de suite.
    séquentiels, chacun derrière une migration appliquée par moi. Toute matière que tu me présentes
    nomme son auteur, agent ou fil principal. Dès que tu as une liste d'actions pour moi, donne-la
    numérotée, une action exacte par ligne, et dis ce qui se passe ensuite. **Je suis dans
-   PowerShell** : une commande pour moi ne contient jamais `set -a && . ../.env`, les scripts
+   PowerShell** : une commande pour moi ne contient jamais `set -a && . ./.env`, les scripts
    lisent le `.env` eux-mêmes (`apply-migration.mjs`, `deploy-vercel.mjs`, `rls-check.py`).
 
 2. Quand j'explique un concept, pose tes questions en chat, une ou deux par message, et reformule
@@ -99,8 +97,8 @@ Ce qu'il faut savoir tout de suite.
    départ − exposition des trajets. Le plan de tour : chooseAction renvoie la première action du
    meilleur plan, l'IA se juge sur rankPlans.
 
-4. Pour savoir ce que l'IA a fait dans un match en ligne : depuis boomball/ en bash, set -a &&
-   . ../.env && set +a puis node scripts/run-ts.mjs scripts/dump-match.ts --list, puis --match
+4. Pour savoir ce que l'IA a fait dans un match en ligne : depuis la racine du workspace en bash, set -a &&
+   . ./.env && set +a puis node scripts/run-ts.mjs scripts/dump-match.ts --list, puis --match
    <uuid complet>. Horaires de --list en UTC. Les dossiers de docs/matches/ d'avant le moteur 11
    ne se rejouent plus. 2e30f587 n'est PAS à analyser.
 
@@ -131,7 +129,7 @@ Ce qu'il faut savoir tout de suite.
    neuf ; une sonde qui joue le match e2e le fait avancer) ou si le Giff e2e est cerné (npm run
    e2e:abandon). Juste après un déploiement la connexion de global-setup.ts peut expirer une
    fois : relancer. Si mon npm run dev occupe 5173 sans le crochet : VITE_BOOMBALL_HOOK=1
-   VITE_BOOMBALL_PATIENT=1 npx vite --port 5174 --strictPort depuis boomball/client en
+   VITE_BOOMBALL_PATIENT=1 npx vite --port 5174 --strictPort depuis client/ en
    arrière-plan, chauffer par deux curl, BASE_URL=http://localhost:5174, le tuer après (netstat
    -ano, taskkill). Le spec 3D admet deux avertissements console qui ne sont pas à nous
    (THREE.Clock, GL logiciel) ; toute autre ligne le fait échouer, y compris l'avertissement de
@@ -180,19 +178,19 @@ Ce qu'il faut savoir tout de suite.
    et les deux camps alternent de round en round (sideOrder).
 
 9. Les interdits ne changent pas. Jamais le dépôt GitHub sur Vercel. Jamais le .env ni une clé
-   dans un commit. Le règlement de table du vault est figé. Ne lis jamais design/Boomball
+   dans un commit. Le règlement de table du vault de jarvis-jdr est figé. Ne lis jamais design/Boomball
    Interface.html en entier (ses images sont compressées dans le bundle, inextractibles par une
    regex base64 ; le gabarit s'extrait par la commande du design/README.md). Mon jeton GitHub du
    .env n'a pas le droit de lire les Actions ni les secrets du dépôt : pour le maintien en vie et
    la CI, c'est moi qui regarde l'onglet Actions (vert sur 22564ca le 18 au matin).
 
-10. Les commandes. Depuis boomball/ : npm test (777), npm run typecheck, npm run sweep, npm run
+10. Les commandes. Depuis la racine du workspace : npm test (777), npm run typecheck, npm run sweep, npm run
     e2e, e2e:playthrough, e2e:board3d, e2e:abandon, e2e:coop, e2e:account, npm run build:function,
     npm run export:db ; en bash avec le .env chargé : npm run deploy:function (les deux) ou node
     scripts/deploy-edge-function.mjs resolve-action (une seule) ; node scripts/deploy-vercel.mjs
-    --production (lit le .env lui-même). Depuis boomball/client/ : npm run dev sur
+    --production (lit le .env lui-même). Depuis client/ : npm run dev sur
     http://localhost:5173 (jamais 127.0.0.1), npm run build, npm run typecheck. Depuis la
-    racine : python boomball/supabase/checks/rls-check.py (38 contrôles, crée et supprime deux
+    racine : python supabase/checks/rls-check.py (38 contrôles, crée et supprime deux
     comptes jetables et deux équipes) et browser-path.py, python .claude/scripts/check_drift.py.
     Le cwd de l'outil Bash se réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
@@ -219,8 +217,7 @@ Ce qu'il faut savoir tout de suite.
     commentaires « 2H.23 » de Tokens.tsx ; du rapport 10 : n12 (le secret JWT dans un transcript,
     à faire tourner si un dossier de transcripts est partagé) et n14 (le roster écrit avant la
     validation des sièges) ; le déclencheur `team_members_roll` fait relire le hub à chaque
-    sauvegarde de siège, un bruit sans coût ; les quatre fichiers du vault modifiés hors de nos
-    sessions, à moi de décider.
+    sauvegarde de siège, un bruit sans coût.
 
 12. Un fait de données : le second compte e2e (`BOOMBALL_E2E2_EMAIL`, `BOOMBALL_E2E2_PASSWORD`,
     affiché « E2E Second ») est membre de DEUX équipes, « E2E Battery » et « Shrapnel oath », MON

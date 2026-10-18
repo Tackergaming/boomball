@@ -1,6 +1,6 @@
 # Sources des assets Boomball
 
-Les fichiers bruts de Jérôme, déplacés ici depuis `context/import/` le 2026-10-15 à sa demande.
+Les fichiers bruts de Jérôme, déplacés ici depuis `context/import/`, dans le workspace jarvis-jdr, le 2026-10-15 à sa demande.
 Le jeu ne lit jamais ce dossier : il lit les dérivés, qui eux sont commités.
 
 | Source | Dérivé lu par le jeu |
@@ -17,7 +17,7 @@ Le jeu ne lit jamais ce dossier : il lit les dérivés, qui eux sont commités.
 | `sounds/announcer-pack-banter-man.wav` (2 min 08, 26 répliques d'un commentateur sarcastique) et `sounds/announcer-pack-dragon.wav` (1 min 36, 28 mots d'une voix de gorge) | `client/public/sounds/announcer/<voix>-<nn>-<mots>.mp3`, 54 clips (2H.25) : découpe aux silences par ffmpeg (`silencedetect=noise=-38dB:d=0.35`, 80 ms de marge, fondu de sortie 50 ms, mp3 q3), noms d'après la transcription whisper (modèle medium) ; la répartition par moment est `client/src/match/announcer.ts` |
 | `textures/MetalPlates011_1K-JPG.zip`, `013`, `014` (ambientCG, CC0) | les WebP 1K de `client/src/board3d/textures/` |
 
-Refaire le Giff animé, depuis `boomball/` :
+Refaire le Giff animé, depuis la racine du workspace :
 `"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b -P scripts/blender/rig_giff.py -- client/public/models/giff-rigged.glb assets/source/models/giff-rigged.blend`
 
 Conversion d'un son : `ffmpeg -i source.wav -ac 2 -ar 44100 -codec:a libmp3lame -q:a 4 client/public/sounds/<kind>.mp3`,

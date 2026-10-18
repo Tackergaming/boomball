@@ -1,0 +1,45 @@
+# Keeps the free Supabase project of Boomball awake (decision D7, audit line A13).
+#
+# A free project pauses after seven days without traffic, and it did, in
+# September 2026, without anyone seeing it: the game was simply unplayable. One
+# authenticated read a day on a reference table is traffic enough, and a read
+# that does not come back 200 fails the run, which is how a project in pause
+# gets noticed before a friend does.
+#
+# Two repository secrets, set by Jérôme in the GitHub settings of this repo:
+#   SUPABASE_URL        https://<ref>.supabase.co
+#   SUPABASE_ANON_KEY   the anon key, the same one the client ships with
+# The anon key only ever reads what RLS lets a signed-out caller read, which is
+# nothing but the reference tables.
+
+name: Supabase keepalive
+
+on:
+  schedule:
+    # Daily, 06:17 UTC. An odd minute, because the top of the hour is when
+    # every scheduled workflow on GitHub wants to run.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Read one row of role_stats
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "SUPABASE_URL and SUPABASE_ANON_KEY must be set as repository secrets"
+            exit 1
+          fi
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/role_stats?select=role&limit=1")
+          echo "role_stats answered $status"
+          if [ "$status" != "200" ]; then
+            echo "the project did not answer 200: it may be paused, see docs/07 D9 for the restore"
+            exit 1
+          fi

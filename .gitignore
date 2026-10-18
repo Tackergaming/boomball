@@ -1,0 +1,52 @@
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.pfx
+*.p12
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Dépendances ---
+node_modules/
+__pycache__/
+
+# --- Builds ---
+dist/
+build/
+out/
+
+# --- Éditeurs ---
+.vscode/
+.idea/
+
+# --- Logs ---
+*.log
+npm-debug.log*
+logs/
+
+# --- Fichiers temporaires ---
+*.tmp
+*.temp
+.cache/
+
+# --- Harnais Playwright (09/10/2026) ---
+# Captures d'écran, rapports, et l'état de session du compte de test e2e.
+# L'état de session contient un jeton Supabase : jamais versionné.
+e2e/out/
+e2e/.auth/
+e2e/test-results/
+e2e/playwright-report/
+
+# --- Exports de sauvegarde (17/10/2026) ---
+# Contiennent les codes d'invitation des équipes.
+backups/
+
+# --- Sources des assets, hors git depuis toujours (153 Mo, surtout du son) ---
+assets/source/*
+!assets/source/README.md

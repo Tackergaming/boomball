@@ -445,7 +445,7 @@ Ce que Jérôme fait lui-même :
 
 Pour les scripts, la connexion se fait dans `global-setup.ts` à partir de `BOOMBALL_E2E_EMAIL` et
 `BOOMBALL_E2E_PASSWORD` lus dans le `.env` du workspace, et l'état de session est écrit dans
-`boomball/e2e/.auth/`, ignoré par git. Claude ne voit jamais le mot de passe.
+`e2e/.auth/`, ignoré par git. Claude ne voit jamais le mot de passe.
 
 Pour un rendu WebGL sans écran, en CI ou en headless : lancer Chromium avec
 `--use-gl=angle --use-angle=swiftshader-webgl --enable-unsafe-swiftshader`, et vérifier dans la page

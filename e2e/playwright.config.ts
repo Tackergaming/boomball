@@ -1,7 +1,7 @@
 /**
  * The screen harness: Playwright against the real client and the real project.
  *
- * Run from `boomball/`:
+ * Run from the workspace root:
  *
  *     npm run e2e               # smoke: sign in, hub, lobby, a match, three turns, captures
  *     npm run e2e:playthrough   # plays the open match to the final whistle
@@ -26,9 +26,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-// The workspace .env, two levels above boomball/. Anything already exported
+// The workspace .env, one level above e2e/. Anything already exported
 // wins, so a variable set in the shell still overrides the file.
-const envFile = resolve(here, '../../.env');
+const envFile = resolve(here, '../.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 // `localhost`, not `127.0.0.1`: on this machine Vite binds the IPv6 loopback

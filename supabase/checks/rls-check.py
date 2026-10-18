@@ -10,7 +10,7 @@ round trip; the suite under `npm test` runs in milliseconds and must stay that
 way. Python with nothing but the standard library, so there is no dependency to
 install to run it.
 
-    python boomball/supabase/checks/rls-check.py          # from the workspace root
+    python supabase/checks/rls-check.py                   # from the workspace root
 
 Reads SUPABASE_BOOMBALL_URL, SUPABASE_BOOMBALL_ANON_KEY and
 SUPABASE_BOOMBALL_SERVICE_ROLE_KEY. When they are not already in the
@@ -52,7 +52,7 @@ def load_workspace_env():
     )
     if all(name in os.environ for name in wanted):
         return
-    path = Path(__file__).resolve().parents[3] / ".env"
+    path = Path(__file__).resolve().parents[2] / ".env"
     if not path.is_file():
         return
     for line in path.read_text(encoding="utf-8").splitlines():

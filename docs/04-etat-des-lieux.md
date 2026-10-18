@@ -1438,7 +1438,7 @@ bundle, et deux fonctions qui écrivent avec la clé service.
 
 **L'hébergement Vercel, quand tu auras joué.** Le jeton est en place et vérifié, compte
 `montigny-8072`. **Rien n'est connecté à GitHub et il ne faut pas le faire** : l'intégration donnerait
-à Vercel un accès en lecture sur tout le dépôt, dont `campagne-vault/`, `context/` et le `CLAUDE.md`
+à Vercel un accès en lecture sur tout le dépôt (alors celui du workspace jarvis-jdr), dont `campagne-vault/`, `context/` et le `CLAUDE.md`
 racine. Le projet se créera et se déploiera par l'API, en envoyant les fichiers construits, sans que
 Vercel voie jamais le dépôt. **Fait le 2026-10-16 au soir, sur son mot « passons au déploiement
 vercel »** : `scripts/deploy-vercel.mjs` a créé le projet `boomball` par `POST /v10/projects`

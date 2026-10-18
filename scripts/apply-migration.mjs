@@ -15,7 +15,7 @@
  * pointing at it. If Boomball ever grows a second environment, replace this
  * with the CLI rather than growing a ledger here.
  *
- *     set -a && . ../.env && set +a          # from boomball/
+ *     set -a && . ./.env && set +a           # from the workspace root
  *     node scripts/apply-migration.mjs supabase/migrations/0003_record_win.sql
  */
 
@@ -29,7 +29,7 @@ import { resolve } from 'node:path';
 // fails before touching the network and the message blames the environment.
 // Anything already exported wins, so an explicit override still works.
 if (!process.env.SUPABASE_API_KEY_BOOMBALL || !process.env.SUPABASE_BOOMBALL_REF) {
-  const envFile = resolve(import.meta.dirname, '../../.env');
+  const envFile = resolve(import.meta.dirname, '../.env');
   if (existsSync(envFile)) process.loadEnvFile(envFile);
 }
 

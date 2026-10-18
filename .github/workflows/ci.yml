@@ -1,0 +1,46 @@
+# Boomball's continuous integration (audit line A24).
+#
+# Test, typecheck and build the client on every push and pull request. No
+# browser is installed: the Playwright specs are only type-checked here, the
+# live harness needs the e2e account and runs on Jérôme's machine.
+#
+# The client build needs no Supabase variables: `client/src/lib/supabase.ts`
+# reads them at run time, and Vite builds without them.
+
+name: Boomball CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          # `process.loadEnvFile` (used by the scripts) needs Node 21.7 or later.
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Install the client
+        run: npm ci
+        working-directory: client
+
+      - name: Test
+        run: npm test
+
+      - name: Typecheck (root, scripts, e2e)
+        run: npm run typecheck
+
+      - name: Build the client
+        run: npm run build
+        working-directory: client

@@ -1,7 +1,7 @@
 # Boomball v2, règlement codable
 
 > Phase 0 du MVP. Ce document est le verrou : rien ne se code avant que tu l'aies validé.
-> Source : `campagne-vault/08-Rules-Homebrew/Boomball.md`, qui reste la version de table et ne
+> Source : `campagne-vault/08-Rules-Homebrew/Boomball.md`, dans le workspace jarvis-jdr, qui reste la version de table et ne
 > change pas.
 
 Le document se lit en deux temps. La **partie A** liste tout ce qui s'écarte de ta fiche, avec la
@@ -3263,7 +3263,7 @@ infrastructure, et **« mot de passe oublié »** coûte un e-mail qu'aucune voi
 
 **Deux faits vérifiés en cadrant.** Le maintien en vie du projet Supabase (A13) tourne : Jérôme
 a vu une exécution verte du workflow `supabase-keepalive` le 2026-10-17 à 12:53. Le dépôt
-`Tackergaming/jarvis-jdr` est privé, lu par l'API GitHub.
+`Tackergaming/jarvis-jdr`, celui du workspace jarvis-jdr, est privé, lu par l'API GitHub.
 
 **Le parcours d'un ami**, inchangé et validé : il reçoit l'URL, clique « No account yet », tape
 e-mail, mot de passe et nom, pas d'e-mail de confirmation, arrive sur « Raise a team » avec

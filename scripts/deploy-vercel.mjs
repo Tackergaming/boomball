@@ -45,7 +45,7 @@ const PROJECT = argValue('--project', 'boomball');
 const DIST = resolve(root, argValue('--dist', 'client/dist'));
 
 if (!process.env.VERCEL_TOKEN) {
-  const envFile = resolve(root, '../.env');
+  const envFile = resolve(root, '.env');
   const text = await readFile(envFile, 'utf8').catch(() => '');
   for (const line of text.split(/\r?\n/)) {
     const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());

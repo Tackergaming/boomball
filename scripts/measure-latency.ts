@@ -30,7 +30,7 @@
  * `serveAction` is run locally in Node on the same board, so the Deno time can
  * be read against the Node time for identical work.
  *
- *     set -a && . ../.env && set +a          # from boomball/
+ *     set -a && . ./.env && set +a           # from the workspace root
  *     node scripts/run-ts.mjs scripts/measure-latency.ts [--idle 60] [--rounds 10] [--keep]
  *
  * Deletes the throwaway player and everything cascading off it when done,
@@ -69,7 +69,7 @@ function argValue(flag: string): string | undefined {
 function need(name: string): string {
   const value = process.env[name];
   if (!value) {
-    console.error(`${name} is missing. From boomball/: set -a && . ../.env && set +a`);
+    console.error(`${name} is missing. From the workspace root: set -a && . ./.env && set +a`);
     process.exit(1);
   }
   return value;

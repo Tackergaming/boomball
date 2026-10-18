@@ -12,7 +12,7 @@
  * not do with a mouse; it can only do it without one.
  *
  * This file has no Vite or React import on purpose, so the e2e scripts under
- * `boomball/e2e/` can import the type without dragging the browser build in.
+ * `e2e/` can import the type without dragging the browser build in.
  */
 
 import type { Action } from '../../../engine/actions.js';

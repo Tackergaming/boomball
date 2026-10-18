@@ -1,0 +1,7 @@
+{
+  "outputStyle": "Boomball",
+  "enabledMcpjsonServers": ["playwright"],
+  "permissions": {
+    "allow": ["mcp__playwright__*"]
+  }
+}

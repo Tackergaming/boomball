@@ -135,7 +135,7 @@ const SILENT = 0.0001;
 
 /**
  * Jérôme's own recordings (2H.22, the evening of the 15th), by kind: WAV in
- * `boomball/assets/source/sounds/`, served as MP3 from `public/sounds/`. They
+ * `assets/source/sounds/`, served as MP3 from `public/sounds/`. They
  * are fetched and decoded once the context runs; until then, and for every
  * kind without a file, the recipe below plays. `gain` evens them out against
  * the synthesis: the goal and the blast were mastered to 0 dB.

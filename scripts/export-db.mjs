@@ -7,7 +7,7 @@
  * come along without this script knowing about them. It never writes to the
  * database.
  *
- * Output goes to `boomball/backups/<YYYY-MM-DD-HHMM>/<table>.json`, one file
+ * Output goes to `backups/<YYYY-MM-DD-HHMM>/<table>.json`, one file
  * per table, plus a `manifest.json` (row counts, ISO timestamp, project ref).
  * That folder is ignored by git: the dump holds player data and invite codes,
  * and it must stay on this machine, so copy it somewhere safe yourself.
@@ -18,7 +18,7 @@
  * of moves played, which is not what matters. `--events` adds them, read in
  * pages of 5,000 rows ordered by `(match_id, seq)` until a page comes back empty.
  *
- *     node scripts/export-db.mjs            # from boomball/
+ *     node scripts/export-db.mjs            # from the workspace root
  *     node scripts/export-db.mjs --events
  */
 
@@ -29,7 +29,7 @@ import { resolve } from 'node:path';
 // Same loading as apply-migration.mjs: the workspace .env, only when the
 // variables are not already exported.
 if (!process.env.SUPABASE_API_KEY_BOOMBALL || !process.env.SUPABASE_BOOMBALL_REF) {
-  const envFile = resolve(import.meta.dirname, '../../.env');
+  const envFile = resolve(import.meta.dirname, '../.env');
   if (existsSync(envFile)) process.loadEnvFile(envFile);
 }
 
