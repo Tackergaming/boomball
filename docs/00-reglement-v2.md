@@ -3424,6 +3424,172 @@ topic », la formule que `channelReopen.ts` reconnaît ; puis `private_only` à 
 vert, relu, un membre sur un sujet public refusé par « PrivateOnly: This project only allows
 private channels », le même en privé `SUBSCRIBED`.
 
-**Ce qui reste de la revue** : 0016 (m6) à appliquer par Jérôme ; n8 au prochain lot client ;
+**Ce qui reste de la revue** : 0016 (m6) à appliquer par Jérôme (**appliquée par lui le 2026-10-18 après l'écriture du prompt de reprise**, l'index `teams_one_per_owner` lu en base le 2026-10-19) ; n8 au prochain lot client ;
 n12 (le secret JWT dans un transcript) et n14 (le roster écrit avant la validation des sièges)
 restent de la dette connue ; C11, C13, C15 du tableau §4 du rapport restent ouverts ou à jour.
+
+## C37. Décisions du 2026-10-19, **la refonte de l'écran de match, sous-phase 2H.38, cadrée en chat et maquettée**
+
+> Écrites par le fil principal (Opus 5.5) au bout d'un brainstorm point par point avec Jérôme, le
+> 2026-10-19, une question par message, chaque point validé avant le suivant, puis sur une
+> maquette cliquable qu'il a validée sans correction (« ça me va très bien, tout est bon. GO »).
+> **Rien n'est codé dans ce chat : il l'a voulu ainsi**, le chat suivant construit. **Aucun écart de
+> règle, rien dans le moteur, l'IA ni les fonctions, `ENGINE_VERSION` reste 11.** Tout est dans le
+> client, plus n8. La maquette fait foi pour l'aspect : `design/2H38-ecran-de-match/index.html`
+> (s'ouvre telle quelle dans un navigateur, à côté de `data.js` et de ses deux captures), publiée
+> aussi en artifact privé : https://claude.ai/artifact/BHuLoBVPcet2RcCd9wTm2q.
+
+**Son point de départ, dans ses mots.** Deux captures, son portable et son 27 pouces : « il y a une
+grosse différence d'expérience client entre un petit écran et un grand écran », « rendre agréable
+l'expérience dans les 2 cas » ; « les blocs de la partie de droite ne sont plus utiles : le bloc
+initiative, le bloc de log et le bloc de stat du joueur sélectionné. Ils prennent beaucoup de place
+pour rien » ; la barre d'ordre des tours « pourrait être incluse dans la barre tout en haut » et
+« plus lisible et visible » ; le bloc d'actions « devrait disparaître et apparaître directement sur
+le terrain mais jamais bloquant la vue du joueur », « seulement celles dispo au moment de jouer »,
+« transparent plutôt que popup » ; « un endroit plus approprié pour les options de setup » ; « que
+l'action de shove soit séparée de l'action de take the ball, qui est certes un shove mais
+spécifique sur un porteur. C'est important pour clarifier ce que fait l'action à un joueur non
+initié ».
+
+**Ses deux écrans, mesurés par lui dans la console.** Portable : **1536 × 695** pixels CSS utiles,
+`devicePixelRatio` 1,25, écran 1536 × 864. 27 pouces : **2560 × 1271**, `devicePixelRatio` 1,5,
+écran 2560 × 1441. **La contrainte est la hauteur du portable.** La maquette est faite à ces deux
+tailles exactes ; l'échelle de l'interface y vaut `--u` = 1 et 1,4.
+
+**Le périmètre.** Le cadre est refait pour la 3D **et** pour la 2D (sa réponse à la recommandation) ;
+les actions posées sur le terrain viennent en 3D d'abord, la 2D garde une rangée d'actions classique
+dans le nouveau cadre. **La caméra (déplacement, zooms, angles) est un lot à part, 2H.39, juste
+après** (sa réponse) : 2H.38 garde la caméra d'aujourd'hui et ne lui ajoute que trois accès, le clic
+sur une pastille, le clic sur la minicarte et la touche C. C18 à C22 restent vrais jusque-là, dont
+son refus d'une caméra à quatre nombres lissés (C20).
+
+**Les décisions, dix points, tous validés.**
+
+1. **La charpente.** Une seule barre en haut, le plateau sur tout le reste, tout le reste posé
+   par-dessus le plateau dans les coins, en transparence. La colonne de droite disparaît (`Ladder`,
+   `SeatPanel`, le fil « The call »), le panneau d'actions du bas aussi. L'interface grandit avec
+   la fenêtre : `--u` = 1 au portable, 1,4 au 27 pouces (proposition d'implémentation :
+   `clamp(1, min(innerWidth / 1536, innerHeight / 695), 1.4)`). Le commentaire « Desktop only,
+   1280px minimum » de `theme.css` devient faux et se récrit.
+2. **La barre du haut, deux lignes, 84 px × `--u`.** Ligne 1 : blason, nom de l'équipe et « Bench
+   3 of 3 » à gauche ; le score en gros et « Round 8 of 10 » au centre ; l'adversaire à droite,
+   puis la roue ⚙. Ligne 2 : **l'ordre des tours en pastilles**, chacune avec **la lettre du rôle**
+   (S Striker, B Breaker, **W Bulwark**, T Trajector ; le Bulwark disait « B » comme le Breaker),
+   le nom court, **« YOU »** sur son pion et **le prénom** du joueur sur le pion d'un coéquipier
+   humain. **Pas de barre de PV** (son retrait explicite). Le joueur en cours deux fois plus grand,
+   cerclé de laiton ; ceux qui ont joué estompés ; un évacué barré ; **le Spark et les Crackers ont
+   leur pastille** ; le round suivant derrière un séparateur, en pointillés. Survoler une pastille
+   fait briller le pion (et l'inverse) ; un clic centre la caméra sans décrocher le tour. Au
+   portable : le joueur en cours et les sept suivants, puis « +N », les joués cachés ; au 27
+   pouces : le round entier et le début du suivant.
+3. **Les actions.** **Ce que le pion fait seul** va dans **une rangée transparente en bas du
+   plateau** (verre sombre, opaque au survol), **seulement les actions jouables**, « End turn »
+   toujours à droite. **La caméra cadre le terrain au-dessus de cette rangée** : à la vue large des
+   captures, la rangée ne couvre que la rambarde et les gradins. **Ce que le pion fait sur une
+   cible** apparaît **au clic sur la cible, en étiquettes posées à côté d'elle** sur le terrain.
+   Les noms : **« Pick up »** (ramasser le Payload au sol, l'ancien « Take the Payload »),
+   **« Shove 1 square »** (bousculer un non-porteur ; exact, `SHOVE_PUSH_CELLS` = 1),
+   **« Disarm the ball »** (bousculer le porteur, écarts 61 et 63). **Deux boutons distincts pour une
+   seule action du moteur** (`shove`), choisis selon que la cible porte le ballon : jamais les deux
+   sur la même cible. **Le mélange « ball » et « Payload » est voulu** (sa réponse) : « Disarm the
+   ball » sur ce bouton, « Payload » partout ailleurs. **Les pieds restants** (« 40 ft left ») vont
+   au bout de la route tracée au survol d'une case, plus dans un panneau.
+4. **Les réglages, tous derrière la roue ⚙** (sa réponse : « avec tout dedans », rien d'autre dans
+   la barre). Un panneau déroulant qui ne bloque pas le jeu, fermé au clic à côté : Replay (Slow,
+   Normal, Instant), View (3D, 2D), Camera (Close in, Whole silo, qui quitte le coin du plateau),
+   **trois volumes séparés** (Crowd, Announcer, Effects, à la place du bouton « Sound on »),
+   Fullscreen, Rules, la liste des touches, puis sous un trait « Hand my Giff to the house » et
+   « Leave the match » (au propriétaire seul), chacun avec sa confirmation d'aujourd'hui.
+5. **Le fil.** Un bandeau sans boîte en bas à gauche, au-dessus de la rangée : **3 lignes au
+   portable, 4 au 27 pouces** ; texte blanc avec ombre portée, noms à la couleur de l'équipe ;
+   **chaque ligne s'efface au bout d'environ 8 s**, les buts et les évacuations restent deux fois plus
+   et en gras. **L'historique complet** dans un tiroir qui glisse de la gauche, bouton « Log » et
+   touche L, groupé par round ; le jeu continue derrière, le chrono tourne.
+6. **La fiche et les chances.** **La fiche d'un pion s'ouvre au clic, jamais au survol** (sa
+   correction : « j'ai peur que ce soit trop ») : sélectionner un pion hors d'un clic d'action ouvre
+   sa fiche ; si une action est possible sur lui, ses étiquettes s'ouvrent en même temps ; un clic
+   au sol ou Échap la ferme. **Elle s'affiche dans un coin fixe, en haut à gauche sous le chrono**,
+   pour ne pas s'empiler sur les étiquettes. Elle porte PV, AC, Melee, Throw, Dex et l'état (porte le
+   ballon, esquive, planté, Réaction prête). **Le pourcentage exact de réussite sur chaque
+   étiquette**, calculé côté client avec les règles du moteur (son « oui » sans réserve) : Swing,
+   d20 + `might` contre l'AC, au carré si la cible esquive ; Shove 1 square et Disarm the ball,
+   `opposedRoll` de `combat.ts` (d20 + `might` contre d20 + le meilleur de `might` et `agility`,
+   l'égalité au défenseur, désavantage et −3 contre un Bulwark planté) ; Bat a Cracker contre
+   `CRACKER_AC` ; Pass et Shoot avec la règle de lancer du moteur. Couleurs : **vert à partir de
+   60 %, ambre de 35 à 60, rouge en dessous**. Au survol d'une étiquette, une ligne dit ce que fait
+   l'action (« Blast-bat, 1d8+4 damage. You recoil 2 squares. »). **Un module pur et testé**, qui
+   lit `statsFor` et les constantes du moteur, jamais une seconde copie des chiffres.
+7. **La minicarte et les plaques.** La minicarte reste en haut à droite, **se replie d'un clic** et
+   à la touche M, **retient le choix** (`localStorage`), suit la taille de l'écran, et **un clic
+   dessus déplace la caméra**. **Les plaques** s'écartent verticalement quand les pions se touchent,
+   **restent dans l'écran** (ramenées au bord au lieu d'être coupées), **se réduisent en vue large**
+   à la lettre du rôle et aux PV, le nom complet au zoom rapproché et sur le pion sélectionné, et
+   **portent le prénom du joueur humain** (dette de 2H.33 soldée).
+8. **Ce qui flotte.** Les bandeaux (but, KO, Spark, round, « Your turn ») restent au centre, un à
+   la fois, un peu plus petits au portable. **La carte du coup de dés (`Announce.tsx`) disparaît**
+   (son mot : « elle ne sert pas pour l'instant ») : le résultat se lit dans les mots qui montent
+   au-dessus des têtes. **La question de place prend la place de la rangée d'actions**, sur une
+   seule ligne transparente, sans voile ni boîte, avec son chrono ; **il y insiste : « il faut
+   pouvoir voir le terrain et les joueurs pendant qu'on demande de choisir, car c'est une décision
+   stratégique »**. Donc la caméra reste entièrement libre pendant le choix (tourner, zoomer,
+   minicarte, pastilles, sélection d'un pion), et **le survol de 1st, 2nd ou 3rd montre dans la file
+   du haut où il s'insérerait** ; Échap vaut « dernier », comme aujourd'hui. **Le Dash tenu**
+   s'affiche sur son propre bouton (« Dash · held · cancel »). Les deux confirmations (abandon,
+   siège remis) restent au centre et bloquent. **Les notes du chrono** (« Default initiative · you
+   go last ») passent dans le fil. Le briefing n'est pas touché.
+9. **Le clavier.** **1 à 9** pour les actions de la rangée, ou pour les étiquettes quand une cible
+   est sélectionnée, le chiffre affiché dans le coin de chaque bouton ; **E pour End turn, en deux
+   appuis** (le premier allume « Press E again », trois secondes) ; Échap annule et ferme ; **C**
+   recentre (« Follow the play ») ; **L** le fil ; **M** la minicarte ; **F** le plein écran ; les
+   flèches pour la caméra, comme aujourd'hui. Rien ne se déclenche dans un champ de saisie, ni hors
+   de son tour sauf la caméra, le fil et la minicarte.
+10. **La coop et les ordres.** Le coin du chrono, en haut à gauche, dit qui a la main : **« Your
+    turn · 118s »** en laiton, **« Sarn · Marc · 42s »** en cyan pour un coéquipier humain (nom du
+    pion, prénom du joueur), **« The House »** en magenta, **« Spectating »** quand il a remis son
+    pion ; la pastille en cours porte la même couleur. Pendant le tour d'un autre, **la rangée
+    d'actions disparaît**. **« Call for the ball »**, un ordre qui ne coûte rien, va **à gauche de la
+    rangée, en contour seul, séparé des actions par un trait**.
+
+**Ce qui part avec ce lot, décidé avant.** **n8** (rapport 10) : `password_min_length` à 8 par
+l'API de gestion (`/v1/projects/{ref}/config/auth`, PATCH, sur son feu vert) et les deux écrans
+qui disent « At least 6 characters » (`SignIn.tsx`, `AccountMenu.tsx`) dans le même redéploiement.
+**Le client redéployé** emporte aussi le traitement du 503 « could not read the match » écrit le
+2026-10-19 dans `useMatch.send` (`resolve-action` v30 est déjà en ligne).
+
+**Trois précisions du fil principal, dans l'esprit des dix points, à lui relire en livrant.**
+(a) **Shoot et Catch the Spark vont dans la rangée du bas**, avec leur pourcentage : leur cible est
+unique (la bouche adverse, la case du Spark sous ses pieds), un clic sur une cible n'apporterait
+rien ; **Pass** reste une étiquette sur le coéquipier visé ; **Dig in** va dans la rangée. (b)
+**« Plot route »** (la route à points de passage de 2H.7, avec Go et Clear) n'a pas été discuté :
+il reste dans la rangée du bas, à droite des actions, Go et Clear apparaissant à côté quand il est
+allumé. (c) **L'écran reste en anglais**, comme le jeu : « Your turn », pas « À toi ».
+
+**Ce que la maquette a de faux, à ne pas recopier.** La caméra y est une image fixe ; les étiquettes
+s'y ouvrent même hors de portée, pour la démonstration ; les lignes du fil sont des exemples ;
+« Marc » est un coéquipier inventé, posé sur Sarn ; la 2D n'y est pas.
+
+**Comment elle a été faite**, pour la refaire si l'aspect bouge : une spec jetable (supprimée) a
+ouvert le match e2e en 3D aux deux tailles, caché par CSS tout le DOM sauf le canvas en le collant
+sous une barre de 84 × `--u` px, capturé la scène, et lu par le crochet l'état, `legalSummary` et
+`cellToScreen` de chaque pion ; un script Python a ajusté l'homographie du sol (erreur maximale
+0,09 px sur quatorze pions) pour placer les cases atteignables, les Crackers et le Spark.
+
+**Ce qu'il faut toucher, lu dans le code**, pour le chat suivant : `screens/Match.tsx` (la
+disposition ; les hooks restent au-dessus du retour anticipé), `match/ActionBar.tsx` (devient la
+rangée et les étiquettes), `match/TurnStrip.tsx` (devient la ligne 2 de la barre ; `ladderRungs`
+reste la source de l'ordre), `match/Ladder.tsx` et `match/Announce.tsx` (retirés),
+`match/SeatPanel.tsx` (devient la fiche), `match/Feed.tsx` (bandeau et tiroir),
+`match/PlacePrompt.tsx` (dans la rangée), `board3d/Labels.tsx` (plaques), `board3d/Minimap.tsx`,
+le cadrage de `board3d/framing.ts` (la marge du bas), `match/sound.ts` (trois gains),
+`match/Board.tsx` pour la 2D, `theme.css`. Nouveaux, purs et testés : les chances (par exemple
+`match/odds.ts`), le clavier, l'écart des plaques. **Le harnais change avec** : `smoke.spec.ts`,
+`board3d.spec.ts`, `coop.spec.ts`, `abandon.spec.ts` et le crochet lisent des `data-testid`
+(« view-toggle », « zoom-toggle », la popup de place, le bandeau) qui déménagent dans le panneau ⚙
+ou la rangée. **Sous-agents possibles** (08 §9), fichiers disjoints, brief fermé : le module des
+chances et ses tests, le clavier, le tiroir du fil, le panneau ⚙ ; le fil principal tient
+`Match.tsx`, la rangée, le cadrage, le harnais.
+
+**Sa porte** : tests verts, smoke 2D et `e2e:board3d` verts avec une capture par élément neuf aux
+deux tailles (Playwright à 1536 × 695 et 2560 × 1271), **son feu vert de redéploiement du client
+et de n8**, puis **sa partie sur son portable et sur son 27 pouces**, et son verdict : le plateau se
+voit, on comprend quoi faire sans lire, et le choix de place se fait en regardant le jeu.

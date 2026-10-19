@@ -1,0 +1,672 @@
+<meta charset="utf-8">
+<title>Boomball, écran de match</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: la page de revue (réglages en français) au-dessus d'un écran de match à la taille réelle de chaque écran de Jérôme, mis à l'échelle. */
+:root {
+  --own: #3ce0f0;
+  --foe: #ff56dc;
+  --brass: #c9b489;
+  --brass-dim: #8a6a2f;
+  --text: #e9f0f2;
+  --text-dim: #8ea1a9;
+  --text-faint: #6b7c84;
+  --line: #2b3439;
+  --panel: #10161a;
+  --shell: #0b0f12;
+  --page: #07080a;
+  --good: #6fd49a;
+  --warn: #d8a12a;
+  --bad: #ff6b5e;
+  --glass: rgb(10 14 17 / 62%);
+  --glass-strong: rgb(10 14 17 / 86%);
+  --display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font-family: var(--sans); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 32px; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+/* ---------- la page de revue ---------- */
+.review { max-width: 1700px; margin: 0 auto 14px; display: grid; gap: 10px; }
+.review h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(24px, 3vw, 34px); letter-spacing: .03em; text-transform: uppercase; }
+.review h1 span { color: var(--brass); }
+.ctrls { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; }
+.ctrl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ctrl > b { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); font-weight: 500; margin-right: 4px; }
+.ctrl button { background: transparent; border: 1px solid var(--line); padding: 6px 10px; font-family: var(--mono); font-size: 12px; cursor: pointer; color: var(--text-dim); }
+.ctrl button[aria-pressed="true"] { color: var(--brass); border-color: var(--brass); }
+.ctrl button:hover { color: var(--text); }
+.try { margin: 0; color: var(--text-dim); font-size: 13px; line-height: 1.5; max-width: 110ch; }
+.try kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); padding: 0 5px; color: var(--text); }
+.stagewrap { max-width: 1700px; margin: 0 auto; position: relative; overflow: hidden; }
+
+/* ---------- l'écran de match ---------- */
+.frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #05070a; overflow: hidden; --u: 1; font-family: var(--sans); user-select: none; }
+.u { }
+.bar { position: absolute; left: 0; right: 0; top: 0; height: calc(84px * var(--u)); background: linear-gradient(#0d1216, #0a0e11); border-bottom: 1px solid var(--line); display: grid; grid-template-rows: calc(44px * var(--u)) 1fr; z-index: 20; }
+.row1 { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 calc(14px * var(--u)); }
+.team { display: flex; align-items: center; gap: calc(10px * var(--u)); min-width: 0; }
+.team.right { justify-content: flex-end; }
+.hex { width: calc(30px * var(--u)); height: calc(30px * var(--u)); clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: calc(13px * var(--u)); color: #05070a; }
+.hex.own { background: var(--own); } .hex.foe { background: var(--foe); }
+.tname { font-family: var(--display); font-weight: 800; font-size: calc(20px * var(--u)); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.tsub { font-family: var(--mono); font-size: calc(10px * var(--u)); letter-spacing: .14em; color: var(--text-faint); text-transform: uppercase; }
+.score { text-align: center; line-height: 1; }
+.score .n { font-family: var(--display); font-weight: 800; font-size: calc(30px * var(--u)); }
+.score .n i { font-style: normal; color: var(--text-faint); padding: 0 calc(8px * var(--u)); }
+.score .own { color: var(--own); } .score .foe { color: var(--foe); }
+.score .r { font-family: var(--mono); font-size: calc(10px * var(--u)); letter-spacing: .16em; color: var(--text-dim); margin-top: calc(2px * var(--u)); }
+.gear { margin-left: calc(14px * var(--u)); width: calc(32px * var(--u)); height: calc(32px * var(--u)); border: 1px solid var(--line); background: transparent; color: var(--text-dim); font-size: calc(18px * var(--u)); cursor: pointer; display: grid; place-items: center; }
+.gear[aria-expanded="true"] { color: var(--brass); border-color: var(--brass); }
+.row2 { display: flex; align-items: center; gap: calc(5px * var(--u)); padding: 0 calc(14px * var(--u)); overflow: hidden; border-top: 1px solid rgb(43 52 57 / 50%); }
+.chip { flex: none; display: flex; align-items: center; gap: calc(5px * var(--u)); height: calc(26px * var(--u)); padding: 0 calc(8px * var(--u)); border: 1px solid; font-family: var(--mono); font-size: calc(12px * var(--u)); font-weight: 600; cursor: pointer; background: transparent; color: var(--text); transition: opacity .2s, transform .2s; }
+.chip .rl { font-family: var(--display); font-weight: 800; font-size: calc(15px * var(--u)); }
+.chip.A { border-color: rgb(60 224 240 / 55%); } .chip.A .rl { color: var(--own); }
+.chip.B { border-color: rgb(255 86 220 / 55%); } .chip.B .rl { color: var(--foe); }
+.chip.haz { border-color: rgb(216 161 42 / 60%); color: var(--warn); }
+.chip.spark { border-color: rgb(255 252 232 / 50%); color: #fffce8; }
+.chip .you { font-size: calc(9px * var(--u)); letter-spacing: .12em; padding: 1px calc(4px * var(--u)); background: var(--brass); color: #05070a; }
+.chip .who { font-size: calc(9px * var(--u)); letter-spacing: .08em; padding: 1px calc(4px * var(--u)); border: 1px solid var(--own); color: var(--own); }
+.chip.played { opacity: .38; }
+.chip.next { border-style: dashed; opacity: .6; }
+.chip.cur { height: calc(34px * var(--u)); padding: 0 calc(12px * var(--u)); font-size: calc(15px * var(--u)); border: 2px solid var(--brass); box-shadow: 0 0 calc(12px * var(--u)) rgb(201 180 137 / 35%); }
+.chip.cur .rl { font-size: calc(19px * var(--u)); }
+.chip.ghost { border: 2px dashed var(--brass); color: var(--brass); }
+.chip.more { border-color: var(--line); color: var(--text-dim); cursor: default; }
+.sep { flex: none; font-family: var(--mono); font-size: calc(10px * var(--u)); letter-spacing: .14em; color: var(--text-faint); padding: 0 calc(6px * var(--u)); border-left: 1px solid var(--line); margin-left: calc(4px * var(--u)); }
+.arrow { flex: none; color: var(--text-faint); font-size: calc(11px * var(--u)); }
+
+.board { position: absolute; left: 0; right: 0; bottom: 0; top: calc(84px * var(--u)); background-size: 100% 100%; overflow: hidden; }
+.board svg.paint { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.plate { position: absolute; transform: translate(-50%, 0); white-space: nowrap; font-family: var(--mono); font-size: calc(11px * var(--u)); font-weight: 600; padding: calc(1px * var(--u)) calc(5px * var(--u)); background: rgb(5 7 10 / 78%); border: 1px solid; pointer-events: none; display: flex; gap: calc(4px * var(--u)); align-items: center; }
+.plate.A { border-color: rgb(60 224 240 / 70%); } .plate.B { border-color: rgb(255 86 220 / 70%); }
+.plate .rl { font-family: var(--display); font-weight: 800; font-size: calc(13px * var(--u)); }
+.plate.A .rl { color: var(--own); } .plate.B .rl { color: var(--foe); }
+.plate .hp { color: var(--text-dim); }
+.plate.me { border-color: var(--brass); }
+.plate .tag { font-size: calc(8px * var(--u)); letter-spacing: .1em; padding: 0 calc(3px * var(--u)); background: var(--brass); color: #05070a; }
+.plate .tag.mate { background: transparent; border: 1px solid var(--own); color: var(--own); }
+.plate.sel { z-index: 3; border-width: 2px; }
+.hot { position: absolute; width: calc(40px * var(--u)); height: calc(54px * var(--u)); transform: translate(-50%, -78%); cursor: pointer; border-radius: 40%; }
+.hot.cr { width: calc(30px * var(--u)); height: calc(30px * var(--u)); transform: translate(-50%, -50%); border-radius: 50%; }
+.glow { position: absolute; width: calc(46px * var(--u)); height: calc(20px * var(--u)); transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid var(--brass); box-shadow: 0 0 calc(14px * var(--u)) var(--brass); pointer-events: none; }
+
+.clock { position: absolute; left: calc(14px * var(--u)); top: calc(12px * var(--u)); display: flex; align-items: center; gap: calc(10px * var(--u)); padding: calc(6px * var(--u)) calc(12px * var(--u)) calc(6px * var(--u)) calc(6px * var(--u)); background: var(--glass); border-left: 3px solid var(--brass); z-index: 10; }
+.clock.mate { border-left-color: var(--own); } .clock.foe { border-left-color: var(--foe); }
+.ring { width: calc(34px * var(--u)); height: calc(34px * var(--u)); }
+.clock .who { font-family: var(--display); font-weight: 800; font-size: calc(19px * var(--u)); letter-spacing: .05em; text-transform: uppercase; line-height: 1; }
+.clock.me .who { color: var(--brass); } .clock.mate .who { color: var(--own); }
+.clock .sub { font-family: var(--mono); font-size: calc(10px * var(--u)); letter-spacing: .12em; color: var(--text-dim); text-transform: uppercase; margin-top: calc(3px * var(--u)); }
+
+.card { position: absolute; left: calc(14px * var(--u)); top: calc(70px * var(--u)); width: calc(250px * var(--u)); background: var(--glass-strong); border: 1px solid var(--line); border-top: 2px solid; padding: calc(10px * var(--u)) calc(12px * var(--u)); z-index: 10; display: grid; gap: calc(6px * var(--u)); }
+.card.A { border-top-color: var(--own); } .card.B { border-top-color: var(--foe); }
+.card .h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.card .nm { font-family: var(--display); font-weight: 800; font-size: calc(18px * var(--u)); letter-spacing: .04em; text-transform: uppercase; }
+.card .tm { font-family: var(--mono); font-size: calc(10px * var(--u)); color: var(--text-dim); letter-spacing: .1em; text-transform: uppercase; }
+.card .st { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(4px * var(--u)) calc(10px * var(--u)); font-family: var(--mono); font-size: calc(11px * var(--u)); color: var(--text-dim); }
+.card .st b { color: var(--text); font-weight: 600; }
+.card .state { font-family: var(--mono); font-size: calc(10px * var(--u)); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.card .x { font-family: var(--mono); font-size: calc(9px * var(--u)); color: var(--text-faint); }
+
+.mini { position: absolute; right: calc(14px * var(--u)); top: calc(12px * var(--u)); z-index: 10; }
+.mini .box { width: calc(240px * var(--u)); background: var(--glass); border: 1px solid var(--line); padding: calc(6px * var(--u)); cursor: crosshair; }
+.mini svg { display: block; width: 100%; height: auto; }
+.mini .tog { position: absolute; right: 0; top: calc(-1px * var(--u)); transform: translateY(-100%); background: var(--glass); border: 1px solid var(--line); border-bottom: none; font-family: var(--mono); font-size: calc(10px * var(--u)); padding: calc(2px * var(--u)) calc(6px * var(--u)); color: var(--text-dim); cursor: pointer; }
+.mini.closed .tog { position: static; transform: none; border-bottom: 1px solid var(--line); padding: calc(6px * var(--u)) calc(10px * var(--u)); }
+
+.feed { position: absolute; left: calc(16px * var(--u)); bottom: calc(66px * var(--u)); display: grid; gap: calc(3px * var(--u)); z-index: 9; max-width: calc(520px * var(--u)); pointer-events: none; }
+.line { font-size: calc(13px * var(--u)); color: var(--text); text-shadow: 0 1px 2px #000, 0 0 8px #000, 0 0 2px #000; transition: opacity 1.2s ease, transform .4s ease; }
+.line.A b { color: var(--own); } .line.B b { color: var(--foe); }
+.line.big { font-weight: 700; font-size: calc(15px * var(--u)); }
+.line.out { opacity: 0; }
+.logbtn { position: absolute; left: calc(16px * var(--u)); bottom: calc(14px * var(--u)); z-index: 11; }
+
+.row { position: absolute; left: 0; right: 0; bottom: 0; height: calc(62px * var(--u)); display: flex; align-items: center; gap: calc(8px * var(--u)); padding: 0 calc(16px * var(--u)); z-index: 11; }
+.row .spacer { flex: 1; }
+.act { position: relative; height: calc(38px * var(--u)); padding: 0 calc(14px * var(--u)); background: var(--glass); border: 1px solid rgb(233 240 242 / 22%); font-family: var(--display); font-weight: 700; font-size: calc(16px * var(--u)); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: background .15s, border-color .15s; backdrop-filter: blur(2px); }
+.act:hover, .act.flash { background: var(--glass-strong); border-color: var(--text); }
+.act .k { position: absolute; left: calc(4px * var(--u)); top: calc(2px * var(--u)); font-family: var(--mono); font-size: calc(9px * var(--u)); color: var(--text-faint); font-weight: 500; letter-spacing: 0; }
+.act.order { background: transparent; border: 1px dashed rgb(60 224 240 / 60%); color: var(--own); font-size: calc(14px * var(--u)); }
+.act.end { border-color: var(--brass); color: var(--brass); min-width: calc(150px * var(--u)); }
+.act.end.armed { background: var(--brass); color: #05070a; }
+.act.held { background: rgb(201 180 137 / 22%); border-color: var(--brass); color: var(--brass); }
+.vr { width: 1px; height: calc(30px * var(--u)); background: var(--line); }
+.left-pad { width: calc(70px * var(--u)); flex: none; }
+.ask { font-family: var(--mono); font-size: calc(12px * var(--u)); letter-spacing: .14em; color: var(--brass); text-transform: uppercase; text-shadow: 0 1px 3px #000; }
+.place { min-width: calc(110px * var(--u)); border-color: var(--brass); }
+.place:hover { background: rgb(201 180 137 / 25%); }
+.pclock { font-family: var(--mono); font-size: calc(13px * var(--u)); color: var(--brass); text-shadow: 0 1px 3px #000; }
+
+.tl { position: absolute; z-index: 12; display: grid; gap: calc(4px * var(--u)); }
+.tlab { position: relative; display: flex; align-items: center; gap: calc(8px * var(--u)); height: calc(30px * var(--u)); padding: 0 calc(10px * var(--u)); background: var(--glass-strong); border: 1px solid rgb(233 240 242 / 25%); border-left: 3px solid; font-family: var(--display); font-weight: 700; font-size: calc(15px * var(--u)); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.tlab .p { font-family: var(--mono); font-weight: 600; font-size: calc(13px * var(--u)); letter-spacing: 0; }
+.tlab.g { border-left-color: var(--good); } .tlab.g .p { color: var(--good); }
+.tlab.w { border-left-color: var(--warn); } .tlab.w .p { color: var(--warn); }
+.tlab.r { border-left-color: var(--bad); } .tlab.r .p { color: var(--bad); }
+.tlab .k { font-family: var(--mono); font-size: calc(9px * var(--u)); color: var(--text-faint); font-weight: 500; }
+.tlab .why { display: none; position: absolute; left: 0; top: 100%; margin-top: calc(3px * var(--u)); width: calc(260px * var(--u)); white-space: normal; font-family: var(--sans); font-weight: 400; font-size: calc(12px * var(--u)); letter-spacing: 0; text-transform: none; background: var(--glass-strong); border: 1px solid var(--line); padding: calc(6px * var(--u)) calc(8px * var(--u)); color: var(--text-dim); z-index: 2; }
+.tlab:hover .why { display: block; }
+
+.ftleft { position: absolute; transform: translate(10%, -210%); font-family: var(--mono); font-size: calc(12px * var(--u)); font-weight: 600; color: var(--text); background: var(--glass-strong); border: 1px solid var(--brass); padding: calc(2px * var(--u)) calc(6px * var(--u)); pointer-events: none; white-space: nowrap; z-index: 8; }
+
+.drawer { position: absolute; left: 0; top: 0; bottom: 0; width: calc(380px * var(--u)); background: rgb(8 11 14 / 90%); border-right: 1px solid var(--line); z-index: 15; transform: translateX(-102%); transition: transform .25s ease; display: flex; flex-direction: column; }
+.drawer.open { transform: none; }
+.drawer header { display: flex; justify-content: space-between; align-items: center; padding: calc(12px * var(--u)) calc(14px * var(--u)); border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: calc(11px * var(--u)); letter-spacing: .14em; color: var(--text-dim); text-transform: uppercase; }
+.drawer .lst { overflow: auto; padding: calc(8px * var(--u)) calc(14px * var(--u)); display: grid; gap: calc(4px * var(--u)); font-size: calc(13px * var(--u)); }
+.drawer .rd { font-family: var(--mono); font-size: calc(11px * var(--u)); color: var(--text-faint); margin-top: calc(8px * var(--u)); }
+.drawer .A b { color: var(--own); } .drawer .B b { color: var(--foe); }
+.ghostbtn { background: transparent; border: 1px solid var(--line); font-family: var(--mono); font-size: calc(11px * var(--u)); letter-spacing: .1em; padding: calc(4px * var(--u)) calc(9px * var(--u)); color: var(--text-dim); cursor: pointer; text-transform: uppercase; }
+.ghostbtn:hover { color: var(--text); }
+.logbtn.ghostbtn { background: var(--glass); }
+
+.settings { position: absolute; right: calc(14px * var(--u)); top: calc(78px * var(--u)); width: calc(330px * var(--u)); background: var(--glass-strong); border: 1px solid var(--line); z-index: 30; padding: calc(10px * var(--u)) calc(14px * var(--u)); display: grid; gap: calc(9px * var(--u)); font-size: calc(13px * var(--u)); }
+.settings .ln { display: grid; grid-template-columns: calc(90px * var(--u)) 1fr; align-items: center; gap: calc(8px * var(--u)); }
+.settings .ln > span { font-family: var(--mono); font-size: calc(10px * var(--u)); letter-spacing: .12em; color: var(--text-dim); text-transform: uppercase; }
+.seg { display: flex; }
+.seg button { flex: 1; background: transparent; border: 1px solid var(--line); margin-left: -1px; font-family: var(--mono); font-size: calc(11px * var(--u)); padding: calc(4px * var(--u)) 0; color: var(--text-dim); cursor: pointer; text-transform: uppercase; }
+.seg button[aria-pressed="true"] { color: var(--brass); border-color: var(--brass); position: relative; }
+.vol { display: grid; grid-template-columns: calc(78px * var(--u)) 1fr; align-items: center; gap: 6px; font-size: calc(12px * var(--u)); color: var(--text-dim); }
+.vol input { width: 100%; accent-color: var(--brass); }
+.settings hr { border: 0; border-top: 1px solid var(--line); margin: calc(2px * var(--u)) 0; width: 100%; }
+.settings .danger { text-align: left; background: transparent; border: 0; padding: calc(3px * var(--u)) 0; color: var(--bad); cursor: pointer; font-size: calc(13px * var(--u)); }
+.settings .plain { text-align: left; background: transparent; border: 0; padding: calc(3px * var(--u)) 0; color: var(--text); cursor: pointer; font-size: calc(13px * var(--u)); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: calc(2px * var(--u)) calc(10px * var(--u)); font-size: calc(12px * var(--u)); color: var(--text-dim); }
+.keys kbd { font-family: var(--mono); font-size: calc(10px * var(--u)); border: 1px solid var(--line); padding: 0 calc(4px * var(--u)); color: var(--text); justify-self: start; }
+
+.banner { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(.96); font-family: var(--display); font-weight: 800; font-size: calc(64px * var(--u)); letter-spacing: .06em; text-transform: uppercase; color: #fff; text-shadow: 0 0 calc(24px * var(--u)) var(--own), 0 2px 4px #000; opacity: 0; transition: opacity .35s, transform .35s; pointer-events: none; z-index: 25; white-space: nowrap; }
+.banner small { display: block; text-align: center; font-size: .4em; letter-spacing: .2em; color: var(--own); }
+.banner.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+.modal { position: absolute; inset: 0; background: rgb(0 0 0 / 45%); display: grid; place-items: center; z-index: 40; }
+.modal .m { width: calc(380px * var(--u)); background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--bad); padding: calc(16px * var(--u)); display: grid; gap: calc(10px * var(--u)); font-size: calc(14px * var(--u)); }
+.modal .m h3 { margin: 0; font-family: var(--display); font-size: calc(22px * var(--u)); text-transform: uppercase; letter-spacing: .04em; }
+.modal .m p { margin: 0; color: var(--text-dim); }
+.modal .bt { display: flex; gap: 8px; justify-content: flex-end; }
+
+.note { position: absolute; left: 50%; bottom: calc(76px * var(--u)); transform: translateX(-50%); background: rgb(30 24 10 / 92%); border: 1px dashed var(--warn); color: #f4dfa8; font-size: calc(13px * var(--u)); padding: calc(6px * var(--u)) calc(12px * var(--u)); z-index: 35; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 70%; text-align: center; }
+.note.on { opacity: 1; }
+.pin { position: absolute; width: calc(22px * var(--u)); height: calc(22px * var(--u)); border-radius: 50%; background: var(--warn); color: #05070a; font-family: var(--mono); font-weight: 700; font-size: calc(12px * var(--u)); display: grid; place-items: center; z-index: 50; box-shadow: 0 0 0 2px #05070a; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .line, .banner, .drawer, .chip { transition: none; } }
+</style>
+
+<div class="review">
+  <h1>Écran de match · <span>maquette 2H.38</span></h1>
+  <div class="ctrls">
+    <div class="ctrl" role="group" aria-label="Écran"><b>Écran</b>
+      <button type="button" id="sz-laptop" data-size="laptop" aria-pressed="true">Portable · 1536×695</button>
+      <button type="button" id="sz-desk" data-size="desk" aria-pressed="false">27 pouces · 2560×1271</button>
+    </div>
+    <div class="ctrl" role="group" aria-label="Situation"><b>Situation</b>
+      <button type="button" id="sc-turn" data-scen="turn" aria-pressed="true">Ton tour</button>
+      <button type="button" id="sc-place" data-scen="place" aria-pressed="false">Choix de place</button>
+      <button type="button" id="sc-mate" data-scen="mate" aria-pressed="false">Tour d'un coéquipier</button>
+      <button type="button" id="sc-spect" data-scen="spect" aria-pressed="false">Spectateur</button>
+    </div>
+    <div class="ctrl"><b>Démo</b>
+      <button type="button" id="demo-goal">Simuler un but</button>
+      <button type="button" id="demo-pins" aria-pressed="false">Numéros des points</button>
+    </div>
+  </div>
+  <p class="try">Plateau réel du match du compte de test (round 8), capturé aux deux tailles. Essaie : clique un pion (fiche, et étiquettes d'action sur un adversaire ou un Cracker), survole une case bleue (les pieds restants), <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> pour les actions, <kbd>E</kbd> deux fois pour finir le tour, <kbd>L</kbd> le fil, <kbd>M</kbd> la minicarte, <kbd>C</kbd> recentrer, <kbd>Échap</kbd>, la roue ⚙, et une pastille en haut. Les étiquettes s'ouvrent ici même hors de portée, pour la démonstration.</p>
+</div>
+<div class="stagewrap" id="wrap"><div class="frame" id="frame"></div></div>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  const SIZES = {
+    laptop: { W: 1536, H: 695, u: 1, img: 'laptop.jpg' },
+    desk: { W: 2560, H: 1271, u: 1.4, img: 'desk.jpg' },
+  };
+  const STATS = {
+    striker: { hp: 50, ac: 15, might: 4, aim: 11, agility: 8 },
+    breaker: { hp: 85, ac: 14, might: 8, aim: 5, agility: 3 },
+    bulwark: { hp: 70, ac: 25, might: 5, aim: 4, agility: 4 },
+    trajector: { hp: 45, ac: 16, might: 2, aim: 11, agility: 10 },
+  };
+  const LETTER = { striker: 'S', breaker: 'B', bulwark: 'W', trajector: 'T' };
+  const ROLE = { striker: 'Striker', breaker: 'Breaker', bulwark: 'Bulwark', trajector: 'Trajector' };
+  const ME = 'A-striker-2';
+  const MATE = 'A-striker-3';
+  const MATE_NAME = 'Marc';
+  const TEAM = { A: 'E2E Battery', B: 'The House' };
+
+  const S = { size: 'laptop', scen: 'turn', sel: null, map: true, log: false, gear: false, armed: false, dash: false, place: 2, clock: 118, pclock: 15, pins: false, hoverChip: null, hoverCell: null };
+  try { const m = localStorage.getItem('bb-mock-map'); if (m === '0') S.map = false; } catch (e) {}
+
+  const wrap = document.getElementById('wrap');
+  const frame = document.getElementById('frame');
+  const D = () => MOCK[S.size];
+  const unit = (id) => D().units.find((u) => u.id === id);
+  const short = (u) => u.name.split(' ')[0];
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---- chances, from the engine's own rules ----
+  function swingP(ac, dodging) { const p = Math.max(0, Math.min(20, 21 - (ac - 4))) / 20; return dodging ? p * p : p; }
+  function opposed(bonus, def) { let w = 0; for (let a = 1; a <= 20; a++) for (let b = 1; b <= 20; b++) if (a + bonus > b + def) w++; return w / 400; }
+  const pct = (p) => Math.round(p * 100);
+  const band = (p) => (p >= 0.6 ? 'g' : p >= 0.35 ? 'w' : 'r');
+
+  // ---- the order of the round ----
+  function orderChips() {
+    const d = D();
+    const slots = d.turnOrder.map((o) => (o.actor.kind === 'unit' ? { id: o.actor.unitId } : { kind: o.actor.kind }));
+    let cur = d.turnIndex; // Giff
+    let list = slots.slice();
+    if (S.scen === 'mate' || S.scen === 'spect') cur = d.turnIndex + 1;
+    if (S.scen === 'place') {
+      const strikers = ['A-striker-4', 'A-striker-3'];
+      strikers.splice(S.place, 0, ME);
+      list = [slots[0], slots[1], ...strikers.map((id) => ({ id, ghost: id === ME })), ...slots.slice(5)];
+      cur = 2;
+    }
+    return { list, cur };
+  }
+  function chipHtml(s, cls) {
+    if (s.kind === 'spark') return `<span class="chip spark ${cls}">✦ Spark</span>`;
+    if (s.kind === 'crackers') return `<span class="chip haz ${cls}">✸ Crackers</span>`;
+    const u = unit(s.id);
+    let tag = '';
+    if (u.id === ME && S.scen !== 'spect') tag = '<span class="you">YOU</span>';
+    if (u.id === ME && S.scen === 'spect') tag = '<span class="who">HOUSE</span>';
+    if (u.id === MATE && S.scen !== 'turn' && S.scen !== 'place') tag = `<span class="who">${MATE_NAME}</span>`;
+    const ghost = s.ghost ? ' ghost' : '';
+    return `<button type="button" class="chip ${u.team} ${cls}${ghost}" data-chip="${u.id}"><span class="rl">${LETTER[u.role]}</span>${esc(short(u))}${tag}</button>`;
+  }
+  function renderOrder() {
+    const { list, cur } = orderChips();
+    const laptop = S.size === 'laptop';
+    let html = '';
+    const shown = [];
+    list.forEach((s, i) => {
+      if (i < cur && laptop) return;
+      shown.push([s, i < cur ? 'played' : i === cur ? 'cur' : '']);
+    });
+    let rest = 0;
+    if (laptop) { rest = Math.max(0, shown.length - 8); shown.length = Math.min(shown.length, 8); }
+    shown.forEach(([s, c], i) => { html += (i ? '<span class="arrow">›</span>' : '') + chipHtml(s, c); });
+    if (rest) html += `<span class="arrow">›</span><span class="chip more">+${rest}</span>`;
+    if (!laptop || rest === 0) {
+      html += `<span class="sep">ROUND ${D().round + 1}</span>`;
+      list.slice(0, laptop ? 2 : 5).forEach((s, i) => { html += (i ? '<span class="arrow">›</span>' : '') + chipHtml({ ...s, ghost: false }, 'next'); });
+    }
+    return html;
+  }
+
+  // ---- render ----
+  function render() {
+    const z = SIZES[S.size], d = D();
+    frame.style.width = z.W + 'px'; frame.style.height = z.H + 'px'; frame.style.setProperty('--u', z.u);
+    const scale = Math.min(1, wrap.clientWidth / z.W);
+    frame.style.transform = `scale(${scale})`;
+    wrap.style.height = z.H * scale + 'px';
+    frame.dataset.scale = scale;
+
+    const myTurn = S.scen === 'turn';
+    const me = unit(ME);
+    let html = '';
+    // bar
+    html += `<div class="bar"><div class="row1">
+      <div class="team"><div class="hex own">EB</div><div><div class="tname">${TEAM.A}</div><div class="tsub">Bench 3 of 3</div></div></div>
+      <div class="score"><div class="n"><span class="own">${d.score.A}</span><i>·</i><span class="foe">${d.score.B}</span></div><div class="r">ROUND ${d.round} OF 10</div></div>
+      <div class="team right"><div style="text-align:right"><div class="tname">${TEAM.B}</div><div class="tsub">Bench 3 of 3</div></div><div class="hex foe">HS</div>
+        <button type="button" class="gear" id="gear" aria-expanded="${S.gear}" aria-label="Settings">⚙</button></div>
+    </div><div class="row2" id="order">${renderOrder()}</div></div>`;
+
+    // board
+    html += `<div class="board" id="board" style="background-image:url(${z.img})"><svg class="paint" id="paint"></svg><div id="layer"></div>`;
+    // clock
+    let clock;
+    if (S.scen === 'turn') clock = `<div class="clock me">${ring(S.clock / 120)}<div><div class="who">Your turn</div><div class="sub">${S.clock}s · Giff, Striker</div></div></div>`;
+    else if (S.scen === 'place') clock = `<div class="clock me">${ring(S.pclock / 15)}<div><div class="who">Choose your place</div><div class="sub">${S.pclock}s · Strikers this round</div></div></div>`;
+    else if (S.scen === 'mate') clock = `<div class="clock mate">${ring(0.35)}<div><div class="who">Sarn · ${MATE_NAME}</div><div class="sub">42s · your team-mate plays</div></div></div>`;
+    else clock = `<div class="clock mate">${ring(0.35)}<div><div class="who">Spectating</div><div class="sub">Sarn · ${MATE_NAME} plays · 42s</div></div></div>`;
+    html += clock;
+    // card
+    if (S.sel) html += cardHtml(S.sel);
+    // minimap
+    html += S.map
+      ? `<div class="mini"><button type="button" class="tog" id="maptog">M · hide</button><div class="box" id="mapbox">${miniSvg()}</div></div>`
+      : `<div class="mini closed"><button type="button" class="tog" id="maptog">▣ Map · M</button></div>`;
+    // feed
+    html += `<div class="feed" id="feed"></div><button type="button" class="ghostbtn logbtn" id="logbtn">Log · L</button>`;
+    // row
+    html += `<div class="row">${rowHtml()}</div>`;
+    // drawer, banner, note
+    html += `<div class="drawer ${S.log ? 'open' : ''}" id="drawer"><header><span>The call · whole match</span><button type="button" class="ghostbtn" id="logclose">Close · L</button></header><div class="lst">${logHtml()}</div></div>`;
+    html += `<div class="banner" id="banner"></div></div>`;
+    html += `<div class="note" id="note"></div>`;
+    if (S.gear) html += settingsHtml();
+    frame.innerHTML = html;
+    paintBoard();
+    renderFeed(false);
+    if (S.pins) drawPins();
+    bind();
+  }
+
+  function ring(f) {
+    const r = 15, c = 2 * Math.PI * r;
+    const col = S.scen === 'turn' || S.scen === 'place' ? 'var(--brass)' : 'var(--own)';
+    return `<svg class="ring" viewBox="0 0 34 34"><circle cx="17" cy="17" r="${r}" fill="none" stroke="#2b3439" stroke-width="3"/><circle cx="17" cy="17" r="${r}" fill="none" stroke="${col}" stroke-width="3" stroke-dasharray="${c * f} ${c}" transform="rotate(-90 17 17)" stroke-linecap="round"/></svg>`;
+  }
+
+  function rowHtml() {
+    if (S.scen === 'mate' || S.scen === 'spect') return '';
+    if (S.scen === 'place') {
+      const names = ['1st', '2nd', '3rd'];
+      return `<div class="left-pad"></div><span class="ask">Play this round as striker</span>` +
+        names.map((n, i) => `<button type="button" class="act place" data-place="${i}"><span class="k">${i + 1}</span>${n}</button>`).join('') +
+        `<span class="pclock">◔ ${S.pclock}s</span><div class="spacer"></div><span class="ask" style="color:var(--text-dim)">Esc · play last</span>`;
+    }
+    const L = D().legal;
+    const acts = [];
+    if (L.canDash) acts.push(['dash', S.dash ? 'Dash · held · cancel' : 'Dash']);
+    if (L.canDodge) acts.push(['dodge', 'Dodge']);
+    if (L.canDisengage) acts.push(['disengage', 'Disengage']);
+    if (L.canGrabPayload) acts.push(['pickup', 'Pick up']);
+    return `<div class="left-pad"></div><button type="button" class="act order" id="call">⟲ Call for the ball</button><div class="vr"></div>` +
+      acts.map(([k, l], i) => `<button type="button" class="act ${k === 'dash' && S.dash ? 'held' : ''}" data-act="${k}"><span class="k">${i + 1}</span>${l}</button>`).join('') +
+      `<div class="spacer"></div><button type="button" class="act end ${S.armed ? 'armed' : ''}" id="end"><span class="k">E</span>${S.armed ? 'Press E again' : 'End turn'}</button>`;
+  }
+
+  function cardHtml(sel) {
+    if (sel.startsWith('cracker')) {
+      return `<div class="card" style="border-top-color:var(--warn)"><div class="h"><span class="nm">Cracker</span><span class="tm">Hazard</span></div><div class="st"><span>AC <b>10</b></span><span>Blast <b>3d6</b></span><span></span></div><div class="state">Rolls toward the ball at count 20</div><div class="x">Esc or a click on the floor closes</div></div>`;
+    }
+    const u = unit(sel), st = STATS[u.role];
+    const states = [];
+    if (u.holding) states.push('Carrying the ball');
+    if (u.dodging) states.push('Dodging');
+    states.push('Reaction ready');
+    const who = u.id === ME ? ' · You' : u.id === MATE && S.scen !== 'turn' && S.scen !== 'place' ? ' · ' + MATE_NAME : '';
+    return `<div class="card ${u.team}"><div class="h"><span class="nm">${LETTER[u.role]} · ${esc(u.name)}</span><span class="tm">${ROLE[u.role]}${who}</span></div>
+      <div class="st"><span>HP <b>${u.hp}/${u.maxHp}</b></span><span>AC <b>${st.ac}</b></span><span>Melee <b>+${st.might}</b></span><span>Throw <b>+${st.aim}</b></span><span>Dex <b>+${st.agility}</b></span><span></span></div>
+      <div class="state">${states.join(' · ')}</div><div class="x">Esc or a click on the floor closes</div></div>`;
+  }
+
+  function miniSvg() {
+    const d = D();
+    let s = `<svg viewBox="-1 -1 47 17" aria-label="Minimap"><rect x="-0.5" y="-0.5" width="45" height="15" fill="#0b1013" stroke="#2b3439" stroke-width=".2"/>`;
+    s += `<rect x="-0.5" y="4.5" width="0.6" height="5" fill="var(--own)"/><rect x="43.9" y="4.5" width="0.6" height="5" fill="var(--foe)"/>`;
+    s += `<line x1="22" y1="-0.5" x2="22" y2="14.5" stroke="#2b3439" stroke-width=".15"/>`;
+    for (const u of d.units) if (u.status === 'active') s += `<circle cx="${u.cell.y}" cy="${u.cell.x}" r="${u.id === ME ? .75 : .55}" fill="${u.team === 'A' ? 'var(--own)' : 'var(--foe)'}" ${u.id === ME ? 'stroke="var(--brass)" stroke-width=".3"' : ''}/>`;
+    for (const c of d.crackers) s += `<rect x="${c.y - .45}" y="${c.x - .45}" width=".9" height=".9" fill="var(--warn)"/>`;
+    const car = unit(d.payload.carriedBy);
+    if (car) s += `<circle cx="${car.cell.y}" cy="${car.cell.x}" r="1.1" fill="none" stroke="#f3c64a" stroke-width=".25"/>`;
+    s += `<circle cx="${d.spark.y}" cy="${d.spark.x}" r=".45" fill="#fffce8"/>`;
+    return s + '</svg>';
+  }
+
+  function settingsHtml() {
+    const owner = true;
+    return `<div class="settings" id="settings">
+      <div class="ln"><span>Replay</span><div class="seg"><button type="button" aria-pressed="false">Slow</button><button type="button" aria-pressed="true">Normal</button><button type="button" aria-pressed="false">Instant</button></div></div>
+      <div class="ln"><span>View</span><div class="seg"><button type="button" aria-pressed="true">3D</button><button type="button" aria-pressed="false" id="to2d">2D</button></div></div>
+      <div class="ln"><span>Camera</span><div class="seg"><button type="button" aria-pressed="false">Close in</button><button type="button" aria-pressed="true">Whole silo</button></div></div>
+      <div class="ln" style="align-items:start"><span>Sound</span><div style="display:grid;gap:4px">
+        <label class="vol" for="v-crowd">Crowd<input id="v-crowd" type="range" min="0" max="100" value="40"></label>
+        <label class="vol" for="v-ann">Announcer<input id="v-ann" type="range" min="0" max="100" value="80"></label>
+        <label class="vol" for="v-fx">Effects<input id="v-fx" type="range" min="0" max="100" value="90"></label></div></div>
+      <div class="ln"><span>Screen</span><button type="button" class="plain" id="fs">Fullscreen · F</button></div>
+      <div class="ln"><span>Help</span><button type="button" class="plain" id="rules">Rules</button></div>
+      <div class="ln" style="align-items:start"><span>Keys</span><div class="keys"><kbd>1–9</kbd><span>actions</span><kbd>E E</kbd><span>end turn</span><kbd>Esc</kbd><span>cancel, close</span><kbd>C</kbd><span>follow the play</span><kbd>L</kbd><span>log</span><kbd>M</kbd><span>minimap</span><kbd>F</kbd><span>fullscreen</span><kbd>← ↑ → ↓</kbd><span>move the camera</span></div></div>
+      <hr><button type="button" class="danger" id="yield" style="color:var(--text)">Hand my Giff to the house</button>
+      ${owner ? '<button type="button" class="danger" id="leave">Leave the match</button>' : ''}
+    </div>`;
+  }
+
+  // ---- the board's overlays ----
+  function boardScale() { return 1; }
+  function paintBoard() {
+    const d = D(), z = SIZES[S.size];
+    const layer = document.getElementById('layer');
+    const paint = document.getElementById('paint');
+    let h = '';
+    // hotspots
+    for (const u of d.units) if (u.status === 'active') h += `<div class="hot" data-unit="${u.id}" style="left:${u.screen.x}px;top:${u.screen.y}px" title=""></div>`;
+    for (const c of d.crackers) h += `<div class="hot cr" data-cr="${c.id}" style="left:${c.screen[0]}px;top:${c.screen[1]}px"></div>`;
+    // glow for hovered chip or selection
+    const g = S.hoverChip || S.sel;
+    if (g && !g.startsWith('cracker')) { const u = unit(g); h += `<div class="glow" style="left:${u.screen.x}px;top:${u.screen.y}px"></div>`; }
+    layer.innerHTML = h;
+    // plates
+    const plates = [];
+    for (const u of d.units) {
+      if (u.status !== 'active') continue;
+      const el = document.createElement('div');
+      const isMe = u.id === ME;
+      const isMate = u.id === MATE && (S.scen === 'mate' || S.scen === 'spect');
+      const full = S.sel === u.id;
+      let inner = `<span class="rl">${LETTER[u.role]}</span>`;
+      if (full) inner += `${esc(u.name)} `;
+      inner += `<span class="hp">${u.hp}</span>`;
+      if (isMe && S.scen !== 'spect') inner += '<span class="tag">YOU</span>';
+      if (isMate) inner += `<span class="tag mate">${MATE_NAME}</span>`;
+      el.className = `plate ${u.team}${isMe ? ' me' : ''}${full ? ' sel' : ''}`;
+      el.innerHTML = inner;
+      layer.appendChild(el);
+      plates.push({ el, x: u.screen.x, y: u.screen.y - 52 * z.u, w: el.offsetWidth, h: el.offsetHeight });
+    }
+    plates.sort((a, b) => b.y - a.y);
+    const placed = [];
+    for (const p of plates) {
+      let y = p.y;
+      let moved = true;
+      while (moved) {
+        moved = false;
+        for (const q of placed) {
+          const overlapX = Math.abs(p.x - q.x) < (p.w + q.w) / 2 + 2;
+          const overlapY = y < q.y + q.h + 2 && y + p.h + 2 > q.y;
+          if (overlapX && overlapY) { y = q.y - p.h - 2; moved = true; }
+        }
+      }
+      y = Math.max(4, y);
+      p.y = y; placed.push(p);
+      p.el.style.left = p.x + 'px'; p.el.style.top = y + 'px';
+    }
+    // targets
+    if (S.sel && S.scen === 'turn') targets(layer);
+    // route preview
+    let svg = '';
+    if (S.hoverCell && S.scen === 'turn') {
+      const me = unit(ME), c = S.hoverCell;
+      svg += `<line x1="${me.screen.x}" y1="${me.screen.y}" x2="${c.screen[0]}" y2="${c.screen[1]}" stroke="#c9b489" stroke-width="${2.5 * z.u}" stroke-dasharray="${6 * z.u} ${5 * z.u}"/>`;
+      svg += `<circle cx="${c.screen[0]}" cy="${c.screen[1]}" r="${9 * z.u}" fill="none" stroke="#c9b489" stroke-width="${2 * z.u}"/>`;
+      const left = (S.dash ? 80 : 40) - c.costFeet;
+      layer.insertAdjacentHTML('beforeend', `<div class="ftleft" style="left:${c.screen[0]}px;top:${c.screen[1]}px">${left} ft left${S.dash ? ' · dash' : ''}</div>`);
+    }
+    paint.innerHTML = svg;
+  }
+
+  function targets(layer) {
+    const me = unit(ME), st = STATS.striker, z = SIZES[S.size];
+    let labs = [], at;
+    if (S.sel.startsWith('cracker')) {
+      const c = D().crackers.find((k) => k.id === S.sel);
+      at = { x: c.screen[0], y: c.screen[1] };
+      const p = swingP(10, false);
+      labs.push(['Bat a Cracker', p, 'Send it up to 12 squares in a line. It blows on the first Giff it meets, either side.']);
+    } else {
+      const u = unit(S.sel);
+      if (u.team === 'A') return;
+      at = u.screen;
+      const ts = STATS[u.role];
+      labs.push(['Swing', swingP(ts.ac, u.dodging), `Blast-bat, 1d8+${st.might} damage. You recoil 2 squares.`]);
+      const def = Math.max(ts.might, ts.agility);
+      if (u.holding) labs.push(['Disarm the ball', opposed(st.might, def), 'Shove the carrier: on a win the ball is yours, and a free pass follows this turn.']);
+      else labs.push(['Shove 1 square', opposed(st.might, def), 'Push them one square away. No damage.']);
+    }
+    const right = at.x < SIZES[S.size].W * 0.7;
+    let h = `<div class="tl" style="left:${at.x + (right ? 36 : -36) * z.u}px;top:${at.y - 26 * z.u}px;${right ? '' : 'transform:translateX(-100%)'}">`;
+    labs.forEach(([n, p, why], i) => { h += `<div class="tlab ${band(p)}" data-tl="${n}"><span class="k">${i + 1}</span>${n}<span class="p">${pct(p)} %</span><span class="why">${why}</span></div>`; });
+    layer.insertAdjacentHTML('beforeend', h + '</div>');
+  }
+
+  // ---- the feed ----
+  const LINES = [
+    ['A', '<b>Petra Sparshot</b> moves 6 cells.'],
+    ['A', '<b>Harrow Cannonade</b> swings at <b>Yarrow Flintlock</b> · HIT · 9 damage.'],
+    ['B', '<b>Yarrow Flintlock</b> is thrown back 2 squares.'],
+    ['A', '<b>Harrow Cannonade</b> ends the turn.'],
+    ['', 'Giff plays second of the role this round.'],
+  ];
+  let feedTimers = [], feedItems = [];
+  function renderFeed(reset) {
+    const box = document.getElementById('feed');
+    if (!box) return;
+    if (reset) { feedTimers.forEach(clearTimeout); feedTimers = []; feedItems = []; }
+    const max = S.size === 'laptop' ? 3 : 4;
+    box.innerHTML = feedItems.slice(-max).map((it) => `<div class="line ${it.team} ${it.big ? 'big' : ''} ${it.out ? 'out' : ''}">${it.html}</div>`).join('');
+  }
+  function pushLine(team, html, big) {
+    const it = { team, html, big, out: false };
+    feedItems.push(it); renderFeed();
+    feedTimers.push(setTimeout(() => { it.out = true; renderFeed(); }, big ? 16000 : 8000));
+    feedTimers.push(setTimeout(() => { feedItems = feedItems.filter((x) => x !== it); renderFeed(); }, big ? 17300 : 9300));
+  }
+  function playFeed() { renderFeed(true); LINES.forEach(([t, h], i) => feedTimers.push(setTimeout(() => pushLine(t, h), 600 + i * 1300))); }
+  function logHtml() {
+    const r7 = ['<span class="A"><b>Petra Sparshot</b> catches the Spark.</span>', '<span class="A"><b>Giff</b> shoots · 19 vs 14 · GOAL.</span>', '<span class="B"><b>Thessa Rossel</b> relaunches to <b>Yarrow Flintlock</b>.</span>', '<span>Cracker 1 rolls 8 cells.</span>', '<span class="B"><b>Gullo Spyre</b> swings at <b>Sarn Gunwale</b> · HIT · 6 damage.</span>'];
+    return `<div class="rd">— Round 7 —</div>${r7.map((l) => `<div>${l}</div>`).join('')}<div class="rd">— Round 8 —</div>${LINES.map(([t, h]) => `<div class="${t}">${h}</div>`).join('')}`;
+  }
+
+  // ---- notes, banner, pins ----
+  let noteT;
+  function note(t) { const n = document.getElementById('note'); if (!n) return; n.textContent = 'Maquette · ' + t; n.classList.add('on'); clearTimeout(noteT); noteT = setTimeout(() => n.classList.remove('on'), 2600); }
+  function banner(t, sub) { const b = document.getElementById('banner'); b.innerHTML = `${t}<small>${sub}</small>`; b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 2500); }
+  function drawPins() {
+    const z = SIZES[S.size], u = z.u;
+    const pins = [[1, 8, 8], [2, z.W / 2 - 260 * u, 52 * u], [3, z.W / 2, z.H - 70 * u], [4, z.W - 40 * u, 8], [5, 30 * u, z.H - 150 * u], [6, 240 * u, 140 * u], [7, z.W - 40 * u, 100 * u], [8, z.W / 2, z.H * 0.42], [9, z.W - 200 * u, z.H - 70 * u], [10, 290 * u, 96 * u]];
+    frame.insertAdjacentHTML('beforeend', pins.map(([n, x, y]) => `<div class="pin" style="left:${x}px;top:${y}px">${n}</div>`).join(''));
+  }
+
+  // ---- events ----
+  function local(e) { const r = frame.getBoundingClientRect(), s = +frame.dataset.scale; return { x: (e.clientX - r.left) / s, y: (e.clientY - r.top) / s }; }
+  function bind() {
+    const z = SIZES[S.size];
+    frame.querySelectorAll('[data-unit]').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); S.sel = el.dataset.unit; S.hoverCell = null; render(); }));
+    frame.querySelectorAll('[data-cr]').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); S.sel = el.dataset.cr; render(); }));
+    frame.querySelectorAll('[data-tl]').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); note(`${el.dataset.tl} serait joué (le serveur tire les dés).`); }));
+    const board = document.getElementById('board');
+    board.addEventListener('click', (e) => {
+      if (S.hoverCell) { note(`Giff marcherait jusqu'à cette case.`); return; }
+      if (S.sel) { S.sel = null; render(); }
+    });
+    board.addEventListener('mousemove', (e) => {
+      if (S.scen !== 'turn') return;
+      const p = local(e); p.y -= 84 * z.u;
+      let best = null, bd = 20 * z.u;
+      for (const c of D().legal.destinations) { const dd = Math.hypot(c.screen[0] - p.x, c.screen[1] - p.y); if (dd < bd) { bd = dd; best = c; } }
+      if (best !== S.hoverCell) { S.hoverCell = best; paintBoard(); bindHot(); }
+    });
+    board.addEventListener('mouseleave', () => { if (S.hoverCell) { S.hoverCell = null; paintBoard(); bindHot(); } });
+    frame.querySelectorAll('[data-chip]').forEach((el) => {
+      el.addEventListener('mouseenter', () => { S.hoverChip = el.dataset.chip; paintBoard(); bindHot(); });
+      el.addEventListener('mouseleave', () => { S.hoverChip = null; paintBoard(); bindHot(); });
+      el.addEventListener('click', () => note(`La caméra se centre sur ${unit(el.dataset.chip).name}, sans toucher à ton tour.`));
+    });
+    const gear = document.getElementById('gear');
+    gear.addEventListener('click', (e) => { e.stopPropagation(); S.gear = !S.gear; render(); });
+    const set = document.getElementById('settings');
+    if (set) {
+      set.addEventListener('click', (e) => e.stopPropagation());
+      set.querySelectorAll('.seg').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); if (b.id === 'to2d') note('La 2D garde ce cadre, avec une rangée d\'actions classique.'); })));
+      document.getElementById('fs').addEventListener('click', () => note('Plein écran (F) : la barre d\'onglets du navigateur disparaît.'));
+      document.getElementById('rules').addEventListener('click', () => note('Les règles s\'ouvrent, comme aujourd\'hui.'));
+      document.getElementById('yield').addEventListener('click', () => confirmBox('Hand my Giff to the house?', 'The house plays your Giff until the end of the match. You keep watching.', 'Hand it over', () => { S.scen = 'spect'; syncBtns(); S.gear = false; render(); }));
+      const lv = document.getElementById('leave');
+      if (lv) lv.addEventListener('click', () => confirmBox('Leave the match?', 'The match ends without a result for both teams. It cannot be resumed.', 'Leave the match', () => note('Le match serait abandonné.')));
+    }
+    document.getElementById('maptog').addEventListener('click', () => toggleMap());
+    const mb = document.getElementById('mapbox');
+    if (mb) mb.addEventListener('click', () => note('La caméra se déplace à cet endroit du terrain.'));
+    const lb = document.getElementById('logbtn');
+    if (lb) lb.addEventListener('click', () => toggleLog());
+    document.getElementById('logclose').addEventListener('click', () => toggleLog());
+    frame.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => doAct(b.dataset.act)));
+    frame.querySelectorAll('[data-place]').forEach((b) => {
+      b.addEventListener('mouseenter', () => { S.place = +b.dataset.place; document.getElementById('order').innerHTML = renderOrder(); bindChips(); });
+      b.addEventListener('click', () => { note(`Giff joue ${['premier', 'deuxième', 'troisième'][+b.dataset.place]} des Strikers ce round.`); S.scen = 'turn'; syncBtns(); render(); });
+    });
+    const call = document.getElementById('call');
+    if (call) call.addEventListener('click', () => note('Ordre donné : tes coéquipiers IA cherchent à te passer le ballon. Ça ne coûte pas ton tour.'));
+    const end = document.getElementById('end');
+    if (end) end.addEventListener('click', () => endTurn());
+  }
+  function bindHot() {
+    frame.querySelectorAll('[data-unit]').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); S.sel = el.dataset.unit; S.hoverCell = null; render(); }));
+    frame.querySelectorAll('[data-cr]').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); S.sel = el.dataset.cr; render(); }));
+    frame.querySelectorAll('[data-tl]').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); note(`${el.dataset.tl} serait joué (le serveur tire les dés).`); }));
+  }
+  function bindChips() {
+    frame.querySelectorAll('[data-chip]').forEach((el) => {
+      el.addEventListener('mouseenter', () => { S.hoverChip = el.dataset.chip; paintBoard(); bindHot(); });
+      el.addEventListener('mouseleave', () => { S.hoverChip = null; paintBoard(); bindHot(); });
+    });
+  }
+  function confirmBox(title, text, ok, fn) {
+    S.gear = false; render();
+    frame.insertAdjacentHTML('beforeend', `<div class="modal" id="modal"><div class="m"><h3>${title}</h3><p>${text}</p><div class="bt"><button type="button" class="ghostbtn" id="mc">Cancel</button><button type="button" class="ghostbtn" id="mo" style="color:var(--bad);border-color:var(--bad)">${ok}</button></div></div></div>`);
+    document.getElementById('mc').addEventListener('click', () => document.getElementById('modal').remove());
+    document.getElementById('mo').addEventListener('click', () => { document.getElementById('modal').remove(); fn(); });
+  }
+  function toggleMap() { S.map = !S.map; try { localStorage.setItem('bb-mock-map', S.map ? '1' : '0'); } catch (e) {} render(); }
+  function toggleLog() { S.log = !S.log; document.getElementById('drawer').classList.toggle('open', S.log); }
+  function doAct(k) {
+    const b = frame.querySelector(`[data-act="${k}"]`);
+    if (b) { b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 250); }
+    if (k === 'dash') { S.dash = !S.dash; render(); note(S.dash ? 'Dash tenu : 40 pieds de plus, annulable tant que tu n\'as pas dépassé tes pieds de base.' : 'Dash annulé.'); return; }
+    note(`${k[0].toUpperCase() + k.slice(1)} serait joué.`);
+  }
+  let armT;
+  function endTurn() {
+    if (!S.armed) { S.armed = true; render(); clearTimeout(armT); armT = setTimeout(() => { S.armed = false; render(); }, 3000); return; }
+    S.armed = false; clearTimeout(armT); render(); note('Tour fini. La rangée d\'actions disparaît jusqu\'à ton prochain tour.');
+  }
+
+  document.addEventListener('click', () => { if (S.gear) { S.gear = false; render(); } });
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest && e.target.closest('input, textarea')) return;
+    const k = e.key;
+    if (k === 'Escape') { if (document.getElementById('modal')) document.getElementById('modal').remove(); else if (S.gear) S.gear = false; else if (S.log) { toggleLog(); return; } else if (S.scen === 'place') { note('Échap : Giff joue dernier des Strikers.'); S.scen = 'turn'; syncBtns(); } else S.sel = null; render(); return; }
+    if (k === 'l' || k === 'L') { toggleLog(); return; }
+    if (k === 'm' || k === 'M') { toggleMap(); return; }
+    if (k === 'c' || k === 'C') { note('C : la caméra revient sur l\'action.'); return; }
+    if (k === 'f' || k === 'F') { note('F : plein écran.'); return; }
+    if (S.scen === 'place' && /^[1-3]$/.test(k)) { frame.querySelector(`[data-place="${+k - 1}"]`).click(); return; }
+    if (S.scen !== 'turn') return;
+    if (k === 'e' || k === 'E') { endTurn(); return; }
+    if (/^[1-9]$/.test(k)) {
+      const tl = frame.querySelectorAll('[data-tl]');
+      if (tl.length && S.sel) { const t = tl[+k - 1]; if (t) t.click(); return; }
+      const b = frame.querySelectorAll('[data-act]')[+k - 1];
+      if (b) doAct(b.dataset.act);
+    }
+  });
+
+  function syncBtns() {
+    document.querySelectorAll('[data-size]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.size === S.size)));
+    document.querySelectorAll('[data-scen]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scen === S.scen)));
+    document.getElementById('demo-pins').setAttribute('aria-pressed', String(S.pins));
+  }
+  document.querySelectorAll('[data-size]').forEach((b) => b.addEventListener('click', () => { S.size = b.dataset.size; S.hoverCell = null; syncBtns(); render(); playFeed(); }));
+  document.querySelectorAll('[data-scen]').forEach((b) => b.addEventListener('click', () => { S.scen = b.dataset.scen; S.sel = null; S.dash = false; S.armed = false; S.pclock = 15; syncBtns(); render(); playFeed(); }));
+  document.getElementById('demo-goal').addEventListener('click', () => { banner('Goal', 'Your team'); pushLine('A', '<b>Giff</b> shoots · 19 vs 14 · GOAL.', true); });
+  document.getElementById('demo-pins').addEventListener('click', () => { S.pins = !S.pins; syncBtns(); render(); });
+
+  setInterval(() => {
+    if (S.scen === 'turn') { S.clock = S.clock > 1 ? S.clock - 1 : 120; const c = frame.querySelector('.clock'); if (c) { c.querySelector('.ring').outerHTML = ring(S.clock / 120); c.querySelector('.sub').textContent = `${S.clock}s · Giff, Striker`; } }
+    if (S.scen === 'place') { S.pclock = S.pclock > 1 ? S.pclock - 1 : 15; const c = frame.querySelector('.clock'); if (c) { c.querySelector('.ring').outerHTML = ring(S.pclock / 15); c.querySelector('.sub').textContent = `${S.pclock}s · Strikers this round`; } const pc = frame.querySelector('.pclock'); if (pc) pc.textContent = `◔ ${S.pclock}s`; }
+  }, 1000);
+  new ResizeObserver(() => { const z = SIZES[S.size]; const s = Math.min(1, wrap.clientWidth / z.W); frame.style.transform = `scale(${s})`; wrap.style.height = z.H * s + 'px'; frame.dataset.scale = s; }).observe(wrap);
+  render();
+  playFeed();
+})();
+</script>
