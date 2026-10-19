@@ -33,7 +33,9 @@ diffuse `roll` et `abandoned` elle-même), `announceAbandoned` et `announceTeamC
 projet ; m2, m3, m5 acceptés ; m6 en 0016, appliquée ; n8 avec 2H.38. **C37 EST 2H.38, L'ÉCRAN DE
 MATCH REFAIT, CADRÉ PAR MOI LE 2026-10-19 EN DIX POINTS SUR UNE MAQUETTE VALIDÉE SANS CORRECTION
 (`design/2H38-ecran-de-match/index.html`), PUIS CODÉ LE MÊME JOUR** : lis « comment 2H.38 est
-codée » à la fin de C37 avant de toucher à l'écran. Ne rediscute rien de C12 à C37.
+codée » à la fin de C37 avant de toucher à l'écran. **C38 EST MON RETOUR DE PARTIE SUR 2H.38**
+(les actions sur cible au survol et dans la rangée, le clic n'ouvre que la fiche), en ligne, et
+porte mes deux demandes pour après la caméra. Ne rediscute rien de C12 à C38.
 07 §10 porte le journal (2H.15 la 2.5D fichier par fichier, 2H.16 à 2H.20 la caméra, 2H.21 et
 2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31 à
 2H.38). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
@@ -41,53 +43,51 @@ codée » à la fin de C37 avant de toucher à l'écran. Ne rediscute rien de C1
 rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, n8 est
 dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
 
-Où on en est : **2H.38 EST CODÉE LE 2026-10-19 (`97470f6`) ET EN LIGNE LE MÊME JOUR SUR MON FEU
-VERT** (git doit être propre et `origin/main..main` vide : vérifie-le). L'écran de match refait
-selon C37 : barre à deux lignes et pastilles, plateau plein cadre, rangée transparente des seules
-actions jouables, étiquettes sur cible avec leur pourcentage exact (`match/odds.ts`), fiche au clic,
-fil qui s'efface et tiroir (L), minicarte repliable et cliquable (M), ⚙ avec trois volumes, le
-clavier, la coop dans le coin du chrono, la question de place dans la rangée, la caméra qui cadre
-au-dessus de la rangée (`insetLens`). n8 est dans les deux écrans (`PASSWORD_MIN_LENGTH` = 8,
-la connexion n'impose rien). **842 tests verts sur 50 fichiers**, typecheck racine, scripts, e2e et
-client verts, **smoke 2D vert en 36 s, `e2e:board3d` vert en 14,0 min à 1536 × 695 et en 22,1 min à 2560 × 1271**, captures lues, puis **`e2e:abandon` vert en 22 s, `e2e:coop`
-vert en 4,6 min, `e2e:playthrough` vert en 1,8 min**, sans une ligne à corriger ; `e2e:account`
-n'a pas été relancé sur 2H.38. `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
-`create-match` v27 (le 503 « could not read the match » ; si la ligne « reading the match failed »
-apparaît dans les logs de la fonction, dis-le-moi). **LE CLIENT EN LIGNE
-(https://boomball.vercel.app) EST CELUI DE 2H.38**, bundle `index-BLdoW79j.js`, mis en ligne par
-moi le 2026-10-19 (`npm.cmd --prefix client run build` puis `node scripts/deploy-vercel.mjs
---production`) ; **`password_min_length` vaut 8** (n8, mis par moi dans le tableau de bord, relu
-par l'API), `disable_signup` faux. Sonde Playwright sur l'URL en ligne verte : « At least 8
-characters. » à l'inscription, hub, lobby, briefing, plateau 3D et ⚙ capturés à 1536 × 695,
-crochet absent, aucune erreur sinon l'aléa connu du 401 sur `role_stats` à la connexion (`07`
-l. 1243) et les avertissements GL ; elle a laissé le match e2e ouvert sur la question de place. **Le
-projet Realtime est en `private_only`** : tout nouveau canal doit être `private: true` ET avoir une
-politique sur `realtime.messages`. Migrations appliquées : **0001 à 0016**. Vérifier git status et
-git log origin/main..main en premier et me le dire. assets/source/ (mes sources) est ignoré par
-git : ne le commite jamais. `backups/` est ignoré par git et contient les codes d'invitation :
-jamais dans un dossier partagé.
+Où on en est : **2H.38 ET SON RETOUR C38 SONT EN LIGNE ET MA PARTIE EST FAITE : « TOUT EST
+PARFAIT. BRAVO. »** (git doit être propre et `origin/main..main` vide : vérifie-le). C38 : au
+survol d'une cible, ses étiquettes avec leurs chances, cliquables (350 ms pour y passer,
+`TAG_LINGER_MS`) ; dans la rangée, un bouton par couple action et cible ; le clic sur un pion
+n'ouvre que sa fiche ; la 2D a perdu son mode « choisir une cible ». Commit `53a01dc`. **842 tests
+verts sur 50 fichiers**, smoke 2D vert en 55 s, sonde 3D jetable verte ; `e2e:board3d` n'a pas été
+relancé sur C38. `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
+`create-match` v27 (si la ligne « reading the match failed » apparaît dans les logs de la
+fonction, dis-le-moi). **LE CLIENT EN LIGNE (https://boomball.vercel.app) EST `index-sXBC7HJQ.js`**,
+construit par toi, déployé par moi le 2026-10-19 au soir. `password_min_length` vaut 8,
+`disable_signup` faux. **Le projet Realtime est en `private_only`** : tout nouveau canal doit être
+`private: true` ET avoir une politique sur `realtime.messages`. Migrations appliquées : **0001 à
+0016**. Vérifier git status et git log origin/main..main en premier et me le dire. assets/source/
+(mes sources) est ignoré par git : ne le commite jamais. `backups/` est ignoré par git et contient
+les codes d'invitation : jamais dans un dossier partagé.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (7) FAITS, **(7) étant 2H.38, l'écran de match refait
-(`00` C37), en ligne le 2026-10-19** (les trois précisions du fil principal et les quatre choix au
-code relus et acceptés par moi : « tout me va ») ; (8) 2H.39, la caméra (déplacement, zooms,
-angles), un lot à part à cadrer avec moi dans son propre chat, après ma partie sur 2H.38.
-Restent aussi, sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui
-crée un compte et joue sans moi (la porte de la phase 8).
+(`00` C37), et son retour C38, en ligne et validés le 2026-10-19** ; (8) **2H.39, la caméra
+(déplacement, zooms, angles)**, un lot à part à cadrer avec moi dans ce chat ; (9) **2H.40, une
+réplique pour le Spark attrapé**, « à créer ou trouver », à la place de « and it's a goal » ; (10)
+**2H.41, en option, un humain joue tous les Giffs de son équipe**, ce qui refait l'ordre et
+l'initiative de son équipe (moteur, fonctions, `ENGINE_VERSION`). 2H.40 et 2H.41 sont notées en
+`00` C38 et `08` §5, PAS cadrées : chacune se cadre en chat, une question par message, la première
+bornant l'ampleur. Restent aussi, sans date : ma partie à deux sur les canaux privés (la porte de
+2H.37) et un ami qui crée un compte et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **recevoir mes retours de partie sur
-2H.38** (le portable et le 27 pouces : le plateau se voit, on comprend quoi faire sans lire, le
-choix de place se fait en regardant le jeu). Un retour d'écran se reformule et se tranche avec moi
-avant tout code, sans rouvrir C37 ; s'il n'y a rien, on cadre 2H.39 en chat, une question par
-message, la première bornant l'ampleur. **Ne touche pas à la caméra au-delà des trois accès de
-C37** avant que 2H.39 soit cadrée. **Fermer les inscriptions** (`disable_signup`) le jour où je le
-dis, pas avant. Deux remarques de la relecture des captures, sans décision : la maison peut avoir
-deux pions au même prénom (deux « Osric »), que les pastilles et les plaques ne distinguent pas ;
-le bandeau « Your turn » à côté de « Spectating » juste après un siège remis (dette connue).
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **cadrer 2H.39, la caméra**, en chat,
+une question par message, la première bornant l'ampleur, en relisant C18 à C22 (dont MON REFUS
+d'une caméra à quatre nombres lissés, C20) et les trois accès de C37 ; une maquette ou un essai en
+jouant avant le code si l'aspect est en jeu. **Fermer les inscriptions** (`disable_signup`) le
+jour où je le dis, pas avant. Deux remarques de la relecture des captures de 2H.38, sans décision :
+la maison peut avoir deux pions au même prénom (deux « Osric »), que les pastilles et les plaques
+ne distinguent pas ; le bandeau « Your turn » à côté de « Spectating » juste après un siège remis
+(dette connue). Une de C38 : la fiche, fixée en haut à gauche, peut s'ouvrir sur une cible qui se
+trouve juste dessous et lui faire perdre ses étiquettes.
 
-**Le classifieur du mode auto a refusé le PATCH Auth et même `npm run build`** le 2026-10-19
-(« Account & Standing-Rule Changes ») : un redéploiement ou une écriture de configuration, je les
-fais moi-même dans PowerShell ou le tableau de bord, et **dans mon PowerShell `npm` ne marche pas**
-(la politique d'exécution bloque `npm.ps1`) : écris-moi `npm.cmd`.
+**Le classifieur du mode auto** a refusé le PATCH Auth le 2026-10-19 et refuse
+`node scripts/deploy-vercel.mjs --production` (« Production Deploy »). Depuis `09e29aa`,
+`.claude/settings.json` autorise `Bash(npm --prefix client run build)` (le build passe, écris-le
+EXACTEMENT ainsi, depuis la racine) et `Bash(node scripts/deploy-vercel.mjs:*)` (refusé quand même
+dans la session qui l'a ajouté : RÉESSAIE au prochain déploiement, sur mon feu vert, et dis-moi si
+ça passe ; sinon je déploie, ou je passe en mode par défaut le temps de la commande). Une écriture
+de configuration, je la fais moi-même dans PowerShell ou le tableau de bord, et **dans mon
+PowerShell `npm` ne marche pas** (la politique d'exécution bloque `npm.ps1`) : écris-moi
+`npm.cmd`.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -222,7 +222,7 @@ Ce qu'il faut savoir tout de suite.
     Le cwd de l'outil Bash se réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 65 de 00
-    partie C, et C11 à C37 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
+    partie C, et C11 à C38 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
     des autres pions humains et `onFinished` appelé à chaque rendu. Dette connue : le bandeau
     « Your turn » à revoir avec le coin du chrono (C37 ne l'a pas tranché) ; « Giff picks the league » et « Giff
     starts the match » se répètent dans la barre du membre ; `mergeRoll` reste côté client,

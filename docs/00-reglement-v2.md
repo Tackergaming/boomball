@@ -3671,6 +3671,24 @@ plateaux, toujours à `null`). `ActionRow.tsx` : `target` et `aims` sur `Act`, `
 `onHoverUnit` et `tags` (`BesideTarget`, retourné à gauche et en haut près des bords), et un
 Cracker y est cliquable ; `Ordnance.tsx` donne `onHover` au Cracker 3D. Le smoke survole la
 cible, lit le bouton `[data-aims]` de la rangée puis vérifie que le clic ouvre la fiche. **Vu**
-au smoke 2D vert (55 s) et par une sonde 3D jetable (2,4 min, supprimée). **Pas en ligne.**
+au smoke 2D vert (55 s) et par une sonde 3D jetable (2,4 min, supprimée). **En ligne le
+2026-10-19** (`53a01dc`, client `index-sXBC7HJQ.js`, build par le fil principal, déploiement par
+Jérôme : le classifieur du mode auto a refusé `deploy-vercel.mjs --production` malgré la règle
+ajoutée à `.claude/settings.json` dans la même session).
 **Limite connue** : la fiche est fixée en haut à gauche (C37 point 6) ; une cible qui se trouve
 juste dessous perd ses étiquettes quand la fiche s'ouvre sur elle.
+
+**Sa partie sur C38, le 2026-10-19 au soir : « tout est parfait. bravo. »** La porte de 2H.38 et de
+C38 est franchie sur ses deux écrans.
+
+**Deux demandes pour après 2H.39 (la caméra), dictées le même soir, notées et pas cadrées** (`08`
+§5, 2H.40 et 2H.41) :
+
+1. **Une réplique pour le Spark attrapé**, « à créer ou trouver », à la place de « and it's a
+   goal », qui sert aujourd'hui aussi quand on attrape le Spark. Le son est dans `match/sound.ts`
+   (le clip `goal`, les repères `sparkCaught`) ; C26 et C27 disent comment les répliques sont
+   choisies.
+2. **Un humain qui joue tous les Giffs de son équipe**, en option, pas seulement le sien, « et donc
+   chambouler tout l'ordre des joueurs et leurs initiatives pour l'équipe de l'humain ». Touche au
+   moteur (l'initiative, écarts 51, 55, 58 et 65, le siège), aux fonctions et à `ENGINE_VERSION` :
+   un lot à cadrer en chat, une question par message, la première bornant l'ampleur.

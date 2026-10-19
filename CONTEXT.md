@@ -18,6 +18,11 @@ un humain.
 `07-audit-et-plan-3d.md` est l'audit du 2026-10-09, avec les décisions D1 à D11 et le journal des
 phases ; `04-etat-des-lieux.md` est l'historique de ce qui a été construit et pourquoi.
 
+**État au 2026-10-19 au soir.** Mon retour de partie sur 2H.38 est codé et en ligne (`00` C38) : les
+actions sur une cible au survol et dans la rangée, avec leurs chances, le clic n'ouvre que la
+fiche. « Tout est parfait. » Suite : 2H.39 la caméra, puis 2H.40 une réplique pour le Spark
+attrapé et 2H.41 un humain qui joue toute son équipe, à cadrer.
+
 **État au 2026-10-19.** 0016 appliquée (le 18, par moi). `resolve-action` v30 et `create-match`
 v27 en ligne : le 404 « no such match » relu une fois avant de répondre, sinon un 503 qui garde
 l'erreur. Une comparaison 2.5D contre 3D : je garde la 2.5D. **L'écran de match refait, 2H.38, est

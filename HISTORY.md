@@ -6,6 +6,15 @@
 
 ## 2026-10-19
 
+### Le retour de partie sur 2H.38, par le fil principal (Opus 5.5)
+
+- Son retour : les actions sur cible au survol et dans la rangée, avec leurs chances ; le clic
+  n'ouvre que la fiche. Deux choix fermés (un bouton par cible, étiquettes cliquables). `00` C38,
+  commit `53a01dc`, en ligne (`index-sXBC7HJQ.js`). Sa partie : « tout est parfait. bravo. »
+- Deux règles d'autorisation dans `.claude/settings.json` (`09e29aa`) : le build du client passe
+  désormais, le déploiement en production a encore été refusé par le classifieur ; Jérôme l'a fait.
+- Notés pour après 2H.39 : 2H.40 la réplique du Spark attrapé, 2H.41 toute l'équipe à un humain.
+
 ### La comparaison 2.5D et 3D, le 404 relu, l'écran de match cadré, par le fil principal (Opus 5.5)
 
 - Une page côte à côte, la vraie capture 2.5D contre une maquette three.js : il garde la 2.5D.

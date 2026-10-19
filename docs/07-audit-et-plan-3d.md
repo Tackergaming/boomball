@@ -2153,3 +2153,15 @@ base ; `ENGINE_VERSION` reste 11 ; pas de sweep. Détail en `00` C37, « comment
 
 **Porte ouverte** : sa partie sur le portable et sur le 27 pouces. Les trois précisions du fil
 principal et les quatre choix au code relus par lui : « tout me va ».
+
+### Retour de partie sur 2H.38 (`00` C38), codé et en ligne le 2026-10-19 au soir, porte franchie
+
+Par le fil principal (Opus 5.5), seul. Son retour : les actions sur une cible ne se cachent plus
+derrière un clic. Au survol d'une cible, ses étiquettes avec leurs chances, cliquables ; dans la
+rangée, un bouton par couple action et cible ; le clic n'ouvre que la fiche ; dans les deux vues.
+Commit `53a01dc`, 842 tests, smoke 2D vert en 55 s, sonde 3D jetable verte. **En ligne** : client
+`index-sXBC7HJQ.js`, construit par le fil principal (règle `Bash(npm --prefix client run build)`
+ajoutée à `.claude/settings.json`, `09e29aa`), déployé par Jérôme : le classifieur du mode auto a
+refusé `deploy-vercel.mjs --production` malgré la règle, peut-être faute d'une session qui l'a
+relue. **Sa partie : « tout est parfait. bravo. »** Deux demandes notées pour après 2H.39, en `08`
+§5 (2H.40, 2H.41).
