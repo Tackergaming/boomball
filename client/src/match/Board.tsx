@@ -95,7 +95,8 @@ export interface BoardProps {
   plot?: { readonly on: boolean; readonly route: readonly Point[] } | null;
   onPlotStep?: ((segment: Point[]) => void) | null;
 
-  // -- 2H.38 (`00` C37), read by the 3D board; the flat board ignores them. --
+  // -- 2H.38 (`00` C37), read by the 3D board; the flat board reads only the
+  // -- last two, the hover and the labels beside a target. --
   /** The camera preset, chosen in the settings panel. */
   zoom?: Zoom;
   /** The pixels at the bottom the action row covers: the camera frames the pitch above them. */
@@ -107,7 +108,7 @@ export interface BoardProps {
   /** A unit lit from the turn order's chips, and the unit under the cursor told back. */
   highlight?: UnitId | null;
   onHoverUnit?: ((unitId: UnitId | null) => void) | null;
-  /** The action labels beside the selected target (a unit or a Cracker), drawn on the pitch. */
+  /** The action labels beside the hovered target (a unit or a Cracker), drawn on the pitch. */
   tags?: { readonly anchorId: string; readonly node: ReactNode } | null;
   /** The first names of the humans driving other Giffs, by unit id. */
   names?: ReadonlyMap<string, string>;
@@ -193,6 +194,8 @@ export function Board({
   onAct = null,
   plot = null,
   onPlotStep = null,
+  onHoverUnit = null,
+  tags = null,
 }: BoardProps) {
   const units = activeUnits(state);
 
@@ -522,7 +525,13 @@ export function Board({
             .map((cracker) => {
               const at = where(`c:${cracker.id}`, cracker);
               return (
-                <g key={cracker.id}>
+                <g
+                  key={cracker.id}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onSelectUnit(selected === cracker.id ? null : cracker.id)}
+                  onMouseEnter={() => onHoverUnit?.(cracker.id)}
+                  onMouseLeave={() => onHoverUnit?.(null)}
+                >
                   <circle cx={at.y + 0.5} cy={at.x + 0.5} r={0.2} fill="#d8a12a" stroke="#05070a" strokeWidth={0.05} />
                   <circle
                     cx={at.y + 0.5}
@@ -598,6 +607,7 @@ export function Board({
                   if (answer(unit.id)) return;
                   onSelectUnit(selected === unit.id ? null : unit.id);
                 }}
+                onHover={(on) => onHoverUnit?.(on ? unit.id : null)}
               />
             );
           })}
@@ -674,9 +684,40 @@ export function Board({
             </text>
           ))}
         </svg>
+        {tags && <BesideTarget tags={tags} state={state} where={where} />}
       </div>
     </div>
   );
+}
+
+/**
+ * The labels beside a hovered target, over the SVG (Jérôme after his game on
+ * 2H.38: the actions on a target show on hover, with their chances, in both
+ * views). To the right of it and level with it, flipped left and up near the
+ * far edges so the stage, which clips, never cuts them.
+ */
+function BesideTarget({
+  tags,
+  state,
+  where,
+}: {
+  tags: { readonly anchorId: string; readonly node: ReactNode };
+  state: MatchState;
+  where: (key: string, fallback: Point) => Point;
+}) {
+  const unit = state.units.find((u) => u.id === tags.anchorId);
+  const cracker = unit ? undefined : state.crackers.find((c) => c.id === tags.anchorId);
+  if (!unit && !cracker) return null;
+  const at = unit ? where(`u:${unit.id}`, unit) : where(`c:${cracker!.id}`, cracker!);
+  const left = at.y > COLS * 0.6;
+  const low = at.x > ROWS / 2;
+  const box: React.CSSProperties = {
+    position: 'absolute',
+    zIndex: 2,
+    ...(left ? { right: `${((COLS - at.y) / COLS) * 100}%` } : { left: `${((at.y + 1) / COLS) * 100}%` }),
+    ...(low ? { bottom: `${((ROWS - at.x - 1) / ROWS) * 100}%` } : { top: `${(at.x / ROWS) * 100}%` }),
+  };
+  return <div style={box}>{tags.node}</div>;
 }
 
 /**
@@ -927,6 +968,7 @@ function UnitMark({
   ring,
   ringKind,
   onClick,
+  onHover,
 }: {
   unit: Unit;
   own: 'A' | 'B';
@@ -952,6 +994,7 @@ function UnitMark({
   /** Which of the three it is a target of, which picks the colour of the ring. */
   ringKind: 'attack' | 'shove' | 'pass';
   onClick: () => void;
+  onHover: (on: boolean) => void;
 }) {
   // Three colours, not two. Every shirt on your own side was one cyan, so the
   // only way to find yourself was to read names off the sheet. Yours is amber,
@@ -961,7 +1004,13 @@ function UnitMark({
   const x = col;
 
   return (
-    <g style={{ cursor: 'pointer' }} onClick={onClick} data-unit={unit.id}>
+    <g
+      style={{ cursor: 'pointer' }}
+      onClick={onClick}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      data-unit={unit.id}
+    >
       {/* The whole name, on hover, because the plate only has room for four letters. */}
       <title>{unit.name}</title>
       {spotlit && (

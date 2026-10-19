@@ -123,28 +123,30 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
 
   await page.evaluate(() => window.__boomball!.dismissBeat());
 
-  // A pawn is clickable since 2H.7: a target of a Swing, Shove or Pass gets a
-  // tray of those options under the bar, any other pawn is merely selected
-  // and its sheet shows. Prefer a target when the board offers one, otherwise
-  // the first opposing pawn, then put the selection back on our own Giff.
+  // A target's actions show on hover, beside it and in the row, each with
+  // its chance; the click opens the sheet alone (Jérôme after his game on
+  // 2H.38). Prefer a target when the board offers one, otherwise the first
+  // opposing pawn.
   const legalTwo = await summary(page);
   const boardTwo = await state(page);
   const me = boardTwo.units.find((u) => u.id === legalTwo.unitId)!;
   const targetId = legalTwo.attack[0] ?? legalTwo.shove[0] ?? legalTwo.pass[0] ?? null;
   const pawnId = targetId ?? boardTwo.units.find((u) => u.team !== me.team && u.hp > 0)!.id;
   const pawn = boardTwo.units.find((u) => u.id === pawnId)!;
-  await page.locator(`[data-unit="${pawnId}"]`).click();
-  // The sheet opens on the click (2H.38, `00` C37 point 6), and a target's
-  // labels with it, with their chances.
-  await expect(page.getByTestId('unit-card')).toContainText(pawn.name);
+  const odds = /(Swing|Shove 1 square|Disarm the ball|Pass)[\s\S]*\d+ %/;
   if (targetId) {
+    await expect(page.locator(`[data-testid="action-row"] [data-aims="${targetId}"]`).first()).toContainText(odds);
+    await page.locator(`[data-unit="${pawnId}"]`).hover();
     const tags = page.getByTestId('target-tags');
     await expect(tags).toBeVisible();
-    await expect(tags.locator('[data-tag]').first()).toContainText(/(Swing|Shove 1 square|Disarm the ball|Pass)\s*\d+ %/);
+    await expect(tags.locator('[data-tag]').first()).toContainText(odds);
+    await shots.take('pawn-hovered-target');
   }
+  await page.locator(`[data-unit="${pawnId}"]`).click();
+  await expect(page.getByTestId('unit-card')).toContainText(pawn.name);
   await shots.take(targetId ? 'pawn-clicked-target' : 'pawn-clicked');
-  // Escape closes the sheet and the labels (2H.38); the sheet sits over the
-  // pitch's top-left corner, where our own Giff may stand.
+  // Escape closes the sheet (2H.38); the sheet sits over the pitch's top-left
+  // corner, where our own Giff may stand.
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('unit-card')).toHaveCount(0);
 

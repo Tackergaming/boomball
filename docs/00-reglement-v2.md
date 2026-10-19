@@ -3637,3 +3637,40 @@ réécrites sur les nouveaux `data-testid`, `board3d.spec.ts` à vingt minutes (
 27 pouces) et cinq captures neuves (panneau ⚙, tiroir, minicarte repliée, fiche, retour en vue
 large) ; le bandeau « Your turn » et les lignes neuves du fil y sont vus par un observateur posé
 dans la page, parce qu'ils s'effacent avant que des étapes à 2 images par seconde les regardent.
+
+## C38. Décisions du 2026-10-19, **son retour de partie sur 2H.38 : les actions sur cible ne se cachent plus derrière un clic**
+
+> Écrites par le fil principal (Opus 5.5), sur son retour de partie et deux arbitrages fermés le
+> même jour. Rien dans le moteur, l'IA ni les fonctions, `ENGINE_VERSION` reste 11. Le reste de
+> 2H.38 « se passe bien sur les deux types d'écrans ».
+
+**Ses mots.** « je n'aime pas que les actions à faire sur quelqu'un soient cachées derrière un
+clic : pass, swing, disarm etc. Je les veux à deux endroits : en survol de souris avec les
+pourcentages, et dans la barre d'action à côté des dash, dodge etc. avec les pourcentages aussi.
+La seule chose qui apparaît au clic est la fiche du personnage. On conserve bien sûr d'appliquer
+l'action quand on clique comme avant. »
+
+**Ce qui change dans C37 point 3 et point 6, dans les deux vues.** (1) **Au survol d'une cible**
+(un pion, ou un Cracker pour « Bat a Cracker »), ses étiquettes s'affichent à côté d'elle avec
+leur pourcentage ; **elles sont cliquables** (son choix) : elles restent tant que la souris est
+sur la cible ou sur elles, plus 350 ms pour passer de l'une aux autres (`TAG_LINGER_MS`). (2)
+**La rangée porte un bouton par couple action et cible** (son choix, plutôt qu'un bouton par
+action) : l'action sur la première ligne, le nom de la cible dessous, le pourcentage à droite,
+dans l'ordre Swing, Shove ou Disarm, Pass, Bat a Cracker, entre Catch the Spark et Dash ; un clic
+joue l'action, le survol du bouton allume le pion visé. (3) **Le clic sur un pion n'ouvre que sa
+fiche.** (4) La 2D perd son mode « choisir une cible » (Swing, Shove, Pass, Bat qui ouvraient une
+liste) : elle a les mêmes boutons et les mêmes étiquettes au survol, posées à côté du pion.
+**Les touches 1 à 9 suivent la rangée** ; seules les lignes d'un Cracker frappé (qui attendent
+une réponse) les prennent.
+
+**Comment c'est codé.** `Match.tsx` : `tagTarget` et `holdTags` à la place de l'ouverture au
+clic, la liste `aimed` construite par `tagsFor` pour chaque cible de `legalActions`, l'état
+`pending` retiré de l'écran (le type `Pending` et la réponse au clic restent dans les deux
+plateaux, toujours à `null`). `ActionRow.tsx` : `target` et `aims` sur `Act`, `onAim`, la classe
+`aimed` sur deux lignes ; `TargetTags` prend `onHold` et `numbered`. `Board.tsx` lit enfin
+`onHoverUnit` et `tags` (`BesideTarget`, retourné à gauche et en haut près des bords), et un
+Cracker y est cliquable ; `Ordnance.tsx` donne `onHover` au Cracker 3D. Le smoke survole la
+cible, lit le bouton `[data-aims]` de la rangée puis vérifie que le clic ouvre la fiche. **Vu**
+au smoke 2D vert (55 s) et par une sonde 3D jetable (2,4 min, supprimée). **Pas en ligne.**
+**Limite connue** : la fiche est fixée en haut à gauche (C37 point 6) ; une cible qui se trouve
+juste dessous perd ses étiquettes quand la fiche s'ouvre sur elle.

@@ -54,9 +54,20 @@ export function Ball({ link }: { link: SceneLink }) {
   );
 }
 
-export function Cracker({ id, link, onClick }: { id: string; link: SceneLink; onClick?: () => void }) {
+export function Cracker({
+  id,
+  link,
+  onClick,
+  onHover,
+}: {
+  id: string;
+  link: SceneLink;
+  onClick?: () => void;
+  /** Its id under the cursor, null when it leaves: "Bat a Cracker" goes up beside it. */
+  onHover?: (id: string | null) => void;
+}) {
   const register = useRegister(link, `c:${id}`);
-  // Clickable since 2H.38 (`00` C37 point 3): its sheet, and "Bat a Cracker" beside it.
+  // Clickable since 2H.38 (`00` C37 point 3): its sheet. Hovered, "Bat a Cracker" beside it.
   return (
     <group
       ref={register}
@@ -65,11 +76,14 @@ export function Cracker({ id, link, onClick }: { id: string; link: SceneLink; on
         e.stopPropagation();
         onClick();
       }}
-      onPointerOver={() => {
+      onPointerOver={(e) => {
+        e.stopPropagation();
         if (onClick) document.body.style.cursor = 'pointer';
+        onHover?.(id);
       }}
       onPointerOut={() => {
         document.body.style.cursor = '';
+        onHover?.(null);
       }}
     >
       <mesh position-y={0.24} castShadow>

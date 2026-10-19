@@ -537,6 +537,7 @@ export function Board3D({
             id={cracker.id}
             link={link}
             onClick={() => onSelectUnit(selected === cracker.id ? null : cracker.id)}
+            onHover={setHoverUnit}
           />
         ))}
         {sparkSeen && <Spark link={link} />}

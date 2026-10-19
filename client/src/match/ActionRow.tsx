@@ -11,11 +11,13 @@
  *   "Call for the ball" on the left behind a rule (an order, free), "End
  *   turn" always on the right, in two presses. The camera frames the pitch
  *   above it (`framing.ts`, `insetLens`).
- * - **The labels**, beside a target once it is clicked, for what the Giff does
- *   to it: Swing, "Shove 1 square" or "Disarm the ball" (one engine action,
- *   `shove`, two buttons by whether the target carries the ball, never both),
- *   Pass, Bat a Cracker; each with its exact chance (`odds.ts`) in green,
- *   amber or red, and a line saying what it does on hover.
+ * - **The labels**, beside a target while the cursor is on it, for what the
+ *   Giff does to it: Swing, "Shove 1 square" or "Disarm the ball" (one engine
+ *   action, `shove`, two buttons by whether the target carries the ball, never
+ *   both), Pass, Bat a Cracker; each with its exact chance (`odds.ts`) in
+ *   green, amber or red, and a line saying what it does on hover. The same
+ *   actions are in the row too, one button per target (Jérôme after his game
+ *   on 2H.38: never "cachées derrière un clic"; the click is the sheet alone).
  *
  * The one-generator rule still holds: what is on offer is what `legalActions`
  * listed, and the match screen builds the lists from it. This file only draws
@@ -28,10 +30,10 @@
 import type { OddsBand } from './odds.js';
 
 /**
- * What the player has started and not finished, kept by the match screen so
- * the boards can answer it: on the flat board a pending Swing rings the
- * enemies and a click on one is the answer; `cracker` is the line still to
- * pick after "Bat a Cracker".
+ * What the player has started and not finished, which the boards can answer: a
+ * pending Swing rings the enemies and a click on one is the answer. The match
+ * screen no longer starts one since every target has its own button (after
+ * Jérôme's game on 2H.38), so the boards always get null.
  */
 export type Pending = 'attack' | 'shove' | 'pass' | 'cracker' | null;
 
@@ -44,6 +46,10 @@ export interface Act {
   readonly band?: OddsBand;
   /** What the action does, shown on hover. */
   readonly why?: string;
+  /** Whom it is aimed at, by name, for a button of the row. */
+  readonly target?: string;
+  /** The id of that unit or Cracker, lit on the board while the button is hovered. */
+  readonly aims?: string;
   /** Lit: a held Dash, the plotting switch. */
   readonly on?: boolean;
   readonly testId?: string;
@@ -53,6 +59,7 @@ export interface Act {
 export function ActionRow({
   mode,
   actions,
+  onAim,
   busy,
   call,
   end,
@@ -61,6 +68,8 @@ export function ActionRow({
   /** `turn` the player's own turn, `place` the place question, `none` anybody else's turn. */
   mode: 'turn' | 'place' | 'none';
   actions: readonly Act[];
+  /** The target of the button under the cursor, or null when it leaves. */
+  onAim?: (id: string | null) => void;
   busy: boolean;
   call: { readonly called: boolean; readonly disabled: boolean; readonly run: () => void } | null;
   end: { readonly armed: boolean; readonly run: () => void };
@@ -130,14 +139,28 @@ export function ActionRow({
         <button
           key={act.key}
           type="button"
-          className={`bb-act${act.on ? ' on' : ''}`}
+          className={`bb-act${act.on ? ' on' : ''}${act.target ? ' aimed' : ''}`}
           disabled={busy}
           onClick={act.run}
           title={act.why}
+          {...(act.aims
+            ? {
+                'data-aims': act.aims,
+                onMouseEnter: () => onAim?.(act.aims ?? null),
+                onMouseLeave: () => onAim?.(null),
+              }
+            : {})}
           {...(act.testId ? { 'data-testid': act.testId, 'data-on': act.on ? 'yes' : 'no' } : {})}
         >
           {i < 9 && <span className="k" aria-hidden>{i + 1}</span>}
-          {act.label}
+          {act.target ? (
+            <span className="two">
+              <span>{act.label}</span>
+              <span className="who">{act.target}</span>
+            </span>
+          ) : (
+            act.label
+          )}
           {act.chance !== undefined && <span className={`p ${act.band ?? ''}`}>{pct(act.chance)}</span>}
         </button>
       ))}
@@ -154,10 +177,24 @@ export function ActionRow({
  * The labels beside a target (`00` C37 point 3), or the eight lines a batted
  * Cracker can be sent down. Positioned by the board that hangs them.
  */
-export function TargetTags({ tags, busy, title }: { tags: readonly Act[]; busy: boolean; title?: string }) {
+export function TargetTags({
+  tags,
+  busy,
+  title,
+  numbered = false,
+  onHold,
+}: {
+  tags: readonly Act[];
+  busy: boolean;
+  title?: string;
+  /** Whether the keys 1 to 9 answer them: only the lines of a batted Cracker, the row has them otherwise. */
+  numbered?: boolean;
+  /** The cursor on the labels (true) or gone from them (false), so hover-shown labels stay up to be clicked. */
+  onHold?: (on: boolean) => void;
+}) {
   if (tags.length === 0) return null;
   return (
-    <div className="bb-tags" data-testid="target-tags">
+    <div className="bb-tags" data-testid="target-tags" onMouseEnter={() => onHold?.(true)} onMouseLeave={() => onHold?.(false)}>
       {title && <span className="bb-tags-title">{title}</span>}
       {tags.map((tag, i) => (
         <button
@@ -171,7 +208,7 @@ export function TargetTags({ tags, busy, title }: { tags: readonly Act[]; busy: 
           }}
           data-tag={tag.key}
         >
-          {i < 9 && <span className="k" aria-hidden>{i + 1}</span>}
+          {numbered && i < 9 && <span className="k" aria-hidden>{i + 1}</span>}
           {tag.label}
           {tag.chance !== undefined && <span className="p">{pct(tag.chance)}</span>}
           {tag.why && <span className="why">{tag.why}</span>}

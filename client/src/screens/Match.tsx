@@ -39,7 +39,7 @@ import { arena } from '../lib/arena.js';
 import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
 import { webglAvailable } from '../lib/webgl.js';
 import { DIRECTIONS } from '../../../engine/geometry.js';
-import { ActionRow, TargetTags, type Act, type Pending } from '../match/ActionRow.js';
+import { ActionRow, TargetTags, type Act } from '../match/ActionRow.js';
 import { Banner, type Announcement } from '../match/Banner.js';
 import { Board } from '../match/Board.js';
 import { dashNeeded, heldDashState } from '../match/dashHold.js';
@@ -48,6 +48,9 @@ import { FLOAT_MS, type Cue } from '../match/motion.js';
 import { createSounds, readVolumes, type AnnouncerCue, type SoundKind, type Sounds, type VolumeChannel } from '../match/sound.js';
 import { ANNOUNCER_LINES } from '../match/announcer.js';
 // The 2.5D board and the whole three.js stack come down only when asked for.
+/** How long a target's labels stay up once the cursor has left it, to cross over to them. */
+const TAG_LINGER_MS = 350;
+
 const Board3D = lazy(() => import('../board3d/Board3D.js').then((m) => ({ default: m.Board3D })));
 import { projectCell } from '../board3d/projection.js';
 import { Briefing, hasBeenBriefed } from '../match/Briefing.js';
@@ -106,15 +109,6 @@ export function Match({
   // The confirmation before leaving the match (2H.28). A hook, so it stays
   // above the early return on `state` like every other one.
   const [leaving, setLeaving] = useState(false);
-
-  /**
-   * What the action bar has started (a Swing waiting for its target, say). It
-   * lives here and not in the bar so the board can read it as well: a pending
-   * Swing rings the enemies on the board and a click on one is the answer.
-   * Dropped whenever the board moves on, because a half-made choice aimed at a
-   * position that no longer exists is how a player swings at the wrong Giff.
-   */
-  const [pending, setPending] = useState<Pending>(null);
 
   /**
    * Route plotting. While `plotting` is on, a click on a cell appends the
@@ -244,9 +238,6 @@ export function Match({
 
   const send = match.send;
 
-  useEffect(() => {
-    setPending(null);
-  }, [match.seq]);
   useEffect(() => {
     setRoute((r) => (r.length === 0 ? r : []));
   }, [match.seq, state]);
@@ -523,9 +514,8 @@ export function Match({
     setCalled(false);
   }, [onClock?.x, onClock?.y]);
 
-  /** Every action goes through here, so a pending choice is over once it is made. */
+  /** Every action goes through here. */
   const act = (action: Action) => {
-    setPending(null);
     void send(action);
   };
 
@@ -712,6 +702,30 @@ export function Match({
   // A chip hovered lights its Giff, and a Giff hovered lights its chip.
   const [chipHover, setChipHover] = useState<string | null>(null);
   const [boardHover, setBoardHover] = useState<string | null>(null);
+  /**
+   * The target whose labels are up (`00` C37 point 3, as Jérôme corrected it
+   * after his game on 2H.38: "en survol de souris avec les pourcentages", the
+   * click being the sheet alone). Held a moment after the cursor leaves the
+   * target, and for as long as it is on the labels, so they can be clicked.
+   */
+  const [tagTarget, setTagTarget] = useState<string | null>(null);
+  const tagLetGo = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTags = useCallback((id: string | null) => {
+    if (tagLetGo.current) clearTimeout(tagLetGo.current);
+    tagLetGo.current = null;
+    if (id !== null) setTagTarget(id);
+    else tagLetGo.current = setTimeout(() => setTagTarget(null), TAG_LINGER_MS);
+  }, []);
+  useEffect(() => () => {
+    if (tagLetGo.current) clearTimeout(tagLetGo.current);
+  }, []);
+  const hoverOnBoard = useCallback(
+    (id: string | null) => {
+      setBoardHover(id);
+      holdTags(id);
+    },
+    [holdTags],
+  );
   // Where the Giff would slot in, while 1st, 2nd or 3rd is hovered (écart 58).
   const [placePreview, setPlacePreview] = useState<number | null>(null);
   useEffect(() => {
@@ -857,21 +871,39 @@ export function Match({
         label: screenArrow(cracker, d, view),
         run: () => done({ kind: 'batCracker', crackerId: cracker.id, direction: d }),
       }));
-    } else if (view === '2d' && pending && pending !== 'cracker') {
-      // The flat board keeps its classic row (`00` C37): a Swing, Shove or
-      // Pass pressed there lists its targets here, and a click on a token
-      // answers it too.
-      const list = pending === 'attack' ? legalView.attack : pending === 'shove' ? legalView.shove : legalView.pass;
-      tagsTitle = 'Pick a target';
-      tags = list.flatMap((t) => tagsFor(t.unitId).filter((tag) => (pending === 'attack' ? tag.key === 'swing' : pending === 'pass' ? tag.key === 'pass' : tag.key === 'shove' || tag.key === 'disarm')).map((tag) => ({ ...tag, key: `${tag.key}-${t.unitId}`, label: `${tag.label} · ${t.name}` })));
-    } else if (view === '2d' && pending === 'cracker') {
-      tagsTitle = 'Which Cracker';
-      tags = legalView.batCracker.map((o) => ({ ...odds(`bat-${o.crackerId}`, `Bat ${o.crackerId.replace('cracker-', 'Cracker ')}`, batChance(mover), actionLine('bat', mover), () => setAimCracker(o.crackerId)) }));
-    } else if (selected) {
-      tags = tagsFor(selected);
-      tagsAnchor = selected;
-      if (view === '2d') tagsTitle = state.units.find((unit) => unit.id === selected)?.name ?? undefined;
+    } else if (tagTarget) {
+      // On hover, never on the click, which opens the sheet alone.
+      tags = tagsFor(tagTarget);
+      tagsAnchor = tagTarget;
     }
+  }
+
+  /**
+   * Every action on a target, also in the row, one button per target with its
+   * chance (Jérôme after his game on 2H.38: "dans la barre d'action à côté des
+   * dash, dodge etc. avec les pourcentages aussi"). Swings first, then shoves,
+   * passes and Crackers, as `legalActions` lists them.
+   */
+  const aimed: Act[] = [];
+  if (playing && legalView && mover) {
+    const nameOf = (id: string) =>
+      state.units.find((unit) => unit.id === id)?.name ?? id.replace('cracker-', 'Cracker ');
+    const ids = [
+      ...legalView.attack.map((t) => t.unitId),
+      ...legalView.shove.map((t) => t.unitId),
+      ...legalView.pass.map((t) => t.unitId),
+      ...legalView.batCracker.map((o) => o.crackerId),
+    ];
+    const byKind = new Map<string, Act[]>();
+    for (const id of new Set(ids)) {
+      for (const tag of tagsFor(id)) {
+        const kind = tag.key === 'disarm' ? 'shove' : tag.key;
+        const list = byKind.get(kind) ?? [];
+        list.push({ ...tag, key: `${tag.key}-${id}`, target: nameOf(id), aims: id });
+        byKind.set(kind, list);
+      }
+    }
+    for (const kind of ['swing', 'shove', 'pass', 'bat']) aimed.push(...(byKind.get(kind) ?? []));
   }
 
   /** The row (`00` C37 point 3): only what can be done now; the precisions (a) and (b) of the main thread. */
@@ -882,12 +914,7 @@ export function Match({
     if (legalView.catchSpark) {
       row.push(odds('catch', 'Catch the Spark', catchChance(mover, legalView.catchSpark), actionLine('catch', mover), () => act({ kind: 'catchSpark' })));
     }
-    if (view === '2d') {
-      if (legalView.attack.length > 0) row.push({ key: 'swing', label: 'Swing', on: pending === 'attack', run: () => setPending(pending === 'attack' ? null : 'attack') });
-      if (legalView.shove.length > 0) row.push({ key: 'shove', label: 'Shove', on: pending === 'shove', run: () => setPending(pending === 'shove' ? null : 'shove') });
-      if (legalView.pass.length > 0) row.push({ key: 'pass', label: 'Pass', on: pending === 'pass', run: () => setPending(pending === 'pass' ? null : 'pass') });
-      if (legalView.batCracker.length > 0) row.push({ key: 'bat', label: 'Bat a Cracker', on: pending === 'cracker', run: () => setPending(pending === 'cracker' ? null : 'cracker') });
-    }
+    row.push(...aimed);
     if (legalView.canDash) {
       // Held, never sent from here (2H.30): the walk that needs it sends it.
       row.push({
@@ -896,10 +923,7 @@ export function Match({
         on: dashHeld,
         testId: 'dash',
         why: dashHeld ? 'Spent by the walk that needs it. Click to cancel.' : 'Forty more feet this turn, spent by the walk that needs it.',
-        run: () => {
-          setPending(null);
-          setDashHeld(!dashHeld);
-        },
+        run: () => setDashHeld(!dashHeld),
       });
     }
     if (legalView.canDodge) row.push({ key: 'dodge', label: 'Dodge', run: () => act({ kind: 'dodge' }) });
@@ -940,7 +964,6 @@ export function Match({
           else if (logOpen) setLogOpen(false);
           else if (placing !== null && canAct) act({ kind: 'choosePlace', place: placing });
           else if (aimCracker) setAimCracker(null);
-          else if (pending) setPending(null);
           else setSelected(null);
           return;
         case 'action':
@@ -948,7 +971,9 @@ export function Match({
             if (command.index < placing) act({ kind: 'choosePlace', place: command.index + 1 });
             return;
           }
-          (tags.length > 0 ? tags : row)[command.index]?.run();
+          // The keys follow the row; only the lines of a batted Cracker,
+          // which wait for an answer, take them over.
+          (aimCracker && tags.length > 0 ? tags : row)[command.index]?.run();
           return;
         case 'endTurn': {
           if (placing !== null || match.busy) return;
@@ -1078,7 +1103,6 @@ export function Match({
           yoursId={mineId}
           spotlight={match.beat?.unitId ?? null}
           motion={match.motion}
-          pending={pending}
           onAct={canAct ? act : null}
           plot={{ on: plotting && canAct, route }}
           onPlotStep={canAct ? (segment) => setRoute((r) => [...r, ...segment]) : null}
@@ -1087,8 +1111,23 @@ export function Match({
           camera={camera}
           minimap={{ open: mapOpen, width: Math.round(240 * u), onToggle: toggleMap }}
           highlight={chipHover}
-          onHoverUnit={setBoardHover}
-          tags={view === '3d' && tags.length > 0 && tagsAnchor ? { anchorId: tagsAnchor, node: <TargetTags tags={tags} busy={match.busy} {...(tagsTitle ? { title: tagsTitle } : {})} /> } : null}
+          onHoverUnit={hoverOnBoard}
+          tags={
+            tags.length > 0 && tagsAnchor
+              ? {
+                  anchorId: tagsAnchor,
+                  node: (
+                    <TargetTags
+                      tags={tags}
+                      busy={match.busy}
+                      numbered={aimCracker !== null}
+                      onHold={(on) => holdTags(on ? tagsAnchor : null)}
+                      {...(tagsTitle ? { title: tagsTitle } : {})}
+                    />
+                  ),
+                }
+              : null
+          }
           names={names}
         />
 
@@ -1113,15 +1152,10 @@ export function Match({
           Log · L
         </button>
 
-        {view === '2d' && tags.length > 0 && (
-          <div className="bb-tags-flat">
-            <TargetTags tags={tags} busy={match.busy} {...(tagsTitle ? { title: tagsTitle } : {})} />
-          </div>
-        )}
-
         <ActionRow
           mode={placing !== null && !briefing ? 'place' : playing ? 'turn' : 'none'}
           actions={row}
+          onAim={setChipHover}
           busy={match.busy}
           call={
             mineId !== null
