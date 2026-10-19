@@ -41,8 +41,8 @@ codée » à la fin de C37 avant de toucher à l'écran. Ne rediscute rien de C1
 rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, n8 est
 dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
 
-Où on en est : **2H.38 EST CODÉE LE 2026-10-19, PAS COMMITÉE, PAS EN LIGNE** (sauf si je te dis
-l'avoir fait commiter à la fin du chat précédent : vérifie `git status`). L'écran de match refait
+Où on en est : **2H.38 EST CODÉE LE 2026-10-19, COMMITÉE ET POUSSÉE (`97470f6`), PAS EN LIGNE**
+(git doit être propre et `origin/main..main` vide : vérifie-le). L'écran de match refait
 selon C37 : barre à deux lignes et pastilles, plateau plein cadre, rangée transparente des seules
 actions jouables, étiquettes sur cible avec leur pourcentage exact (`match/odds.ts`), fiche au clic,
 fil qui s'efface et tiroir (L), minicarte repliable et cliquable (M), ⚙ avec trois volumes, le
@@ -62,7 +62,7 @@ git : ne le commite jamais. `backups/` est ignoré par git et contient les codes
 jamais dans un dossier partagé.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (6) FAITS ; **(7) 2H.38, l'écran de match refait
-(`00` C37), CODÉ, À VÉRIFIER, COMMITER ET METTRE EN LIGNE** ; (8) 2H.39, la caméra (déplacement,
+(`00` C37), CODÉ ET COMMITÉ, À VÉRIFIER ET METTRE EN LIGNE** ; (8) 2H.39, la caméra (déplacement,
 zooms, angles), un lot à part à cadrer avec moi dans son propre chat, après ma partie sur 2H.38.
 Restent aussi, sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui
 crée un compte et joue sans moi (la porte de la phase 8).
@@ -79,7 +79,8 @@ rangée en 2D ; le fil ne répète pas les ouvertures de round, le bandeau centr
 **sur mon feu vert seulement** : le PATCH `password_min_length` à 8
 (`/v1/projects/{ref}/config/auth`, relire après, la réponse peut être vide), puis `npm run build`
 dans `client/` et `node scripts/deploy-vercel.mjs --production`, puis une sonde Playwright sur
-l'URL en ligne ; (e) commit puis push sur mon mot. Ensuite ma partie sur le portable et le 27
+l'URL en ligne ; (e) commit puis push sur mon mot pour ce que (a) aura corrigé et pour les
+documents de la mise en ligne. Ensuite ma partie sur le portable et le 27
 pouces. **Ne touche pas à la caméra au-delà des trois accès de C37** : la caméra est 2H.39.
 **Fermer les inscriptions** (`disable_signup`) le jour où je le dis, pas avant.
 
