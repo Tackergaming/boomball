@@ -540,8 +540,15 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
           // match the database held, both times on the first request after
           // three idle minutes, under the screen harness. Treated like a lost
           // reply: the head is read through the REST path (which finds the
-          // match), then one more try.
-          if (!reply.accepted && (reply.unreachable || reply.reason === 'no such match')) {
+          // match), then one more try. Since 2026-10-19 the function reads
+          // again itself and says "could not read the match" when that fails
+          // too: the same lost reply.
+          if (
+            !reply.accepted &&
+            (reply.unreachable ||
+              reply.reason === 'no such match' ||
+              reply.reason.startsWith('could not read the match'))
+          ) {
             await wait(RETRY_AFTER_MS);
             const head = await headSeq(matchId);
             if (head !== null && head > seqRef.current) {

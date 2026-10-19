@@ -58,6 +58,11 @@ declare const Deno: {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+/** PostgREST's code for `.single()` on zero rows: the only read failure that means the match is not there. */
+const NO_ROWS = 'PGRST116';
+/** The pause before the match is read a second time after a failed read. */
+const READ_RETRY_MS = 300;
+
 function reply(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -115,15 +120,33 @@ Deno.serve(async (request: Request): Promise<Response> => {
   // event, which is the point of it existing.
   const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  const [{ data: snapshot, error: snapshotError }, { data: match }] = await Promise.all([
-    db.from('match_state').select('seq, snapshot').eq('match_id', matchId).single(),
-    db
-      .from('matches')
-      .select('arena_id, turn_deadline, team_id, orders, engine_version, tier, abandoned_at')
-      .eq('id', matchId)
-      .single(),
-  ]);
-  if (snapshotError || !snapshot || !match) return refuse('no such match', 404);
+  // 2H.22 and again on 2026-10-19: the first request after a few idle minutes
+  // has failed this double read on a match the database held, and the function
+  // answered "no such match". A failed read is not an absent match: it is read
+  // once more, and only zero rows on both tries is a 404. Anything else is a
+  // 503 that keeps the error, and the log line says what it was.
+  const readMatch = () =>
+    Promise.all([
+      db.from('match_state').select('seq, snapshot').eq('match_id', matchId).single(),
+      db
+        .from('matches')
+        .select('arena_id, turn_deadline, team_id, orders, engine_version, tier, abandoned_at')
+        .eq('id', matchId)
+        .single(),
+    ]);
+  let [{ data: snapshot, error: snapshotError }, { data: match, error: matchError }] = await readMatch();
+  if (snapshotError || matchError) {
+    console.error('resolve-action: reading the match failed, reading again', matchId, snapshotError, matchError);
+    await new Promise((resolve) => setTimeout(resolve, READ_RETRY_MS));
+    [{ data: snapshot, error: snapshotError }, { data: match, error: matchError }] = await readMatch();
+  }
+  const absent = (error: { code?: string } | null) => error?.code === NO_ROWS;
+  if (absent(snapshotError) || absent(matchError)) return refuse('no such match', 404);
+  if (snapshotError || matchError || !snapshot || !match) {
+    console.error('resolve-action: reading the match failed twice', matchId, snapshotError, matchError);
+    const cause = (snapshotError ?? matchError)?.message ?? 'no row and no error';
+    return refuse(`could not read the match: ${cause}`, 503);
+  }
 
   // Before anything is loaded into the engine: a snapshot written by another
   // engine is not a board this one can read (audit line A11).
