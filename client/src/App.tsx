@@ -78,6 +78,8 @@ export function App() {
         userId={account.userId}
         teamName={account.team?.name ?? 'Your team'}
         isOwner={!!account.team && account.team.owner === account.userId}
+        // First names for the team-mates' chips and plates (2H.38, `00` C37 point 2).
+        playerNames={new Map(account.members.map((m) => [m.profile_id, m.display_name.split(' ')[0] ?? m.display_name]))}
         onFinished={async () => {
           setAtTheBoard(false);
           await account.refresh();

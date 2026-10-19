@@ -1,157 +1,107 @@
 /**
- * Artboards 1d and 2e: the identity sheet of whoever is selected.
+ * The sheet of whoever is selected (2H.38, `00` C37 point 6).
  *
- * The stat line is read from the engine's own table rather than from
- * `role_stats`, because this client already imports the engine for
- * `legalActions` and a second copy fetched over the network could only ever
- * disagree with the first. The database mirror is for consumers that cannot
- * import the engine.
+ * It used to sit in the right column all match long, on the unit on the clock
+ * when nothing was picked. The column is gone: the sheet **opens on a click,
+ * never on hover** (Jérôme: "j'ai peur que ce soit trop"), in a fixed corner,
+ * top left under the clock, so it never stacks on the labels beside a target.
+ * A click on the floor or Escape closes it.
  *
- * **Current HP comes from the snapshot and nothing else.** It is the one number
- * on this panel that changes during a match, and reading it from anywhere but
- * the live board would show a figure that was true a round ago.
+ * The stat line is read from the engine's own table (`statsFor`) and the HP
+ * from the snapshot, as before: a second copy of either could only disagree.
  */
 
+import { CRACKER_AC, CRACKER_DAMAGE_DICE, CRACKER_DAMAGE_DIE } from '../../../engine/constants.js';
 import { statsFor } from '../../../engine/stats.js';
-import { unitById, type MatchState } from '../../../engine/types.js';
-import { thirdName } from './replay.js';
+import type { MatchState } from '../../../engine/types.js';
+import { ROLE_LETTER } from './TurnStrip.js';
+
+const ROLE_NAME = { striker: 'Striker', breaker: 'Breaker', bulwark: 'Bulwark', trajector: 'Trajector' } as const;
 
 export function SeatPanel({
   state,
-  unitId,
+  selectedId,
   own,
+  yoursId,
+  names,
 }: {
   state: MatchState;
-  unitId: string | null;
+  /** A unit's id, or a Cracker's. */
+  selectedId: string;
   own: 'A' | 'B';
+  yoursId: string | null;
+  names: ReadonlyMap<string, string>;
 }) {
-  const unit = unitId ? state.units.find((u) => u.id === unitId) ?? null : null;
-
-  if (!unit) {
+  const cracker = state.crackers.find((c) => c.id === selectedId);
+  if (cracker) {
     return (
-      <div style={S.panel}>
-        <span className="label">Pick a Giff</span>
-        <p style={S.blank}>
-          Click anyone on the field or in the ladder to read their sheet.
-        </p>
+      <div className="bb-card" style={{ borderTopColor: 'var(--danger)' }} data-testid="unit-card">
+        <div className="h">
+          <span className="nm">Cracker</span>
+          <span className="tm">Hazard</span>
+        </div>
+        <div className="st">
+          <span>
+            AC <b>{CRACKER_AC}</b>
+          </span>
+          <span>
+            Blast{' '}
+            <b>
+              {CRACKER_DAMAGE_DICE}d{CRACKER_DAMAGE_DIE}
+            </b>
+          </span>
+        </div>
+        <div className="state">Rolls toward the ball at count 20</div>
+        <div className="x">Esc or a click on the floor closes</div>
       </div>
     );
   }
 
+  const unit = state.units.find((u) => u.id === selectedId);
+  if (!unit) return null;
   const stats = statsFor(unit.role, unit.tier);
   const mine = unit.team === own;
-  const colour = mine ? 'var(--team-own)' : 'var(--team-foe)';
-  const carrying = state.payload.carriedBy === unit.id;
+  const who = unit.id === yoursId ? ' · You' : names.get(unit.id) ? ` · ${names.get(unit.id)}` : '';
+  const flags = [
+    state.payload.carriedBy === unit.id ? 'Carrying the Payload' : null,
+    unit.dodging ? 'Dodging' : null,
+    unit.braced ? 'Dug in' : null,
+    unit.status !== 'active' ? `Off the field · ${unit.status}` : unit.reactionAvailable ? 'Reaction ready' : 'Reaction spent',
+  ].filter(Boolean);
 
   return (
-    <div style={S.panel}>
-      <div style={S.head}>
-        <div className="plate" style={{ ...S.plate, border: `2px solid ${colour}` }}>
-          <span style={{ ...S.plateText, color: colour }}>{unit.role[0]!.toUpperCase()}</span>
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <p className="display" style={{ margin: 0, fontSize: 21 }}>
-            {unit.name}
-          </p>
-          <p className="label" style={{ margin: '2px 0 0', color: colour }}>
-            {unit.role} · {unit.tier} · {mine ? 'yours' : 'the house'}
-          </p>
-        </div>
+    <div className="bb-card" style={{ borderTopColor: mine ? 'var(--team-own)' : 'var(--team-foe)' }} data-testid="unit-card">
+      <div className="h">
+        <span className="nm">
+          {ROLE_LETTER[unit.role]} · {unit.name}
+        </span>
+        <span className="tm">
+          {ROLE_NAME[unit.role]}
+          {who}
+        </span>
       </div>
-
-      <div style={S.hpTrack}>
-        <div
-          style={{
-            ...S.hpFill,
-            width: `${Math.max(0, (unit.hp / unit.maxHp) * 100)}%`,
-            background: colour,
-          }}
-        />
+      <div className="st">
+        <span>
+          HP{' '}
+          <b style={unit.hp / unit.maxHp <= 0.34 ? { color: '#ff8fa0' } : undefined}>
+            {unit.hp}/{unit.maxHp}
+          </b>
+        </span>
+        <span>
+          AC <b>{stats.ac}</b>
+        </span>
+        <span>
+          Melee <b>+{stats.might}</b>
+        </span>
+        <span>
+          Throw <b>+{stats.aim}</b>
+        </span>
+        <span>
+          Dex <b>+{stats.agility}</b>
+        </span>
       </div>
-      <p className="label" style={{ margin: '5px 0 0' }}>
-        {unit.hp} / {unit.maxHp} hp
-      </p>
-
-      <dl style={S.stats}>
-        <Stat term="AC" value={stats.ac} />
-        {/* The same three names as the team sheet, for the same reason: Bat,
-            Aim and Agility name nothing a D&D player has ever rolled. Melee and
-            Throw name the roll the number is added to. The third is Dex and not
-            Dodge, because it is never added to the Dodge action: it carries
-            initiative, Dexterity saves, Acrobatics, an interception and a shove
-            resisted on agility. That is a whole ability score, not one move. */}
-        <Stat term="Melee" value={`+${stats.might}`} />
-        <Stat term="Throw" value={`+${stats.aim}`} />
-        <Stat term="Dex" value={`+${stats.agility}`} />
-      </dl>
-
-      <div style={S.flags}>
-        <Flag on={carrying} label="Carrying the Payload" tone="var(--brass)" />
-        <Flag on={unit.dodging} label="Dodging" tone="var(--team-own)" />
-        <Flag on={unit.braced} label="Dug in" tone="var(--team-own)" />
-        <Flag on={!unit.reactionAvailable} label="Reaction spent" tone="var(--text-faint)" />
-        <Flag on={unit.status !== 'active'} label={`Off the field · ${unit.status}`} tone="var(--team-foe)" />
-      </div>
-
-      <p className="label" style={{ marginTop: 12, color: 'var(--text-faint)' }}>
-        {thirdLabel(thirdName(unit, own))} · {unit.x},{unit.y}
-      </p>
+      <div className="state">{flags.join(' · ')}</div>
+      <div className="x">Esc or a click on the floor closes</div>
     </div>
   );
 }
-
-/** The third in words, capitalised for a label: "Own end", "Midfield", "Their end". */
-function thirdLabel(name: string): string {
-  return name[0]!.toUpperCase() + name.slice(1);
-}
-
-function Stat({ term, value }: { term: string; value: string | number }) {
-  return (
-    <div style={S.stat}>
-      <dt className="label" style={{ margin: 0 }}>
-        {term}
-      </dt>
-      <dd style={S.statValue}>{value}</dd>
-    </div>
-  );
-}
-
-function Flag({ on, label, tone }: { on: boolean; label: string; tone: string }) {
-  if (!on) return null;
-  return (
-    <span style={{ ...S.flag, borderColor: tone, color: tone }} className="label">
-      {label}
-    </span>
-  );
-}
-
-const S: Record<string, React.CSSProperties> = {
-  panel: { padding: 14, background: 'var(--panel)', border: '1px solid var(--line)' },
-  blank: { marginTop: 10, fontSize: 12, lineHeight: 1.6, color: 'var(--text-faint)' },
-  head: { display: 'flex', alignItems: 'center', gap: 11 },
-  plate: { width: 44, height: 44, flex: 'none' },
-  plateText: { fontFamily: 'var(--display)', fontWeight: 800, fontSize: 19 },
-  hpTrack: {
-    marginTop: 14,
-    height: 7,
-    background: 'var(--void)',
-    border: '1px solid var(--line)',
-  },
-  hpFill: { height: '100%' },
-  stats: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '14px 0 0' },
-  stat: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    padding: '6px 8px',
-    background: 'var(--panel-deep)',
-  },
-  statValue: {
-    margin: 0,
-    fontFamily: 'var(--display)',
-    fontSize: 18,
-    color: 'var(--text)',
-  },
-  flags: { display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 12 },
-  flag: { padding: '3px 6px', borderWidth: 1, borderStyle: 'solid' },
-};

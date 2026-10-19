@@ -122,6 +122,33 @@ export function viewAxes(yaw: number): { forward: { x: number; z: number }; righ
   };
 }
 
+/**
+ * The lens of a frame whose bottom `inset` pixels are covered (2H.38, `00` C37
+ * point 3): the action row lies over the board, and the camera frames the
+ * pitch above it. Everything the rig works out (the preset distances, the pan,
+ * the centring) uses the `usable` lens, the frame above the row, at the same
+ * pixel scale the whole frame would have at `fov`. The camera itself is given
+ * the `virtual` lens: a frame `inset` taller than the canvas whose centre is
+ * the usable frame's centre, of which the canvas shows the bottom part
+ * (`setViewOffset(width, fullHeight, 0, offsetY, width, height)`). Picking and
+ * projection go through the camera's matrices, so they stay exact.
+ */
+export interface InsetLens {
+  readonly usable: { readonly fov: number; readonly aspect: number };
+  readonly virtual: { readonly fov: number; readonly aspect: number; readonly fullHeight: number; readonly offsetY: number };
+}
+
+export function insetLens(fovDeg: number, width: number, height: number, inset: number): InsetLens {
+  const h = Math.max(1, height);
+  const m = Math.max(0, Math.min(inset, h * 0.5));
+  const half = Math.tan(((fovDeg * Math.PI) / 180) / 2);
+  const deg = (t: number) => (2 * Math.atan(t) * 180) / Math.PI;
+  return {
+    usable: { fov: deg((half * (h - m)) / h), aspect: width / (h - m) },
+    virtual: { fov: deg((half * (h + m)) / h), aspect: width / (h + m), fullHeight: h + m, offsetY: m },
+  };
+}
+
 /** Where a camera orbiting `lookAt` sits. */
 export function orbitPosition(
   lookAt: { x: number; z: number },

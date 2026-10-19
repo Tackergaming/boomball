@@ -21,6 +21,7 @@ import {
   distanceForSpan,
   groundCentreOffsetPerUnit,
   groundDepthPerUnit,
+  insetLens,
   orbitPosition,
   presetDistance,
   presetOrbit,
@@ -163,5 +164,27 @@ describe('the orbit', () => {
     expect(b.x).toBeCloseTo(a.z, 9);
     expect(b.z).toBeCloseTo(0, 9);
     expect(c.z).toBeCloseTo(-a.z, 9);
+  });
+});
+
+describe('the lens above the action row (2H.38)', () => {
+  it('keeps the pixel scale and centres the usable frame', () => {
+    const lens = insetLens(36, 1536, 611, 62);
+    const t = (deg: number) => Math.tan((deg * Math.PI) / 360);
+    // Same pixels per unit of tangent as the bare 36 degree frame.
+    expect(t(lens.usable.fov) / (611 - 62)).toBeCloseTo(t(36) / 611, 9);
+    expect(t(lens.virtual.fov) / (611 + 62)).toBeCloseTo(t(36) / 611, 9);
+    expect(lens.usable.aspect).toBeCloseTo(1536 / 549, 9);
+    expect(lens.virtual.fullHeight).toBe(673);
+    expect(lens.virtual.offsetY).toBe(62);
+    // The virtual centre, seen in the canvas, is the usable frame's centre.
+    expect(lens.virtual.fullHeight / 2 - lens.virtual.offsetY).toBe((611 - 62) / 2);
+  });
+
+  it('is the bare lens with no inset, and never covers more than half the frame', () => {
+    const bare = insetLens(36, 1000, 500, 0);
+    expect(bare.usable.fov).toBeCloseTo(36, 9);
+    expect(bare.virtual.fov).toBeCloseTo(36, 9);
+    expect(insetLens(36, 1000, 500, 900).virtual.offsetY).toBe(250);
   });
 });

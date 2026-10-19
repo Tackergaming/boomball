@@ -14,20 +14,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
-import {
-  Shots,
-  act,
-  farthest,
-  prefer2D,
-  report,
-  stamp,
-  summary,
-  view,
-  waitForArrival,
-  waitForHook,
-  waitForPlayableTurn,
-  watch,
-} from './harness.js';
+import { Shots, act, farthest, prefer2D, report, stamp, summary, view, waitForArrival, waitForHook, waitForPlayableTurn, watch, setReplay, openSettings, closeSettings, settingsClick } from './harness.js';
 
 const viewport = { width: 1440, height: 900 };
 
@@ -128,7 +115,7 @@ test('@coop two players meet in the lobby, open one match, and one hands over', 
         () => false,
       );
       if (briefed) await into.click();
-      await one.getByRole('button', { name: 'instant', exact: true }).click();
+      await setReplay(one, 'instant');
     }
     // Each client drives its own Giff: two human units on side A. The board
     // is read once the hook holds it: the opening replays from the kick-off.
@@ -173,16 +160,17 @@ test('@coop two players meet in the lobby, open one match, and one hands over', 
     expect(await waitForPlayableTurn(second, () => 1, guest)).toBe('turn');
     await expect(page.getByTestId('waiting-for')).toContainText('Second Giff', { timeout: 30_000 });
     await owner.take('owner-waiting-for-second');
-    await expect(second.getByTestId('hand-over')).toBeVisible();
-    await second.getByTestId('hand-over').click();
+    await settingsClick(second, 'hand-over');
     await expect(second.getByTestId('yield-prompt')).toBeVisible();
     await guest.take('hand-over-prompt');
     await second.getByTestId('yield-yes').click();
     // The seat is the house's now: the second client watches, the owner's
     // board reads the unit as the AI's once the batch lands.
     await expect(second.getByTestId('watching')).toBeVisible({ timeout: 30_000 });
+    await openSettings(second);
     await expect(second.getByTestId('hand-over')).toHaveCount(0);
     await expect(second.getByTestId('watch-leave')).toBeVisible();
+    await closeSettings(second);
     await page.waitForFunction(
       (id) => window.__boomball?.state?.units.find((u) => u.id === id)?.controller.kind === 'ai' && !window.__boomball?.replaying,
       mine,
@@ -192,7 +180,7 @@ test('@coop two players meet in the lobby, open one match, and one hands over', 
     await owner.take('owner-after-hand-over');
 
     // -- The owner leaves; the second client is told and lands on its hub -----
-    await page.getByTestId('leave-match').click();
+    await settingsClick(page, 'leave-match');
     await page.getByTestId('abandon-yes').click();
     await expect(page.getByRole('heading', { name: 'E2E Battery' })).toBeVisible({ timeout: 30_000 });
     await expect(second.getByRole('heading', { name: 'E2E Battery' })).toBeVisible({ timeout: 30_000 });

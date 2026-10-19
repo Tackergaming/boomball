@@ -14,28 +14,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import {
-  Shots,
-  act,
-  boardOf,
-  farthest,
-  firstChangedBoard,
-  glideSeen,
-  judgeSend,
-  report,
-  roundMarkers,
-  stamp,
-  startSendWatch,
-  state,
-  stopSendWatch,
-  summary,
-  unitAt,
-  view,
-  waitForArrival,
-  waitForHook,
-  waitForPlayableTurn,
-  watch,
-prefer2D } from './harness.js';
+import { Shots, act, boardOf, farthest, firstChangedBoard, glideSeen, judgeSend, report, roundMarkers, stamp, startSendWatch, state, stopSendWatch, summary, unitAt, view, waitForArrival, waitForHook, waitForPlayableTurn, watch, prefer2D, setReplay } from './harness.js';
 
 test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   const shots = new Shots(page, info, stamp());
@@ -107,7 +86,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
     await into.click();
   }
 
-  await page.getByRole('button', { name: 'instant', exact: true }).click();
+  await setReplay(page, 'instant');
   expect(await myTurn()).toBe('turn');
   await shots.take('match-open');
 
@@ -155,15 +134,19 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   const pawnId = targetId ?? boardTwo.units.find((u) => u.team !== me.team && u.hp > 0)!.id;
   const pawn = boardTwo.units.find((u) => u.id === pawnId)!;
   await page.locator(`[data-unit="${pawnId}"]`).click();
-  await expect(page.getByText(pawn.name, { exact: true }).first()).toBeVisible();
+  // The sheet opens on the click (2H.38, `00` C37 point 6), and a target's
+  // labels with it, with their chances.
+  await expect(page.getByTestId('unit-card')).toContainText(pawn.name);
   if (targetId) {
-    // An adjacent opponent is both a Swing and a Shove, so the tray holds two
-    // buttons: first seen at the harness on 2026-10-11, once the house pressed
-    // Giff at round 2 (2H.9), and the bare locator tripped on the pair.
-    await expect(page.getByRole('button', { name: /^(Swing at|Shove|Pass to) / }).first()).toBeVisible();
+    const tags = page.getByTestId('target-tags');
+    await expect(tags).toBeVisible();
+    await expect(tags.locator('[data-tag]').first()).toContainText(/(Swing|Shove 1 square|Disarm the ball|Pass)\s*\d+ %/);
   }
   await shots.take(targetId ? 'pawn-clicked-target' : 'pawn-clicked');
-  await page.locator(`[data-unit="${me.id}"]`).click();
+  // Escape closes the sheet and the labels (2H.38); the sheet sits over the
+  // pitch's top-left corner, where our own Giff may stand.
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('unit-card')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Dodge', exact: true }).click();
   await page.waitForFunction(
@@ -209,15 +192,14 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   const plain = await cellsOn();
   const dash = page.getByTestId('dash');
   await dash.click();
-  await expect(page.getByTestId('feet-left')).toHaveAttribute('data-dash-held', 'yes');
-  await expect(page.getByTestId('feet-left')).toContainText('Dash held');
   await expect(dash).toHaveAttribute('data-on', 'yes');
+  await expect(dash).toContainText('Dash · held · cancel');
   const held = await cellsOn();
   const beyond = [...held].filter((cell) => !plain.has(cell));
   expect(beyond.length, 'cells only the held Dash reaches').toBeGreaterThan(0);
   await shots.take('turn-3-dash-held');
   await dash.click();
-  await expect(page.getByTestId('feet-left')).toHaveAttribute('data-dash-held', 'no');
+  await expect(dash).toHaveAttribute('data-on', 'no');
   expect((await cellsOn()).size).toBe(plain.size);
   expect(await page.evaluate(() => window.__boomball!.state!.turn!.actionUsed)).toBe(false);
   // Held again, and spent by a walk only the Dash reaches: the first such
@@ -244,7 +226,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   // The same click is watched for audit line "retour 1 de 2H.5": between the
   // click and the first beat, the board and `seq` must still be the ones the
   // player was looking at. The sampler runs in the page, the captures here.
-  await page.getByRole('button', { name: 'slow', exact: true }).click();
+  await setReplay(page, 'slow');
   const seqBeforeSend = (await view(page)).seq;
   const boardBeforeSend = await boardOf(page);
   await startSendWatch(page);
@@ -257,7 +239,7 @@ test('sign in, hub, lobby, a match, three turns', async ({ page }, info) => {
   // A glide is a token between two cells: at some sample its box is not on
   // the cell grid the instant layout would have put it on.
   expect(glide.largestShift).toBeGreaterThan(2);
-  await page.getByRole('button', { name: 'instant', exact: true }).click();
+  await setReplay(page, 'instant');
   await page.evaluate(() => window.__boomball?.skipReplay());
 
   expect(await myTurn()).toBe('turn');

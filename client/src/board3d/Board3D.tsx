@@ -42,7 +42,7 @@ import type { BoardProps } from '../match/Board.js';
 import { fxBridge } from '../match/fxBridge.js';
 import { FLOAT_MS, type Cue, type Motion, type TimedCue } from '../match/motion.js';
 import { planOf, poseAt, type Plan, type Pose } from '../match/pose.js';
-import { Rig, type Zoom } from './Camera.js';
+import { Rig } from './Camera.js';
 import { Effects } from './Effects.js';
 import { Floaters } from './Floaters.js';
 import { Labels, Tag, type Label } from './Labels.js';
@@ -119,17 +119,27 @@ export function Board3D({
   onAct = null,
   plot = null,
   onPlotStep = null,
+  zoom = 'wide',
+  bottomInset = 0,
+  camera = null,
+  minimap = null,
+  highlight = null,
+  onHoverUnit = null,
+  tags = null,
+  names,
 }: BoardProps) {
   const units = activeUnits(state);
   const link = useMemo(() => newSceneLink(), []);
-  const [zoom, setZoom] = useState<Zoom>(() => {
-    try {
-      return localStorage.getItem('boomball.zoom') === 'close' ? 'close' : 'wide';
-    } catch {
-      return 'wide';
-    }
-  });
-  const [hoverUnit, setHoverUnit] = useState<UnitId | null>(null);
+  // The row's height, read by the rig once a frame (2H.38).
+  link.bottomInset = bottomInset;
+  const [hoverUnit, setHoverUnitState] = useState<UnitId | null>(null);
+  const setHoverUnit = useCallback(
+    (id: UnitId | null) => {
+      setHoverUnitState(id);
+      onHoverUnit?.(id);
+    },
+    [onHoverUnit],
+  );
   const [hover, setHover] = useState<Point | null>(null);
   // Whether the camera follows the play (C19): a pan lets go of it, and it
   // takes hold again when the player's own Giff comes on the clock.
@@ -138,6 +148,26 @@ export function Board3D({
   useEffect(() => {
     if (onTheClock !== null && onTheClock === yoursId) setHooked(true);
   }, [onTheClock, yoursId]);
+  // Choosing a preset in the settings takes hold of the play again, as the
+  // board's own button did before 2H.38.
+  const firstZoom = useRef(true);
+  useEffect(() => {
+    if (firstZoom.current) {
+      firstZoom.current = false;
+      return;
+    }
+    setHooked(true);
+  }, [zoom]);
+  // The match screen's ways in (2H.38): a chip, the minimap, the C key.
+  useEffect(() => {
+    if (!camera) return;
+    camera.centre = (cell) => link.centreOn?.(cell);
+    camera.follow = () => setHooked(true);
+    return () => {
+      camera.centre = null;
+      camera.follow = null;
+    };
+  }, [camera, link]);
 
   // -- Routes, as on the SVG board: the engine answers, this file asks ----------
   const canMove = onMove !== null;
@@ -206,9 +236,12 @@ export function Board3D({
   }, [mover, canMove, legal]);
 
   const onCellClick = (cell: Point) => {
-    if (!reachable) return;
-    const route = routeTo(cell);
-    if (!route) return;
+    // A click on the floor that walks nowhere closes the sheet and the labels (2H.38).
+    const route = reachable ? routeTo(cell) : null;
+    if (!route) {
+      onSelectUnit(null);
+      return;
+    }
     if (plotting) {
       setHover(null);
       onPlotStep?.(route);
@@ -346,17 +379,6 @@ export function Board3D({
     if (state.score.B > before.B) setFlash((f) => ({ ...f, A: performance.now() }));
   }, [state.score]);
 
-  const toggleZoom = () => {
-    const next: Zoom = zoom === 'wide' ? 'close' : 'wide';
-    setZoom(next);
-    setHooked(true);
-    try {
-      localStorage.setItem('boomball.zoom', next);
-    } catch {
-      /* a private window has no say */
-    }
-  };
-
   const motionCrackers = new Set(
     (motion?.steps ?? []).flatMap((t) => (t.step.kind === 'cracker' ? [t.step.crackerId] : [])),
   );
@@ -385,8 +407,11 @@ export function Board3D({
             isYou={yoursId === unit.id}
             selected={selected === unit.id}
             onTheClock={state.turn?.unitId === unit.id}
+            wide={zoom === 'wide'}
+            player={names?.get(unit.id) ?? null}
           />
         ),
+        spread: true,
       }),
     ),
     {
@@ -407,8 +432,23 @@ export function Board3D({
       ),
     },
   ];
-  if (hover && ahead) {
-    labels.push({ key: 'route', anchor: atCell(hover, 1.2), node: <Tag text={swingsText(ahead.swings)} bad={ahead.swings > 0} /> });
+  if (tags) {
+    const isCracker = state.crackers.some((c) => c.id === tags.anchorId);
+    labels.push({
+      key: `tags:${tags.anchorId}`,
+      anchor: above(isCracker ? `c:${tags.anchorId}` : `u:${tags.anchorId}`, isCracker ? 0.5 : GIFF_HEIGHT * 0.6),
+      node: tags.node,
+      beside: true,
+    });
+  }
+  if (hover && ahead && mover) {
+    // The feet left go at the end of the route (2H.38, `00` C37 point 3).
+    const left = (state.turn?.movementFeetRemaining ?? 0) - pathCostFeet({ x: mover.x, y: mover.y }, [...planned, ...ahead.segment]);
+    labels.push({
+      key: 'route',
+      anchor: atCell(hover, 1.2),
+      node: <Tag text={`${left} ft left · ${swingsText(ahead.swings)}`} bad={ahead.swings > 0} />,
+    });
   } else if (planned.length > 0) {
     labels.push({
       key: 'route',
@@ -427,7 +467,10 @@ export function Board3D({
         dpr={[1, 1.5]}
         camera={{ fov: 36, near: 1, far: 160, position: [0, 34, 26] }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
-        onPointerMissed={() => setHoverUnit(null)}
+        onPointerMissed={() => {
+          setHoverUnit(null);
+          onSelectUnit(null);
+        }}
         style={{ position: 'absolute', inset: 0 }}
       >
         <color attach="background" args={['#05070a']} />
@@ -476,7 +519,7 @@ export function Board3D({
             isYou={yoursId === unit.id}
             selected={selected === unit.id}
             onTheClock={state.turn?.unitId === unit.id}
-            spotlit={spotlight === unit.id}
+            spotlit={spotlight === unit.id || highlight === unit.id}
             ring={ringFor(unit.id)}
             ringKind={targetKind ?? (targets?.pass.has(unit.id) ? 'pass' : 'attack')}
             link={link}
@@ -489,7 +532,12 @@ export function Board3D({
         ))}
 
         {crackers.map((cracker) => (
-          <Cracker key={cracker.id} id={cracker.id} link={link} />
+          <Cracker
+            key={cracker.id}
+            id={cracker.id}
+            link={link}
+            onClick={() => onSelectUnit(selected === cracker.id ? null : cracker.id)}
+          />
         ))}
         {sparkSeen && <Spark link={link} />}
         <Ball link={link} />
@@ -505,28 +553,36 @@ export function Board3D({
       <Labels link={link} labels={labels} />
       <Floaters link={link} />
 
+      {/* The minimap, top right (2H.38, `00` C37 point 7): folds away on a
+          click or M, and a click on it moves the camera there. The presets
+          moved to the settings panel. */}
       <div style={S.hud}>
-        <button
-          className="ghost"
-          style={S.zoomButton}
-          data-testid="zoom-toggle"
-          onClick={toggleZoom}
-          title="Two framings: the whole silo, or the pitch's width around the play. Right-drag turns the camera, the wheel zooms, the arrow keys or Ctrl with the mouse move it; this button sets it back."
-        >
-          {zoom === 'wide' ? 'Close in' : 'Whole silo'}
-        </button>
+        {minimap && (
+          <button
+            className="ghost"
+            style={S.mapTab}
+            data-testid="minimap-toggle"
+            data-open={minimap.open ? 'yes' : 'no'}
+            onClick={minimap.onToggle}
+            title="Fold the minimap away, or bring it back (M)"
+          >
+            {minimap.open ? 'M · hide' : '▣ Map · M'}
+          </button>
+        )}
+        {(!minimap || minimap.open) && (
+          <Minimap state={state} own={own} yoursId={yoursId} width={minimap?.width ?? 225} onPick={(cell) => link.centreOn?.(cell)} />
+        )}
         {!hooked && (
           <button
             className="ghost"
             style={S.zoomButton}
             data-testid="follow-play"
             onClick={() => setHooked(true)}
-            title="Back on the play. The camera follows it again by itself when your Giff comes on the clock."
+            title="Back on the play (C). The camera follows it again by itself when your Giff comes on the clock."
           >
-            Follow the play
+            Follow the play · C
           </button>
         )}
-        <Minimap state={state} own={own} yoursId={yoursId} width={225} />
         {import.meta.env.DEV && <FpsReadout link={link} />}
       </div>
     </div>
@@ -824,14 +880,22 @@ const S: Record<string, React.CSSProperties> = {
   },
   hud: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 'calc(12px * var(--u, 1))',
+    right: 'calc(14px * var(--u, 1))',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
     gap: 6,
     pointerEvents: 'none',
   },
-  zoomButton: { fontSize: 10, padding: '4px 9px', pointerEvents: 'auto', background: 'rgba(5,7,10,.8)' },
+  zoomButton: { fontSize: 'calc(10px * var(--u, 1))', padding: '4px 9px', pointerEvents: 'auto', background: 'rgba(5,7,10,.8)' },
+  mapTab: {
+    fontSize: 'calc(10px * var(--u, 1))',
+    padding: 'calc(2px * var(--u, 1)) calc(7px * var(--u, 1))',
+    pointerEvents: 'auto',
+    background: 'rgb(10 14 17 / 62%)',
+    textTransform: 'none',
+    letterSpacing: '.04em',
+  },
   fps: { font: `600 10px 'IBM Plex Mono', monospace`, color: BRASS, background: 'rgba(5,7,10,.8)', padding: '1px 5px' },
 };

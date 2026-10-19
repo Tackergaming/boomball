@@ -1,8 +1,14 @@
 /**
  * A small static top-down map of the pitch, drawn in SVG with the same
  * convention as the 2D board: the engine's `y` is the screen column and `x`
- * the screen row. No text, no interaction, no hooks.
+ * the screen row. No text, no hooks.
+ *
+ * Since 2H.38 (`00` C37 point 7) a click on it moves the camera to that spot
+ * of the pitch (`onPick`, the cell under the cursor); folding it away is the
+ * board's business.
  */
+
+import type { Point } from '../../../engine/geometry.js';
 
 import { memo } from 'react';
 
@@ -28,11 +34,13 @@ export const Minimap = memo(function Minimap({
   own,
   yoursId,
   width = 270,
+  onPick,
 }: {
   state: MatchState;
   own: 'A' | 'B';
   yoursId?: UnitId | null;
   width?: number;
+  onPick?: (cell: Point) => void;
 }) {
   const units = activeUnits(state);
   const carrier = state.payload.carriedBy ? units.find((u) => u.id === state.payload.carriedBy) : undefined;
@@ -45,7 +53,14 @@ export const Minimap = memo(function Minimap({
         viewBox={`0 0 ${COLS} ${ROWS}`}
         width={width}
         height={width / 3}
-        style={{ pointerEvents: 'none', display: 'block' }}
+        style={{ pointerEvents: onPick ? 'auto' : 'none', display: 'block', cursor: onPick ? 'crosshair' : undefined }}
+        onClick={(e) => {
+          if (!onPick) return;
+          const box = e.currentTarget.getBoundingClientRect();
+          const y = Math.floor(((e.clientX - box.left) / box.width) * COLS);
+          const x = Math.floor(((e.clientY - box.top) / box.height) * ROWS);
+          onPick({ x: Math.max(0, Math.min(ROWS - 1, x)), y: Math.max(0, Math.min(COLS - 1, y)) });
+        }}
       >
         {/* Floor */}
         <rect x={0} y={0} width={COLS} height={ROWS} fill="#0a0e11" />

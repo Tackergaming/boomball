@@ -109,6 +109,42 @@ export async function prefer2D(page: Page): Promise<void> {
   });
 }
 
+/**
+ * The settings behind the gear (2H.38, `00` C37 point 4): replay speed, view,
+ * camera preset, volumes, and the seat buttons. Opens the panel if it is
+ * shut and returns it; `closeSettings` shuts it again with the gear.
+ */
+export async function openSettings(page: Page) {
+  const panel = page.getByTestId('settings-panel');
+  if (!(await panel.isVisible())) await page.getByTestId('settings-open').click();
+  await panel.waitFor({ state: 'visible' });
+  return panel;
+}
+
+export async function closeSettings(page: Page): Promise<void> {
+  // The match can end behind the panel (the house's round was the last): the
+  // results sheet takes the screen and the gear is gone with the panel.
+  const gear = page.getByTestId('settings-open');
+  if ((await page.getByTestId('settings-panel').isVisible()) && (await gear.count()) > 0) {
+    await gear.click({ timeout: 20_000 }).catch(() => undefined);
+  }
+  await page.getByTestId('settings-panel').waitFor({ state: 'detached', timeout: 20_000 });
+}
+
+/** Replay speed, through the gear. */
+export async function setReplay(page: Page, speed: 'slow' | 'normal' | 'instant'): Promise<void> {
+  const panel = await openSettings(page);
+  await panel.getByTestId(`replay-${speed}`).click();
+  await closeSettings(page);
+}
+
+/** One of the settings' buttons (a preset, a view, a seat button), clicked with the panel opened first. */
+export async function settingsClick(page: Page, testId: string): Promise<void> {
+  const panel = await openSettings(page);
+  await panel.getByTestId(testId).click();
+  if (await panel.isVisible()) await closeSettings(page);
+}
+
 /** Fails with the one explanation that fits when the hook never shows. */
 export async function waitForHook(page: Page): Promise<void> {
   try {
@@ -206,9 +242,10 @@ export async function waitForPlayableTurn(
 
     const prompt = page.getByTestId('place-prompt');
     await prompt.waitFor({ state: 'visible', timeout: 10_000 });
-    // 2H.23 (C25 2): the call button is greyed out while the place is asked.
+    // 2H.23 (C25 2): no live call button while the place is asked; since
+    // 2H.38 the question takes the row's place and the button is not drawn.
     const call = page.getByRole('button', { name: /call(ing)? for the ball/i });
-    if (!(await call.isDisabled())) throw new Error('"Call for the ball" is live while the place is asked');
+    if ((await call.count()) > 0 && !(await call.isDisabled())) throw new Error('"Call for the ball" is live while the place is asked');
     if (shots && !placeSeen) {
       placeSeen = true;
       await shots.take(`place-prompt-round-${board.round}`);

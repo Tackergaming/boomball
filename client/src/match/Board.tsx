@@ -28,7 +28,7 @@
  * display positions are the state's, in the same render, with no frame between.
  */
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
@@ -45,7 +45,9 @@ import {
 import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
 import { ARENA_HEIGHT, ARENA_WIDTH, arena, spec } from '../lib/arena.js';
-import type { Pending } from './ActionBar.js';
+import type { Zoom } from '../board3d/framing.js';
+import type { Pending } from './ActionRow.js';
+import type { CameraControl } from './cameraControl.js';
 import { fxBridge } from './fxBridge.js';
 import { FLOAT_MS, type Cue, type Motion } from './motion.js';
 import { planOf, poseAt, type BallPose } from './pose.js';
@@ -92,6 +94,23 @@ export interface BoardProps {
    */
   plot?: { readonly on: boolean; readonly route: readonly Point[] } | null;
   onPlotStep?: ((segment: Point[]) => void) | null;
+
+  // -- 2H.38 (`00` C37), read by the 3D board; the flat board ignores them. --
+  /** The camera preset, chosen in the settings panel. */
+  zoom?: Zoom;
+  /** The pixels at the bottom the action row covers: the camera frames the pitch above them. */
+  bottomInset?: number;
+  /** Filled in by the 3D board: centre on a cell, follow the play. */
+  camera?: CameraControl | null;
+  /** The minimap's fold, remembered by the match screen, and its width. */
+  minimap?: { readonly open: boolean; readonly width: number; readonly onToggle: () => void } | null;
+  /** A unit lit from the turn order's chips, and the unit under the cursor told back. */
+  highlight?: UnitId | null;
+  onHoverUnit?: ((unitId: UnitId | null) => void) | null;
+  /** The action labels beside the selected target (a unit or a Cracker), drawn on the pitch. */
+  tags?: { readonly anchorId: string; readonly node: ReactNode } | null;
+  /** The first names of the humans driving other Giffs, by unit id. */
+  names?: ReadonlyMap<string, string>;
 }
 
 /** The unit as it would stand on `cell`, so the engine can be asked about the walk from there. */

@@ -31,7 +31,7 @@ migrations 0013 et 0014 (un déclencheur fige `team_id`, l'insertion est « sa p
 du moteur et de `resolve-action` (v28), M3 et m4 par la migration 0015 (les trois canaux Realtime
 privés, la base diffuse elle-même, `private_only` sur le projet, fonctions v29 et v26), m2, m3,
 m5 acceptés, m6 écrite en 0016 à appliquer, n8 au prochain lot client. Le client de 2H.36 puis
-celui de 2H.37 mis en ligne sur mon feu vert. 777 tests. Reste ma partie à deux sur les canaux
+celui de 2H.37 mis en ligne sur mon feu vert. Le 2026-10-19, 2H.38, l'écran de match refait (`00` C37), est codée avec n8, pas encore en ligne. 842 tests. Reste ma partie à deux sur les canaux
 privés, 0016, puis un ami qui joue sans moi. Ce qui suit est dans
 `docs/05-reprise-chat-suivant.md`.
 

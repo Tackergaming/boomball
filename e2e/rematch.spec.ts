@@ -20,7 +20,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { chooseAction } from '../ai/chooseAction.js';
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import { Shots, act, prefer2D, report, stamp, state, view, waitForHook, waitForPlayableTurn, watch } from './harness.js';
+import { Shots, act, prefer2D, report, stamp, state, view, waitForHook, waitForPlayableTurn, watch, setReplay, settingsClick } from './harness.js';
 
 const arena = new Arena(KILL_SILO);
 const viewport = { width: 1440, height: 900 };
@@ -48,7 +48,7 @@ async function intoTheSilo(page: Page): Promise<void> {
   await waitForHook(page);
   const into = page.getByRole('button', { name: 'Into the silo' });
   if (await into.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) await into.click();
-  await page.getByRole('button', { name: 'instant', exact: true }).click();
+  await setReplay(page, 'instant');
 }
 
 /** Plays this seat with the house's brain until the whistle. Returns the requests sent. */
@@ -155,7 +155,7 @@ test('@coop two players finish a match and play again with two seats', async ({ 
     await owner.take('rematch-board-owner');
 
     // -- Clean up: the owner abandons the rematch -----------------------------
-    await page.getByTestId('leave-match').click();
+    await settingsClick(page, 'leave-match');
     await page.getByTestId('abandon-yes').click();
     await expect(page.getByRole('heading', { name: 'E2E Battery' })).toBeVisible({ timeout: 30_000 });
     await expect(second.getByRole('heading', { name: 'E2E Battery' })).toBeVisible({ timeout: 30_000 });

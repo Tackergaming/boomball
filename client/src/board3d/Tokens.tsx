@@ -37,6 +37,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 
 import type { Unit, UnitId } from '../../../engine/types.js';
 import { giffBody } from './giffRig.js';
+import { ROLE_LETTER } from '../match/TurnStrip.js';
 import { type SceneLink, shirt } from './scene.js';
 
 /** Built from Jérôme's model by `scripts/blender/rig_giff.py` (2H.23). */
@@ -113,40 +114,53 @@ export function Token({ unit, own, isYou, selected, onTheClock, spotlit, ring, r
   );
 }
 
-/** The plate over a Giff's head, for the label layer. */
-export function Plate({ unit, own, isYou, selected, onTheClock }: { unit: Unit; own: 'A' | 'B'; isYou: boolean; selected: boolean; onTheClock: boolean }) {
+/**
+ * The plate over a Giff's head, for the label layer. Since 2H.38 (`00` C37
+ * point 7) it shrinks in the wide view to the role's letter and the HP, and
+ * shows the whole name when close in and on the selected Giff; it says "YOU"
+ * on the player's Giff and the player's first name on a human team-mate's.
+ * The label layer keeps the plates apart and inside the frame.
+ */
+export function Plate({
+  unit,
+  own,
+  isYou,
+  selected,
+  onTheClock,
+  wide,
+  player,
+}: {
+  unit: Unit;
+  own: 'A' | 'B';
+  isYou: boolean;
+  selected: boolean;
+  onTheClock: boolean;
+  wide: boolean;
+  /** The first name of the human who drives this Giff, when it is not this player. */
+  player: string | null;
+}) {
   const colour = shirt(unit.team, own, isYou);
   const hurt = unit.hp / unit.maxHp;
-  const given = unit.name.split(' ')[0] ?? unit.name;
-  const label = selected ? unit.name : given.slice(0, 4);
+  const full = selected || !wide;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} data-plate={unit.id}>
-      {isYou && <span style={{ color: colour, fontSize: 10, lineHeight: '8px' }}>▼</span>}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 6,
-          padding: '2px 6px',
-          background: 'rgba(5,7,10,.88)',
-          border: `1px solid ${selected || onTheClock ? colour : 'rgba(255,255,255,.08)'}`,
-          font: `600 11px 'IBM Plex Mono', monospace`,
-          color: colour,
-        }}
-        title={unit.name}
-      >
-        <span style={{ opacity: 0.75 }}>{unit.role[0]!.toUpperCase()}</span>
-        <span>{label}</span>
-        <span style={{ fontWeight: 700, color: hurt <= 0.34 ? '#ff8fa0' : colour }}>{unit.hp}</span>
-        {!unit.reactionAvailable && (
-          <span style={{ color: '#6b7c84' }} title={`${unit.name}: Reaction spent this round`}>
-            ⊘
-          </span>
-        )}
-      </div>
-      <div style={{ width: 44, height: 3, background: 'rgba(5,7,10,.8)' }}>
-        <div style={{ width: `${Math.max(0, hurt) * 100}%`, height: '100%', background: colour }} />
-      </div>
+    <div
+      className="bb-nameplate"
+      data-plate={unit.id}
+      style={{ borderColor: selected || onTheClock ? colour : isYou ? '#c9b489' : 'rgba(255,255,255,.12)', borderWidth: selected ? 2 : 1 }}
+      title={unit.name}
+    >
+      <span className="rl" style={{ color: colour }}>
+        {ROLE_LETTER[unit.role]}
+      </span>
+      {full && <span style={{ color: colour }}>{unit.name}</span>}
+      <span style={{ fontWeight: 700, color: hurt <= 0.34 ? '#ff8fa0' : 'var(--text-dim)' }}>{unit.hp}</span>
+      {!unit.reactionAvailable && (
+        <span style={{ color: '#6b7c84' }} title={`${unit.name}: Reaction spent this round`}>
+          ⊘
+        </span>
+      )}
+      {isYou && <span className="tag">YOU</span>}
+      {!isYou && player && <span className="tag mate">{player}</span>}
     </div>
   );
 }

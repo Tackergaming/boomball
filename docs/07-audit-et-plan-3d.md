@@ -2133,3 +2133,23 @@ vue par Jérôme, puis le client de 2H.36 mis en ligne sur son feu vert avant le
 
 **Porte ouverte** : sa partie à deux sur les canaux privés, 0016 à appliquer, puis un ami qui
 crée un compte et joue sans lui.
+
+### Sous-phase 2H.38, « l'écran de match refait », codée le 2026-10-19, pas encore en ligne
+
+Par le fil principal (Opus 5.5) à partir de `00` C37 (cadré et maquetté le matin même, validé sans
+correction), avec cinq sous-agents Sonnet 5.5 sur fichiers disjoints et consigne fermée : A
+`match/odds.ts` (effort moyen), B `match/keys.ts` et `board3d/plateSpread.ts` (moyen), C les trois
+volumes de `match/sound.ts` (moyen), D le fil en bandeau et en tiroir de `match/Feed.tsx` (élevé),
+E le panneau ⚙ `match/SettingsPanel.tsx` (moyen). Rien dans le moteur, l'IA, les fonctions ni la
+base ; `ENGINE_VERSION` reste 11 ; pas de sweep. Détail en `00` C37, « comment 2H.38 est codée ».
+
+| Quoi | État |
+|---|---|
+| L'écran | La barre à deux lignes et ses pastilles, le plateau plein cadre, la rangée et les étiquettes avec leurs chances, la fiche au clic, le fil qui s'efface et son tiroir, la minicarte repliable et cliquable, les plaques écartées, ⚙ avec trois volumes, le clavier, la coop dans le coin du chrono, la question de place dans la rangée ; la colonne de droite, le panneau d'actions et la carte de dés retirés ; la caméra cadre au-dessus de la rangée (`insetLens`) |
+| n8 | Le plancher à 8 caractères dans `AccountMenu.tsx` et à l'inscription de `SignIn.tsx` ; **le PATCH `password_min_length` attend le feu vert de Jérôme** |
+| Tests | **842 sur 50 fichiers** (777, plus odds 19, keys 19, plateSpread 14, feed 8, turnStrip 3, framing 2, sound et le test de `PlacePrompt` retiré) ; typecheck racine, scripts, e2e et client verts |
+| Harnais | La fenêtre Playwright à 1536 × 695 par défaut, `E2E_VIEWPORT=2560x1271` pour le 27 pouces ; les réglages par `openSettings`, `setReplay`, `settingsClick`. **Smoke 2D vert en 36 s ; `e2e:board3d` vert en 14,0 min au portable et en 22,1 min au 27 pouces** (cinq captures neuves, lues aux deux tailles). Deux contrôles du spec 3D passés sur un observateur posé dans la page (le bandeau « Your turn » et les lignes neuves du fil s'effacent avant que des étapes à 2 images par seconde les regardent) |
+| Pas en ligne | Le client en ligne reste celui de 2H.37 ; le redéploiement emportera aussi le 503 du 2026-10-19 |
+
+**Porte ouverte** : son feu vert pour n8 et le client, puis sa partie sur le portable et sur le
+27 pouces.

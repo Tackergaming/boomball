@@ -1,10 +1,10 @@
 On reprend Boomball, le jeu vidéo. Il vit à la racine de ce workspace.
 Charge le skill boomball, puis lis EN ENTIER docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, 2H.37
-est la dernière sous-phase codée (les phases 3, 4 et 5 sont faites par 2H.15, la 6 par 2H.29,
-la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et la limite de présence, 2H.36 le
-premier lot de la phase 8, 2H.37 les corrections de la revue de sécurité), **2H.38 est CADRÉE ET
-MAQUETTÉE, PAS CODÉE : C'EST TA TÂCHE**, 2H.39 (la caméra) vient après, §9 la parallélisation.
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, **2H.38
+est la dernière sous-phase codée, le 2026-10-19, PAS ENCORE EN LIGNE** (les phases 3, 4 et 5 sont
+faites par 2H.15, la 6 par 2H.29, la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et
+la limite de présence, 2H.36 le premier lot de la phase 8, 2H.37 les corrections de la revue de
+sécurité, 2H.38 l'écran de match refait), 2H.39 (la caméra) vient après, §9 la parallélisation.
 Lis ensuite la partie C de docs/00-reglement-v2.md : les écarts 27 à 65, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 à C16 les passes suivantes de l'IA (chacune finit par « comment ...
@@ -31,61 +31,56 @@ migration 0015 (les trois canaux Realtime PRIVÉS, politiques sur `realtime.mess
 diffuse `roll` et `abandoned` elle-même), `announceAbandoned` et `announceTeamChange` SUPPRIMÉES,
 `lib/channelReopen.ts`, fonctions v29 et v26 en supabase-js 2.113.0, `private_only` à vrai sur le
 projet ; m2, m3, m5 acceptés ; m6 en 0016, appliquée ; n8 avec 2H.38. **C37 EST 2H.38, L'ÉCRAN DE
-MATCH REFAIT, CADRÉ PAR MOI LE 2026-10-19 EN DIX POINTS PUIS SUR UNE MAQUETTE CLIQUABLE QUE J'AI
-VALIDÉE SANS CORRECTION** : lis-le EN ENTIER, c'est ton cahier des charges, avec ses trois
-précisions du fil principal et sa liste de fichiers ; ouvre la maquette
-`design/2H38-ecran-de-match/index.html` (elle s'ouvre seule dans un navigateur) avant d'écrire une
-ligne. Ne rediscute rien de C12 à C37.
+MATCH REFAIT, CADRÉ PAR MOI LE 2026-10-19 EN DIX POINTS SUR UNE MAQUETTE VALIDÉE SANS CORRECTION
+(`design/2H38-ecran-de-match/index.html`), PUIS CODÉ LE MÊME JOUR** : lis « comment 2H.38 est
+codée » à la fin de C37 avant de toucher à l'écran. Ne rediscute rien de C12 à C37.
 07 §10 porte le journal (2H.15 la 2.5D fichier par fichier, 2H.16 à 2H.20 la caméra, 2H.21 et
 2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31 à
-2H.37). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
+2H.38). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
 2H.8. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend. 10 est le
-rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, lis
-son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
+rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, n8 est
+dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
 
-Où on en est : **2H.37 EST CODÉE, APPLIQUÉE ET EN LIGNE LE 2026-10-18 AU MATIN. `ENGINE_VERSION`
-toujours 11.** **Le 2026-10-19 : `resolve-action` v30 et `create-match` v27 en ligne** (commit
-`f5fdf61`) : le 404 « no such match » de 2H.22 est revenu à `e2e:board3d` sur la première requête
-après cinq minutes d'inaction ; la fonction relit une fois une lecture du match qui échoue, ne dit
-404 que sur zéro ligne (`PGRST116`), sinon 503 « could not read the match » avec l'erreur, écrite
-dans ses logs ; `useMatch.send` traite ce 503 comme le 404 (part avec le prochain client). Cause
-serveur toujours inconnue : si la ligne « reading the match failed » apparaît dans les logs de la
-fonction, dis-le-moi. `e2e:board3d` vert en 6,1 min sur la v30. Le même jour, une comparaison 2.5D
-contre 3D (artifact) : **je garde la 2.5D**. 777 tests verts sur
-47 fichiers, typecheck racine, scripts, e2e et client verts. Smoke 2D vert en 42,6 s (sur la v28),
-`npm run e2e:coop` vert en 4,3 min sur les canaux privés, `npm run e2e:abandon` vert en 13 s,
-`rls-check.py` 38 sur 38. **LE CLIENT EN LIGNE (https://boomball.vercel.app) EST CELUI DE 2H.37**,
-bundle `index-CKHWjOUz.js`, canaux privés, menu « Account », ligne « Ask Jérôme », repli sans
-WebGL. **Le projet Realtime est en `private_only`** : tout nouveau canal doit être
-`private: true` ET avoir une politique sur `realtime.messages`, sinon la jointure est refusée.
-Migrations appliquées : **0001 à 0016** (0016, `teams_one_per_owner`, appliquée par moi le 18
-après l'écriture de l'ancien prompt). Vérifier git status et git log origin/main..main en premier
-et me le dire : le 18 octobre, Boomball a déménagé de jarvis-jdr dans ce workspace, avec son
-historique (voir HISTORY.md). assets/source/ (mes sources) est ignoré par git : ne le commite
-jamais.
-`backups/` est ignoré par git et contient les codes d'invitation : jamais dans un
-dossier partagé.
+Où on en est : **2H.38 EST CODÉE LE 2026-10-19, PAS COMMITÉE, PAS EN LIGNE** (sauf si je te dis
+l'avoir fait commiter à la fin du chat précédent : vérifie `git status`). L'écran de match refait
+selon C37 : barre à deux lignes et pastilles, plateau plein cadre, rangée transparente des seules
+actions jouables, étiquettes sur cible avec leur pourcentage exact (`match/odds.ts`), fiche au clic,
+fil qui s'efface et tiroir (L), minicarte repliable et cliquable (M), ⚙ avec trois volumes, le
+clavier, la coop dans le coin du chrono, la question de place dans la rangée, la caméra qui cadre
+au-dessus de la rangée (`insetLens`). n8 est dans les deux écrans (`PASSWORD_MIN_LENGTH` = 8,
+la connexion n'impose rien). **842 tests verts sur 50 fichiers**, typecheck racine, scripts, e2e et
+client verts, **smoke 2D vert en 36 s, `e2e:board3d` vert en 14,0 min à 1536 × 695 et en 22,1 min à 2560 × 1271**, captures lues. **NON
+RELANCÉS sur 2H.38 : `e2e:coop`, `e2e:abandon`, `e2e:playthrough`, `e2e:account`** (leurs specs
+sont réécrites sur ⚙). `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
+`create-match` v27 (le 503 « could not read the match » ; si la ligne « reading the match failed »
+apparaît dans les logs de la fonction, dis-le-moi). **LE CLIENT EN LIGNE
+(https://boomball.vercel.app) EST TOUJOURS CELUI DE 2H.37**, bundle `index-CKHWjOUz.js`. **Le
+projet Realtime est en `private_only`** : tout nouveau canal doit être `private: true` ET avoir une
+politique sur `realtime.messages`. Migrations appliquées : **0001 à 0016**. Vérifier git status et
+git log origin/main..main en premier et me le dire. assets/source/ (mes sources) est ignoré par
+git : ne le commite jamais. `backups/` est ignoré par git et contient les codes d'invitation :
+jamais dans un dossier partagé.
 
-L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (5) FAITS (ligue et abandon, phase 6, client en
-ligne, coop, interface d'équipe, ma partie à deux avec revanche) ; (6) la phase 8 : **le cadrage,
-2H.36 et 2H.37 FAITS, 0016 appliquée** ; **(7) 2H.38, l'écran de match refait (`00` C37), CADRÉ
-ET MAQUETTÉ, À CODER** ; (8) 2H.39, la caméra (déplacement, zooms, angles), un lot à part à cadrer
-avec moi dans son propre chat, après 2H.38. Restent aussi, sans date : ma partie à deux sur les
-canaux privés (la porte de 2H.37) et un ami qui crée un compte et joue sans moi (la porte de la
-phase 8 : il reçoit l'URL, « No account yet », e-mail, mot de passe, nom, « Or join a team with a
-code »).
+L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (6) FAITS ; **(7) 2H.38, l'écran de match refait
+(`00` C37), CODÉ, À VÉRIFIER, COMMITER ET METTRE EN LIGNE** ; (8) 2H.39, la caméra (déplacement,
+zooms, angles), un lot à part à cadrer avec moi dans son propre chat, après ma partie sur 2H.38.
+Restent aussi, sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui
+crée un compte et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **CODER 2H.38 selon `00` C37 et la
-maquette**, sans rouvrir le cadrage : les dix points sont tranchés, les trois précisions du fil
-principal (Shoot et Catch the Spark dans la rangée, Plot route gardé dans la rangée, l'écran en
-anglais) sont à me signaler en livrant. Annonce-moi d'abord ton découpage en lots et tes
-sous-agents (modèle et effort en une ligne chacun), puis construis. **Teste aux deux tailles de
-mes écrans** (Playwright à 1536 × 695 et à 2560 × 1271) et lis les captures. **n8 part avec ce
-lot** : `password_min_length` à 8 par l'API de gestion (`/v1/projects/{ref}/config/auth`, PATCH,
-sur mon feu vert) ET les deux écrans qui disent « At least 6 characters » (`SignIn.tsx`,
-`AccountMenu.tsx`) dans le même redéploiement du client, qui emporte aussi le 503 du 19. Le
-redéploiement du client, sur mon feu vert seulement. **Ne touche pas à la caméra au-delà des trois
-accès de C37** (clic sur une pastille, clic sur la minicarte, touche C) : la caméra est 2H.39.
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **finir 2H.38 sans rien rouvrir** :
+(a) lancer `npm run e2e:abandon`, `npm run e2e:coop` et `npm run e2e:playthrough` (jamais en même
+temps que `e2e:board3d` ni que `npm test`), corriger ce qui casse, lire les captures ; (b) les deux
+`e2e:board3d` sont verts, ne les relance que si (a) touche l'écran ; (c) me
+signaler en une fois les trois précisions du fil principal (Shoot et Catch the Spark dans la
+rangée, Plot route gardé dans la rangée, l'écran en anglais) et les choix faits au code (le bouton
+End turn part au clic, seule la touche E demande deux appuis ; « Follow the play · C » reste sous
+la minicarte quand la caméra est décrochée ; les étiquettes de cible se posent au-dessus de la
+rangée en 2D ; le fil ne répète pas les ouvertures de round, le bandeau central les dit) ; (d)
+**sur mon feu vert seulement** : le PATCH `password_min_length` à 8
+(`/v1/projects/{ref}/config/auth`, relire après, la réponse peut être vide), puis `npm run build`
+dans `client/` et `node scripts/deploy-vercel.mjs --production`, puis une sonde Playwright sur
+l'URL en ligne ; (e) commit puis push sur mon mot. Ensuite ma partie sur le portable et le 27
+pouces. **Ne touche pas à la caméra au-delà des trois accès de C37** : la caméra est 2H.39.
 **Fermer les inscriptions** (`disable_signup`) le jour où je le dis, pas avant.
 
 Ce qu'il faut savoir tout de suite.
@@ -132,12 +127,22 @@ Ce qu'il faut savoir tout de suite.
    ou rejoindre le compte e2e n'est pas destructif, et un compte jetable créé par l'API admin et
    supprimé après non plus (c'est ce que fait `rls-check.py`). `npm run export:db` est une lecture.
 
-6. Le harnais : npm run e2e en 18 à 55 s, e2e:playthrough en 15 à 70 s, e2e:board3d en 6 à 10
-   min, e2e:abandon en 10 s, e2e:coop en 2 à 5 min (deux specs, hors de npm run e2e ; il
-   abandonne le match e2e en cours pour atteindre le lobby, et abandonne le match coop qu'il
+6. Le harnais : npm run e2e en 30 à 55 s, e2e:playthrough en 15 à 70 s, **e2e:board3d en 14 min
+   à 1536 × 695 (vingt de marge) et jusqu'à 45 à 2560 × 1271**, e2e:abandon en 10 s, e2e:coop en
+   2 à 5 min (deux specs, hors de npm run e2e ; il abandonne le match e2e en cours pour atteindre
+   le lobby, et abandonne le match coop qu'il
+   ouvre)abandonne le match coop qu'il
    ouvre), e2e:account en 8 s (hors de npm run e2e : il change le mot de passe du compte e2e et le
    remet dans un `finally` ; s'il casse entre les deux, le compte garde l'original suivi de
-   `-tmp`, à remettre à la main). **Ne lance jamais npm test et e2e:board3d en même temps** : à
+   `-tmp`, à remettre à la main). **Depuis 2H.38 les réglages sont derrière ⚙** : vitesse, vue,
+   préréglage de caméra, volumes, et les boutons « Leave the match », « Hand my Giff to the
+   house », « Back to the hub » ; le harnais passe par `openSettings`, `closeSettings`,
+   `setReplay`, `settingsClick` (`e2e/harness.ts`). La fenêtre Playwright vaut **1536 × 695 par
+   défaut** et `E2E_VIEWPORT=2560x1271` donne le 27 pouces. Ouvrir ⚙ coûte plusieurs secondes à 2
+   images par seconde : un contrôle de quelque chose qui s'efface (bandeau, ligne neuve du fil)
+   passe par un observateur posé dans la page, comme dans `board3d.spec.ts`. Le match e2e qui
+   finit pendant le tour de la maison emporte l'écran et la roue : le run suivant en ouvre un
+   neuf. **Ne lance jamais npm test et e2e:board3d en même temps** : à
    2 fps sous GL logiciel le bandeau « Your turn » de 1,2 s est raté et le spec tombe. Le crochet
    window.__boomball (DEV seulement) : fx(), audio(), crowd(), lastSaid(), probe(), clickCell,
    act, legalSummary ; `yours` du crochet est faux derrière le briefing (utiliser waitFor sur
@@ -212,12 +217,12 @@ Ce qu'il faut savoir tout de suite.
     Le cwd de l'outil Bash se réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 65 de 00
-    partie C, et C11 à C37 en entier. 2H.38 solde de cette dette : le nom du joueur sur la plaque
-    des autres pions humains, le bandeau « Your turn » à revoir avec le coin du chrono. Dette connue : `Match.tsx` appelle `onFinished` à chaque
-    rendu une fois la phase finie (à borner par un `useRef`) ; « Giff picks the league » et « Giff
+    partie C, et C11 à C37 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
+    des autres pions humains et `onFinished` appelé à chaque rendu. Dette connue : le bandeau
+    « Your turn » à revoir avec le coin du chrono (C37 ne l'a pas tranché) ; « Giff picks the league » et « Giff
     starts the match » se répètent dans la barre du membre ; `mergeRoll` reste côté client,
     inutile depuis 0012 ; la RPC garde le nom `battery_members` et `create-match` dit encore
-    « battery » dans un message ; le nom du joueur sur la plaque des autres pions humains ; le
+    « battery » dans un message ; le
     bandeau « Your turn » qui reste sa durée après un siège remis ; un spectateur ne frappe pas à
     la porte ; `e0d9b642` (moteur 10) et tous les matchs antérieurs ne se rejouent plus ;
     arenas.art et le champ art nomment trois JPEG retirés ; substituteEntry non lu ; la parade du

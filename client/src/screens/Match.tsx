@@ -14,9 +14,20 @@
  * knock: when the clock reaches zero it sends one request so that the server
  * *does* notice, because a timer that runs out and changes nothing is worse
  * than no timer at all.
+ *
+ * **The frame, since 2H.38** (`00` C37, cadré par Jérôme le 2026-10-19 sur une
+ * maquette validée sans correction): one bar on top, two lines (the score,
+ * then the order of the turns in chips), the board on everything else, and
+ * the rest laid over the board in its corners, in glass: the clock top left
+ * and under it the sheet of a clicked Giff, the minimap top right, the feed
+ * bottom left fading by itself with its drawer, the row of playable actions
+ * along the bottom with the labels beside a clicked target, every setting
+ * behind the gear. The right column (ladder, sheet, feed), the action panel
+ * and the dice card are gone. The interface grows with the window through
+ * `--u`, 1 on Jérôme's laptop (1536 x 695) and 1.4 on his 27 inch.
  */
 
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
@@ -27,27 +38,39 @@ import { isHuman } from '../../../engine/types.js';
 import { arena } from '../lib/arena.js';
 import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
 import { webglAvailable } from '../lib/webgl.js';
-import { ActionBar, type Pending } from '../match/ActionBar.js';
-import { Announce } from '../match/Announce.js';
+import { DIRECTIONS } from '../../../engine/geometry.js';
+import { ActionRow, TargetTags, type Act, type Pending } from '../match/ActionRow.js';
 import { Banner, type Announcement } from '../match/Banner.js';
 import { Board } from '../match/Board.js';
 import { dashNeeded, heldDashState } from '../match/dashHold.js';
 import { fxBridge } from '../match/fxBridge.js';
 import { FLOAT_MS, type Cue } from '../match/motion.js';
-import { createSounds, readSoundEnabled, type AnnouncerCue, type SoundKind, type Sounds } from '../match/sound.js';
+import { createSounds, readVolumes, type AnnouncerCue, type SoundKind, type Sounds, type VolumeChannel } from '../match/sound.js';
 import { ANNOUNCER_LINES } from '../match/announcer.js';
 // The 2.5D board and the whole three.js stack come down only when asked for.
 const Board3D = lazy(() => import('../board3d/Board3D.js').then((m) => ({ default: m.Board3D })));
 import { projectCell } from '../board3d/projection.js';
 import { Briefing, hasBeenBriefed } from '../match/Briefing.js';
-import { PlacePrompt } from '../match/PlacePrompt.js';
 import { AbandonPrompt } from '../match/AbandonPrompt.js';
 import { YieldPrompt } from '../match/YieldPrompt.js';
 import { clockText, secondsLeft as clockSecondsLeft, teammateKnockDue } from '../match/coopClock.js';
-import { Feed } from '../match/Feed.js';
-import { Ladder } from '../match/Ladder.js';
-import { TurnStrip } from '../match/TurnStrip.js';
+import { FeedDrawer, FeedRibbon, type FeedNote } from '../match/Feed.js';
+import { TONE_COLOUR, TurnStrip, type ClockTone } from '../match/TurnStrip.js';
 import { SeatPanel } from '../match/SeatPanel.js';
+import { SettingsPanel } from '../match/SettingsPanel.js';
+import { newCameraControl } from '../match/cameraControl.js';
+import { commandForKey, endTurnArmed, isTypingTarget, pressEndTurn, type KeyCommand } from '../match/keys.js';
+import {
+  actionLine,
+  batChance,
+  catchChance,
+  oddsBand,
+  passChance,
+  shotChance,
+  shoveChance,
+  swingChance,
+} from '../match/odds.js';
+import type { Zoom } from '../board3d/framing.js';
 import { cellToScreen, publishHook, summarise, withdrawHook } from '../match/testHook.js';
 import { beatHoldMs, useMatch, type Speed } from '../match/useMatch.js';
 
@@ -56,6 +79,7 @@ export function Match({
   userId,
   teamName,
   isOwner,
+  playerNames,
   onFinished,
   onLeft,
 }: {
@@ -64,6 +88,8 @@ export function Match({
   teamName: string;
   /** Whether this player owns the team: the owner alone abandons (2H.28), a team-mate hands over (2H.33). */
   isOwner: boolean;
+  /** The team's players' first names by profile id, for the human team-mates' chips and plates (2H.38). */
+  playerNames?: ReadonlyMap<string, string>;
   onFinished: () => void;
   /**
    * Back to the hub without a result: the owner abandoned the match from
@@ -145,7 +171,8 @@ export function Match({
    * for the first render, before the instance exists.
    */
   const soundsRef = useRef<Sounds | null>(null);
-  const [soundOn, setSoundOn] = useState(() => readSoundEnabled());
+  // Three volumes behind the gear since 2H.38 (`00` C37 point 4), in place of "Sound on".
+  const [volumes, setVolumes] = useState(() => readVolumes());
   useEffect(() => {
     const sounds = createSounds();
     soundsRef.current = sounds;
@@ -154,10 +181,9 @@ export function Match({
       sounds.dispose();
     };
   }, []);
-  const toggleSound = () => {
-    const next = !soundOn;
-    soundsRef.current?.setEnabled(next);
-    setSoundOn(next);
+  const setVolume = (channel: VolumeChannel, value: number) => {
+    soundsRef.current?.setVolume(channel, value);
+    setVolumes((old) => ({ ...old, [channel]: value }));
   };
 
   const state = match.state;
@@ -207,8 +233,13 @@ export function Match({
     return () => clearInterval(tick);
   }, []);
 
+  // Once (2H.38): `App` hands a new function every render, and this used to
+  // call it on every render once the match was over.
+  const finishedSent = useRef(false);
   useEffect(() => {
-    if (state?.phase === 'finished') onFinished();
+    if (state?.phase !== 'finished' || finishedSent.current) return;
+    finishedSent.current = true;
+    onFinished();
   }, [state?.phase, onFinished]);
 
   const send = match.send;
@@ -471,18 +502,6 @@ export function Match({
   const mineRole = state?.units.find((u) => u.id === mineId)?.role ?? null;
   const roleName = mineRole === 'striker' ? 'Strikers' : mineRole === 'breaker' ? 'Breakers' : 'your role';
 
-  // The place popup is born at the top left of the body (Jérôme, 2026-10-14,
-  // 2H.14; it used to sit over the right column) and the player can drag it.
-  // The parent owns the position so it survives the popup unmounting between
-  // rounds: kept for the whole match.
-  const bodyRef = useRef<HTMLDivElement | null>(null);
-  const [placePos, setPlacePos] = useState<{ x: number; y: number } | null>(null);
-  const placeShown = placing !== null && !briefing;
-  useLayoutEffect(() => {
-    if (!placeShown || placePos !== null) return;
-    setPlacePos({ x: 0, y: 0 });
-  }, [placeShown, placePos]);
-
   const postOrders = match.order;
   const callForBall = useCallback(async () => {
     if (!state || !onClock) return;
@@ -658,6 +677,102 @@ export function Match({
     soundsRef.current?.say('clock');
   }, [turnBanner, secondsLeft]);
 
+  // -- The frame (2H.38, `00` C37) -----------------------------------------------
+  // Hooks, so above the early return on `state` like the others.
+  const viewport = useViewport();
+  const u = viewport.u;
+  // The laptop's strip of chips stops after eight; the 27 inch shows the round.
+  const compact = viewport.width < 1900;
+  const [zoom, setZoomState] = useState<Zoom>(() => (readStored('boomball.zoom') === 'close' ? 'close' : 'wide'));
+  const setZoom = (next: Zoom) => {
+    setZoomState(next);
+    writeStored('boomball.zoom', next);
+  };
+  const [mapOpen, setMapOpen] = useState(() => readStored('boomball.minimap') !== 'closed');
+  const toggleMap = useCallback(() => {
+    setMapOpen((open) => {
+      writeStored('boomball.minimap', open ? 'closed' : 'open');
+      return !open;
+    });
+  }, []);
+  const [logOpen, setLogOpen] = useState(false);
+  const [gearOpen, setGearOpen] = useState(false);
+  const closeGear = useCallback(() => setGearOpen(false), []);
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    else void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  }, []);
+  const camera = useMemo(() => newCameraControl(), []);
+  // A chip hovered lights its Giff, and a Giff hovered lights its chip.
+  const [chipHover, setChipHover] = useState<string | null>(null);
+  const [boardHover, setBoardHover] = useState<string | null>(null);
+  // Where the Giff would slot in, while 1st, 2nd or 3rd is hovered (écart 58).
+  const [placePreview, setPlacePreview] = useState<number | null>(null);
+  useEffect(() => {
+    if (placing === null) setPlacePreview(null);
+  }, [placing]);
+  // "Bat a Cracker" pressed: the labels become the lines it can go down.
+  const [aimCracker, setAimCracker] = useState<string | null>(null);
+  useEffect(() => {
+    setAimCracker(null);
+  }, [match.seq, selected]);
+  // E pressed once: "Press E again" for three seconds.
+  const [endArmedAt, setEndArmedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (endArmedAt === null) return;
+    const timer = setTimeout(() => setEndArmedAt(null), 3000);
+    return () => clearTimeout(timer);
+  }, [endArmedAt]);
+  useEffect(() => {
+    setEndArmedAt(null);
+  }, [turnKeyNow]);
+  // The first names of the humans driving the other Giffs (the chips, the plates, the sheet).
+  const units = state?.units;
+  const names = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const unit of units ?? []) {
+      if (unit.controller.kind !== 'human' || unit.controller.humanId === userId) continue;
+      const first = playerNames?.get(unit.controller.humanId);
+      if (first) out.set(unit.id, first);
+    }
+    return out;
+  }, [units, playerNames, userId]);
+  // The clock's notes go into the feed (`00` C37 point 8), once each.
+  const [notes, setNotes] = useState<readonly FeedNote[]>([]);
+  const noteKey = notice ? `${notice}@${match.deadline ?? ''}@${match.seq}` : null;
+  useEffect(() => {
+    if (!noteKey || !notice) return;
+    setNotes((old) =>
+      old.some((n) => n.id === noteKey) ? old : [...old.slice(-5), { id: noteKey, notice, text: noteText(notice, roleName) }],
+    );
+    // `roleName` is read for the text only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteKey]);
+  // The keyboard (`00` C37 point 9): one listener, which reads what this
+  // render offers through a ref.
+  const keysRef = useRef<{ myTurn: boolean; run: (command: KeyCommand) => void } | null>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const keys = keysRef.current;
+      if (!keys) return;
+      const command = commandForKey(
+        { key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, typing: isTypingTarget(event.target) },
+        { myTurn: keys.myTurn },
+      );
+      if (!command) return;
+      event.preventDefault();
+      keys.run(command);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   if (!state) {
     return (
       <div style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
@@ -682,349 +797,448 @@ export function Match({
         )
       : null;
   const beatUnit = match.beat?.unitId ? state.units.find((u) => u.id === match.beat!.unitId) ?? null : null;
-  const beatActor = beatUnit?.name ?? null;
-  // The actor's shirt, as the boards paint it: amber for this player's Giff.
-  const beatColour = beatUnit
-    ? beatUnit.id === mineId
-      ? '#ffc14d'
-      : beatUnit.team === own
-        ? 'var(--team-own)'
-        : 'var(--team-foe)'
-    : null;
+
+  // -- What can be done, from `legalActions` and nothing else ---------------------
+  const board = viewState ?? state;
+  const mover = legalView ? board.units.find((unit) => unit.id === legalView.unitId) ?? null : null;
+  const playing = canAct && placing === null && !!legalView && !!mover;
+  const odds = (key: string, label: string, chance: number, why: string, run: () => void): Act => ({
+    key,
+    label,
+    chance,
+    band: oddsBand(chance),
+    why,
+    run,
+  });
+  const done = (action: Action) => {
+    setSelected(null);
+    act(action);
+  };
+
+  /** The labels a target offers (`00` C37 point 3): one engine `shove`, two names. */
+  const tagsFor = (id: string): Act[] => {
+    if (!legalView || !mover) return [];
+    const out: Act[] = [];
+    const swing = legalView.attack.find((t) => t.unitId === id);
+    if (swing) out.push(odds('swing', 'Swing', swingChance(mover, swing), actionLine('swing', mover), () => done({ kind: 'attack', targetId: id })));
+    const shove = legalView.shove.find((t) => t.unitId === id);
+    const target = state.units.find((unit) => unit.id === id);
+    if (shove && target) {
+      const carrier = state.payload.carriedBy === id;
+      out.push(
+        odds(
+          carrier ? 'disarm' : 'shove',
+          carrier ? 'Disarm the ball' : 'Shove 1 square',
+          shoveChance(mover, target),
+          actionLine(carrier ? 'disarm' : 'shove', mover),
+          () => done({ kind: 'shove', targetId: id }),
+        ),
+      );
+    }
+    const pass = legalView.pass.find((t) => t.unitId === id);
+    if (pass) out.push(odds('pass', 'Pass', passChance(mover, pass), actionLine('pass', mover), () => done({ kind: 'pass', targetId: id })));
+    if (legalView.batCracker.some((o) => o.crackerId === id)) {
+      out.push(odds('bat', 'Bat a Cracker', batChance(mover), actionLine('bat', mover), () => setAimCracker(id)));
+    }
+    return out;
+  };
+
+  let tags: Act[] = [];
+  let tagsTitle: string | undefined;
+  let tagsAnchor: string | null = null;
+  if (playing && legalView && mover) {
+    const aimed = aimCracker ? legalView.batCracker.find((o) => o.crackerId === aimCracker) : undefined;
+    const cracker = aimCracker ? state.crackers.find((c) => c.id === aimCracker) : undefined;
+    if (aimed && cracker) {
+      tagsTitle = 'Send it down a line';
+      tagsAnchor = cracker.id;
+      tags = aimed.directions.map((d) => ({
+        key: `line-${d}`,
+        label: screenArrow(cracker, d, view),
+        run: () => done({ kind: 'batCracker', crackerId: cracker.id, direction: d }),
+      }));
+    } else if (view === '2d' && pending && pending !== 'cracker') {
+      // The flat board keeps its classic row (`00` C37): a Swing, Shove or
+      // Pass pressed there lists its targets here, and a click on a token
+      // answers it too.
+      const list = pending === 'attack' ? legalView.attack : pending === 'shove' ? legalView.shove : legalView.pass;
+      tagsTitle = 'Pick a target';
+      tags = list.flatMap((t) => tagsFor(t.unitId).filter((tag) => (pending === 'attack' ? tag.key === 'swing' : pending === 'pass' ? tag.key === 'pass' : tag.key === 'shove' || tag.key === 'disarm')).map((tag) => ({ ...tag, key: `${tag.key}-${t.unitId}`, label: `${tag.label} · ${t.name}` })));
+    } else if (view === '2d' && pending === 'cracker') {
+      tagsTitle = 'Which Cracker';
+      tags = legalView.batCracker.map((o) => ({ ...odds(`bat-${o.crackerId}`, `Bat ${o.crackerId.replace('cracker-', 'Cracker ')}`, batChance(mover), actionLine('bat', mover), () => setAimCracker(o.crackerId)) }));
+    } else if (selected) {
+      tags = tagsFor(selected);
+      tagsAnchor = selected;
+      if (view === '2d') tagsTitle = state.units.find((unit) => unit.id === selected)?.name ?? undefined;
+    }
+  }
+
+  /** The row (`00` C37 point 3): only what can be done now; the precisions (a) and (b) of the main thread. */
+  const row: Act[] = [];
+  if (playing && legalView && mover) {
+    if (legalView.canGrabPayload) row.push({ key: 'pickup', label: 'Pick up', run: () => act({ kind: 'grabPayload' }) });
+    if (legalView.shoot) row.push(odds('shoot', 'Shoot', shotChance(mover, legalView.shoot), actionLine('shoot', mover), () => act({ kind: 'shoot' })));
+    if (legalView.catchSpark) {
+      row.push(odds('catch', 'Catch the Spark', catchChance(mover, legalView.catchSpark), actionLine('catch', mover), () => act({ kind: 'catchSpark' })));
+    }
+    if (view === '2d') {
+      if (legalView.attack.length > 0) row.push({ key: 'swing', label: 'Swing', on: pending === 'attack', run: () => setPending(pending === 'attack' ? null : 'attack') });
+      if (legalView.shove.length > 0) row.push({ key: 'shove', label: 'Shove', on: pending === 'shove', run: () => setPending(pending === 'shove' ? null : 'shove') });
+      if (legalView.pass.length > 0) row.push({ key: 'pass', label: 'Pass', on: pending === 'pass', run: () => setPending(pending === 'pass' ? null : 'pass') });
+      if (legalView.batCracker.length > 0) row.push({ key: 'bat', label: 'Bat a Cracker', on: pending === 'cracker', run: () => setPending(pending === 'cracker' ? null : 'cracker') });
+    }
+    if (legalView.canDash) {
+      // Held, never sent from here (2H.30): the walk that needs it sends it.
+      row.push({
+        key: 'dash',
+        label: dashHeld ? 'Dash · held · cancel' : 'Dash',
+        on: dashHeld,
+        testId: 'dash',
+        why: dashHeld ? 'Spent by the walk that needs it. Click to cancel.' : 'Forty more feet this turn, spent by the walk that needs it.',
+        run: () => {
+          setPending(null);
+          setDashHeld(!dashHeld);
+        },
+      });
+    }
+    if (legalView.canDodge) row.push({ key: 'dodge', label: 'Dodge', run: () => act({ kind: 'dodge' }) });
+    if (legalView.canDisengage) row.push({ key: 'disengage', label: 'Disengage', run: () => act({ kind: 'disengage' }) });
+    if (legalView.canBrace) row.push({ key: 'brace', label: 'Dig in', run: () => act({ kind: 'brace' }) });
+    if (legalView.destinations.size > 0 || plotting) {
+      row.push({
+        key: 'plot',
+        label: 'Plot route',
+        on: plotting,
+        why: 'Click cells to add waypoints, then Go.',
+        run: () => {
+          setPlotting((on) => !on);
+          setRoute([]);
+        },
+      });
+      if (plotting && route.length > 0) {
+        row.push({
+          key: 'go',
+          label: 'Go',
+          run: () => {
+            moveWith([...route]);
+            setRoute([]);
+          },
+        });
+        row.push({ key: 'clear', label: 'Clear', run: () => setRoute([]) });
+      }
+    }
+  }
+
+  keysRef.current = {
+    myTurn: canAct,
+    run: (command) => {
+      if (briefing) return;
+      switch (command.kind) {
+        case 'escape':
+          if (gearOpen) setGearOpen(false);
+          else if (logOpen) setLogOpen(false);
+          else if (placing !== null && canAct) act({ kind: 'choosePlace', place: placing });
+          else if (aimCracker) setAimCracker(null);
+          else if (pending) setPending(null);
+          else setSelected(null);
+          return;
+        case 'action':
+          if (placing !== null) {
+            if (command.index < placing) act({ kind: 'choosePlace', place: command.index + 1 });
+            return;
+          }
+          (tags.length > 0 ? tags : row)[command.index]?.run();
+          return;
+        case 'endTurn': {
+          if (placing !== null || match.busy) return;
+          const press = pressEndTurn(endArmedAt, Date.now());
+          setEndArmedAt(press.armedAt);
+          if (press.fire) act({ kind: 'endTurn' });
+          return;
+        }
+        case 'follow':
+          camera.follow?.();
+          return;
+        case 'log':
+          setLogOpen((open) => !open);
+          return;
+        case 'minimap':
+          toggleMap();
+          return;
+        case 'fullscreen':
+          toggleFullscreen();
+          return;
+      }
+    },
+  };
+
+  // -- Who has the clock (`00` C37 point 10) -----------------------------------------
+  const mate = !!onClock && isHuman(onClock) && onClock.id !== mineId && !yours;
+  const tone: ClockTone = (yours && !replaying) || placing !== null ? 'you' : mate ? 'mate' : 'house';
+  const mateLeft = mate ? clockSecondsLeft(match.deadline, match.skew, now) : null;
+  const clock =
+    placing !== null && !briefing
+      ? { who: 'Choose your place', sub: `${left ?? TURN_TIMER_SECONDS}s · ${roleName} this round`, fraction: (left ?? TURN_TIMER_SECONDS) / TURN_TIMER_SECONDS, testId: 'clock-you' }
+      : yours && !replaying
+        ? { who: 'Your turn', sub: `${left ?? TURN_TIMER_SECONDS}s · ${onClock?.name ?? ''}`, fraction: (left ?? TURN_TIMER_SECONDS) / TURN_TIMER_SECONDS, testId: 'clock-you' }
+        : mineId === null && state.phase !== 'finished'
+          ? { who: 'Spectating', sub: onClock ? `${onClock.name} plays` : 'Resolving', fraction: 1, testId: 'watching' }
+          : mate && onClock
+            ? {
+                who: `${onClock.name.split(' ')[0]} · ${names.get(onClock.id) ?? 'Team-mate'}`,
+                sub: `${mateLeft !== null ? clockText(mateLeft) : ''} · ${onClock.name} plays`,
+                fraction: mateLeft !== null ? Math.min(1, mateLeft / TURN_TIMER_SECONDS) : 1,
+                testId: 'waiting-for',
+              }
+            : { who: 'The House', sub: beatUnit ? `${beatUnit.name} plays` : onClock ? `${onClock.name} is up` : 'Resolving', fraction: 1, testId: 'clock-house' };
+  const clockColour = TONE_COLOUR[tone];
+  const seat: 'owner' | 'member' | 'spectator' = isOwner ? 'owner' : mineId !== null ? 'member' : 'spectator';
+  const rowInset = 62 * u;
 
   return (
-    <div style={S.screen}>
-      <header style={S.top}>
-        <div style={S.side}>
-          <div className="plate" style={{ ...S.crest, border: '2px solid var(--team-own)' }}>
-            <span style={{ ...S.crestText, color: 'var(--team-own)' }}>{initials(teamName)}</span>
+    <div className="bb-match" style={{ '--u': u } as React.CSSProperties} data-u={u}>
+      <header className="bb-mbar">
+        <div className="bb-mbar-row1">
+          <div className="bb-team">
+            <div className="bb-hex" style={{ background: 'var(--team-own)' }}>
+              {initials(teamName)}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="bb-tname">{teamName}</div>
+              <div className="bb-tsub">
+                Bench {state.bench.A} of {BENCH_SIZE}
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="display" style={{ margin: 0, fontSize: 19 }}>
-              {teamName}
-            </p>
-            <p className="label" style={{ margin: '2px 0 0' }}>
-              Bench {state.bench.A} of {BENCH_SIZE}
-            </p>
+          <div className="bb-score">
+            <div className="n">
+              <span key={`A${state.score.A}`} style={{ ...S.tally, color: 'var(--team-own)' }}>
+                {state.score.A}
+              </span>
+              <i>·</i>
+              <span key={`B${state.score.B}`} style={{ ...S.tally, color: 'var(--team-foe)' }}>
+                {state.score.B}
+              </span>
+            </div>
+            <div className="r">
+              Round {state.round} of {MATCH_ROUNDS}
+              {state.phase === 'suddenDeath' ? ' · sudden death' : ''}
+            </div>
+          </div>
+          <div className="bb-team right">
+            <div style={{ textAlign: 'right' }}>
+              <div className="bb-tname">The House</div>
+              <div className="bb-tsub">
+                Bench {state.bench.B} of {BENCH_SIZE}
+              </div>
+            </div>
+            <div className="bb-hex" style={{ background: 'var(--team-foe)' }}>
+              HS
+            </div>
+            <button
+              type="button"
+              className="bb-gear"
+              data-settings-gear
+              data-testid="settings-open"
+              aria-expanded={gearOpen}
+              aria-label="Settings"
+              onClick={() => setGearOpen((open) => !open)}
+            >
+              ⚙
+            </button>
           </div>
         </div>
-
-        <div style={S.centre}>
-          <p className="display" style={S.score}>
-            <span key={`A${state.score.A}`} style={{ ...S.tally, color: 'var(--team-own)' }}>
-              {state.score.A}
-            </span>
-            <span style={{ color: 'var(--text-faint)', fontSize: 22, padding: '0 12px' }}>·</span>
-            <span key={`B${state.score.B}`} style={{ ...S.tally, color: 'var(--team-foe)' }}>
-              {state.score.B}
-            </span>
-          </p>
-          <p className="label" style={{ margin: 0, textAlign: 'center' }}>
-            Round {state.round} of {MATCH_ROUNDS}
-            {state.phase === 'suddenDeath' ? ' · sudden death' : ''}
-          </p>
-        </div>
-
-        <div style={{ ...S.side, justifyContent: 'flex-end' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p className="display" style={{ margin: 0, fontSize: 19 }}>
-              The House
-            </p>
-            <p className="label" style={{ margin: '2px 0 0' }}>
-              Bench {state.bench.B} of {BENCH_SIZE}
-            </p>
-          </div>
-          <div className="plate" style={{ ...S.crest, border: '2px solid var(--team-foe)' }}>
-            <span style={{ ...S.crestText, color: 'var(--team-foe)' }}>HS</span>
-          </div>
-        </div>
+        <TurnStrip
+          state={state}
+          own={own}
+          yoursId={mineId}
+          names={names}
+          compact={compact}
+          tone={tone}
+          preview={placePreview !== null && onClock ? { unitId: onClock.id, place: placePreview } : null}
+          highlight={boardHover}
+          onHover={setChipHover}
+          onPick={(id) => {
+            const unit = state.units.find((x) => x.id === id);
+            if (unit && unit.status === 'active') camera.centre?.({ x: unit.x, y: unit.y });
+          }}
+        />
       </header>
 
-      <div style={S.body} ref={bodyRef}>
-        {placing !== null && onClock && !briefing && placePos !== null && (
-          <PlacePrompt
-            name={onClock.name}
-            role={onClock.role === 'breaker' ? 'breaker' : 'striker'}
-            places={placing}
-            secondsLeft={left}
-            busy={match.busy}
-            position={placePos}
-            onMove={setPlacePos}
-            onChoose={(place) => act({ kind: 'choosePlace', place })}
-            // Closing without a choice is the last place, as under écart 55.
-            onClose={() => {
-              if (!match.busy) act({ kind: 'choosePlace', place: placing });
-            }}
-          />
-        )}
+      <div className="bb-boardarea">
+        <BoardOf
+          view={view}
+          state={board}
+          legal={legalView}
+          own={own}
+          onMove={canAct ? moveWith : null}
+          onSelectUnit={setSelected}
+          selected={selected}
+          yoursId={mineId}
+          spotlight={match.beat?.unitId ?? null}
+          motion={match.motion}
+          pending={pending}
+          onAct={canAct ? act : null}
+          plot={{ on: plotting && canAct, route }}
+          onPlotStep={canAct ? (segment) => setRoute((r) => [...r, ...segment]) : null}
+          zoom={zoom}
+          bottomInset={rowInset}
+          camera={camera}
+          minimap={{ open: mapOpen, width: Math.round(240 * u), onToggle: toggleMap }}
+          highlight={chipHover}
+          onHoverUnit={setBoardHover}
+          tags={view === '3d' && tags.length > 0 && tagsAnchor ? { anchorId: tagsAnchor, node: <TargetTags tags={tags} busy={match.busy} {...(tagsTitle ? { title: tagsTitle } : {})} /> } : null}
+          names={names}
+        />
 
-        <div style={S.left}>
-          {/* The chain of turns, read left to right: who is up, who is next,
-              then next. Jérôme could not tell from the side ladder alone. */}
-          <TurnStrip state={state} own={own} yoursId={mineId} onSelect={setSelected} />
-
-          <div style={S.boardWrap}>
-            <BoardOf
-              view={view}
-              state={viewState ?? state}
-              legal={legalView}
-              own={own}
-              onMove={canAct ? moveWith : null}
-              onSelectUnit={setSelected}
-              selected={selected}
-              yoursId={mineId}
-              spotlight={match.beat?.unitId ?? null}
-              motion={match.motion}
-              pending={pending}
-              onAct={canAct ? act : null}
-              plot={{ on: plotting && canAct, route }}
-              onPlotStep={canAct ? (segment) => setRoute((r) => [...r, ...segment]) : null}
-            />
-
-            {match.beat && (
-              <Announce
-                beat={match.beat}
-                actorName={beatActor}
-                actorColour={beatColour}
-                progress={match.progress}
-                onSkip={match.skip}
-                onDismiss={match.dismissBeat}
-              />
-            )}
-
-            {/* Held longer under the harness flag: headless Chromium's software GL
-                takes longer to screenshot than a banner lasts. */}
-            <Banner queue={banners} speed={match.speed} stretch={PATIENT ? 4 : 1} />
-
-            {briefing && <Briefing onClose={() => setBriefing(false)} />}
-          </div>
-
-          {notice && (
-            <div style={S.expired} data-testid="clock-notice" data-notice={notice}>
-              <span className="label" style={{ color: 'var(--brass)', flex: 'none', whiteSpace: 'nowrap' }}>
-                {notice === 'place' ? 'Default initiative · you go last' : 'The clock ran out'}
-              </span>
-              <span style={S.expiredLine}>
-                {notice === 'place' ? (
-                  // Jérôme's words (C25 1): say that we play last. The server put
-                  // this Giff last of its role the moment the popup ran out.
-                  <>
-                    The clock ran out before you chose your place. Your Giff plays last of the{' '}
-                    {roleName} this round; your turn opens when the ladder reaches it, with a full
-                    clock.
-                  </>
-                ) : (
-                  <>
-                    Your Giff took cover and the turn passed to the house. You have{' '}
-                    {TURN_TIMER_SECONDS} seconds a turn, counted from the moment the board is yours
-                    again.
-                  </>
-                )}
-              </span>
+        <div className="bb-clock" style={{ borderLeftColor: clockColour }} data-testid={clock.testId}>
+          <ClockRing fraction={clock.fraction} colour={clockColour} />
+          <div>
+            <div className="who" style={{ color: tone === 'house' ? 'var(--team-foe)' : clockColour }}>
+              {clock.who}
             </div>
-          )}
-
-          {match.refusal && (
-            <div style={S.refusal}>
-              <span className="error">{match.refusal}</span>
-              <button className="ghost" style={S.dismiss} onClick={match.dismissRefusal}>
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          <div style={S.clockRow}>
-            {replaying ? (
-              <span className="label" style={{ color: 'var(--brass)' }}>
-                The house is playing
-              </span>
-            ) : yours ? (
-              <span
-                className="label"
-                style={{ color: left !== null && left <= 10 ? 'var(--danger)' : 'var(--brass)' }}
-              >
-                Your turn · {left ?? TURN_TIMER_SECONDS}s
-              </span>
-            ) : onClock && isHuman(onClock) && onClock.id !== mineId ? (
-              // Another human's clock, read by everybody (2H.33, C32 point 5).
-              <span className="label" data-testid="waiting-for" style={{ color: 'var(--brass)' }}>
-                Waiting for {onClock.name}
-                {clockSecondsLeft(match.deadline, match.skew, now) !== null
-                  ? ` · ${clockText(clockSecondsLeft(match.deadline, match.skew, now)!)}`
-                  : ''}
-              </span>
-            ) : (
-              <span className="label">{onClock ? `${onClock.name} is up` : 'Resolving'}</span>
-            )}
-            {mineId === null && state.phase !== 'finished' && (
-              <span className="label" data-testid="watching" style={{ color: 'var(--text-faint)' }}>
-                Watching · no seat in this match
-              </span>
-            )}
-
-            <button
-              className="ghost"
-              style={{
-                ...S.speed,
-                ...(called ? { color: 'var(--brass)', borderColor: 'var(--brass)' } : null),
-              }}
-              // `busy` as well as the turn: an orders write and a turn write
-              // both land on the `matches` row, and the last one in wins. And
-              // not while the place is asked (2H.23, C25 2): the turn has not
-              // begun, there is nobody to call for yet.
-              disabled={!yours || replaying || match.busy || placing !== null}
-              onClick={() => void callForBall()}
-              title="Tell your AI team-mates to look for you with the Payload"
-            >
-              {called ? 'Calling for the ball' : 'Call for the ball'}
-            </button>
-
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span className="label" style={{ color: 'var(--text-faint)' }}>
-                Replay
-              </span>
-              {(['slow', 'normal', 'instant'] as Speed[]).map((option) => (
-                <button
-                  key={option}
-                  className="ghost"
-                  onClick={() => match.setSpeed(option)}
-                  style={{
-                    ...S.speed,
-                    ...(match.speed === option
-                      ? { color: 'var(--brass)', borderColor: 'var(--brass)' }
-                      : null),
-                  }}
-                >
-                  {option}
-                </button>
-              ))}
-              <button className="ghost" style={S.speed} onClick={() => setBriefing(true)}>
-                Rules
-              </button>
-              <button
-                className="ghost"
-                style={{ ...S.speed, color: 'var(--brass)', borderColor: 'var(--brass-dim)' }}
-                data-testid="view-toggle"
-                data-webgl={hasWebgl ? 'yes' : 'no'}
-                onClick={toggleView}
-                disabled={!hasWebgl}
-                title={
-                  hasWebgl
-                    ? 'The same match, flat from above or in three quarters'
-                    : 'This browser cannot open WebGL, so the match is shown flat from above'
-                }
-              >
-                {!hasWebgl ? 'No 3D here' : view === '2d' ? 'See it in 3D' : 'Back to 2D'}
-              </button>
-              <button
-                className="ghost"
-                style={S.speed}
-                data-testid="sound-toggle"
-                data-sound={soundOn ? 'on' : 'off'}
-                onClick={toggleSound}
-                title="The bats, the blasts, the whistle. Synthesized, nothing to download."
-              >
-                {soundOn ? '♪ Sound on' : 'Sound off'}
-              </button>
-              {isOwner ? (
-                <button
-                  className="ghost"
-                  style={S.speed}
-                  data-testid="leave-match"
-                  onClick={() => setLeaving(true)}
-                  disabled={leaving}
-                  title="Abandon this match for everybody: no result, back to the hub"
-                >
-                  Leave the match
-                </button>
-              ) : mineId !== null ? (
-                <button
-                  className="ghost"
-                  style={S.speed}
-                  data-testid="hand-over"
-                  onClick={() => setYielding(true)}
-                  disabled={yielding}
-                  title="Hand your Giff to the house for the rest of the match, and keep watching"
-                >
-                  Hand my Giff to the house
-                </button>
-              ) : (
-                <button
-                  className="ghost"
-                  style={S.speed}
-                  data-testid="watch-leave"
-                  onClick={() => void onLeft()}
-                  title="Back to the hub; the match goes on without you"
-                >
-                  Back to the hub
-                </button>
-              )}
+            <div className="sub" style={left !== null && left <= 10 && tone === 'you' ? { color: 'var(--danger)' } : undefined}>
+              {clock.sub}
             </div>
           </div>
-          {leaving && (
-            <div style={S.leaving}>
-              <AbandonPrompt
-                matchId={matchId}
-                onAbandoned={async () => {
-                  // The others are told by `abandon_match` itself (2H.37).
-                  await onLeft();
-                }}
-                onKeep={() => setLeaving(false)}
-              />
-            </div>
-          )}
-          {yielding && mineId !== null && (
-            <div style={S.leaving}>
-              <YieldPrompt
-                onYield={async () => {
-                  await match.sendAs(mineId, { kind: 'yieldSeat' });
-                  setYielding(false);
-                }}
-                onKeep={() => setYielding(false)}
-              />
-            </div>
-          )}
-
-          <ActionBar
-            legal={legalView}
-            yours={canAct && placing === null}
-            busy={match.busy}
-            movementFeet={(viewState ?? state).turn?.movementFeetRemaining ?? 0}
-            onAct={act}
-            pending={pending}
-            onPending={setPending}
-            dashHeld={dashHeld}
-            onHoldDash={() => setDashHeld(true)}
-            onDropDash={() => setDashHeld(false)}
-            selectedId={selected}
-            plotting={plotting}
-            plotLength={route.length}
-            onTogglePlot={() => {
-              setPlotting((on) => !on);
-              setRoute([]);
-            }}
-            onGo={() => {
-              if (route.length === 0) return;
-              moveWith([...route]);
-              setRoute([]);
-            }}
-            onClearPlot={() => setRoute([])}
-          />
         </div>
 
-        <aside style={S.right}>
-          <Ladder state={state} own={own} onSelect={setSelected} />
-          <SeatPanel state={state} unitId={selected ?? onClock?.id ?? null} own={own} />
-          <Feed feed={match.feed} state={state} own={own} />
-        </aside>
+        {selected && <SeatPanel state={state} selectedId={selected} own={own} yoursId={mineId} names={names} />}
+
+        <div className="bb-feedpos">
+          <FeedRibbon feed={match.feed} state={state} own={own} lines={compact ? 3 : 4} notes={notes} />
+        </div>
+        <button type="button" className="ghost bb-logbtn" data-testid="log-open" onClick={() => setLogOpen((open) => !open)}>
+          Log · L
+        </button>
+
+        {view === '2d' && tags.length > 0 && (
+          <div className="bb-tags-flat">
+            <TargetTags tags={tags} busy={match.busy} {...(tagsTitle ? { title: tagsTitle } : {})} />
+          </div>
+        )}
+
+        <ActionRow
+          mode={placing !== null && !briefing ? 'place' : playing ? 'turn' : 'none'}
+          actions={row}
+          busy={match.busy}
+          call={
+            mineId !== null
+              ? {
+                  called,
+                  // `busy` as well as the turn: an orders write and a turn write
+                  // both land on the `matches` row, and the last one in wins.
+                  disabled: !yours || replaying || placing !== null,
+                  run: () => void callForBall(),
+                }
+              : null
+          }
+          end={{ armed: endTurnArmed(endArmedAt, now), run: () => act({ kind: 'endTurn' }) }}
+          place={
+            placing !== null && onClock
+              ? {
+                  role: onClock.role === 'breaker' ? 'breaker' : 'striker',
+                  places: placing,
+                  secondsLeft: left,
+                  onChoose: (place) => act({ kind: 'choosePlace', place }),
+                  onPreview: setPlacePreview,
+                  // Playing last without a choice is the last place, as under écart 55.
+                  onLast: () => {
+                    if (!match.busy) act({ kind: 'choosePlace', place: placing });
+                  },
+                }
+              : null
+          }
+        />
+
+        <FeedDrawer feed={match.feed} state={state} own={own} open={logOpen} onClose={() => setLogOpen(false)} />
+
+        {/* Held longer under the harness flag: headless Chromium's software GL
+            takes longer to screenshot than a banner lasts. */}
+        <Banner queue={banners} speed={match.speed} stretch={PATIENT ? 4 : 1} />
+
+        {match.refusal && (
+          <div className="bb-toast">
+            <span className="error">{match.refusal}</span>
+            <button className="ghost" style={{ fontSize: 11, padding: '5px 10px' }} onClick={match.dismissRefusal}>
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {briefing && <Briefing onClose={() => setBriefing(false)} />}
       </div>
+
+      {gearOpen && (
+        <SettingsPanel
+          speed={match.speed}
+          onSpeed={match.setSpeed}
+          view={view}
+          hasWebgl={hasWebgl}
+          onView={(next) => {
+            if (next !== view) toggleView();
+          }}
+          zoom={view === '3d' ? zoom : null}
+          onZoom={setZoom}
+          volumes={volumes}
+          onVolume={setVolume}
+          fullscreen={fullscreen}
+          onFullscreen={toggleFullscreen}
+          onRules={() => {
+            setGearOpen(false);
+            setBriefing(true);
+          }}
+          seat={seat}
+          onLeave={() => {
+            setGearOpen(false);
+            setLeaving(true);
+          }}
+          onHandOver={() => {
+            setGearOpen(false);
+            setYielding(true);
+          }}
+          onBackToHub={() => void onLeft()}
+          onClose={closeGear}
+        />
+      )}
+
+      {leaving && (
+        <div className="bb-modal">
+          <AbandonPrompt
+            matchId={matchId}
+            onAbandoned={async () => {
+              // The others are told by `abandon_match` itself (2H.37).
+              await onLeft();
+            }}
+            onKeep={() => setLeaving(false)}
+          />
+        </div>
+      )}
+      {yielding && mineId !== null && (
+        <div className="bb-modal">
+          <YieldPrompt
+            onYield={async () => {
+              await match.sendAs(mineId, { kind: 'yieldSeat' });
+              setYielding(false);
+            }}
+            onKeep={() => setYielding(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-/** One of the two boards, same props. */
+/** One of the two boards, same props. The flat board keeps clear of the clock and the row. */
 function BoardOf({ view, ...props }: { view: '2d' | '3d' } & Parameters<typeof Board>[0]) {
-  if (view === '2d') return <Board {...props} />;
+  if (view === '2d') {
+    return (
+      <div style={S.flat}>
+        <Board {...props} />
+      </div>
+    );
+  }
   return (
     <Suspense
       fallback={
@@ -1038,6 +1252,89 @@ function BoardOf({ view, ...props }: { view: '2d' | '3d' } & Parameters<typeof B
       <Board3D {...props} />
     </Suspense>
   );
+}
+
+/** The clock corner's ring, the time left as an arc. */
+function ClockRing({ fraction, colour }: { fraction: number; colour: string }) {
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  const f = Math.max(0, Math.min(1, fraction));
+  return (
+    <svg className="ring" viewBox="0 0 34 34" aria-hidden>
+      <circle cx="17" cy="17" r={r} fill="none" stroke="#2b3439" strokeWidth="3" />
+      <circle
+        cx="17"
+        cy="17"
+        r={r}
+        fill="none"
+        style={{ stroke: colour }}
+        strokeWidth="3"
+        strokeDasharray={`${c * f} ${c}`}
+        transform="rotate(-90 17 17)"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * The interface's scale (`00` C37 point 1): 1 on the laptop's 1536 x 695, up
+ * to 1.4 on the 27 inch's 2560 x 1271, never below 1.
+ */
+function useViewport(): { u: number; width: number } {
+  const read = () => {
+    const width = typeof window === 'undefined' ? 1536 : window.innerWidth;
+    const height = typeof window === 'undefined' ? 695 : window.innerHeight;
+    const u = Math.max(1, Math.min(width / 1536, height / 695, 1.4));
+    return { u: Math.round(u * 1000) / 1000, width };
+  };
+  const [viewport, setViewport] = useState(read);
+  useEffect(() => {
+    const onResize = () => setViewport(read());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return viewport;
+}
+
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* a private window has no say */
+  }
+}
+
+/** The clock's note, now a line of the feed (`00` C37 point 8); Jérôme's words of C25 1. */
+function noteText(notice: 'turn' | 'place', roleName: string): string {
+  return notice === 'place'
+    ? `Default initiative · you go last. The clock ran out before you chose your place: your Giff plays last of the ${roleName} this round.`
+    : `The clock ran out. Your Giff took cover and the turn passed. You have ${TURN_TIMER_SECONDS} seconds a turn, counted from the moment the board is yours again.`;
+}
+
+/**
+ * The arrow of a line a Cracker can be sent down, as it points on the screen:
+ * the camera can turn, and the flat board lays the engine's `y` across, so the
+ * engine's own compass would point the wrong way. Read from where the
+ * Cracker's cell and the next cell on the line land on the screen.
+ */
+function screenArrow(cracker: { x: number; y: number }, direction: number, view: '2d' | '3d'): string {
+  const step = DIRECTIONS[direction - 1];
+  if (!step) return String(direction);
+  const project = view === '3d' ? projectCell : cellToScreen;
+  const a = project(cracker.x, cracker.y);
+  const b = project(cracker.x + step.x, cracker.y + step.y);
+  if (!a || !b) return String(direction);
+  const index = Math.round(Math.atan2(b.y - a.y, b.x - a.x) / (Math.PI / 4));
+  return ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗'][((index % 8) + 8) % 8]!;
 }
 
 /**
@@ -1111,84 +1408,14 @@ function initials(name: string): string {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  screen: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    gap: 10,
-    padding: 12,
-    background: '#0a0c0e',
-  },
-  top: {
-    height: 74,
-    flex: 'none',
-    display: 'grid',
-    gridTemplateColumns: '1fr auto 1fr',
-    alignItems: 'center',
-    padding: '0 14px',
-    background: 'linear-gradient(#161b1f,#0e1214)',
-    border: '1px solid var(--line)',
-    boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 6%)',
-  },
-  side: { display: 'flex', alignItems: 'center', gap: 12 },
-  crest: { width: 44, height: 44, flex: 'none' },
-  crestText: { fontFamily: 'var(--display)', fontWeight: 800, fontSize: 17 },
-  centre: { textAlign: 'center' },
-  score: { margin: 0, fontSize: 36, letterSpacing: '.04em' },
   // Keyed on its own value in the markup above, so React remounts the span when
-  // the number changes and the animation runs again. A goal has to be visible
-  // in both places a player might be looking: the card and the scoreboard.
+  // the number changes and the animation runs again.
   tally: { display: 'inline-block', animation: 'bb-struck .7s ease-out' },
-  body: {
-    position: 'relative',
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) 340px',
-    gap: 10,
+  /** The flat board, kept clear of the clock above and the row below (2H.38). */
+  flat: {
     flex: 1,
     minHeight: 0,
-  },
-  left: { display: 'flex', flexDirection: 'column', gap: 6, minHeight: 0 },
-  boardWrap: {
-    position: 'relative',
-    flex: 1,
-    minHeight: 0,
-    minWidth: 0,
     display: 'flex',
-    flexDirection: 'column',
+    padding: 'calc(58px * var(--u)) calc(14px * var(--u)) calc(64px * var(--u))',
   },
-  right: {
-    display: 'grid',
-    gridTemplateRows: 'minmax(140px, 1fr) auto minmax(140px, 1.2fr)',
-    gap: 10,
-    minHeight: 0,
-    // The column is a fixed track, and a panel whose content cannot shrink
-    // (a ladder rung that refuses to wrap, say) would otherwise push the whole
-    // column past the window's edge instead of scrolling inside its panel.
-    minWidth: 0,
-    overflow: 'hidden',
-  },
-  clockRow: { flex: 'none', display: 'flex', alignItems: 'center', gap: 10 },
-  speed: { fontSize: 10, padding: '4px 9px' },
-  /** The abandon confirmation, over the board, under the top bar (2H.28). */
-  leaving: { position: 'absolute', top: 56, right: 16, zIndex: 20 },
-  expired: {
-    flex: 'none',
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: 12,
-    padding: '9px 12px',
-    background: 'var(--panel-deep)',
-    border: '1px solid var(--brass-dim)',
-  },
-  expiredLine: { fontSize: 12, lineHeight: 1.5, color: 'var(--text-dim)' },
-  refusal: {
-    flex: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    padding: '9px 12px',
-    background: 'var(--panel-deep)',
-    border: '1px solid #ff8fa0',
-  },
-  dismiss: { marginLeft: 'auto', fontSize: 11, padding: '5px 10px' },
 };

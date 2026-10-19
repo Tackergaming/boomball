@@ -16,7 +16,7 @@ import { expect, test } from '@playwright/test';
 import { chooseAction } from '../ai/chooseAction.js';
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import { Shots, act, report, roundMarkers, stamp, state, view, waitForHook, waitForPlayableTurn, watch, prefer2D } from './harness.js';
+import { Shots, act, report, roundMarkers, stamp, state, view, waitForHook, waitForPlayableTurn, watch, prefer2D, setReplay } from './harness.js';
 
 const arena = new Arena(KILL_SILO);
 
@@ -45,7 +45,7 @@ test('@playthrough plays the open match to the final whistle', async ({ page }, 
   if (await into.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) {
     await into.click();
   }
-  await page.getByRole('button', { name: 'instant', exact: true }).click();
+  await setReplay(page, 'instant');
 
   let turns = 0;
   let refusals = 0;

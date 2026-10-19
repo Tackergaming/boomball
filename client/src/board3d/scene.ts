@@ -84,6 +84,17 @@ export interface SceneLink {
    * these, so the marker has no clock of its own.
    */
   carrierGlow: { readonly beam: MeshBasicMaterial; readonly ring: MeshBasicMaterial } | null;
+  /**
+   * The pixels at the bottom of the canvas the action row covers (2H.38,
+   * `00` C37 point 3): the camera frames the pitch above them. Written by
+   * the board from the match screen, read by the rig once a frame.
+   */
+  bottomInset: number;
+  /**
+   * Puts a cell in the middle of the frame and lets go of the play (2H.38):
+   * a click on a chip of the turn order, or on the minimap. Set by the rig.
+   */
+  centreOn: ((cell: Point) => void) | null;
 }
 
 export function newSceneLink(): SceneLink {
@@ -102,6 +113,8 @@ export function newSceneLink(): SceneLink {
     gestures: new Map(),
     bodies: new Map(),
     carrierGlow: null,
+    bottomInset: 0,
+    centreOn: null,
   };
 }
 

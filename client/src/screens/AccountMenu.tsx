@@ -20,8 +20,12 @@ import { useEffect, useState, type FormEvent } from 'react';
 
 import { changePassword, signOut } from '../lib/supabase.js';
 
-/** The same floor as `SignIn.tsx`; the server enforces it too. */
-export const PASSWORD_MIN_LENGTH = 6;
+/**
+ * The same floor as `SignIn.tsx`; the server enforces it too
+ * (`password_min_length`). Eight since 2H.38, n8 of the security review
+ * (`docs/10-revue-securite-2026-10-17.md`).
+ */
+export const PASSWORD_MIN_LENGTH = 8;
 
 export function AccountMenu({
   displayName,

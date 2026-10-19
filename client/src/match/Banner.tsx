@@ -116,7 +116,7 @@ const S: Record<string, React.CSSProperties> = {
   loud: {
     fontFamily: 'var(--display)',
     fontWeight: 800,
-    fontSize: 26,
+    fontSize: 'calc(26px * var(--u, 1))',
     letterSpacing: '.12em',
     padding: '10px 24px',
     background: 'rgba(5,7,10,.92)',
@@ -126,7 +126,7 @@ const S: Record<string, React.CSSProperties> = {
   goal: {
     fontFamily: 'var(--display)',
     fontWeight: 800,
-    fontSize: 40,
+    fontSize: 'calc(40px * var(--u, 1))',
     letterSpacing: '.14em',
     padding: '14px 34px',
     background: 'rgba(5,7,10,.92)',
@@ -135,7 +135,7 @@ const S: Record<string, React.CSSProperties> = {
   quiet: {
     fontFamily: 'var(--mono)',
     fontWeight: 600,
-    fontSize: 12,
+    fontSize: 'calc(12px * var(--u, 1))',
     letterSpacing: '.14em',
     padding: '6px 14px',
     background: 'rgba(5,7,10,.88)',

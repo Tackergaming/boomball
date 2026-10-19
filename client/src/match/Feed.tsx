@@ -18,70 +18,320 @@
  * The lines that arrived since the last render carry a brass edge that fades in
  * three seconds, a goal opens with a diamond and a knockout with a cross in
  * bold. Nothing is removed or reworded: the feed stays the record.
+ *
+ * 2H.38 (00 C37, point 5): the right column is gone, and the panel with it. The
+ * feed splits in two. A ribbon with no box sits over the board, above the
+ * action row, so the player reads what just happened without looking away from
+ * the pitch: three lines on the laptop, four on the 27-inch, white with a drop
+ * shadow and the names in their team colour. Each line fades after about eight
+ * seconds, a goal or a knockout after sixteen, in bold. The whole record moves
+ * to a drawer that slides in from the left, grouped by round, while the game
+ * goes on behind it. The clock's notices ("Default initiative · you go last")
+ * used to be a box of their own; they now come through the ribbon, in brass.
+ * What counts as new is still judged by content and not by count (2H.22), but
+ * it now feeds a list of lines that expire, not a brass edge that fades.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { SUBSTITUTE_DELAY_ROUNDS } from '../../../engine/constants.js';
 import type { MatchEvent } from '../../../engine/events.js';
 import type { MatchState } from '../../../engine/types.js';
 import { label } from './replay.js';
 
-export function Feed({ feed, state, own }: { feed: MatchEvent[]; state: MatchState; own: 'A' | 'B' }) {
-  const box = useRef<HTMLDivElement>(null);
-  // Fresh means "not there at the previous render". 2H.21 judged it by count,
-  // which went blind once the window was full (`FEED_LIMIT`): a batch that
-  // arrives then trims as many lines off the front as it adds, and the count
-  // does not move. The 3D harness caught it on a match three rounds old
-  // (2H.22). So the last event of the previous render is remembered by its
-  // content, and everything after its latest copy is fresh; if it is gone
-  // from the window, everything is. The first render marks nothing.
-  const lastKeyRef = useRef<string | null | undefined>(undefined);
-  const freshFromRef = useRef<number>(Infinity);
-  const lastKey = feed.length > 0 ? JSON.stringify(feed[feed.length - 1]) : null;
-  if (lastKeyRef.current !== undefined && lastKey !== lastKeyRef.current) {
-    let i = feed.length - 1;
-    while (i >= 0 && JSON.stringify(feed[i]) !== lastKeyRef.current) i -= 1;
-    freshFromRef.current = i + 1;
+/** A client line that is not an event: the clock's notices. Seen once by `id`. */
+export interface FeedNote {
+  readonly id: string;
+  readonly text: string;
+  readonly notice?: 'turn' | 'place';
+}
+
+/** How long a line stays whole before it starts to fade, then how long the fade takes. */
+const LINE_MS = 8000;
+const BIG_MS = 16000;
+const NOTE_MS = 12000;
+const FADE_MS = 1300;
+/** A hard stop on what the ribbon keeps, whatever a batch brings. */
+const KEPT = 100;
+
+// ── what is new ────────────────────────────────────────────────────────────
+
+/**
+ * The key a render remembers for the next one: the last event, by content.
+ * Fresh means "not there at the previous render". 2H.21 judged it by count,
+ * which went blind once the window was full (`FEED_LIMIT`): a batch that
+ * arrives then trims as many lines off the front as it adds, and the count
+ * does not move. The 3D harness caught it on a match three rounds old (2H.22).
+ */
+export function lastKeyOf(feed: readonly MatchEvent[]): string | null {
+  return feed.length > 0 ? JSON.stringify(feed[feed.length - 1]) : null;
+}
+
+/**
+ * Where the fresh events start: everything after the latest copy of the
+ * previous last event. If it is gone from the window, everything is fresh.
+ */
+export function freshFrom(feed: readonly MatchEvent[], previousKey: string | null): number {
+  let i = feed.length - 1;
+  while (i >= 0 && JSON.stringify(feed[i]) !== previousKey) i -= 1;
+  return i + 1;
+}
+
+// ── names in colour ────────────────────────────────────────────────────────
+
+export type Side = 'own' | 'foe';
+export interface Piece {
+  readonly text: string;
+  readonly side?: Side;
+}
+
+/**
+ * A line cut into pieces, every occurrence of a unit's name tagged with its
+ * side. Longest names first, so "Sarn Gunwale" is not eaten by a "Sarn". The
+ * first side given for a name wins; an empty name matches nothing.
+ */
+export function splitNames(text: string, names: readonly { name: string; side: Side }[]): Piece[] {
+  const sides = new Map<string, Side>();
+  for (const { name, side } of names) if (name && !sides.has(name)) sides.set(name, side);
+  if (sides.size === 0) return text ? [{ text }] : [];
+  const sorted = [...sides.keys()].sort((a, b) => b.length - a.length);
+  const re = new RegExp(sorted.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  const out: Piece[] = [];
+  let at = 0;
+  for (const m of text.matchAll(re)) {
+    if (m.index > at) out.push({ text: text.slice(at, m.index) });
+    out.push({ text: m[0], side: sides.get(m[0]) as Side });
+    at = m.index + m[0].length;
   }
-  lastKeyRef.current = lastKey;
-  const freshFrom = freshFromRef.current;
+  if (at < text.length) out.push({ text: text.slice(at) });
+  return out;
+}
+
+// ── the ribbon ─────────────────────────────────────────────────────────────
+
+interface RibbonItem {
+  readonly id: number;
+  readonly text: string;
+  readonly big: boolean;
+  readonly note: boolean;
+  readonly notice?: 'turn' | 'place';
+  readonly out: boolean;
+}
+
+const reducedMotion = (): boolean =>
+  typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * The newest lines over the board, no box. The parent places it (position,
+ * left, bottom) and sets `--u`; the first mount shows nothing, so a reload
+ * does not flash the history. A line is fresh from its arrival until it has
+ * faded and gone.
+ */
+export function FeedRibbon({
+  feed,
+  state,
+  own,
+  lines,
+  notes = [],
+}: {
+  feed: MatchEvent[];
+  state: MatchState;
+  own: 'A' | 'B';
+  lines: number;
+  notes?: readonly FeedNote[];
+}) {
+  const [items, setItems] = useState<RibbonItem[]>([]);
+  const alive = useRef(true);
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const nextId = useRef(1);
+  const lastKeyRef = useRef<string | null | undefined>(undefined);
+  const seenNotes = useRef<Set<string> | undefined>(undefined);
 
   useEffect(() => {
-    box.current?.scrollTo({ top: box.current.scrollHeight });
-  }, [feed.length]);
+    alive.current = true;
+    const pending = timers.current;
+    return () => {
+      alive.current = false;
+      for (const t of pending) clearTimeout(t);
+      pending.clear();
+    };
+  }, []);
 
-  const name = (id: string) => state.units.find((unit) => unit.id === id)?.name ?? id;
-  const side = (id: string) =>
-    state.units.find((unit) => unit.id === id)?.team === own ? 'own' : 'foe';
+  const later = (ms: number, fn: () => void) => {
+    const t = setTimeout(() => {
+      timers.current.delete(t);
+      if (alive.current) fn();
+    }, ms);
+    timers.current.add(t);
+  };
+
+  const admit = (fresh: Omit<RibbonItem, 'id' | 'out'>[]) => {
+    if (fresh.length === 0) return;
+    const added = fresh.map((item) => ({ ...item, id: nextId.current++, out: false }));
+    setItems((prev) => [...prev, ...added].slice(-KEPT));
+    for (const { id, big, note } of added) {
+      const ttl = note ? NOTE_MS : big ? BIG_MS : LINE_MS;
+      later(ttl, () => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, out: true } : i))));
+      later(ttl + FADE_MS, () => setItems((prev) => prev.filter((i) => i.id !== id)));
+    }
+  };
+
+  const nameOf = (id: string) => state.units.find((unit) => unit.id === id)?.name ?? id;
+
+  // The events: whatever came after the previous render's last event.
+  useEffect(() => {
+    const key = lastKeyOf(feed);
+    const previous = lastKeyRef.current;
+    lastKeyRef.current = key;
+    if (previous === undefined || key === previous) return;
+    const from = freshFrom(feed, previous);
+    admit(
+      feedLines(feed, nameOf)
+        .filter(({ index, event }) => index >= from && event.kind !== 'roundStarted')
+        .map(({ event, line }) => ({
+          text: line,
+          big: event.kind === 'scored' || event.kind === 'evacuated',
+          note: false,
+        })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feed]);
+
+  // The notices: each id once. Those already there at mount are history.
+  useEffect(() => {
+    if (seenNotes.current === undefined) {
+      seenNotes.current = new Set(notes.map((n) => n.id));
+      return;
+    }
+    const seen = seenNotes.current;
+    const fresh = notes.filter((n) => !seen.has(n.id));
+    for (const n of fresh) seen.add(n.id);
+    admit(fresh.map((n) => ({ text: n.text, big: false, note: true, ...(n.notice ? { notice: n.notice } : {}) })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
+
+  const names = useMemo(
+    () => state.units.map((unit) => ({ name: unit.name, side: (unit.team === own ? 'own' : 'foe') as Side })),
+    [state.units, own],
+  );
+  const reduced = reducedMotion();
 
   return (
-    <div style={S.panel}>
+    <div data-testid="feed-ribbon" style={S.ribbon}>
+      {items.slice(-Math.max(1, lines)).map((item) => (
+        <RibbonLine key={item.id} item={item} names={names} reduced={reduced} />
+      ))}
+    </div>
+  );
+}
+
+function RibbonLine({
+  item,
+  names,
+  reduced,
+}: {
+  item: RibbonItem;
+  names: readonly { name: string; side: Side }[];
+  reduced: boolean;
+}) {
+  // It enters one tick after mounting, so the transition has something to run from.
+  const [entered, setEntered] = useState(reduced);
+  useEffect(() => {
+    if (entered) return;
+    const t = setTimeout(() => setEntered(true), 30);
+    return () => clearTimeout(t);
+  }, [entered]);
+
+  const shown = entered && !item.out;
+  const style: React.CSSProperties = {
+    ...S.line,
+    ...(item.big ? S.big : {}),
+    ...(item.note ? { color: 'var(--brass)' } : {}),
+    opacity: shown ? 1 : 0,
+    transform: entered ? 'none' : 'translateY(calc(4px * var(--u)))',
+    transition: reduced
+      ? 'none'
+      : item.out
+        ? 'opacity 1.2s ease'
+        : 'opacity .3s ease, transform .4s ease',
+  };
+  const pieces = item.note ? [{ text: item.text } as Piece] : splitNames(item.text, names);
+  return (
+    <div
+      style={style}
+      {...(item.note
+        ? { 'data-testid': 'clock-notice', ...(item.notice ? { 'data-notice': item.notice } : {}) }
+        : { 'data-fresh': '' })}
+    >
+      {pieces.map((piece, i) =>
+        piece.side ? (
+          <span key={i} style={{ color: piece.side === 'own' ? 'var(--team-own)' : 'var(--team-foe)' }}>
+            {piece.text}
+          </span>
+        ) : (
+          piece.text
+        ),
+      )}
+    </div>
+  );
+}
+
+// ── the drawer ─────────────────────────────────────────────────────────────
+
+/**
+ * The whole record, in a drawer that slides in from the left of its positioned
+ * parent. Always mounted: its lines are in the page even when it is shut. The
+ * parent owns the open state and the L key; the game goes on behind it.
+ */
+export function FeedDrawer({
+  feed,
+  state,
+  own,
+  open,
+  onClose,
+}: {
+  feed: MatchEvent[];
+  state: MatchState;
+  own: 'A' | 'B';
+  open: boolean;
+  onClose: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const name = (id: string) => state.units.find((unit) => unit.id === id)?.name ?? id;
+  const side = (id: string): Side => (state.units.find((unit) => unit.id === id)?.team === own ? 'own' : 'foe');
+  const lines = feedLines(feed, name);
+
+  useEffect(() => {
+    if (open) box.current?.scrollTo({ top: box.current.scrollHeight });
+  }, [open, lines.length, feed]);
+
+  return (
+    <aside
+      data-testid="feed-drawer"
+      data-open={open ? 'yes' : 'no'}
+      aria-hidden={!open}
+      inert={!open}
+      style={{ ...S.drawer, transform: open ? 'none' : 'translateX(-102%)' }}
+    >
       <div style={S.head}>
         <span className="label">The call</span>
+        <span style={{ flex: 1, marginLeft: 'calc(8px * var(--u))' }}>· whole match</span>
+        <button type="button" data-testid="log-close" style={S.ghost} onClick={onClose}>
+          Close · L
+        </button>
       </div>
       <div ref={box} style={S.list}>
-        {feedLines(feed, name).map(({ event, line, index }, i) => {
-          const fresh = index >= freshFrom;
-          return (
-            <p
-              key={i}
-              {...(fresh ? { 'data-fresh': '' } : {})}
-              style={{
-                ...S.line,
-                ...toneOf(event, side),
-                borderLeft: '2px solid transparent',
-                paddingLeft: 6,
-                marginLeft: -8,
-                ...(fresh ? { animation: 'bb-fresh 3s ease-out forwards' } : {}),
-              }}
-            >
-              {line}
-            </p>
-          );
-        })}
+        {lines.map(({ event, line, index }) => (
+          <p
+            key={index}
+            data-feed-line=""
+            style={event.kind === 'roundStarted' ? S.round : { ...S.entry, ...toneOf(event, side) }}
+          >
+            {line}
+          </p>
+        ))}
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -273,15 +523,67 @@ function describe(event: MatchEvent, name: (id: string) => string, free = false)
 }
 
 const S: Record<string, React.CSSProperties> = {
-  panel: {
+  ribbon: { display: 'grid', gap: 'calc(3px * var(--u))', pointerEvents: 'none' },
+  line: {
+    fontSize: 'calc(13px * var(--u))',
+    color: 'var(--text)',
+    textShadow: '0 1px 2px #000, 0 0 8px #000, 0 0 2px #000',
+  },
+  big: { fontWeight: 700, fontSize: 'calc(15px * var(--u))' },
+  drawer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 'calc(380px * var(--u))',
+    background: 'rgb(8 11 14 / 90%)',
+    borderRight: '1px solid var(--line)',
+    zIndex: 15,
+    transition: 'transform .25s ease',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: 0,
-    flex: 1,
-    background: 'var(--panel)',
-    border: '1px solid var(--line)',
   },
-  head: { padding: '10px 12px', borderBottom: '1px solid var(--line)' },
-  list: { overflowY: 'auto', padding: '8px 12px' },
-  line: { marginTop: 3, marginBottom: 3, marginLeft: 0, marginRight: 0, fontSize: 12, lineHeight: 1.5 },
+  head: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 'calc(12px * var(--u)) calc(14px * var(--u))',
+    borderBottom: '1px solid var(--line)',
+    fontFamily: 'var(--mono)',
+    fontSize: 'calc(11px * var(--u))',
+    letterSpacing: '.14em',
+    color: 'var(--text-dim)',
+    textTransform: 'uppercase',
+  },
+  ghost: {
+    background: 'transparent',
+    border: '1px solid var(--line)',
+    fontFamily: 'var(--mono)',
+    fontSize: 'calc(11px * var(--u))',
+    letterSpacing: '.1em',
+    padding: 'calc(4px * var(--u)) calc(9px * var(--u))',
+    color: 'var(--text-dim)',
+    cursor: 'pointer',
+    textTransform: 'uppercase',
+  },
+  list: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    padding: 'calc(8px * var(--u)) calc(14px * var(--u))',
+    display: 'grid',
+    alignContent: 'start',
+    gap: 'calc(4px * var(--u))',
+    fontSize: 'calc(13px * var(--u))',
+  },
+  entry: { marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0, lineHeight: 1.45 },
+  round: {
+    marginTop: 'calc(8px * var(--u))',
+    marginBottom: 0,
+    marginLeft: 0,
+    marginRight: 0,
+    fontFamily: 'var(--mono)',
+    fontSize: 'calc(11px * var(--u))',
+    color: 'var(--text-faint)',
+  },
 };

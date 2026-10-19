@@ -35,7 +35,10 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 // only (`[::1]:5173`), so the IPv4 address never answers and the server check
 // times out. Node and Chromium both resolve `localhost` to `::1` first.
 const baseURL = process.env.BASE_URL ?? 'http://localhost:5173';
-const viewport = { width: 1440, height: 900 };
+// Jérôme's two screens, in CSS pixels (2H.38, `00` C37): the laptop by
+// default, the 27 inch with E2E_VIEWPORT=2560x1271.
+const [vw, vh] = (process.env.E2E_VIEWPORT ?? '1536x695').split('x').map(Number);
+const viewport = { width: vw || 1536, height: vh || 695 };
 
 export default defineConfig({
   testDir: here,

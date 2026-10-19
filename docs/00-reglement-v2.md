@@ -3593,3 +3593,47 @@ chances et ses tests, le clavier, le tiroir du fil, le panneau ⚙ ; le fil prin
 deux tailles (Playwright à 1536 × 695 et 2560 × 1271), **son feu vert de redéploiement du client
 et de n8**, puis **sa partie sur son portable et sur son 27 pouces**, et son verdict : le plateau se
 voit, on comprend quoi faire sans lire, et le choix de place se fait en regardant le jeu.
+
+**Comment 2H.38 est codée** (le 2026-10-19, fil principal Opus 5.5, cinq sous-agents Sonnet 5.5
+sur fichiers disjoints et consigne fermée ; rien dans le moteur, l'IA ni les fonctions,
+`ENGINE_VERSION` 11). **La charpente** : `screens/Match.tsx` garde toute la logique du tour (chrono,
+coup à la porte, Dash tenu, bandeaux, crochet) et pose une barre `bb-mbar` de 84 × `--u` px, puis
+`bb-boardarea` où tout est posé en coins ; `--u` vient de la fenêtre (`useViewport`, borné entre 1
+et 1,4). Retirés : `ActionBar.tsx`, `Announce.tsx`, `Ladder.tsx`, `PlacePrompt.tsx` et son test.
+**La barre** : `TurnStrip.tsx` récrit en pastilles, `roundChips` pur et testé (l'ordre du moteur,
+le curseur, l'aperçu de la place qui déplace le Giff dans son bloc), lettre du rôle (`ROLE_LETTER`,
+W pour le Bulwark), « YOU », prénom du joueur humain (passé par `App` depuis `account.members`),
+la pastille en cours à la couleur du coin du chrono (`TONE_COLOUR`). **Les actions** :
+`ActionRow.tsx` (la rangée et `TargetTags`), les listes construites dans `Match.tsx` depuis
+`legalActions` seul ; Shoot, Catch the Spark, Dig in et Plot route dans la rangée (précisions a et
+b), Swing, « Shove 1 square » ou « Disarm the ball » selon `payload.carriedBy`, Pass et Bat a
+Cracker en étiquettes posées à côté de la cible par la couche `Labels.tsx` (`beside`, cliquable) ;
+« Bat a Cracker » ouvre les lignes, en flèches lues à l'écran (`screenArrow`, par la projection,
+juste quel que soit l'angle). En 2D, la rangée garde Swing, Shove, Pass et Bat (choix de cible
+comme avant) et les étiquettes se posent au-dessus d'elle. Le bouton End turn part au clic ; la
+touche E demande deux appuis. **Les chances** : `match/odds.ts` (sous-agent A), énumération exacte
+des d20, qui lit `statsFor` et les constantes et refait `resolveShove` (malus et désavantage du
+Bulwark planté) ; contrôlé par Monte-Carlo contre `rollAgainst` et `opposedRoll` du moteur ;
+`actionLine` dit chaque action. **Le cadrage** : `insetLens` dans `framing.ts` (testé) donne à la
+caméra un objectif virtuel plus haut que le canevas (`setViewOffset`), centré sur la zone
+au-dessus de la rangée, à la même échelle de pixels ; tout ce que le rig calcule passe par
+l'objectif utile ; projection et clics restent exacts par les matrices de la caméra.
+`link.bottomInset` porte les 62 × `--u` px. **Les trois accès caméra** : `link.centreOn` (pastille,
+minicarte) et `cameraControl.ts` (touche C), rien d'autre ; le préréglage passe dans ⚙ et remonte
+dans `Match.tsx`. **Le reste** : la fiche (`SeatPanel.tsx` récrit, Cracker compris, au clic,
+Échap ou clic au sol la ferment), les plaques (`Plate`, réduites en vue large, écartées et gardées
+dans l'écran par `plateSpread.ts`, sous-agent B), la minicarte repliable et cliquable (`M`,
+`localStorage`), le fil (`FeedRibbon` et `FeedDrawer`, sous-agent D ; les notes du chrono y entrent
+comme lignes), le panneau ⚙ (`SettingsPanel.tsx`, sous-agent E), trois volumes (`sound.ts`,
+sous-agent C, `boomball.volume.*`, 1 par défaut, le mélange d'avant), le clavier (`keys.ts`,
+sous-agent B), les confirmations au centre sous un voile. **Au passage** : `onFinished` n'est plus
+appelé qu'une fois (dette soldée) ; deux collisions de classes CSS évitées (`.bb-bar` et
+`.bb-plate` existaient pour le lobby). **n8** : `PASSWORD_MIN_LENGTH` à 8 dans `AccountMenu.tsx` et
+dans l'inscription de `SignIn.tsx` (la connexion n'impose rien : un compte de six caractères se
+connecte toujours) ; le PATCH `password_min_length` attend son feu vert. **Le harnais** :
+`openSettings`, `closeSettings`, `setReplay`, `settingsClick` dans `harness.ts`, la taille de
+fenêtre par `E2E_VIEWPORT` (1536 × 695 par défaut, 2560 × 1271 pour le 27 pouces), les specs
+réécrites sur les nouveaux `data-testid`, `board3d.spec.ts` à vingt minutes (quarante-cinq au
+27 pouces) et cinq captures neuves (panneau ⚙, tiroir, minicarte repliée, fiche, retour en vue
+large) ; le bandeau « Your turn » et les lignes neuves du fil y sont vus par un observateur posé
+dans la page, parce qu'ils s'effacent avant que des étapes à 2 images par seconde les regardent.

@@ -5,9 +5,8 @@
  * seen: a bat that cracks, a Cracker that booms, a furnace that rings when the
  * Payload goes in, a referee's whistle at each round. He chose synthesis over
  * audio files, so nothing is downloaded, nothing has a licence to track, and
- * every sound is one small readable recipe below (`RECIPES`). Sound is on by
- * default, a mute toggle is remembered in localStorage under `boomball.sound`,
- * and the caller keeps it silent during instant replay. If the synthesis ever
+ * every sound is one small readable recipe below (`RECIPES`). The caller keeps
+ * it silent during instant replay. If the synthesis ever
  * sounds too thin, CC0 samples may replace any recipe later, at Jérôme's
  * choice; the `play(kind)` contract would not change.
  *
@@ -43,6 +42,20 @@
  * lives in `announcer.ts`. The announcer has a single voice of its own, outside
  * the `MAX_VOICES` of the effects: it never speaks over itself, and a busy
  * round of effects must not silence it on a goal.
+ *
+ * Three volumes instead of a switch (2H.38, `00` C37 point 4). The single
+ * « Sound on » toggle (`boomball.sound`) is gone: sound is always on, and a
+ * settings panel holds three sliders, `crowd`, `announcer` and `effects`, each a
+ * number in [0, 1] that defaults to 1, which is the mix tuned so far: a slider
+ * only ever scales down, never louder than before. Each channel has one
+ * GainNode, set live with a short `setTargetAtTime` so a drag does not click,
+ * between its voices and the compressor: the crowd loops (with their own fades
+ * and the tuned `AMBIENCE.gain`) feed the crowd bus, every `play()` voice,
+ * sample or recipe, whistles included, feeds the effects bus, and every line of
+ * `say` feeds the announcer bus. Each volume is remembered per channel under
+ * `boomball.volume.<channel>`; a volume set before the context exists waits and
+ * is applied when it opens. The old `boomball.sound` key is ignored: a player
+ * who had switched sound off hears it again, and can now lower it as they like.
  */
 
 import {
@@ -77,11 +90,19 @@ export type SoundKind =
   | 'fullTime'; // match end: a long whistle, three blows (short short long)
 
 export interface Sounds {
-  /** Plays one sound now. Dropped silently when muted or before the first user gesture. */
+  /** Plays one sound now. Dropped silently at effects volume 0 or before the first user gesture. */
   play(kind: SoundKind): void;
-  /** Whether sound is on. Persisted under localStorage key 'boomball.sound' ('on' | 'off'); on when the key is absent or storage throws. */
-  readonly enabled: boolean;
-  setEnabled(on: boolean): void;
+  /**
+   * The three volumes, each in [0, 1] and 1 by default (today's mix; 2H.38, C37
+   * point 4). Persisted per channel under `boomball.volume.<channel>`.
+   */
+  readonly volumes: Readonly<Record<VolumeChannel, number>>;
+  /**
+   * Sets one channel's volume (clamped to [0, 1]; NaN is ignored), live and
+   * without a click, remembered for the next visit. Set before the context
+   * exists, it is applied when it opens. 0 silences that channel only.
+   */
+  setVolume(channel: VolumeChannel, value: number): void;
   /**
    * Where the audio stands: `silent` without Web Audio, `waiting` for the
    * first gesture, `running` once the context runs, `disposed` after
@@ -92,7 +113,7 @@ export interface Sounds {
    * Which crowd plays: `attack` while the player's team has the ball, `defence`
    * otherwise (2H.25, C26 point 4). A change crossfades over `CROWD_CROSSFADE`
    * seconds; the same side again does nothing. Remembered before the first
-   * gesture, while muted, and while the side's loop is still decoding: the
+   * gesture, at crowd volume 0, and while the side's loop is still decoding: the
    * loop starts on that side as soon as it can.
    */
   setCrowd(side: CrowdSide): void;
@@ -101,7 +122,7 @@ export interface Sounds {
   /**
    * Comments a moment of the match (2H.25, C26 point 5): one decoded line of
    * `ANNOUNCER_LINES[cue]`, at random and never the one said last for that
-   * cue when there is another. Dropped when muted, before the first gesture,
+   * cue when there is another. Dropped at announcer volume 0, before the first gesture,
    * when the cue has no decoded line, or when another line still holds the
    * floor, unless the cue is a goal or full time, which cut it, even with no
    * line of their own to say (2H.26).
@@ -116,13 +137,24 @@ export interface Sounds {
 /** Who has the ball, as the crowd hears it: the player's team (`attack`) or not (`defence`). */
 export type CrowdSide = 'attack' | 'defence';
 
+/** The three channels the player can turn up and down (2H.38, C37 point 4). */
+export type VolumeChannel = 'crowd' | 'announcer' | 'effects';
+
+export const VOLUME_CHANNELS: readonly VolumeChannel[] = ['crowd', 'announcer', 'effects'];
+
 /** The two storage calls used here, so a test can hand in a plain object. */
 export interface SoundStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
 
-export const SOUND_STORAGE_KEY = 'boomball.sound';
+/** Where a channel's volume is remembered. */
+export const volumeStorageKey = (channel: VolumeChannel): string => `boomball.volume.${channel}`;
+
+/** A volume nobody has touched: today's mix. */
+const DEFAULT_VOLUME = 1;
+/** How fast a volume change settles, as a `setTargetAtTime` time constant in seconds: short, but not a click. */
+const VOLUME_SETTLE = 0.02;
 
 /** How many sounds may ring at once; a play beyond that is dropped. */
 const MAX_VOICES = 12;
@@ -176,7 +208,7 @@ const CROWD_CROSSFADE = 2;
 const ANNOUNCER_CUT = 0.05;
 
 // ---------------------------------------------------------------------------
-// The remembered toggle. Pure, and tested in `sound.test.ts`.
+// The remembered volumes. Pure, and tested in `sound.test.ts`.
 // ---------------------------------------------------------------------------
 
 /** The browser's localStorage, or null where it is missing or reading it throws (private mode, Node). */
@@ -188,21 +220,36 @@ function defaultStorage(): SoundStorage | null {
   }
 }
 
-/** On unless the stored value is exactly 'off'. Absent key, missing storage or a throw all read as on. */
-export function readSoundEnabled(storage: SoundStorage | null = defaultStorage()): boolean {
-  if (!storage) return true;
-  try {
-    return storage.getItem(SOUND_STORAGE_KEY) !== 'off';
-  } catch {
-    return true;
-  }
+/** A volume held to [0, 1]; anything that is not a finite number is the default. */
+function clampVolume(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_VOLUME;
+  return Math.min(1, Math.max(0, value));
 }
 
-/** Writes 'on' or 'off'. A full or forbidden storage is ignored: the toggle still works for the session. */
-export function writeSoundEnabled(on: boolean, storage: SoundStorage | null = defaultStorage()): void {
+/**
+ * The three stored volumes. An absent or unreadable value, a missing storage or
+ * a throw reads as 1; a number out of range is clamped; garbage is 1.
+ */
+export function readVolumes(storage: SoundStorage | null = defaultStorage()): Record<VolumeChannel, number> {
+  const out: Record<VolumeChannel, number> = { crowd: DEFAULT_VOLUME, announcer: DEFAULT_VOLUME, effects: DEFAULT_VOLUME };
+  if (!storage) return out;
+  for (const channel of VOLUME_CHANNELS) {
+    try {
+      const raw = storage.getItem(volumeStorageKey(channel));
+      if (raw === null || raw.trim() === '') continue;
+      out[channel] = clampVolume(Number(raw));
+    } catch {
+      // This channel stays at its default.
+    }
+  }
+  return out;
+}
+
+/** Writes one channel's volume, clamped. A full or forbidden storage is ignored: the slider still works for the session. */
+export function writeVolume(channel: VolumeChannel, value: number, storage: SoundStorage | null = defaultStorage()): void {
   if (!storage) return;
   try {
-    storage.setItem(SOUND_STORAGE_KEY, on ? 'on' : 'off');
+    storage.setItem(volumeStorageKey(channel), String(clampVolume(value)));
   } catch {
     // Nothing to do: the in-memory value is the one that counts until reload.
   }
@@ -464,7 +511,10 @@ const RECIPES: Record<SoundKind, (v: Voice) => number> = {
 
 interface Engine {
   readonly ctx: AudioContext;
+  /** The compressor: where the three channel buses meet. */
   readonly bus: AudioNode;
+  /** One gain per channel, between its voices and the compressor: the volume sliders. */
+  readonly channels: Readonly<Record<VolumeChannel, GainNode>>;
   readonly noise: AudioBuffer;
   /** The recordings, by kind, once decoded. */
   readonly samples: Map<SoundKind, AudioBuffer>;
@@ -539,7 +589,7 @@ function cutCrowd(voice: CrowdVoice): void {
  * yet, whatever plays goes on, and the caller asks again when it arrives.
  */
 function syncAmbience(engine: Engine, side: CrowdSide): void {
-  const { ambience, ctx, bus } = engine;
+  const { ambience, ctx } = engine;
   if (ambience.playing?.side === side) return;
   const buffer = ambience.buffers.get(side);
   if (!buffer) return;
@@ -555,7 +605,7 @@ function syncAmbience(engine: Engine, side: CrowdSide): void {
     gain.gain.setValueAtTime(SILENT, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(AMBIENCE.gain, ctx.currentTime + fade);
     src.connect(gain);
-    gain.connect(bus);
+    gain.connect(engine.channels.crowd);
     src.start(0, AMBIENCE.trim);
     ambience.playing = { side, source: src, gain };
   } catch {
@@ -649,7 +699,7 @@ function pageHasBeenActivated(): boolean {
   return navigator.userActivation.hasBeenActive;
 }
 
-function buildEngine(Ctor: AudioContextCtor): Engine {
+function buildEngine(Ctor: AudioContextCtor, volumes: Readonly<Record<VolumeChannel, number>>): Engine {
   const ctx = new Ctor();
   const compressor = ctx.createDynamicsCompressor();
   compressor.threshold.setValueAtTime(-18, ctx.currentTime);
@@ -662,6 +712,15 @@ function buildEngine(Ctor: AudioContextCtor): Engine {
   compressor.connect(master);
   master.connect(ctx.destination);
 
+  // One gain per channel, at the volume asked for before the context existed.
+  const channels = {} as Record<VolumeChannel, GainNode>;
+  for (const channel of VOLUME_CHANNELS) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(volumes[channel], ctx.currentTime);
+    g.connect(compressor);
+    channels[channel] = g;
+  }
+
   const length = Math.floor(ctx.sampleRate * NOISE_SECONDS);
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -670,6 +729,7 @@ function buildEngine(Ctor: AudioContextCtor): Engine {
   return {
     ctx,
     bus: compressor,
+    channels,
     noise: buffer,
     samples: new Map(),
     lines: new Map(),
@@ -680,20 +740,21 @@ function buildEngine(Ctor: AudioContextCtor): Engine {
 const GESTURES = ['pointerdown', 'pointerup', 'keydown', 'touchend'] as const;
 
 /**
- * Silent stand-in where there is no Web Audio: it still remembers the toggle
+ * Silent stand-in where there is no Web Audio: it still remembers the volumes
  * and the crowd's side, and says nothing (`lastSaid` stays null).
  */
 function silentSounds(storage: SoundStorage | null): Sounds {
-  let enabled = readSoundEnabled(storage);
+  const volumes = readVolumes(storage);
   let crowd: CrowdSide = 'defence';
   return {
     play() {},
-    get enabled() {
-      return enabled;
+    get volumes() {
+      return { ...volumes };
     },
-    setEnabled(on) {
-      enabled = on;
-      writeSoundEnabled(on, storage);
+    setVolume(channel, value) {
+      if (!VOLUME_CHANNELS.includes(channel) || typeof value !== 'number' || Number.isNaN(value)) return;
+      volumes[channel] = clampVolume(value);
+      writeVolume(channel, volumes[channel], storage);
     },
     get state() {
       return 'silent' as const;
@@ -714,7 +775,7 @@ function silentSounds(storage: SoundStorage | null): Sounds {
 
 /** What `createSounds` takes, both for tests. */
 export interface SoundOptions {
-  /** Where the toggle is remembered; the browser's localStorage by default, null for nowhere. */
+  /** Where the volumes are remembered; the browser's localStorage by default, null for nowhere. */
   readonly storage?: SoundStorage | null;
   /** The announcer's dice, in [0, 1): `ANNOUNCER_CHANCE` and the choice of line. `Math.random` by default. */
   readonly random?: () => number;
@@ -737,7 +798,8 @@ export function createSounds(options: SoundOptions = {}): Sounds {
   if (!Ctor) return silentSounds(storage);
   const ctor: AudioContextCtor = Ctor;
 
-  let enabled = readSoundEnabled(storage);
+  /** The volumes in force; read once, then kept here so one set before the context exists is not lost. */
+  const volumes = readVolumes(storage);
   let engine: Engine | null = null;
   let disposed = false;
   let voices = 0;
@@ -782,12 +844,12 @@ export function createSounds(options: SoundOptions = {}): Sounds {
   function start(): void {
     if (disposed) return;
     try {
-      if (!engine) engine = buildEngine(ctor);
+      if (!engine) engine = buildEngine(ctor, volumes);
       const { ctx } = engine;
       const made = engine;
       // Each crowd loop that arrives is offered to the side in force at that moment.
       const onCrowd = () => {
-        if (enabled && !disposed) syncAmbience(made, crowd);
+        if (!disposed) syncAmbience(made, crowd);
       };
       if (ctx.state === 'running') {
         unlisten();
@@ -826,12 +888,12 @@ export function createSounds(options: SoundOptions = {}): Sounds {
 
   return {
     play(kind) {
-      if (disposed || !enabled || !engine || voices >= MAX_VOICES) return;
-      const { ctx, bus, noise: buffer } = engine;
+      if (disposed || volumes.effects === 0 || !engine || voices >= MAX_VOICES) return;
+      const { ctx, channels, noise: buffer } = engine;
       if (ctx.state !== 'running') return;
       try {
         const out = ctx.createGain();
-        out.connect(bus);
+        out.connect(channels.effects);
         const at = ctx.currentTime + 0.005;
         const sample = engine.samples.get(kind);
         let length: number;
@@ -860,19 +922,22 @@ export function createSounds(options: SoundOptions = {}): Sounds {
         // A node that failed to build: that sound is lost, the match goes on.
       }
     },
-    get enabled() {
-      return enabled;
+    get volumes() {
+      return { ...volumes };
     },
-    setEnabled(on) {
-      enabled = on;
-      writeSoundEnabled(on, storage);
-      // The crowd follows the switch at once, on the side in force; the effects
-      // follow it at their next play. Muting also silences the announcer mid-line.
+    setVolume(channel, value) {
+      if (!VOLUME_CHANNELS.includes(channel) || typeof value !== 'number' || Number.isNaN(value)) return;
+      const v = clampVolume(value);
+      volumes[channel] = v;
+      writeVolume(channel, v, storage);
+      // Live, on the channel's own gain; a context not yet open picks it up in `buildEngine`.
       if (engine && !disposed) {
-        if (on) syncAmbience(engine, crowd);
-        else {
-          stopAmbience(engine);
-          hush(engine.ctx);
+        try {
+          const param = engine.channels[channel].gain;
+          param.cancelScheduledValues(engine.ctx.currentTime);
+          param.setTargetAtTime(v, engine.ctx.currentTime, VOLUME_SETTLE);
+        } catch {
+          // A gain that will not move: the next start of that sound uses the new value.
         }
       }
     },
@@ -884,7 +949,7 @@ export function createSounds(options: SoundOptions = {}): Sounds {
       if (side === crowd) return;
       crowd = side;
       // A loop not decoded yet starts on this side when it arrives (`onCrowd`).
-      if (engine && enabled && !disposed) syncAmbience(engine, side);
+      if (engine && !disposed) syncAmbience(engine, side);
     },
     get crowd() {
       return crowd;
@@ -892,8 +957,8 @@ export function createSounds(options: SoundOptions = {}): Sounds {
     say(cue) {
       // The draw comes first: a moment not to be commented this time costs nothing more.
       if (!passesChance(cue, random, ANNOUNCER_CHANCE)) return;
-      if (disposed || !enabled || !engine) return;
-      const { ctx, bus, lines } = engine;
+      if (disposed || volumes.announcer === 0 || !engine) return;
+      const { ctx, channels, lines } = engine;
       if (ctx.state !== 'running') return;
       const now = ctx.currentTime;
       const gate = admitCue(cue, now, busyUntil);
@@ -911,7 +976,7 @@ export function createSounds(options: SoundOptions = {}): Sounds {
         const at = now + 0.005;
         const out = ctx.createGain();
         out.gain.setValueAtTime(ANNOUNCER_GAIN, at);
-        out.connect(bus);
+        out.connect(channels.announcer);
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         source.connect(out);

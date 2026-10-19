@@ -12,7 +12,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import { Shots, report, stamp, waitForHook, watch, prefer2D } from './harness.js';
+import { Shots, report, stamp, waitForHook, watch, prefer2D, openSettings, settingsClick } from './harness.js';
 
 test('@abandon leaves the running match with no result', async ({ page }, info) => {
   test.setTimeout(3 * 60_000);
@@ -38,12 +38,13 @@ test('@abandon leaves the running match with no result', async ({ page }, info) 
   await waitForHook(page);
 
   // -- Leave, then keep playing: the prompt closes and the match stays -------
-  await page.getByTestId('leave-match').click();
+  await settingsClick(page, 'leave-match');
   await expect(page.getByTestId('abandon-prompt')).toBeVisible();
   await expect(page.getByTestId('abandon-prompt')).toContainText('no win, no loss, and the ladder does not move');
   await shots.take('leave-prompt');
   await page.getByTestId('abandon-no').click();
   await expect(page.getByTestId('abandon-prompt')).toHaveCount(0);
+  await openSettings(page);
   await expect(page.getByTestId('leave-match')).toBeEnabled();
 
   // -- Leave for good --------------------------------------------------------

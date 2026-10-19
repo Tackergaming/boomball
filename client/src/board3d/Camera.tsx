@@ -45,6 +45,7 @@ import {
   confine,
   groundCentreOffsetPerUnit,
   groundDepthPerUnit,
+  insetLens,
   orbitPosition,
   PRESET_TILT,
   presetDistance,
@@ -56,6 +57,9 @@ import { setProjector } from './projection.js';
 import type { SceneLink } from './scene.js';
 
 export type { Zoom } from './framing.js';
+
+/** The lens the canvas is made with, before the action row's inset (`Board3D.tsx`). */
+const BASE_FOV = 36;
 
 /** Radians of orbit per pixel of drag. */
 const YAW_PER_PX = 0.006;
@@ -120,6 +124,12 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
     frames: 0,
     fpsSince: 0,
   });
+  /**
+   * The lens of the frame above the action row (2H.38, `insetLens`), in
+   * radians: what every distance and pan below is worked out with. The
+   * camera itself wears the taller virtual lens, set by the frame step.
+   */
+  const lens = useRef({ fov: (BASE_FOV * Math.PI) / 180, aspect: 1, key: '' });
   const keys = useRef(new Set<string>());
   const lookAt = useRef(new Vector3());
   const hookedRef = useRef(hooked);
@@ -208,8 +218,10 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
       letGo();
       // One pixel of the frame is this much floor at the point aimed at,
       // across; along the view the floor is foreshortened by the tilt.
-      const fov = (camera.fov * Math.PI) / 180;
-      const perPx = (2 * c.distance * Math.tan(fov / 2)) / Math.max(1, el.clientHeight);
+      // The usable lens spans the frame above the row at the same pixel scale.
+      const fov = lens.current.fov;
+      const usableHeight = Math.max(1, el.clientHeight - Math.min(link.bottomInset, el.clientHeight * 0.5));
+      const perPx = (2 * c.distance * Math.tan(fov / 2)) / usableHeight;
       const axes = viewAxes(c.yaw);
       const across = -dx * perPx;
       const along = (dy * perPx) / Math.sin(c.tilt);
@@ -257,20 +269,50 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
       window.removeEventListener('keyup', keyUp);
       window.removeEventListener('blur', blur);
     };
-  }, [gl, camera]);
+  }, [gl, camera, link]);
+
+  // The three ways in from the screen (2H.38, `00` C37): a chip or the
+  // minimap puts a cell in the middle of the frame and lets go of the play.
+  useEffect(() => {
+    link.centreOn = (cell) => {
+      const c = cellCentre(cell);
+      cam.current.target = clampPan({ x: c.x, z: c.z });
+      cam.current.vel = { forward: 0, right: 0 };
+      if (hookedRef.current) unhookRef.current();
+    };
+    return () => {
+      link.centreOn = null;
+    };
+  }, [link]);
 
   // The frame step, run by the scene's loop once the pieces are placed.
   useEffect(() => {
     link.camera = (delta: number) => {
       const c = cam.current;
       const z = zoomRef.current;
-      const fov = (camera.fov * Math.PI) / 180;
       const now = performance.now();
 
+      // The lens above the action row (2H.38). Re-applied whenever the
+      // canvas or the row changes, and whenever fiber has put its own aspect
+      // back after a resize.
+      const width = gl.domElement.clientWidth;
+      const height = gl.domElement.clientHeight;
+      const inset = insetLens(BASE_FOV, Math.max(1, width), Math.max(1, height), link.bottomInset);
+      const lensKey = `${width}x${height}-${link.bottomInset}`;
+      if (lensKey !== lens.current.key || Math.abs(camera.aspect - inset.virtual.aspect) > 1e-9) {
+        lens.current = { fov: (inset.usable.fov * Math.PI) / 180, aspect: inset.usable.aspect, key: lensKey };
+        camera.fov = inset.virtual.fov;
+        camera.aspect = inset.virtual.aspect;
+        camera.setViewOffset(Math.max(1, width), inset.virtual.fullHeight, 0, inset.virtual.offsetY, Math.max(1, width), Math.max(1, height));
+        camera.updateProjectionMatrix();
+      }
+      const fov = lens.current.fov;
+      const aspect = lens.current.aspect;
+
       // The preset distance, at the preset tilt, for this frame's shape.
-      if (Math.abs(camera.aspect - c.presetAspect) > 1e-6) {
-        c.preset = presetDistance(z, camera.aspect, fov, PRESET_TILT);
-        c.presetAspect = camera.aspect;
+      if (Math.abs(aspect - c.presetAspect) > 1e-6) {
+        c.preset = presetDistance(z, aspect, fov, PRESET_TILT);
+        c.presetAspect = aspect;
       }
       const wanted = c.preset * c.zoom;
       c.distance = c.settled ? c.distance + (wanted - c.distance) * settle(delta, ZOOM_EASE) : wanted;
@@ -288,7 +330,7 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
         let tx = 0;
         let tz = 0;
         if (z === 'close') {
-          const halfSpan = c.distance * Math.tan(fov / 2) * camera.aspect;
+          const halfSpan = c.distance * Math.tan(fov / 2) * aspect;
           const limit = Math.max(0, PITCH_LENGTH / 2 + 1 - halfSpan);
           tx = Math.max(-limit, Math.min(limit, c.follow.at.x));
           // The whole width is in the frame at the preset; nearer than that,
@@ -350,7 +392,7 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
     return () => {
       link.camera = null;
     };
-  }, [link, camera]);
+  }, [link, camera, gl]);
 
   return null;
 }

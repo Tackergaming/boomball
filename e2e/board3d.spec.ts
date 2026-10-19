@@ -19,12 +19,16 @@
 
 import { expect, test } from '@playwright/test';
 
-import { Shots, act, farthest, report, stamp, state, summary, unitAt, view, waitForArrival, waitForHook, waitForPlayableTurn, watch } from './harness.js';
+import { Shots, act, farthest, report, stamp, state, summary, unitAt, view, waitForArrival, waitForHook, waitForPlayableTurn, watch, setReplay, openSettings, closeSettings, settingsClick } from './harness.js';
 
 test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({ page }, info) => {
   // The effects and a slow round of the house come on top of the 2.5 minutes
   // the board itself takes under software GL.
-  test.setTimeout(540_000);
+  // Twenty minutes since 2H.38 (fourteen measured on the laptop's size): the
+  // settings, the drawer and the sheet added steps to a spec that already ran
+  // nine at 2 fps; forty-five on the 27 inch (E2E_VIEWPORT=2560x1271), where
+  // software GL draws one frame a second.
+  test.setTimeout((page.viewportSize()?.width ?? 0) > 2000 ? 2_700_000 : 1_200_000);
   const shots = new Shots(page, info, stamp());
   const seen = watch(page);
   const myTurn = () => waitForPlayableTurn(page, (places) => Math.min(2, places), shots);
@@ -51,11 +55,16 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   await waitForHook(page);
   const into = page.getByRole('button', { name: 'Into the silo' });
   if (await into.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) await into.click();
-  await page.getByRole('button', { name: 'instant', exact: true }).click();
+  await setReplay(page, 'instant');
 
   // -- In 3D, which is the default since 2H.29 -----------------------------------
-  await expect(page.getByTestId('view-toggle')).toHaveText('Back to 2D');
   await expect(page.locator('[data-board3d] canvas')).toBeVisible({ timeout: 20_000 });
+  // The settings behind the gear (2H.38, `00` C37 point 4): 3D is pressed.
+  await openSettings(page);
+  await expect(page.getByTestId('view-3d')).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(300);
+  await shots.take('settings-panel');
+  await closeSettings(page);
   await page.waitForFunction(() => window.__boomball?.view === '3d');
   // The textures and the Giff model come over the wire, and the camera glides
   // to its first goal: give the scene a moment before it is looked at.
@@ -95,8 +104,39 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   await page.waitForTimeout(500);
   await shots.take('board3d-moved');
 
+  // -- 2H.38: the log drawer, the minimap folded, the target labels ------------------
+  await page.keyboard.press('l');
+  await expect(page.getByTestId('feed-drawer')).toHaveAttribute('data-open', 'yes');
+  await page.waitForTimeout(400);
+  await shots.take('log-drawer');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('feed-drawer')).toHaveAttribute('data-open', 'no');
+  await page.keyboard.press('m');
+  await expect(page.getByTestId('minimap-toggle')).toHaveAttribute('data-open', 'no');
+  await shots.take('minimap-folded');
+  await page.keyboard.press('m');
+  await expect(page.getByTestId('minimap-toggle')).toHaveAttribute('data-open', 'yes');
+  {
+    // A click on another Giff opens its sheet; on an enemy in reach, its labels too.
+    const board = await state(page);
+    const mover = board.units.find((u) => u.id === legal.unitId)!;
+    const other = board.units
+      .filter((u) => u.id !== mover.id && u.status === 'active')
+      .sort((a, b) => Math.hypot(a.x - mover.x, a.y - mover.y) - Math.hypot(b.x - mover.x, b.y - mover.y))[0]!;
+    const at = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [other.x, other.y] as const);
+    if (at) {
+      await page.mouse.click(at.x, at.y - 12);
+      if (await page.getByTestId('unit-card').isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await page.waitForTimeout(300);
+        await shots.take('unit-card');
+        await page.keyboard.press('Escape');
+        await expect(page.getByTestId('unit-card')).toHaveCount(0);
+      }
+    }
+  }
+
   // -- The close zoom, following the play ----------------------------------------
-  await page.getByTestId('zoom-toggle').click();
+  await settingsClick(page, 'zoom-close');
   await expect(page.locator('[data-board3d][data-zoom="close"]')).toBeVisible();
   await page.waitForTimeout(1_500);
   await shots.take('board3d-close');
@@ -117,8 +157,8 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   expect(turned, 'cellToScreen through the turned camera').not.toBeNull();
   expect(turned, 'the camera turned and zoomed').not.toEqual(steady);
   // Choosing the preset again puts the orbit back.
-  await page.getByTestId('zoom-toggle').click();
-  await page.getByTestId('zoom-toggle').click();
+  await settingsClick(page, 'zoom-wide');
+  await settingsClick(page, 'zoom-close');
   await expect(page.locator('[data-board3d][data-zoom="close"]')).toBeVisible();
   await page.waitForTimeout(1_200);
   const back = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
@@ -238,14 +278,15 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   await expect(goalBanner).toBeVisible();
   await expect(goalBanner).toHaveText(/Goal · Your Team/i);
   await shots.take('banner-goal');
-  // Sound is on by default, the switch turns it off and back on, and nothing
-  // is heard here: headless Chromium has no speaker and the test only reads the switch.
-  const soundToggle = page.locator('[data-testid="sound-toggle"]');
-  await expect(soundToggle).toHaveAttribute('data-sound', 'on');
-  await soundToggle.click();
-  await expect(soundToggle).toHaveAttribute('data-sound', 'off');
-  await soundToggle.click();
-  await expect(soundToggle).toHaveAttribute('data-sound', 'on');
+  // Three volumes behind the gear since 2H.38 (`00` C37 point 4), at today's
+  // mix by default; nothing is heard here: headless Chromium has no speaker.
+  await openSettings(page);
+  const crowd = page.getByTestId('volume-crowd');
+  await expect(crowd).toHaveValue('100');
+  await crowd.fill('40');
+  await expect(crowd).toHaveValue('40');
+  await crowd.fill('100');
+  await closeSettings(page);
   // The clicks above were gestures, so the audio context must be running by
   // now: Jérôme heard nothing on his first game because StrictMode's effect
   // rehearsal had disposed the instance, and the switch alone could not say.
@@ -271,18 +312,29 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   // At `slow` the beats are held, so a banner and a verdict the dice produced
   // can be caught: the round opening is certain within the house's round, a
   // swing nearly so. Back to `instant` once seen, so the rest stays quick.
-  await page.getByRole('button', { name: 'slow', exact: true }).click();
+  await setReplay(page, 'slow');
   // Not awaited: `act` resolves once the whole reply has been replayed, and
   // the banners live inside that replay.
+  // Whether the turn banner ever shows (2H.21), recorded by the page itself:
+  // under PATIENT it lives under five seconds, and at 2 fps the steps around
+  // it can take longer than that.
+  await page.evaluate(() => {
+    const w = window as unknown as { __turnBannerSeen?: boolean; __freshSeen?: boolean };
+    w.__turnBannerSeen = false;
+    w.__freshSeen = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="banner"][data-banner="turn"]')) w.__turnBannerSeen = true;
+      // The feed's new lines fade after eight seconds since 2H.38 (`00` C37 point 5).
+      if (document.querySelector('[data-fresh]')) w.__freshSeen = true;
+    }).observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
   const acting = act(page, { kind: 'endTurn' });
   const banner = page.locator('[data-testid="banner"]:is([data-banner="round"], [data-banner="loud"])');
   await banner.first().waitFor({ state: 'visible', timeout: 90_000 });
   await shots.take('banner');
-  const verdict = page.locator('[data-testid="beat-card"] [data-verdict]');
-  if (await verdict.first().waitFor({ state: 'visible', timeout: 30_000 }).then(() => true, () => false)) {
-    await shots.take('beat-card-verdict');
-  }
-  await page.getByRole('button', { name: 'instant', exact: true }).click();
+  // Through the hook here: the gear takes seconds at 2 fps, and the turn
+  // banner the next lines look for lives under five.
+  await page.evaluate(() => window.__boomball!.setSpeed('instant'));
   await acting;
   // The house's round may have been the match's last: then the results sheet
   // is up, the match screen is gone, and there is nothing left to look at.
@@ -300,16 +352,25 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   // goal or a Spark banner holds four times longer, ten seconds for a goal,
   // and a house round late in a match can queue two of them (seen on the 16th,
   // 40 to 0 in round 9: the 6 s this waited before were not enough).
-  await expect(page.locator('[data-testid="banner"][data-banner="turn"]')).toBeVisible({ timeout: 30_000 });
+  // The banner waits for the place question when the house's round opened a
+  // new one (écart 58): answered first, as the smoke does.
+  if ((await myTurn()) === 'finished') {
+    await info.attach('console-and-network', { body: report(seen), contentType: 'text/plain' });
+    expect(seen.errors, 'console errors and page errors').toEqual([]);
+    return;
+  }
+  await page.waitForFunction(() => (window as unknown as { __turnBannerSeen?: boolean }).__turnBannerSeen === true, undefined, {
+    timeout: 30_000,
+  });
   await page.waitForTimeout(300);
   await shots.take('board3d-house-played');
-  await expect(page.locator('[data-fresh]').first()).toBeAttached();
+  expect(await page.evaluate(() => (window as unknown as { __freshSeen?: boolean }).__freshSeen), 'new lines marked in the feed').toBe(true);
 
   // -- Back to the whole silo, then back to 2D ------------------------------------
-  await page.getByTestId('zoom-toggle').click();
+  await settingsClick(page, 'zoom-wide');
   await page.waitForTimeout(1_500);
   await shots.take('board3d-wide-again');
-  await page.getByTestId('view-toggle').click();
+  await settingsClick(page, 'view-2d');
   await expect(page.locator('[data-board-stage]')).toBeVisible();
   await page.waitForFunction(() => window.__boomball?.view === '2d');
 

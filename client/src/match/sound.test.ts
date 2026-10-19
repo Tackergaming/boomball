@@ -1,8 +1,9 @@
 /**
- * The remembered sound toggle (2H.22, `00` C24), and since 2H.25 (`00` C26
- * points 4 and 5) the two crowds and the announcer. Node has no Web Audio and
+ * The remembered volumes (2H.38, `00` C37 point 4, which replaced the on/off
+ * toggle of 2H.22), and since 2H.25 (`00` C26 points 4 and 5) the two crowds
+ * and the announcer. Node has no Web Audio and
  * no window, so `createSounds` falls back to its silent stand-in here, which
- * still has to remember the toggle and the crowd's side and never throw. The
+ * still has to remember the volumes and the crowd's side and never throw. The
  * engine itself is then driven through a fake AudioContext that hears nothing
  * but records which buffer each source plays and whether it was stopped: the
  * state, not the sound.
@@ -15,10 +16,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { admitCue, passesChance, pickLine } from './announcer.js';
 import {
-  SOUND_STORAGE_KEY,
+  VOLUME_CHANNELS,
   createSounds,
-  readSoundEnabled,
-  writeSoundEnabled,
+  readVolumes,
+  volumeStorageKey,
+  writeVolume,
   type SoundStorage,
 } from './sound.js';
 
@@ -38,9 +40,8 @@ vi.mock('./announcer.js', async (importOriginal) => {
   };
 });
 
-function memory(initial?: string): SoundStorage & { readonly map: Map<string, string> } {
-  const map = new Map<string, string>();
-  if (initial !== undefined) map.set(SOUND_STORAGE_KEY, initial);
+function memory(initial: Record<string, string> = {}): SoundStorage & { readonly map: Map<string, string> } {
+  const map = new Map<string, string>(Object.entries(initial));
   return {
     map,
     getItem: (key) => map.get(key) ?? null,
@@ -59,40 +60,68 @@ const broken: SoundStorage = {
   },
 };
 
-describe('readSoundEnabled', () => {
-  it('is on when the key is absent, the storage missing or throwing', () => {
-    expect(readSoundEnabled(memory())).toBe(true);
-    expect(readSoundEnabled(null)).toBe(true);
-    expect(readSoundEnabled(broken)).toBe(true);
+describe('readVolumes', () => {
+  it('is 1 on every channel when nothing is stored, the storage missing or throwing', () => {
+    const all = { crowd: 1, announcer: 1, effects: 1 };
+    expect(readVolumes(memory())).toEqual(all);
+    expect(readVolumes(null)).toEqual(all);
+    expect(readVolumes(broken)).toEqual(all);
   });
 
-  it('reads what was stored', () => {
-    expect(readSoundEnabled(memory('on'))).toBe(true);
-    expect(readSoundEnabled(memory('off'))).toBe(false);
+  it('reads each channel from its own key', () => {
+    const s = memory({
+      'boomball.volume.crowd': '0.25',
+      'boomball.volume.announcer': '0',
+      'boomball.volume.effects': '0.8',
+    });
+    expect(readVolumes(s)).toEqual({ crowd: 0.25, announcer: 0, effects: 0.8 });
+  });
+
+  it('clamps what is out of range and ignores garbage', () => {
+    const s = memory({
+      'boomball.volume.crowd': '7',
+      'boomball.volume.announcer': '-3',
+      'boomball.volume.effects': 'loud',
+    });
+    expect(readVolumes(s)).toEqual({ crowd: 1, announcer: 0, effects: 1 });
+    for (const bad of ['NaN', '', '  ', 'Infinity', '{}']) {
+      expect(readVolumes(memory({ 'boomball.volume.crowd': bad })).crowd).toBe(1);
+    }
+  });
+
+  it('ignores the old on/off key', () => {
+    expect(readVolumes(memory({ 'boomball.sound': 'off' }))).toEqual({ crowd: 1, announcer: 1, effects: 1 });
   });
 });
 
-describe('writeSoundEnabled', () => {
-  it("writes 'on' and 'off', and swallows a throwing storage", () => {
+describe('writeVolume', () => {
+  it('round-trips per channel, clamps, and swallows a throwing or missing storage', () => {
     const s = memory();
-    writeSoundEnabled(false, s);
-    expect(s.map.get(SOUND_STORAGE_KEY)).toBe('off');
-    writeSoundEnabled(true, s);
-    expect(s.map.get(SOUND_STORAGE_KEY)).toBe('on');
-    expect(() => writeSoundEnabled(false, broken)).not.toThrow();
-    expect(() => writeSoundEnabled(false, null)).not.toThrow();
+    writeVolume('crowd', 0.4, s);
+    writeVolume('effects', 5, s);
+    expect(s.map.get(volumeStorageKey('crowd'))).toBe('0.4');
+    expect(s.map.get('boomball.volume.effects')).toBe('1');
+    expect(s.map.has('boomball.volume.announcer')).toBe(false);
+    expect(readVolumes(s)).toEqual({ crowd: 0.4, announcer: 1, effects: 1 });
+    writeVolume('announcer', -1, s);
+    expect(readVolumes(s).announcer).toBe(0);
+    expect(() => writeVolume('crowd', 0.5, broken)).not.toThrow();
+    expect(() => writeVolume('crowd', 0.5, null)).not.toThrow();
+    expect(VOLUME_CHANNELS).toEqual(['crowd', 'announcer', 'effects']);
   });
 });
 
 describe('createSounds without Web Audio', () => {
-  it('starts on, remembers the toggle, and plays nothing without throwing', () => {
+  it('starts at full volume, remembers the volumes, and plays nothing without throwing', () => {
     const s = memory();
     const sounds = createSounds({ storage: s });
-    expect(sounds.enabled).toBe(true);
-    sounds.setEnabled(false);
-    expect(sounds.enabled).toBe(false);
-    expect(s.map.get(SOUND_STORAGE_KEY)).toBe('off');
-    expect(createSounds({ storage: s }).enabled).toBe(false);
+    expect(sounds.volumes).toEqual({ crowd: 1, announcer: 1, effects: 1 });
+    sounds.setVolume('announcer', 0.3);
+    sounds.setVolume('crowd', 9);
+    sounds.setVolume('effects', Number.NaN);
+    expect(sounds.volumes).toEqual({ crowd: 1, announcer: 0.3, effects: 1 });
+    expect(s.map.get('boomball.volume.announcer')).toBe('0.3');
+    expect(createSounds({ storage: s }).volumes.announcer).toBe(0.3);
     expect(() => {
       sounds.play('goal');
       sounds.dispose();
@@ -163,6 +192,10 @@ class FakeParam {
     this.value = v;
     return this;
   }
+  setTargetAtTime(v: number) {
+    this.value = v;
+    return this;
+  }
   cancelScheduledValues() {
     return this;
   }
@@ -213,6 +246,7 @@ class FakeContext {
   sampleRate = 100;
   destination = new FakeNode();
   readonly sources: FakeSource[] = [];
+  readonly gains: FakeGain[] = [];
   constructor() {
     lastCtx = this;
   }
@@ -222,7 +256,9 @@ class FakeContext {
     return n;
   }
   createGain() {
-    return new FakeGain();
+    const g = new FakeGain();
+    this.gains.push(g);
+    return g;
   }
   createBuffer(_channels: number, length: number, rate: number) {
     return { duration: length / rate, getChannelData: () => new Float32Array(length) };
@@ -327,9 +363,8 @@ describe('createSounds with a fake AudioContext (2H.25)', () => {
     sounds.setCrowd('attack');
     expect(ctx.sources.length).toBe(before);
 
-    sounds.setEnabled(false);
-    expect(ctx.live('crowd-attack.mp3')).toHaveLength(0);
-    sounds.setEnabled(true);
+    // At volume 0 the loop goes on, silent, on its own bus.
+    sounds.setVolume('crowd', 0);
     expect(ctx.live('crowd-attack.mp3')).toHaveLength(1);
     sounds.dispose();
     expect(ctx.sources.every((s) => s.stopped)).toBe(true);
@@ -384,7 +419,7 @@ describe('createSounds with a fake AudioContext (2H.25)', () => {
     sounds.say('kickoff');
     expect(sounds.lastSaid).toBe('h2.mp3');
 
-    sounds.setEnabled(false);
+    sounds.setVolume('announcer', 0);
     ctx.currentTime = 30;
     sounds.say('miss');
     expect(sounds.lastSaid).toBe('h2.mp3');
@@ -407,6 +442,42 @@ describe('createSounds with a fake AudioContext (2H.25)', () => {
     sounds.say('goalFoe');
     expect(ctx.live('announcer/h1.mp3')).toHaveLength(0);
     expect(sounds.lastSaid).toBe('h1.mp3');
+    sounds.dispose();
+  });
+
+  it('setVolume moves the right channel gain, remembers it before the context exists, and mutes only its channel', async () => {
+    const browser = fakeBrowser();
+    const sounds = createSounds({ storage: null, random: draws(0, 0, 0, 0) });
+    sounds.setVolume('effects', 0.4);
+    expect(sounds.volumes).toEqual({ crowd: 1, announcer: 1, effects: 0.4 });
+    browser.gesture();
+    await settle();
+    const ctx = lastCtx!;
+    // Gains in build order: the master, then crowd, announcer, effects.
+    const [, crowdBus, announcerBus, effectsBus] = ctx.gains;
+    expect(effectsBus!.gain.value).toBe(0.4);
+    expect(crowdBus!.gain.value).toBe(1);
+    expect(announcerBus!.gain.value).toBe(1);
+
+    sounds.setVolume('crowd', 0.5);
+    expect(crowdBus!.gain.value).toBe(0.5);
+    expect(announcerBus!.gain.value).toBe(1);
+    expect(effectsBus!.gain.value).toBe(0.4);
+
+    // Announcer at 0: nothing said. Effects still play.
+    sounds.setVolume('announcer', 0);
+    expect(announcerBus!.gain.value).toBe(0);
+    sounds.say('hit');
+    expect(sounds.lastSaid).toBeNull();
+    const before = ctx.sources.length;
+    sounds.play('goal');
+    expect(ctx.sources.length).toBeGreaterThan(before);
+
+    // Effects at 0: play schedules nothing.
+    sounds.setVolume('effects', 0);
+    const after = ctx.sources.length;
+    sounds.play('goal');
+    expect(ctx.sources.length).toBe(after);
     sounds.dispose();
   });
 });

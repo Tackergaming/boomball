@@ -17,6 +17,7 @@ import { useState, type FormEvent } from 'react';
 
 import trench from '../../../assets/arena/sign-in.webp';
 import { supabase } from '../lib/supabase.js';
+import { PASSWORD_MIN_LENGTH } from './AccountMenu.js';
 
 type Mode = 'in' | 'up';
 
@@ -121,10 +122,13 @@ export function SignIn({ onDone }: { onDone: () => void }) {
             type="password"
             autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
             required
-            minLength={6}
+            // The floor binds a new password only (n8, 2H.38): an account made
+            // under the old floor of six still signs in.
+            {...(mode === 'up' ? { minLength: PASSWORD_MIN_LENGTH } : {})}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          {mode === 'up' && <p className="label bb-account-hint">At least {PASSWORD_MIN_LENGTH} characters.</p>}
 
           {mode === 'up' && (
             <>
