@@ -1,7 +1,7 @@
 On reprend Boomball, le jeu vidéo. Il vit à la racine de ce workspace.
 Charge le skill boomball, puis lis EN ENTIER docs/08-plan-terrain-horizontal.md :
 c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, **2H.38
-est la dernière sous-phase codée, le 2026-10-19, PAS ENCORE EN LIGNE** (les phases 3, 4 et 5 sont
+est la dernière sous-phase codée, le 2026-10-19, EN LIGNE LE MÊME JOUR** (les phases 3, 4 et 5 sont
 faites par 2H.15, la 6 par 2H.29, la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et
 la limite de présence, 2H.36 le premier lot de la phase 8, 2H.37 les corrections de la revue de
 sécurité, 2H.38 l'écran de match refait), 2H.39 (la caméra) vient après, §9 la parallélisation.
@@ -41,48 +41,53 @@ codée » à la fin de C37 avant de toucher à l'écran. Ne rediscute rien de C1
 rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, n8 est
 dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
 
-Où on en est : **2H.38 EST CODÉE LE 2026-10-19, COMMITÉE ET POUSSÉE (`97470f6`), PAS EN LIGNE**
-(git doit être propre et `origin/main..main` vide : vérifie-le). L'écran de match refait
+Où on en est : **2H.38 EST CODÉE LE 2026-10-19 (`97470f6`) ET EN LIGNE LE MÊME JOUR SUR MON FEU
+VERT** (git doit être propre et `origin/main..main` vide : vérifie-le). L'écran de match refait
 selon C37 : barre à deux lignes et pastilles, plateau plein cadre, rangée transparente des seules
 actions jouables, étiquettes sur cible avec leur pourcentage exact (`match/odds.ts`), fiche au clic,
 fil qui s'efface et tiroir (L), minicarte repliable et cliquable (M), ⚙ avec trois volumes, le
 clavier, la coop dans le coin du chrono, la question de place dans la rangée, la caméra qui cadre
 au-dessus de la rangée (`insetLens`). n8 est dans les deux écrans (`PASSWORD_MIN_LENGTH` = 8,
 la connexion n'impose rien). **842 tests verts sur 50 fichiers**, typecheck racine, scripts, e2e et
-client verts, **smoke 2D vert en 36 s, `e2e:board3d` vert en 14,0 min à 1536 × 695 et en 22,1 min à 2560 × 1271**, captures lues. **NON
-RELANCÉS sur 2H.38 : `e2e:coop`, `e2e:abandon`, `e2e:playthrough`, `e2e:account`** (leurs specs
-sont réécrites sur ⚙). `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
+client verts, **smoke 2D vert en 36 s, `e2e:board3d` vert en 14,0 min à 1536 × 695 et en 22,1 min à 2560 × 1271**, captures lues, puis **`e2e:abandon` vert en 22 s, `e2e:coop`
+vert en 4,6 min, `e2e:playthrough` vert en 1,8 min**, sans une ligne à corriger ; `e2e:account`
+n'a pas été relancé sur 2H.38. `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
 `create-match` v27 (le 503 « could not read the match » ; si la ligne « reading the match failed »
 apparaît dans les logs de la fonction, dis-le-moi). **LE CLIENT EN LIGNE
-(https://boomball.vercel.app) EST TOUJOURS CELUI DE 2H.37**, bundle `index-CKHWjOUz.js`. **Le
+(https://boomball.vercel.app) EST CELUI DE 2H.38**, bundle `index-BLdoW79j.js`, mis en ligne par
+moi le 2026-10-19 (`npm.cmd --prefix client run build` puis `node scripts/deploy-vercel.mjs
+--production`) ; **`password_min_length` vaut 8** (n8, mis par moi dans le tableau de bord, relu
+par l'API), `disable_signup` faux. Sonde Playwright sur l'URL en ligne verte : « At least 8
+characters. » à l'inscription, hub, lobby, briefing, plateau 3D et ⚙ capturés à 1536 × 695,
+crochet absent, aucune erreur sinon l'aléa connu du 401 sur `role_stats` à la connexion (`07`
+l. 1243) et les avertissements GL ; elle a laissé le match e2e ouvert sur la question de place. **Le
 projet Realtime est en `private_only`** : tout nouveau canal doit être `private: true` ET avoir une
 politique sur `realtime.messages`. Migrations appliquées : **0001 à 0016**. Vérifier git status et
 git log origin/main..main en premier et me le dire. assets/source/ (mes sources) est ignoré par
 git : ne le commite jamais. `backups/` est ignoré par git et contient les codes d'invitation :
 jamais dans un dossier partagé.
 
-L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (6) FAITS ; **(7) 2H.38, l'écran de match refait
-(`00` C37), CODÉ ET COMMITÉ, À VÉRIFIER ET METTRE EN LIGNE** ; (8) 2H.39, la caméra (déplacement,
-zooms, angles), un lot à part à cadrer avec moi dans son propre chat, après ma partie sur 2H.38.
+L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (7) FAITS, **(7) étant 2H.38, l'écran de match refait
+(`00` C37), en ligne le 2026-10-19** (les trois précisions du fil principal et les quatre choix au
+code relus et acceptés par moi : « tout me va ») ; (8) 2H.39, la caméra (déplacement, zooms,
+angles), un lot à part à cadrer avec moi dans son propre chat, après ma partie sur 2H.38.
 Restent aussi, sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui
 crée un compte et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **finir 2H.38 sans rien rouvrir** :
-(a) lancer `npm run e2e:abandon`, `npm run e2e:coop` et `npm run e2e:playthrough` (jamais en même
-temps que `e2e:board3d` ni que `npm test`), corriger ce qui casse, lire les captures ; (b) les deux
-`e2e:board3d` sont verts, ne les relance que si (a) touche l'écran ; (c) me
-signaler en une fois les trois précisions du fil principal (Shoot et Catch the Spark dans la
-rangée, Plot route gardé dans la rangée, l'écran en anglais) et les choix faits au code (le bouton
-End turn part au clic, seule la touche E demande deux appuis ; « Follow the play · C » reste sous
-la minicarte quand la caméra est décrochée ; les étiquettes de cible se posent au-dessus de la
-rangée en 2D ; le fil ne répète pas les ouvertures de round, le bandeau central les dit) ; (d)
-**sur mon feu vert seulement** : le PATCH `password_min_length` à 8
-(`/v1/projects/{ref}/config/auth`, relire après, la réponse peut être vide), puis `npm run build`
-dans `client/` et `node scripts/deploy-vercel.mjs --production`, puis une sonde Playwright sur
-l'URL en ligne ; (e) commit puis push sur mon mot pour ce que (a) aura corrigé et pour les
-documents de la mise en ligne. Ensuite ma partie sur le portable et le 27
-pouces. **Ne touche pas à la caméra au-delà des trois accès de C37** : la caméra est 2H.39.
-**Fermer les inscriptions** (`disable_signup`) le jour où je le dis, pas avant.
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **recevoir mes retours de partie sur
+2H.38** (le portable et le 27 pouces : le plateau se voit, on comprend quoi faire sans lire, le
+choix de place se fait en regardant le jeu). Un retour d'écran se reformule et se tranche avec moi
+avant tout code, sans rouvrir C37 ; s'il n'y a rien, on cadre 2H.39 en chat, une question par
+message, la première bornant l'ampleur. **Ne touche pas à la caméra au-delà des trois accès de
+C37** avant que 2H.39 soit cadrée. **Fermer les inscriptions** (`disable_signup`) le jour où je le
+dis, pas avant. Deux remarques de la relecture des captures, sans décision : la maison peut avoir
+deux pions au même prénom (deux « Osric »), que les pastilles et les plaques ne distinguent pas ;
+le bandeau « Your turn » à côté de « Spectating » juste après un siège remis (dette connue).
+
+**Le classifieur du mode auto a refusé le PATCH Auth et même `npm run build`** le 2026-10-19
+(« Account & Standing-Rule Changes ») : un redéploiement ou une écriture de configuration, je les
+fais moi-même dans PowerShell ou le tableau de bord, et **dans mon PowerShell `npm` ne marche pas**
+(la politique d'exécution bloque `npm.ps1`) : écris-moi `npm.cmd`.
 
 Ce qu'il faut savoir tout de suite.
 
@@ -132,7 +137,6 @@ Ce qu'il faut savoir tout de suite.
    à 1536 × 695 (vingt de marge) et jusqu'à 45 à 2560 × 1271**, e2e:abandon en 10 s, e2e:coop en
    2 à 5 min (deux specs, hors de npm run e2e ; il abandonne le match e2e en cours pour atteindre
    le lobby, et abandonne le match coop qu'il
-   ouvre)abandonne le match coop qu'il
    ouvre), e2e:account en 8 s (hors de npm run e2e : il change le mot de passe du compte e2e et le
    remet dans un `finally` ; s'il casse entre les deux, le compte garde l'original suivi de
    `-tmp`, à remettre à la main). **Depuis 2H.38 les réglages sont derrière ⚙** : vitesse, vue,
@@ -207,7 +211,7 @@ Ce qu'il faut savoir tout de suite.
    .env n'a pas le droit de lire les Actions ni les secrets du dépôt : pour le maintien en vie et
    la CI, c'est moi qui regarde l'onglet Actions (vert sur 22564ca le 18 au matin).
 
-10. Les commandes. Depuis la racine du workspace : npm test (777), npm run typecheck, npm run sweep, npm run
+10. Les commandes. Depuis la racine du workspace : npm test (842), npm run typecheck, npm run sweep, npm run
     e2e, e2e:playthrough, e2e:board3d, e2e:abandon, e2e:coop, e2e:account, npm run build:function,
     npm run export:db ; en bash avec le .env chargé : npm run deploy:function (les deux) ou node
     scripts/deploy-edge-function.mjs resolve-action (une seule) ; node scripts/deploy-vercel.mjs
