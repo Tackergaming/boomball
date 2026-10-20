@@ -415,3 +415,16 @@ vérifie par whisper (une des six disait « cut » pour « caught »). Les prise
 `assets/source/sounds/spark-takes/`, hors git. 848 tests sur 50 fichiers, smoke 2D vert, spec 3D
 non relancé ; **commitée (`6159a45`) et en ligne le 2026-10-20 sur son feu vert, `index-D4GRahNO.js`**,
 déployée par le fil principal. **Porte franchie le même jour** : « parfait ça marche bien ». Suite : 2H.41, à cadrer.
+
+**2H.41, toute l'équipe à un humain, cadrée le 2026-10-20 et pas codée** (`00` C41, l'écart 66,
+avec le plan de code à suivre) : une équipe « entière » joue son rang par des prises (`TurnActor`
+`pick`), l'humain choisit à chaque prise quel Giff agit (`pickUnit`), tour entier avant la prise
+suivante, relance après un but dans son ordre, écarts 55, 58, 62 et 65 suspendus pour elle ; en
+coop le Giff d'un humain n'est qu'à lui, les autres au premier clic (A10 tranche) ; `delegateTurn`
+et `delegateRound` (« Let the AI play », « Let the AI finish the round »), l'expiration vaut le
+second, plus de Dodge d'expiration pour cette équipe ; `setTeamMode` au propriétaire, effet au
+round suivant, case du lobby au départ. **`ENGINE_VERSION` 12**, les deux fonctions à redéployer
+sur son feu vert, pas de migration. Deux lots : moteur et fonctions prouvés par les tests
+(`c41.test.ts`, `session.test.ts`), puis l'écran (fil principal plus deux Sonnet 5.5 effort élevé,
+rangée et bande, lobby et ⚙). Harnais : `npm run e2e:whole` à créer, `coop.spec.ts` étendu,
+épingle à 11 tant que les fonctions sont en ligne au moteur 11.

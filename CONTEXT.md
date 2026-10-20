@@ -18,13 +18,20 @@ un humain.
 `07-audit-et-plan-3d.md` est l'audit du 2026-10-09, avec les décisions D1 à D11 et le journal des
 phases ; `04-etat-des-lieux.md` est l'historique de ce qui a été construit et pourquoi.
 
+**État au 2026-10-20, fin d'après-midi.** **2H.41, toute l'équipe à un humain, est cadrée** (`00` C41,
+écart 66) et pas codée : une équipe « entière » joue son rang par des prises, je choisis à chaque
+prise quel Giff agit ; en coop le Giff d'un humain n'est qu'à lui, les autres au premier clic ; deux
+boutons IA dans la rangée, l'expiration vaut « Let the AI finish the round » ; case du lobby et
+interrupteur dans ⚙ au round suivant, au propriétaire ; `ENGINE_VERSION` 12, deux fonctions, pas de
+migration. **Le code commence dans le chat suivant**, lot moteur d'abord.
+
 **État au 2026-10-20, après-midi.** **2H.40, la réplique du Spark, est cadrée et codée** (`00` C40) :
 « and it's a goal » sur un Spark attrapé était un défaut de `motion.ts` (tout `scored` faisait un
 but) ; ma phrase « And the Spark is caught! Twenty points on the board! » dans la voix du but clonée
 par Chatterbox sur ma carte, ma prise choisie parmi six ; le Spark ne déclenche plus rien du but,
 l'annonceur se tait pour la laisser parler. 848 tests, smoke vert, rien à redéployer côté fonctions,
 **commitée (`6159a45`) et en ligne le même jour sur mon feu vert** (`index-D4GRahNO.js`). Ma partie en ligne :
-« parfait ça marche bien », porte franchie. Suite : 2H.41, toute l'équipe à un humain, à cadrer.
+« parfait ça marche bien », porte franchie. Suite : 2H.41, cadrée le même jour.
 
 **État au 2026-10-20.** **2H.39, la caméra refaite, est cadrée et codée** (`00` C39) : plus de mode
 libre, quatre vues (Side à 52 degrés, Top à 85, Own end et Far end à 40 derrière chaque bouche,

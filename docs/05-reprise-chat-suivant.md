@@ -1,11 +1,11 @@
 On reprend Boomball, le jeu vidéo. Il vit à la racine de ce workspace.
 Charge le skill boomball, puis lis EN ENTIER docs/08-plan-terrain-horizontal.md :
 c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, **2H.40
-est la dernière sous-phase codée, le 2026-10-20** (les phases 3, 4 et 5 sont
+est la dernière sous-phase codée, le 2026-10-20, et 2H.41 est CADRÉE, PAS CODÉE** (les phases 3, 4 et 5 sont
 faites par 2H.15, la 6 par 2H.29, la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et
 la limite de présence, 2H.36 le premier lot de la phase 8, 2H.37 les corrections de la revue de
 sécurité, 2H.38 l'écran de match refait, 2H.39 la caméra refaite, 2H.40 la réplique du Spark),
-2H.41 vient après, §9 la parallélisation.
+2H.41 est la ligne à coder, §9 la parallélisation.
 Lis ensuite la partie C de docs/00-reglement-v2.md : les écarts 27 à 65, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 à C16 les passes suivantes de l'IA (chacune finit par « comment ...
@@ -48,8 +48,15 @@ a goal » sur un Spark attrapé ÉTAIT UN DÉFAUT (`motion.ts` faisait un repèr
 `scored`, source ballon ou Spark), pas une réplique ; ma phrase « And the Spark is caught! Twenty
 points on the board! » dans la voix du but (un clip d'un pack Freesound, PAS ma voix) clonée par
 Chatterbox en local sur ma RTX 4060, ma prise choisie à l'oreille parmi six ; le Spark ne
-déclenche plus rien du but ; la catégorie `spark` de l'annonceur vide et prioritaire. Ne
-rediscute rien de C12 à C40.
+déclenche plus rien du but ; la catégorie `spark` de l'annonceur vide et prioritaire. **C41 EST 2H.41, TOUTE L'ÉQUIPE À UN HUMAIN, CADRÉE PAR MOI LE 2026-10-20 EN CINQ QUESTIONS
+(L'AMPLEUR, LA COOP, L'ÉCRAN, L'INTERRUPTEUR, LE MOTEUR) ET « GO » SUR LA REFORMULATION : C'EST LA
+SPÉCIFICATION QUE TU CODES, LIS-LA EN ENTIER, SES NEUF DÉCISIONS ET SON PLAN DE CODE** (l'écart 66 ;
+une équipe « entière » joue son rang par des prises ; je choisis à chaque prise quel Giff agit ;
+tour entier avant la prise suivante ; la relance après un but dans mon ordre ; les écarts 55, 58,
+62 et 65 suspendus pour cette équipe ; en coop le Giff d'un humain n'est qu'à lui, les autres au
+premier clic ; « Let the AI play » et « Let the AI finish the round », l'expiration vaut le
+second ; la case « We play the whole team » du lobby au propriétaire ; l'interrupteur dans ⚙ au
+round suivant, au propriétaire seul ; `ENGINE_VERSION` 12). Ne rediscute rien de C12 à C41.
 07 §10 porte le journal (2H.15 la 2.5D fichier par fichier, 2H.16 à 2H.20 la caméra, 2H.21 et
 2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31 à
 2H.40). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
@@ -60,11 +67,12 @@ dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche 
 Où on en est : **2H.40, LA RÉPLIQUE DU SPARK, EST CODÉE LE 2026-10-20 PAR LE FIL PRINCIPAL SEUL**
 (`sound.ts`, `motion.ts`, `announcer.ts`, deux tests, `client/public/sounds/spark.mp3`,
 `scripts/voice/clone-line.py`, `00` C40, `08` §5, `07` §10, `04`, CONTEXT, la skill, ce prompt).
-**COMMITÉE (`6159a45`) ET EN LIGNE LE 2026-10-20 SUR MON FEU VERT**, bundle `index-D4GRahNO.js`,
-déployée par le fil principal (le classifieur a laissé passer `deploy-vercel.mjs --production`
-une seconde fois). Les documents qui notent la mise en ligne (07 §10, 08 §5, CONTEXT, la skill, ce
-prompt) ont été modifiés après `6159a45` : s'ils ne sont pas commités, demande-moi « commit » (git
-doit être propre et `origin/main..main` vide : vérifie-le). Rien à redéployer côté fonctions. **848 tests verts sur
+**COMMITÉE (`6159a45`), EN LIGNE ET VALIDÉE PAR MA PARTIE LE 2026-10-20** (« parfait ça marche
+bien »), bundle `index-D4GRahNO.js`. **Puis 2H.41 a été cadrée le même jour (`00` C41) sans une
+ligne de code** : les documents du cadrage (00 C41, 08 §5, 07 §10, CONTEXT, la skill, ce prompt)
+ont été modifiés après `664e6c5` ; s'ils ne sont pas commités, demande-moi « commit » (git doit
+être propre et `origin/main..main` vide : vérifie-le). Rien à redéployer tant que 2H.41 n'est pas
+codée. **848 tests verts sur
 50 fichiers** (847 avant), smoke 2D vert en 46 s (un premier run rouge parce que le match e2e a
 atteint le round 10 pendant ses trois tours, le cas connu), `e2e:board3d` non relancé
 (`Effects.tsx` ne change pas ; dernier vert le 2026-10-20 en 11,5 min au portable et 20,6 min au
@@ -87,18 +95,35 @@ La référence est la voix seule découpée (`assets/source/sounds/spark-takes/r
 Une voix clonée sur cinq secondes ressemble, elle n'est pas exacte.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (9) FAITS, **(9) étant 2H.40, la réplique du Spark
-(`00` C40), codée le 2026-10-20** ; (10) **2H.41, en option, un humain joue tous les Giffs de son
-équipe**, ce qui refait l'ordre et l'initiative de son équipe (moteur, fonctions,
-`ENGINE_VERSION`). 2H.41 est notée en `00` C38 et `08` §5, PAS cadrée : elle se cadre en chat,
-une question par message, la première bornant l'ampleur. Restent aussi, sans date : ma partie à
-deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte et joue sans moi (la
-porte de la phase 8).
+(`00` C40), codée, en ligne et validée le 2026-10-20** ; (10) **2H.41, toute l'équipe à un humain,
+CADRÉE en `00` C41, À CODER**. Restent aussi, sans date : ma partie à deux sur les canaux privés (la
+porte de 2H.37) et un ami qui crée un compte et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire (2H.40 est VALIDÉE par ma partie en ligne :
-« parfait ça marche bien ») ; puis **cadrer 2H.41**, si ce n'est pas déjà commencé dans le chat
-précédent (regarde `00` : un C41 existe alors), en chat, une question par message, la première bornant
-l'ampleur (l'initiative est dans `engine/` : écarts 51, 55, 58 et 65, `turn`, le siège et
-`seatYielded` de 2H.33 ; les fonctions et `ENGINE_VERSION` bougent). **Fermer les inscriptions**
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **CODER 2H.41 depuis `00` C41, en
+deux lots, sans recadrer** (le cadrage est fait et validé ; une question seulement si le code
+contredit la spécification, et alors en chat, une par message). **Lot 1, le moteur et les
+fonctions, par le fil principal seul** : `engine/types.ts` (le mode des équipes dans `MatchState`,
+`{ kind: 'pick', team }` dans `TurnActor`, `pickedBy` et `delegated` dans `TurnState`, les quatre
+actions `pickUnit`, `delegateTurn`, `delegateRound`, `setTeamMode`, les cinq événements),
+`engine/initiative.ts` (`buildTurnOrder` met des prises pour une équipe entière ; `promoteBulwark`,
+`RELAUNCH_ORDER` et `placementAt` ne la concernent plus), `engine/reduce.ts` (`pickUnit` avant les
+contrôles de tour comme `yieldSeat`, une prise sautée s'il ne reste rien à prendre, `startRound`
+applique le mode demandé), `engine/legalActions.ts` (les prises offertes, jamais le Giff d'un
+autre humain), `server/session.ts` (`advance` continue sur un tour délégué et résout les prises
+d'une équipe qui a cédé le round par `orderBySituation` ; `clockKey` nomme la prise ;
+`expireIfDue` délègue le round pour une équipe entière au lieu du Dodge), `ENGINE_VERSION` 12,
+`c41.test.ts` et `session.test.ts` (la liste des cas est dans C41, « La preuve »), `dump-match.ts`
+et `replay.ts` pour les événements nouveaux ; `create-match` (`wholeTeam` dans le corps, la case
+depuis la présence du propriétaire) et `resolve-action` (qui a le droit d'envoyer quoi, 403
+sinon, `isActionShaped`). **Les deux fonctions se redéploient sur mon feu vert après les
+tests** ; le harnais tourne épinglé à 11 tant qu'elles sont au moteur 11. **Lot 2, l'écran** :
+fil principal sur `useMatch.ts`, `Match.tsx`, le crochet et le harnais (`e2e/whole.spec.ts`, `npm
+run e2e:whole`, `coop.spec.ts` étendu, `waitForPlayableTurn` qui sait prendre un Giff) ; un Sonnet
+5.5 effort élevé sur `ActionRow.tsx` et `TurnStrip.tsx` (la rangée de prise, les deux boutons IA,
+le bloc de pastilles) ; un autre sur `Lobby.tsx`, `SettingsPanel.tsx` et `Briefing.tsx` (la case,
+l'interrupteur, deux lignes). Briefs fermés, fichiers disjoints, auteurs nommés. **Puis « comment
+2H.41 est codée » à la fin de C41**, 07 §10, 08 §5, CONTEXT, la skill, ce prompt, et mon feu vert
+pour le client. Sa porte : ma partie seul en équipe entière, puis à deux. **Fermer les inscriptions**
 (`disable_signup`) le jour où je le dis, pas avant. Deux remarques de la relecture des captures
 de 2H.38, sans décision : la maison peut avoir deux pions au même prénom (deux « Osric »), que les
 pastilles et les plaques ne distinguent pas ; le bandeau « Your turn » à côté de « Spectating »
@@ -236,7 +261,15 @@ Ce qu'il faut savoir tout de suite.
    rebond part de la bouche. Deux faits de règle sans décision : l'équipe qui a l'humain joue
    juste après le Spark à chaque round ; la dérive du Spark traverse les unités. Fait de la
    coop, sans décision : une équipe A dont le dernier humain a remis son siège n'a plus d'humain,
-   et les deux camps alternent de round en round (sideOrder). **2H.41 touche à tout ce point.**
+   et les deux camps alternent de round en round (sideOrder). **2H.41 (C41, écart 66) suspend 55,
+   58, 62 et 65 pour une équipe entière et n'en touche aucun autre.** Ce que le code dit aujourd'hui
+   et que C41 réutilise : `turn.placing` et `offerPlace` / `applyChoosePlace` sont le modèle d'un
+   tour qui attend une réponse humaine ; `applyYieldSeat` est le modèle d'une action acceptée hors
+   du tour ; `advance` dans `session.ts` joue l'IA en boucle jusqu'à un humain et s'arrête sur
+   `isHuman(unit)` ; `expireIfDue` joue Dodge puis `endTurn` ; `deadlineFor` ne pose un chrono que
+   quand `clockKey` change ; `hasPlayedThisRound` et `orderBySituation` existent dans
+   `initiative.ts` ; la présence du propriétaire dans le lobby porte déjà `tier`, la case du lobby
+   voyage pareil.
 
 9. Les interdits ne changent pas. Jamais le dépôt GitHub sur Vercel. Jamais le .env ni une clé
    dans un commit. Le règlement de table du vault de jarvis-jdr est figé. Ne lis jamais design/Boomball
@@ -255,8 +288,8 @@ Ce qu'il faut savoir tout de suite.
     comptes jetables et deux équipes) et browser-path.py, python .claude/scripts/check_drift.py.
     Le cwd de l'outil Bash se réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
-11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 65 de 00
-    partie C, et C11 à C40 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
+11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 66 de 00
+    partie C, et C11 à C41 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
     des autres pions humains et `onFinished` appelé à chaque rendu. Dette connue : le bandeau
     « Your turn » à revoir avec le coin du chrono (C37 ne l'a pas tranché) ; « Giff picks the league » et « Giff
     starts the match » se répètent dans la barre du membre ; `mergeRoll` reste côté client,

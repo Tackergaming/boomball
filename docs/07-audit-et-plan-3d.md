@@ -2203,3 +2203,11 @@ parmi six), puis « go » sur la reformulation. Rien dans le moteur, l'IA, les f
 | En ligne | **Le 2026-10-20 sur son feu vert**, commit `6159a45`, bundle `index-D4GRahNO.js` (83 fichiers, 10,2 Mo), déployé par le fil principal ; `curl` de la page en ligne et de `sounds/spark.mp3` (200, 70 260 octets) relus ; rien côté fonctions |
 
 **Porte franchie le même jour**, sa partie en ligne : « parfait ça marche bien ».
+
+### Sous-phase 2H.41, « toute l'équipe à un humain », cadrée le 2026-10-20, à coder
+
+Cadrée par le fil principal (Fable 5.1) en chat avec Jérôme l'après-midi du 2026-10-20, après la
+porte de 2H.40 : cinq questions, une par message (l'ampleur, la coop, l'écran, l'interrupteur, le
+moteur), puis « go » sur la reformulation en neuf paragraphes. La spécification est `00` C41, écart
+66, avec le plan de code que le chat suivant suit : `ENGINE_VERSION` 12, deux lots (moteur et
+fonctions, puis écran), `e2e:whole`. Rien n'est codé dans ce chat, à sa demande.

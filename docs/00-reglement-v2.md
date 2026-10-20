@@ -3856,3 +3856,131 @@ découpée restent dans `assets/source/sounds/spark-takes/`, hors git. Le MP3 es
 `-ar 44100 -b:a 128k`, 4,4 s. **848 tests sur 50 fichiers** (847 avant), typecheck racine, scripts, e2e et client verts. Le spec 3D n'est pas relancé : `Effects.tsx` ne change pas.
 
 **Sa partie sur 2H.40, le 2026-10-20 : « parfait ça marche bien. »** La porte est franchie.
+
+## C41. Décisions du 2026-10-20, **toute l'équipe à un humain, sous-phase 2H.41, cadrée en chat, à coder dans le chat suivant**
+
+> Écrites par le fil principal (Fable 5.1), sur le cadrage en chat de Jérôme le 2026-10-20 après la
+> porte de 2H.40, une question par message, la première bornant l'ampleur, puis son « go » sur la
+> reformulation en neuf paragraphes. **Touche au moteur, aux fonctions et à `ENGINE_VERSION`
+> (12).** Rien dans les poids de l'IA, aucune constante ne bouge, pas de sweep. Le code commence
+> dans un autre chat : cette section est la spécification qu'il suit, et son dernier paragraphe,
+> « comment 2H.41 est codée », s'écrit à la fin.
+
+**Ses mots d'origine (C38, le 19 au soir).** « Un humain qui joue tous les Giffs de son équipe, en
+option, pas seulement le sien, et donc chambouler tout l'ordre des joueurs et leurs initiatives
+pour l'équipe de l'humain. »
+
+### Les décisions
+
+1. **L'ampleur : l'ordre devient le sien.** Sur trois lectures proposées (jouer chaque siège dans
+   l'ordre d'aujourd'hui ; choisir librement quel Giff agit ; un d20 par Giff), ses mots :
+   « L'ordre devient le tien. Et oui aussi en coop mais je ne sais pas comment, je te laisse
+   proposer. »
+2. **Écart 66, l'équipe entière.** Une équipe peut être jouée « entière » par ses humains. En
+   haut du round, l'échelle entre les camps ne change pas (écart 51 : le Spark, l'équipe qui a un
+   humain, les Crackers après l'équipe qui a le ballon, l'autre équipe). Mais le rang d'une équipe
+   entière n'est plus sept cases fixées d'avance : c'est **autant de prises que d'unités actives**,
+   et à chaque prise un humain de l'équipe choisit, parmi les Giffs qui n'ont pas encore joué ce
+   round, celui qui joue maintenant. **Un Giff pris joue son tour entier**, déplacement et action,
+   avant la prise suivante : pas d'entremêlement. Pour cette équipe, **les écarts 55, 58, 62 et 65
+   ne s'appliquent plus** ; tout le reste tient : réactions, attaques d'opportunité toujours
+   prises, parade du Breaker, remplaçants, dérive du Spark, Crackers, zone de réparation et laisse
+   du gardien (53, 53 bis), alternance des camps sans humain.
+3. **La relance après un but encaissé.** Ses mots : « oui l'équipe rejoue toujours aussitôt, mais
+   dans mon ordre ». L'équipe entière qui encaisse rejoue aussitôt (ce que l'écart 62 donne), mais
+   dans l'ordre que l'humain choisit : le gardien n'ouvre plus d'office.
+4. **Le partage en coop, sa validation de la proposition du fil principal.** L'option est celle de
+   l'équipe, pas du joueur. **Le Giff d'un humain n'est jouable que par lui.** Les Giffs sans humain
+   sont à prendre par n'importe quel humain de l'équipe, **premier clic gagnant**, le serveur
+   tranchant la course (A10, 409 au perdant). Le rang finit quand toutes les unités actives ont
+   agi. Seul, même mécanisme avec un seul joueur. Écartée : l'ordre décidé par le propriétaire
+   seul.
+5. **L'IA en renfort, à sa demande.** Ses mots : « en solo par contre il faut pouvoir décider de
+   laisser l'IA jouer le perso. c'est peut-être un bouton d'action en plus dans la barre en bas. »
+   Deux boutons dans la rangée pendant le tour d'un Giff pris, en solo comme en coop :
+   **« Let the AI play »**, l'IA de son rôle joue ce Giff (le reste du tour, depuis l'état où il
+   est) et la main revient à la prise suivante ; **« Let the AI finish the round »** (proposition
+   du fil principal, ses mots : « il me sert. c'est une très bonne suggestion »), l'IA joue ce Giff
+   et tous les Giffs restants du round, dans son ordre à elle (`orderBySituation`).
+6. **Le chrono.** Une prise a le chrono d'un tour, relancé à chaque prise. Ses mots : « si l'humain
+   rate son tour à cause du chrono, tous les joueurs restant sous son contrôle doivent repasser
+   pour ce tour à l'IA. » Donc **une expiration, sur une prise ou sur un tour, vaut « Let the AI
+   finish the round »** : le tour en cours et tout ce qui restait ce round passent à l'IA. Plus de
+   Dodge d'expiration pour une équipe entière. Le coup à la porte à cinq secondes reste.
+7. **L'interrupteur.** Ses mots : « il faut aussi dans le menu des settings l'option de toggle on
+   off, jouer tous les Giffs ou jouer seulement mon Giff. » Et sa validation : l'interrupteur
+   **prend effet au round suivant** (le rang en cours finit comme il a commencé, bandeau « Whole
+   team from next round ») ; c'est **une action envoyée au serveur**, le moteur garde le mode de
+   chaque équipe dans l'état du match et tout le monde le voit ; **en coop, seul le propriétaire
+   le bascule**, gris chez les autres avec « the owner's call » ; revenir à « my Giff only » rend
+   les autres Giffs à l'IA dès le round suivant, et les écarts 55, 58, 62 et 65 reprennent. La case
+   du lobby n'est que la valeur de départ.
+8. **L'écran, sa validation.** Dans l'esprit de C38, rien de caché derrière un clic. **À la prise** :
+   bandeau « Your team · pick a Giff » ; sur le plateau, anneau qui pulse sur les Giffs à jouer,
+   ternis sur ceux qui ont joué ; **un bouton par Giff à jouer dans la rangée**, prénom et lettre
+   de rôle, dans l'ordre des rôles, touches 1 à 9 ; **étiquette « Take the turn »** au survol d'un
+   Giff du plateau, cliquable ; le clic sur le pion ouvre la fiche, comme avant. **Pendant le
+   tour** : la rangée d'aujourd'hui plus les deux boutons IA à droite. **En haut**, la bande des
+   tours montre l'équipe entière comme un seul bloc de pastilles, les jouées éteintes. **Les
+   coéquipiers** voient le bandeau avec le nom de celui qui joue (« Osric · Jérôme ») et la rangée
+   leur dit d'attendre ; dès que le tour finit, la rangée du choix revient pour tous. Chez tous le
+   même chrono. **Dans le lobby**, une case « We play the whole team » sous la ligue, au
+   propriétaire, lue par tous. **Dans ⚙**, « Play the whole team / Play my Giff only ».
+9. **Hors de ce lot** : jouer l'équipe adverse, l'entremêlement de deux tours, la parade manuelle
+   du Breaker.
+
+### Ce que ces décisions rouvrent, et comment le chat suivant les code
+
+**Deux lots, le moteur et les fonctions d'abord, prouvés par les tests ; l'écran ensuite.** Fil
+principal sur le moteur, `session.ts`, les deux fonctions, `useMatch`, `Match.tsx` et le harnais ;
+un Sonnet 5.5 effort élevé sur la rangée et la bande du haut, un autre sur le lobby et ⚙, briefs
+fermés, fichiers disjoints, nommés comme auteurs. Un à deux séances.
+
+**Le moteur (`engine/`), `ENGINE_VERSION` 12.**
+
+- `MatchState` gagne le mode de chaque équipe (`'seat' | 'whole'`) et le mode demandé pour le
+  round suivant, appliqué en haut du round par `startRound` ; `create-match` écrit le mode de
+  départ depuis la case du lobby.
+- `TurnActor` gagne la prise, `{ kind: 'pick', team }`. `buildTurnOrder` (`initiative.ts`) met,
+  pour une équipe entière, autant de prises que d'unités actives à la place des sept cases ;
+  `RELAUNCH_ORDER` et `promoteBulwark` ne s'appliquent pas à une équipe entière, qui rejoue
+  aussitôt par des prises ; `placementAt` ne propose jamais de place à une équipe entière.
+- Quand l'échelle atteint une prise, `turn` est `null` et le serveur attend : c'est un moment où un
+  humain est interrogé, donc **le chrono court** (`clockKey` nomme la prise par round, équipe et
+  numéro). `legalActions` offre `pickUnit` pour chaque unité active de l'équipe qui n'a pas joué ce
+  round (`hasPlayedThisRound`), jamais le Giff d'un autre humain. `reduce` accepte `pickUnit` avant
+  les contrôles de tour, comme `yieldSeat` : la prise devient une case `{ kind: 'unit' }` et
+  `beginTurn` ouvre le tour ; `turn` garde qui a pris (`pickedBy`, l'`humanId`). Si plus aucune
+  unité n'est à prendre (évacuations en cours de round), la prise est sautée.
+- `delegateTurn` : accepté pendant le tour d'une unité prise, pose `turn.delegated` ; la boucle
+  `advance` de `session.ts`, qui s'arrête aujourd'hui sur `isHuman(unit)`, continue aussi quand le
+  tour est délégué et le joue par `chooseAction`. `delegateRound` : pose sur l'état l'équipe qui
+  a cédé le round ; `advance` résout alors ses prises lui-même par `orderBySituation` et joue les
+  tours. `expireIfDue` fait `delegateRound` pour une équipe entière au lieu du Dodge.
+- `setTeamMode` : accepté à tout moment, écrit le mode demandé ; le propriétaire seul, vérifié par
+  la fonction, pas par le moteur.
+- Événements : `unitPicked`, `turnDelegated`, `roundDelegated`, `teamModeRequested`,
+  `teamModeChanged`. Le fil et `dump-match.ts` les disent.
+- Le Cracker frappé vers un Giff d'une équipe entière demande sa réponse à l'humain comme pour son
+  propre Giff aujourd'hui.
+
+**Les fonctions.** `create-match` lit `wholeTeam` dans le corps (la case du lobby, dans la présence
+du propriétaire comme la ligue). `resolve-action` autorise `pickUnit` à tout humain de l'équipe
+sur une unité IA ou sur la sienne, `delegateTurn` à celui qui a pris, `delegateRound` à tout
+humain de l'équipe, `setTeamMode` au propriétaire (`teams.owner`), et refuse le reste en 403 ;
+`isActionShaped` apprend les quatre formes. Redéploiement sur le feu vert de Jérôme, après les
+tests ; pas de migration.
+
+**Le client.** `useMatch` lit les prises et les envoie ; `Match.tsx` la rangée de prise, les deux
+boutons IA, le bandeau de coéquipier, l'étiquette « Take the turn » ; `TurnStrip` le bloc ;
+`SettingsPanel` l'interrupteur ; `Lobby` la case ; `Briefing` deux lignes ; `keys.ts` les
+touches ; `Board.tsx` et `Tokens.tsx` l'anneau et le terni.
+
+**La preuve.** `session.test.ts` et un `c41.test.ts` (la prise, la course à deux humains, le
+Giff d'un autre refusé, la délégation du tour et du round, l'expiration qui délègue, la relance
+dans l'ordre choisi, l'interrupteur appliqué au round suivant, l'archivage du moteur 11) ; tests
+du client (rangée, bande, clavier, interrupteur) ; **`npm run e2e:whole`**, un spec à part qui
+abandonne le match e2e en cours, coche la case, joue un round entier (deux prises, un « Let the AI
+play », un « Let the AI finish the round ») et abandonne ; `coop.spec.ts` étendu, deux humains
+qui se partagent un Giff ; smoke, playthrough, abandon verts. Harnais épinglé à 11 tant que les
+fonctions ne sont pas redéployées.
