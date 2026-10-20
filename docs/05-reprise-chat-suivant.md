@@ -60,18 +60,18 @@ dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche 
 Où on en est : **2H.40, LA RÉPLIQUE DU SPARK, EST CODÉE LE 2026-10-20 PAR LE FIL PRINCIPAL SEUL**
 (`sound.ts`, `motion.ts`, `announcer.ts`, deux tests, `client/public/sounds/spark.mp3`,
 `scripts/voice/clone-line.py`, `00` C40, `08` §5, `07` §10, `04`, CONTEXT, la skill, ce prompt).
-**Si ce chat commence sans que je l'aie dit, lis `07` §10 pour savoir si 2H.40 est commitée et en
-ligne** (la ligne « En ligne » de son tableau) ; sinon git porte le lot non commité : demande-moi
-« commit », puis le feu vert pour `node scripts/deploy-vercel.mjs --production` (le client est
-construit dans `client/dist/`, bundle `index-D4GRahNO.js` ; reconstruire avant de déployer si
-quoi que ce soit a bougé dans `client/`). Rien à redéployer côté fonctions. **848 tests verts sur
+**COMMITÉE (`6159a45`) ET EN LIGNE LE 2026-10-20 SUR MON FEU VERT**, bundle `index-D4GRahNO.js`,
+déployée par le fil principal (le classifieur a laissé passer `deploy-vercel.mjs --production`
+une seconde fois). Les documents qui notent la mise en ligne (07 §10, 08 §5, CONTEXT, la skill, ce
+prompt) ont été modifiés après `6159a45` : s'ils ne sont pas commités, demande-moi « commit » (git
+doit être propre et `origin/main..main` vide : vérifie-le). Rien à redéployer côté fonctions. **848 tests verts sur
 50 fichiers** (847 avant), smoke 2D vert en 46 s (un premier run rouge parce que le match e2e a
 atteint le round 10 pendant ses trois tours, le cas connu), `e2e:board3d` non relancé
 (`Effects.tsx` ne change pas ; dernier vert le 2026-10-20 en 11,5 min au portable et 20,6 min au
 27 pouces). `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
 `create-match` v27 (si la ligne « reading the match failed » apparaît dans les logs de la
-fonction, dis-le-moi). **LE CLIENT EN LIGNE (https://boomball.vercel.app) EST `index-8Llc-Pv3.js`
-(2H.39) tant que 2H.40 n'est pas déployée** ; `07` §10 dit s'il l'a été. `password_min_length`
+fonction, dis-le-moi). **LE CLIENT EN LIGNE (https://boomball.vercel.app) EST `index-D4GRahNO.js`
+(2H.40)**, construit et déployé par le fil principal le 2026-10-20. `password_min_length`
 vaut 8, `disable_signup` faux. **Le projet Realtime est en `private_only`** : tout nouveau canal
 doit être `private: true` ET avoir une politique sur `realtime.messages`. Migrations appliquées :
 **0001 à 0016**. assets/source/ (mes sources, dont `spark.wav` et `spark-takes/`) est ignoré par
@@ -94,9 +94,9 @@ une question par message, la première bornant l'ampleur. Restent aussi, sans da
 deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte et joue sans moi (la
 porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et l'état de 2H.40 (commitée ? en ligne ?) et me le dire ;
-recueillir ma partie sur 2H.40 (j'attrape un Spark, j'entends la phrase, sans « and it's a goal »
-ni braises) ; puis **cadrer 2H.41** en chat, une question par message, la première bornant
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire (2H.40 est VALIDÉE par ma partie en ligne :
+« parfait ça marche bien ») ; puis **cadrer 2H.41**, si ce n'est pas déjà commencé dans le chat
+précédent (regarde `00` : un C41 existe alors), en chat, une question par message, la première bornant
 l'ampleur (l'initiative est dans `engine/` : écarts 51, 55, 58 et 65, `turn`, le siège et
 `seatYielded` de 2H.33 ; les fonctions et `ENGINE_VERSION` bougent). **Fermer les inscriptions**
 (`disable_signup`) le jour où je le dis, pas avant. Deux remarques de la relecture des captures

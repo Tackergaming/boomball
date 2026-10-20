@@ -3854,3 +3854,5 @@ fait taire. Tests : `motion.test.ts`, un `scored` de source `spark` après une p
 prise se juge à l'oreille et se vérifie par whisper ; les cinq autres prises et la référence
 découpée restent dans `assets/source/sounds/spark-takes/`, hors git. Le MP3 est encodé
 `-ar 44100 -b:a 128k`, 4,4 s. **848 tests sur 50 fichiers** (847 avant), typecheck racine, scripts, e2e et client verts. Le spec 3D n'est pas relancé : `Effects.tsx` ne change pas.
+
+**Sa partie sur 2H.40, le 2026-10-20 : « parfait ça marche bien. »** La porte est franchie.

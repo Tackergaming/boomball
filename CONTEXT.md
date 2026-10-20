@@ -23,7 +23,8 @@ phases ; `04-etat-des-lieux.md` est l'historique de ce qui a été construit et 
 but) ; ma phrase « And the Spark is caught! Twenty points on the board! » dans la voix du but clonée
 par Chatterbox sur ma carte, ma prise choisie parmi six ; le Spark ne déclenche plus rien du but,
 l'annonceur se tait pour la laisser parler. 848 tests, smoke vert, rien à redéployer côté fonctions,
-client à mettre en ligne sur mon feu vert. Suite : 2H.41, toute l'équipe à un humain, à cadrer.
+**commitée (`6159a45`) et en ligne le même jour sur mon feu vert** (`index-D4GRahNO.js`). Ma partie en ligne :
+« parfait ça marche bien », porte franchie. Suite : 2H.41, toute l'équipe à un humain, à cadrer.
 
 **État au 2026-10-20.** **2H.39, la caméra refaite, est cadrée et codée** (`00` C39) : plus de mode
 libre, quatre vues (Side à 52 degrés, Top à 85, Own end et Far end à 40 derrière chaque bouche,

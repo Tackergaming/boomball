@@ -2184,7 +2184,7 @@ sweep. Détail en `00` C39, « comment 2H.39 est codée ».
 **Porte franchie le même jour**, sa partie sur les deux écrans : « tout est parfait. j'adore, surtout
 l'option full screen. magnifique ».
 
-### Sous-phase 2H.40, « la réplique du Spark », codée le 2026-10-20
+### Sous-phase 2H.40, « la réplique du Spark », codée et en ligne le 2026-10-20, porte franchie
 
 Par le fil principal (Fable 5.1), seul, à partir de `00` C40, cadré l'après-midi même en chat, une
 question par message : l'ampleur (« petite »), la réplique (aucune trouvée dans les clips, sa phrase
@@ -2200,4 +2200,6 @@ parmi six), puis « go » sur la reformulation. Rien dans le moteur, l'IA, les f
 | Le code | `motion.ts` : le repère `goal` seulement si `event.source === 'payload'`. `sound.ts` : `SAMPLES.sparkCaught`. `announcer.ts` : `spark: []`, `'spark'` dans `ANNOUNCER_PRIORITY`. `Match.tsx` ne change pas |
 | Tests | **848 sur 50 fichiers** (847, plus un test de `motion` : un `scored` de source Spark ne donne aucun repère de but ; `admitCue('spark')` répond `cut` dans un test existant) ; typecheck racine, scripts, e2e et client verts |
 | Harnais | **Smoke 2D vert en 46 s** (un premier run rouge : le match e2e a atteint le round 10 pendant ses trois tours, le cas connu) ; le spec 3D non relancé, `Effects.tsx` ne change pas |
-| En ligne | Client à redéployer sur son feu vert ; rien côté fonctions |
+| En ligne | **Le 2026-10-20 sur son feu vert**, commit `6159a45`, bundle `index-D4GRahNO.js` (83 fichiers, 10,2 Mo), déployé par le fil principal ; `curl` de la page en ligne et de `sounds/spark.mp3` (200, 70 260 octets) relus ; rien côté fonctions |
+
+**Porte franchie le même jour**, sa partie en ligne : « parfait ça marche bien ».

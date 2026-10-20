@@ -413,4 +413,5 @@ clonage** : `scripts/voice/clone-line.py`, environnement Python 3.10 hors dépô
 sur sa RTX 4060 ; la référence est la voix seule découpée, une prise se juge à l'oreille et se
 vérifie par whisper (une des six disait « cut » pour « caught »). Les prises non retenues sont dans
 `assets/source/sounds/spark-takes/`, hors git. 848 tests sur 50 fichiers, smoke 2D vert, spec 3D
-non relancé. Suite : 2H.41, à cadrer.
+non relancé ; **commitée (`6159a45`) et en ligne le 2026-10-20 sur son feu vert, `index-D4GRahNO.js`**,
+déployée par le fil principal. **Porte franchie le même jour** : « parfait ça marche bien ». Suite : 2H.41, à cadrer.
