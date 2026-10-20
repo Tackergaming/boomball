@@ -50,8 +50,11 @@ section Camera de ⚙ retirée, la main brute (C20 tient). Ne rediscute rien de 
 rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, n8 est
 dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
 
-Où on en est : **2H.39, LA CAMÉRA REFAITE, EST CODÉE, COMMITÉE ET EN LIGNE LE 2026-10-20 SUR MON
-FEU VERT ; MA PARTIE SUR LES DEUX ÉCRANS EST LA PORTE** (git doit être propre et
+Où on en est : **2H.39, LA CAMÉRA REFAITE, EST CODÉE, COMMITÉE (`2d86d39`) ET EN LIGNE LE
+2026-10-20 SUR MON FEU VERT, ET MA PARTIE SUR LES DEUX ÉCRANS L'A VALIDÉE : « TOUT EST PARFAIT.
+J'ADORE, SURTOUT L'OPTION FULL SCREEN »** (les documents qui notent cette porte franchie, 07 §10, 08
+§5, CONTEXT, la skill et ce prompt, ont été modifiés après `2d86d39` : s'ils ne sont pas commités,
+demande-moi « commit ») (git doit être propre et
 `origin/main..main` vide : vérifie-le). **Le classifieur du mode auto a laissé passer
 `node scripts/deploy-vercel.mjs --production` ce jour-là** : le fil principal déploie lui-même sur
 mon feu vert. **847 tests verts sur 50 fichiers**, smoke 2D
@@ -76,10 +79,7 @@ chacune se cadre en chat, une question par message, la première bornant l'ample
 sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte
 et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **ma partie sur 2H.39, sur le
-portable et le 27 pouces** : la porte est mon
-verdict sur les quatre vues, le zoom de Follow the play et le bouton droit. Si je donne des retours,
-ils se cadrent en chat avant le code. Puis **cadrer 2H.40**, la réplique du Spark, en chat, une
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **cadrer 2H.40**, la réplique du Spark, en chat, une
 question par message, la première bornant l'ampleur (le son est dans `match/sound.ts`, le clip
 `goal`, les repères `sparkCaught` ; C26 et C27 disent comment les répliques sont choisies). **Fermer
 les inscriptions** (`disable_signup`) le jour où je le dis, pas avant. Deux remarques de la

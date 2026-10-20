@@ -23,7 +23,8 @@ libre, quatre vues (Side à 52 degrés, Top à 85, Own end et Far end à 40 derr
 figées), la roulette sur Side et Top, Follow the play qui part de la largeur plus les deux
 rambardes, le bouton droit qui tire le sol à la place de Ctrl, quatre boutons sous la minicarte et
 la touche V. 847 tests, `e2e:board3d` vert aux deux tailles, smoke vert, **en ligne le même jour sur mon
-feu vert** (`index-8Llc-Pv3.js`). Reste ma partie sur les deux écrans. Puis
+feu vert** (`index-8Llc-Pv3.js`). Ma partie sur les deux écrans : « tout est parfait. j'adore ». Suite :
+2H.40, la réplique du Spark, à cadrer. Puis
 2H.40 et 2H.41, à cadrer.
 
 **État au 2026-10-19 au soir.** Mon retour de partie sur 2H.38 est codé et en ligne (`00` C38) : les

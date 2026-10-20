@@ -399,4 +399,5 @@ est cliquable et prend le clic avant le sol. Disparus de `framing.ts` : `Zoom`, 
 `presetDistance`, `PRESET_TILT`. 847 tests, `e2e:board3d` vert en 11,5 min au portable et 20,6 min au 27 pouces, smoke
 vert ; **en ligne le 2026-10-20 sur son feu vert, `index-8Llc-Pv3.js`, déployé par le fil
 principal : le classifieur du mode auto a laissé passer `node scripts/deploy-vercel.mjs
---production`**.
+--production`**. **Porte franchie le même jour** : « tout est parfait. j'adore ». Suite : 2H.40 la
+réplique du Spark, puis 2H.41.
