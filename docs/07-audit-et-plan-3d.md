@@ -2204,7 +2204,7 @@ parmi six), puis « go » sur la reformulation. Rien dans le moteur, l'IA, les f
 
 **Porte franchie le même jour**, sa partie en ligne : « parfait ça marche bien ».
 
-### Sous-phase 2H.41, « toute l'équipe à un humain », cadrée le 2026-10-20 et codée le même jour, porte ouverte
+### Sous-phase 2H.41, « toute l'équipe à un humain », cadrée, codée et mise en ligne le 2026-10-20, porte ouverte
 
 Cadrée par le fil principal (Fable 5.1) en chat avec Jérôme l'après-midi du 2026-10-20, après la
 porte de 2H.40 : cinq questions, une par message (l'ampleur, la coop, l'écran, l'interrupteur, le
@@ -2220,9 +2220,11 @@ de sweep, aucune constante.
 |---|---|
 | Le moteur | **`ENGINE_VERSION` 12.** Le rang `pick`, `teamMode`, `requestedMode` et `delegatedRound` sur l'état, `pickedBy` et `delegated` sur le tour ; `pickUnit`, `delegateTurn`, `delegateRound`, `setTeamMode` ; cinq événements. L'échelle d'une équipe entière est faite de prises sans nom ; les écarts 55, 58, 62 et 65 suspendus pour elle ; la relance après un but par ses prises ; une prise sans unité sautée ; le mode demandé appliqué en haut du round |
 | La session | `rightsRefusal` (qui envoie quoi, 403), `waitingOnHuman` (la boucle et le chrono lisent la même chose), la maison qui prend elle-même une prise que personne n'attend (`orderBySituation`), `clockKey` par prise, l'expiration qui cède le round au lieu du Dodge |
-| Les fonctions | `create-match` lit `wholeTeam` ; `resolve-action` lit `teams.owner` pour `setTeamMode` et répond le `status` du refus après l'échéance réglée (A28). **Bundlées, pas déployées : à redéployer sur son feu vert**, puis le client |
+| Les fonctions | `create-match` lit `wholeTeam` ; `resolve-action` lit `teams.owner` pour `setTeamMode` et répond le `status` du refus après l'échéance réglée (A28). **En ligne le 2026-10-20 au soir sur son feu vert : `resolve-action` v31, `create-match` v28, moteur 12**, les matchs du moteur 11 archivés |
 | L'écran | La rangée de prise (un bouton par Giff, touches 1 à 9, « Let the AI finish the round »), les deux boutons IA à droite de la rangée pendant un tour pris, la rangée d'attente du coéquipier, « Take the turn » au survol, l'anneau laiton qui respire et les pions ternis, le bandeau « Your team · pick a Giff », le coin du chrono « Pick a Giff », le bloc de pastilles `turn-block`, la case « We play the whole team » du lobby lue par tous, l'interrupteur « Team » de ⚙ au propriétaire avec sa note « from next round », deux lignes du briefing |
 | Tests | **883 sur 51 fichiers** (848, plus `c41.test.ts` 29, `session.test.ts` 2, `turnStrip.test.ts` 3, `lobby.test.ts` 1) ; typecheck racine, scripts, e2e et client verts |
-| Harnais | `e2e/whole.spec.ts` (`npm run e2e:whole`) et `e2e/coop-whole.spec.ts` (`@coop`) écrits, **à jouer après le redéploiement au moteur 12** ; smoke et les deux specs coop d'avant verts épinglés à 11 sur les fonctions en ligne (un run rouge du smoke : le Spark sur la case lointaine du troisième tour, le cercle prend le clic, dette du harnais) |
+| Harnais | Sur le moteur 12 en ligne, sans épingle : **smoke vert en 42 s, `e2e:whole` vert en 26 s** (six captures lues : la case du lobby, la rangée de prise avec les sept anneaux, le tour pris avec les deux boutons IA, « Take the turn » avec Voss terni, le round 2, l'interrupteur et sa note), **`e2e:coop` vert, trois specs** (`coop-whole.spec.ts` en 29 s après un premier run rouge : le propriétaire démarrait avant que le second siège ne soit arrivé, le spec attend désormais les deux sièges prêts comme `coop.spec.ts`). Avant le redéploiement, smoke et coop verts épinglés à 11 ; un run rouge du smoke, le Spark sur la case lointaine du troisième tour (le cercle prend le clic, dette du harnais). La première capture a montré sept noms entiers qui poussaient « Let the AI finish the round » hors de l'écran du portable : la rangée de prise ne porte plus que le prénom |
 
-**Porte ouverte** : ses fonctions redéployées, son client, sa partie seul en équipe entière puis à deux.
+| En ligne | **Le 2026-10-20 au soir sur son feu vert** (« commit et feu vert ») : commit `75f31f3` poussé, les deux fonctions, puis le client, bundle `index-4NSn8CTH.js` (83 fichiers), déployé par le fil principal, `curl` de la page en ligne relu |
+
+**Porte ouverte** : sa partie seul en équipe entière (la case du lobby), puis à deux.

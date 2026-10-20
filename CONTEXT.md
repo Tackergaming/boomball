@@ -18,13 +18,14 @@ un humain.
 `07-audit-et-plan-3d.md` est l'audit du 2026-10-09, avec les décisions D1 à D11 et le journal des
 phases ; `04-etat-des-lieux.md` est l'historique de ce qui a été construit et pourquoi.
 
-**État au 2026-10-20, soir.** **2H.41, toute l'équipe à un humain, est codée** (`00` C41, « comment
+**État au 2026-10-20, soir.** **2H.41, toute l'équipe à un humain, est codée et en ligne** (`00` C41, « comment
 2H.41 est codée ») : le moteur 12 (le rang `pick`, le mode de chaque camp, les quatre actions et les cinq
 événements), la session (`rightsRefusal`, `waitingOnHuman`, l'expiration qui cède le round), les deux
 fonctions bundlées, l'écran (la rangée de prise, les deux boutons IA, « Take the turn », l'anneau, le bloc de
 pastilles, la case du lobby, l'interrupteur de ⚙, le briefing). 883 tests sur 51 fichiers, typecheck vert,
-smoke et coop verts épinglés à 11. **Pas commitée, pas en ligne** : les fonctions puis le client attendent mon
-feu vert, `e2e:whole` et `coop-whole.spec.ts` se jouent après. Porte : ma partie seul en équipe entière, puis à deux.
+**commitée (`75f31f3`) et en ligne le soir même sur mon feu vert** : `resolve-action` v31 et `create-match` v28
+(moteur 12, les matchs du moteur 11 archivés), smoke, `e2e:whole` et `e2e:coop` verts sans épingle, client
+`index-4NSn8CTH.js`. Porte : ma partie seul en équipe entière (la case du lobby), puis à deux.
 
 **État au 2026-10-20, fin d'après-midi.** **2H.41, toute l'équipe à un humain, est cadrée** (`00` C41,
 écart 66) et pas codée : une équipe « entière » joue son rang par des prises, je choisis à chaque

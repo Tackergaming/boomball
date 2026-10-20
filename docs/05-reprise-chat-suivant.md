@@ -1,7 +1,7 @@
 On reprend Boomball, le jeu vidéo. Il vit à la racine de ce workspace.
 Charge le skill boomball, puis lis EN ENTIER docs/08-plan-terrain-horizontal.md :
 c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, **2H.41
-est la dernière sous-phase codée, le 2026-10-20, PAS COMMITÉE, PAS EN LIGNE** (les phases 3, 4 et 5 sont
+est la dernière sous-phase codée, commitée et mise en ligne, le 2026-10-20** (les phases 3, 4 et 5 sont
 faites par 2H.15, la 6 par 2H.29, la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et
 la limite de présence, 2H.36 le premier lot de la phase 8, 2H.37 les corrections de la revue de
 sécurité, 2H.38 l'écran de match refait, 2H.39 la caméra refaite, 2H.40 la réplique du Spark, 2H.41
@@ -66,31 +66,25 @@ dans `session.ts`, à ne pas séparer). Ne rediscute rien de C12 à C41.
 rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, n8 est
 dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
 
-Où on en est : **2H.41, TOUTE L'ÉQUIPE À UN HUMAIN, EST CODÉE LE 2026-10-20 DANS LE CHAT QUI SUIT
-SON CADRAGE**, sans recadrage, en deux lots : le moteur 12, la session et les deux fonctions par le
-fil principal seul (`engine/types.ts`, `initiative.ts`, `reduce.ts`, `legalActions.ts`, `setup.ts`,
-`actions.ts`, `events.ts`, `constants.ts`, `server/session.ts`, `server/lobby.ts`, les deux
-`index.ts`, `scripts/dump-match.ts`, deux lectures d'échelle dans `ai/evaluate.ts`), puis l'écran :
-le fil principal sur `useMatch.ts`, `Match.tsx`, `Board.tsx`, `Tokens.tsx`, `Board3D.tsx`,
-`Feed.tsx`, `testHook.ts`, `e2e/harness.ts`, `e2e/whole.spec.ts`, `e2e/coop-whole.spec.ts`,
-`package.json` ; un Sonnet 5.5 effort élevé sur `ActionRow.tsx`, `TurnStrip.tsx`, `theme.css`,
-`turnStrip.test.ts` ; un autre sur `Lobby.tsx`, `lobbySeats.ts`, `useLobbyChannel.ts`,
-`supabase.ts`, `SettingsPanel.tsx`, `Briefing.tsx`, `lobby.test.ts` ; relus par le fil principal.
-`00` C41 porte « comment 2H.41 est codée », `07` §10, `08` §5, `04`, CONTEXT, la skill et ce prompt
-sont à jour. **883 tests verts sur 51 fichiers** (848 avant : `c41.test.ts` 29, `session.test.ts`
-2, `turnStrip.test.ts` 3, `lobby.test.ts` 1), typecheck racine, scripts, e2e et client verts,
-`npm run build:function` passe. **Smoke et `e2e:coop` (les deux specs d'avant) verts épinglés à 11**
-sur les fonctions en ligne ; un run rouge du smoke avant lui, le Spark sur la case lointaine du
-troisième tour (le cercle prend le clic, dette du harnais, pas du code). **`e2e:whole` et
-`coop-whole.spec.ts` sont écrits et PAS JOUÉS : ils exigent les fonctions au moteur 12.** **RIEN N'EST
-COMMITÉ** : `git status` doit montrer une cinquantaine de fichiers modifiés (code et documents) et les 3 nouveaux
-(`engine/c41.test.ts`, `e2e/whole.spec.ts`, `e2e/coop-whole.spec.ts`) ; si c'est propre, c'est que
-je l'ai commité entre deux chats, vérifie `git log`. `ENGINE_VERSION` vaut 12 dans le dépôt :
-**le client archive tout match en ligne tant que les fonctions sont au moteur 11**, et le harnais
-tourne épinglé à 11 (constante remise à 12 avant tout commit). Fonctions en ligne :
-`resolve-action` v30 et `create-match` v27, **moteur 11** (si la ligne « reading the match failed »
-apparaît dans les logs de la fonction, dis-le-moi). **LE CLIENT EN LIGNE
-(https://boomball.vercel.app) EST `index-D4GRahNO.js` (2H.40)**. `password_min_length` vaut 8,
+Où on en est : **2H.41, TOUTE L'ÉQUIPE À UN HUMAIN, EST CODÉE, COMMITÉE (`75f31f3`) ET EN LIGNE LE
+2026-10-20 AU SOIR SUR MON FEU VERT** (« commit et feu vert »), sans recadrage, en deux lots : le
+moteur 12, la session et les deux fonctions par le fil principal seul, puis l'écran, le fil principal
+sur `useMatch.ts`, `Match.tsx`, les deux plateaux, le crochet et le harnais, un Sonnet 5.5 effort
+élevé sur la rangée et la bande (`ActionRow.tsx`, `TurnStrip.tsx`, `theme.css`), un autre sur le
+lobby, ⚙ et le briefing, relus par le fil principal. `00` C41 porte « comment 2H.41 est codée »,
+`07` §10, `08` §5, `04`, CONTEXT, la skill et ce prompt sont à jour. **883 tests verts sur 51
+fichiers**, typecheck racine, scripts, e2e et client verts. **Fonctions en ligne : `resolve-action`
+v31 et `create-match` v28, moteur 12** (les matchs du moteur 11 sont archivés ; si la ligne
+« reading the match failed » apparaît dans les logs de la fonction, dis-le-moi). **Harnais sur le
+moteur 12 sans épingle : smoke vert en 42 s, `e2e:whole` vert en 26 s, `e2e:coop` vert sur ses trois
+specs** (`coop-whole.spec.ts` en 29 s après un premier run rouge : le propriétaire démarrait avant
+l'arrivée du second siège, corrigé dans le spec). Les six captures de `e2e:whole` ont été lues ; la
+première a montré sept noms entiers qui poussaient « Let the AI finish the round » hors de l'écran
+du portable : la rangée de prise ne porte plus que le prénom. **LE CLIENT EN LIGNE
+(https://boomball.vercel.app) EST `index-4NSn8CTH.js` (2H.41)**, déployé par le fil principal.
+**Après `75f31f3`, deux corrections et les documents de mise en ligne ne sont PAS commités** (le
+prénom dans la rangée de prise dans `Match.tsx`, les deux attentes dans `coop-whole.spec.ts`, `00`,
+`07`, `08`, CONTEXT, la skill, ce prompt) : demande-moi « commit ». `password_min_length` vaut 8,
 `disable_signup` faux. **Le projet Realtime est en `private_only`** : tout nouveau canal doit être
 `private: true` ET avoir une politique sur `realtime.messages`. Migrations appliquées : **0001 à
 0016**, 2H.41 n'en a pas. assets/source/ (mes sources, dont `spark.wav` et `spark-takes/`) est
@@ -106,35 +100,28 @@ La référence est la voix seule découpée (`assets/source/sounds/spark-takes/r
 Une voix clonée sur cinq secondes ressemble, elle n'est pas exacte.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (10) FAITS, **(10) étant 2H.41, toute l'équipe à un
-humain (`00` C41), codée le 2026-10-20, à commiter, à mettre en ligne et à jouer**. Restent aussi,
+humain (`00` C41), codée et mise en ligne le 2026-10-20, à jouer**. Restent aussi,
 sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte
 et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire (si 2H.41 n'est pas commitée, demande-moi
-« commit » : un seul commit, message « 2H.41 : toute l'équipe à un humain (00 C41, écart 66,
-moteur 12) », puis push ; jamais le `.env`) ; puis **METTRE 2H.41 EN LIGNE SUR MON FEU VERT, DANS CET
-ORDRE** : (a) **les deux fonctions** (en bash, depuis la racine : `set -a && . ./.env && set +a` puis
-`npm run deploy:function` ; attendu `resolve-action` v31 et `create-match` v28, moteur 12 ; les
-matchs du moteur 11 s'archivent, le mien compris, c'est voulu) ; (b) **le harnais sur le moteur 12,
-sans épingle** : `npm run e2e` (le smoke ouvre un match neuf), `npm run e2e:whole` (la rangée de
-prise, « Take the turn », les deux boutons IA, l'interrupteur, captures dans `e2e/out/`, à lire),
-`npm run e2e:coop` (trois specs : les deux d'avant et `coop-whole.spec.ts`, deux humains qui se
-partagent les prises) ; un rouge se lit avant d'être corrigé, et un défaut du code se corrige, pas le
-spec ; (c) **le client**, `npm --prefix client run build` depuis la racine (écris-le EXACTEMENT
-ainsi) puis `node scripts/deploy-vercel.mjs --production` (lit le `.env` lui-même ; s'il est refusé
-par le classifieur, je le lance), `curl` de la page en ligne pour relire le nom du bundle, et le
-nom du bundle dans `07` §10, CONTEXT et ce prompt ; (d) **sa porte** : ma partie seul en équipe
-entière (la case du lobby), puis à deux. Mes retours deviennent `00` C42 et 2H.42, à cadrer en chat,
-une question par message. **Fermer les inscriptions** (`disable_signup`) le jour où je le dis, pas
-avant. Dettes de 2H.41, sans décision : le smoke tombe quand le Spark occupe la case lointaine du
-troisième tour (le cercle prend le clic, à éviter dans `smoke.spec.ts`) ; les vues Own end et Far
-end ne suivent pas la prise ; un spectateur ne voit pas la rangée d'attente ; `nextToPlay` de l'IA
-répond null devant une prise de son camp (l'IA déléguée ne sait pas qui jouera après elle). Deux
-remarques de la relecture des captures de 2H.38, sans décision : la maison peut avoir deux pions au
-même prénom (deux « Osric »), que les pastilles et les plaques ne distinguent pas ; le bandeau
-« Your turn » à côté de « Spectating » juste après un siège remis (dette connue). Une de C38 : la
-fiche, fixée en haut à gauche, peut s'ouvrir sur une cible qui se trouve juste dessous et lui faire
-perdre ses étiquettes.
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire (si les corrections et les documents
+d'après `75f31f3` ne sont pas commités, demande-moi « commit » : « 2H.41 en ligne, le prénom dans la
+rangée de prise, coop-whole attend les deux sièges », puis push ; jamais le `.env`) ; puis **ATTENDRE
+MA PARTIE** : seul en équipe entière (la case « We play the whole team » du lobby), puis à deux. Mes
+retours deviennent `00` C42 et 2H.42, à cadrer en chat, une question par message, la première
+bornant l'ampleur, puis reformuler avant de coder. Pour expliquer pourquoi l'IA a fait un choix dans
+un match en ligne, `dump-match.ts` (il rejoue aussi les prises, hors tour) et le viewer, jamais une
+supposition. **Fermer les inscriptions** (`disable_signup`) le jour où je le dis, pas avant. Dettes
+de 2H.41, sans décision : le smoke tombe quand le Spark occupe la case lointaine du troisième tour
+(le cercle prend le clic, à éviter dans `smoke.spec.ts`) ; les vues Own end et Far end ne suivent
+pas la prise ; un spectateur ne voit pas la rangée d'attente ; `nextToPlay` de l'IA répond null
+devant une prise de son camp (l'IA déléguée ne sait pas qui jouera après elle) ; le bandeau « Your
+team · pick a Giff » peut rester affiché sous « Your turn » le temps de sa durée. Deux remarques de
+la relecture des captures de 2H.38, sans décision : la maison peut avoir deux pions au même prénom
+(deux « Osric »), que les pastilles et les plaques ne distinguent pas ; le bandeau « Your turn » à
+côté de « Spectating » juste après un siège remis (dette connue). Une de C38 : la fiche, fixée en
+haut à gauche, peut s'ouvrir sur une cible qui se trouve juste dessous et lui faire perdre ses
+étiquettes.
 
 **Le classifieur du mode auto** a refusé le PATCH Auth le 2026-10-19. Depuis `09e29aa`,
 `.claude/settings.json` autorise `Bash(npm --prefix client run build)` (le build passe, écris-le

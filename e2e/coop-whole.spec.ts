@@ -86,9 +86,14 @@ test('@coop two humans share the picks of a whole team', async ({ page, browser 
     await expect(second.getByTestId('whole-team')).toHaveCount(0);
     await guest.take('lobby-second-whole-note');
 
+    // The owner must see the second seat before starting, or the match opens
+    // solo while the presence is still on its way (seen on the first run).
+    await expect(page.getByTestId('seat-row')).toHaveCount(2);
+    await expect(page.getByTestId('start-match')).toBeDisabled();
     await second.locator('[data-role="breaker"]').click();
     await second.getByTestId('seat-name').fill('Second Giff');
     await second.getByTestId('ready').click();
+    await expect(page.locator('[data-testid="seat-row"][data-ready="true"]')).toHaveCount(2);
     await expect(page.getByTestId('start-match')).toBeEnabled();
     await page.getByTestId('start-match').click();
     await enter(page);

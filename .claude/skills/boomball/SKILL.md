@@ -428,8 +428,8 @@ round suivant (`requestedMode`, appliqué par `rebuild`), case du lobby `wholeTe
 `session.ts`, `rightsRefusal` dit qui envoie quoi et `waitingOnHuman` ce qui arrête la boucle et
 fait courir le chrono : les deux lisent la même fonction, ne les sépare pas.** Un humain au banc
 prend encore (`hasHuman` lit le contrôleur, pas le statut). **`ENGINE_VERSION` 12**, 883 tests sur
-51 fichiers, fonctions bundlées **et pas déployées**, client pas en ligne : les deux sur son feu
-vert. `npm run e2e:whole` et `e2e/coop-whole.spec.ts` (`@coop`) ne passent qu'avec les fonctions
-au moteur 12 ; smoke et coop d'avant verts épinglés à 11 ; le smoke tombe quand le Spark occupe la
-case lointaine du troisième tour (le cercle prend le clic), relancer. Le crochet publie `picking`,
+51 fichiers, **en ligne le 2026-10-20 au soir : `resolve-action` v31, `create-match` v28, client
+`index-4NSn8CTH.js`**, commit `75f31f3`. `npm run e2e:whole` et `e2e/coop-whole.spec.ts` (`@coop`)
+verts sur le moteur 12 ; le smoke tombe quand le Spark occupe la case lointaine du troisième tour
+(le cercle prend le clic), relancer ; en coop, attendre les deux sièges prêts avant « Start match ». Le crochet publie `picking`,
 `pickable`, `pick`, `delegate` ; `waitForMoment` et `pickFromRow` dans `e2e/harness.ts`.

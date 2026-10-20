@@ -951,9 +951,13 @@ export function Match({
     tagsAnchor = id;
   }
 
-  /** The pick row (2H.41): one button per Giff this player may send in, in role order. */
+  /**
+   * The pick row (2H.41): one button per Giff this player may send in, in
+   * role order. First names only: seven full names and the AI button did
+   * not fit the laptop's width (seen on the first capture of `e2e:whole`).
+   */
   const pickRow = canPick
-    ? pickable.map((unit) => ({ id: unit.id, name: unit.name, role: unit.role, run: () => void match.pickUnit(unit.id) }))
+    ? pickable.map((unit) => ({ id: unit.id, name: unit.name.split(' ')[0] ?? unit.name, role: unit.role, run: () => void match.pickUnit(unit.id) }))
     : [];
 
   /**

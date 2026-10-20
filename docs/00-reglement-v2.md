@@ -4066,8 +4066,9 @@ gardien en tête (un but de la maison fabriqué en marchant les graines), l'inte
 sens, deux matchs entiers joués à la main en solo et à deux, le moteur 11 archivé ;
 `session.test.ts` deux cas de plus ; `turnStrip.test.ts` et `lobby.test.ts` par les sous-agents.
 **883 tests sur 51 fichiers.** `e2e/whole.spec.ts` (`npm run e2e:whole`, hors de `npm run e2e`) et
-`e2e/coop-whole.spec.ts` (tag `@coop`) sont écrits et **ne passent qu'avec les fonctions au
-moteur 12** ; smoke et les deux specs coop verts épinglés à 11 sur les fonctions en ligne. Dettes :
+`e2e/coop-whole.spec.ts` (tag `@coop`) **passent sur le moteur 12 en ligne** (fonctions v31 et v28,
+déployées le 2026-10-20 au soir sur son feu vert, client `index-4NSn8CTH.js`) ; la rangée de prise
+porte le prénom seul, sept noms entiers ne tenaient pas sur le portable. Dettes :
 le smoke peut tomber quand le Spark occupe la case la plus lointaine du troisième tour (le cercle
 prend le clic, vu une fois ce jour) ; les vues Own end et Far end ne suivent pas la prise ; en coop,
 un spectateur ne voit pas la rangée d'attente.
