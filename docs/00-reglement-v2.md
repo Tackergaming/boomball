@@ -4072,3 +4072,6 @@ porte le prénom seul, sept noms entiers ne tenaient pas sur le portable. Dettes
 le smoke peut tomber quand le Spark occupe la case la plus lointaine du troisième tour (le cercle
 prend le clic, vu une fois ce jour) ; les vues Own end et Far end ne suivent pas la prise ; en coop,
 un spectateur ne voit pas la rangée d'attente.
+
+**Porte franchie le 2026-10-20 au soir**, sur sa partie seul puis à deux en équipe entière : « tout est
+bon et fonctionne », sans retour. Pas de C42 ouvert par 2H.41.

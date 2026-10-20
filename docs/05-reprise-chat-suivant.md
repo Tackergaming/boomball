@@ -100,16 +100,19 @@ La référence est la voix seule découpée (`assets/source/sounds/spark-takes/r
 Une voix clonée sur cinq secondes ressemble, elle n'est pas exacte.
 
 L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (10) FAITS, **(10) étant 2H.41, toute l'équipe à un
-humain (`00` C41), codée et mise en ligne le 2026-10-20, à jouer**. Restent aussi,
+humain (`00` C41), codée et mise en ligne le 2026-10-20, PORTE FRANCHIE le même soir : « tout est bon
+et fonctionne », sans retour, pas de C42**. Restent aussi,
 sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte
 et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **RECEVOIR MES RETOURS DE PARTIE
-SUR 2H.41**, que je donne dans ce chat-là : ma partie seul en équipe entière (la case « We play the
-whole team » du lobby), puis à deux. Lis-les contre le code et contre `00` C41 avant de répondre ;
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **RECEVOIR CE QUE JE DÉCIDE**. **Le
+2026-10-20 au soir j'ai décidé de partager le lien avec mes amis et d'attendre leurs retours : on reste
+en l'état, rien à coder d'ici là** (la porte de la phase 8 se joue chez eux). La suite est à mon
+initiative : leurs retours, un retour de partie à moi, une des dettes listées plus bas, ou la porte de
+2H.37 (ma partie à deux sur les canaux privés, pas confirmée). Un retour se lit contre le code et contre `00` C41 avant de répondre ;
 pour ce qu'a fait l'IA dans un match en ligne, `dump-match.ts` (il rejoue aussi les prises, hors tour)
 et le viewer, jamais une supposition ; un défaut se reproduit au harnais (`e2e:whole`,
-`coop-whole.spec.ts`) avant d'être corrigé. Mes retours deviennent `00` C42 et 2H.42, à cadrer en
+`coop-whole.spec.ts`) avant d'être corrigé. Un retour devient `00` C42 et 2H.42, à cadrer en
 chat, une question par message, la première bornant l'ampleur, puis reformuler avant de coder ;
 ne rediscute rien de C41. Si un retour touche le moteur, c'est `ENGINE_VERSION` 13 et les deux
 fonctions sur mon feu vert ; sinon rien à redéployer côté fonctions, le client seul. Pour expliquer pourquoi l'IA a fait un choix dans

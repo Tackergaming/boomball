@@ -2204,7 +2204,7 @@ parmi six), puis « go » sur la reformulation. Rien dans le moteur, l'IA, les f
 
 **Porte franchie le même jour**, sa partie en ligne : « parfait ça marche bien ».
 
-### Sous-phase 2H.41, « toute l'équipe à un humain », cadrée, codée et mise en ligne le 2026-10-20, porte ouverte
+### Sous-phase 2H.41, « toute l'équipe à un humain », cadrée, codée, mise en ligne et porte franchie le 2026-10-20
 
 Cadrée par le fil principal (Fable 5.1) en chat avec Jérôme l'après-midi du 2026-10-20, après la
 porte de 2H.40 : cinq questions, une par message (l'ampleur, la coop, l'écran, l'interrupteur, le

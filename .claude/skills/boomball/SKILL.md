@@ -432,4 +432,6 @@ prend encore (`hasHuman` lit le contrôleur, pas le statut). **`ENGINE_VERSION` 
 `index-4NSn8CTH.js`**, commit `75f31f3`. `npm run e2e:whole` et `e2e/coop-whole.spec.ts` (`@coop`)
 verts sur le moteur 12 ; le smoke tombe quand le Spark occupe la case lointaine du troisième tour
 (le cercle prend le clic), relancer ; en coop, attendre les deux sièges prêts avant « Start match ». Le crochet publie `picking`,
-`pickable`, `pick`, `delegate` ; `waitForMoment` et `pickFromRow` dans `e2e/harness.ts`.
+`pickable`, `pick`, `delegate` ; `waitForMoment` et `pickFromRow` dans `e2e/harness.ts`. **Porte franchie le
+2026-10-20 au soir** : « tout est bon et fonctionne », sans retour. Restent les deux portes sans date
+(sa partie à deux sur les canaux privés, un ami qui joue sans lui) et les dettes du prompt de reprise.
