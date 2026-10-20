@@ -82,9 +82,9 @@ l'arrivée du second siège, corrigé dans le spec). Les six captures de `e2e:wh
 première a montré sept noms entiers qui poussaient « Let the AI finish the round » hors de l'écran
 du portable : la rangée de prise ne porte plus que le prénom. **LE CLIENT EN LIGNE
 (https://boomball.vercel.app) EST `index-4NSn8CTH.js` (2H.41)**, déployé par le fil principal.
-**Après `75f31f3`, deux corrections et les documents de mise en ligne ne sont PAS commités** (le
-prénom dans la rangée de prise dans `Match.tsx`, les deux attentes dans `coop-whole.spec.ts`, `00`,
-`07`, `08`, CONTEXT, la skill, ce prompt) : demande-moi « commit ». `password_min_length` vaut 8,
+**Tout est commité et poussé** : `75f31f3` (2H.41) puis `2608407` (le prénom dans la rangée de
+prise dans `Match.tsx`, les deux attentes dans `coop-whole.spec.ts`, les documents de mise en
+ligne) ; git doit être propre et `origin/main..main` vide, vérifie-le et dis-le-moi. `password_min_length` vaut 8,
 `disable_signup` faux. **Le projet Realtime est en `private_only`** : tout nouveau canal doit être
 `private: true` ET avoir une politique sur `realtime.messages`. Migrations appliquées : **0001 à
 0016**, 2H.41 n'en a pas. assets/source/ (mes sources, dont `spark.wav` et `spark-takes/`) est
@@ -104,12 +104,15 @@ humain (`00` C41), codée et mise en ligne le 2026-10-20, à jouer**. Restent au
 sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte
 et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire (si les corrections et les documents
-d'après `75f31f3` ne sont pas commités, demande-moi « commit » : « 2H.41 en ligne, le prénom dans la
-rangée de prise, coop-whole attend les deux sièges », puis push ; jamais le `.env`) ; puis **ATTENDRE
-MA PARTIE** : seul en équipe entière (la case « We play the whole team » du lobby), puis à deux. Mes
-retours deviennent `00` C42 et 2H.42, à cadrer en chat, une question par message, la première
-bornant l'ampleur, puis reformuler avant de coder. Pour expliquer pourquoi l'IA a fait un choix dans
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **RECEVOIR MES RETOURS DE PARTIE
+SUR 2H.41**, que je donne dans ce chat-là : ma partie seul en équipe entière (la case « We play the
+whole team » du lobby), puis à deux. Lis-les contre le code et contre `00` C41 avant de répondre ;
+pour ce qu'a fait l'IA dans un match en ligne, `dump-match.ts` (il rejoue aussi les prises, hors tour)
+et le viewer, jamais une supposition ; un défaut se reproduit au harnais (`e2e:whole`,
+`coop-whole.spec.ts`) avant d'être corrigé. Mes retours deviennent `00` C42 et 2H.42, à cadrer en
+chat, une question par message, la première bornant l'ampleur, puis reformuler avant de coder ;
+ne rediscute rien de C41. Si un retour touche le moteur, c'est `ENGINE_VERSION` 13 et les deux
+fonctions sur mon feu vert ; sinon rien à redéployer côté fonctions, le client seul. Pour expliquer pourquoi l'IA a fait un choix dans
 un match en ligne, `dump-match.ts` (il rejoue aussi les prises, hors tour) et le viewer, jamais une
 supposition. **Fermer les inscriptions** (`disable_signup`) le jour où je le dis, pas avant. Dettes
 de 2H.41, sans décision : le smoke tombe quand le Spark occupe la case lointaine du troisième tour
