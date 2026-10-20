@@ -42,6 +42,7 @@ import {
   openRoles,
   seatRequests,
   tierName,
+  wholeTeamOf,
   type Seat,
 } from './lobbySeats.js';
 import { RoleGlyph } from './RoleGlyph.js';
@@ -92,6 +93,10 @@ export function Lobby({
   // first match that the league will be theirs to choose. The owner chooses;
   // the others read it off the owner's seat.
   const [tier, setTier] = useState<Tier>(team.tier);
+  // "We play the whole team" (2H.41, `00` C41 point 8): the mode the owner's
+  // side starts in, one human sending in any Giff of the team at each turn.
+  // Like the league it is the owner's box, told on their seat and read by all.
+  const [wholeTeam, setWholeTeam] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Becomes true once the first seats were drawn: a card that mounts after
@@ -130,9 +135,9 @@ export function Lobby({
       role,
       ready: isOwner || ready,
       owner: isOwner,
-      ...(isOwner ? { tier } : {}),
+      ...(isOwner ? { tier, ...(wholeTeam ? { wholeTeam: true } : {}) } : {}),
     }),
-    [userId, displayName, name, role, ready, isOwner, tier],
+    [userId, displayName, name, role, ready, isOwner, tier, wholeTeam],
   );
 
   /** Every change of my seat is told to the others. */
@@ -157,6 +162,8 @@ export function Lobby({
   const ownerName =
     ownerSeat?.displayName ?? members.find((member) => member.is_owner)?.display_name ?? 'the owner';
   const shownTier: Tier = isOwner ? tier : ownerSeat?.tier ?? team.tier;
+  // A member reads the box off the owner's seat, which is what the server will start with.
+  const shownWholeTeam = isOwner ? wholeTeam : wholeTeamOf(everyone);
 
   // A role the others filled while I held it: fall back to the first open one,
   // so a seat never names a role the server would refuse.
@@ -185,7 +192,7 @@ export function Lobby({
       // Remember the name for next time. Policy `team_members_write` lets the
       // owner write their own row; `preferred_role` is NOT NULL so it goes too.
       await saveSeatPreference(team.id, userId, role, name);
-      const reply = await createMatch(team.id, seatRequests(everyone), tier);
+      const reply = await createMatch(team.id, seatRequests(everyone), tier, wholeTeam);
       if (!reply.accepted) {
         setError(reply.reason);
         return;
@@ -393,6 +400,27 @@ export function Lobby({
             })}
           </div>
           {!isOwner && <span className="bb-note">{ownerName} picks the league</span>}
+          {isOwner ? (
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}
+              title="At every turn of your team you pick which Giff plays. Your team-mates' Giffs stay theirs; the rest is yours to send in any order."
+            >
+              <input
+                type="checkbox"
+                data-testid="whole-team"
+                checked={wholeTeam}
+                onChange={(e) => setWholeTeam(e.target.checked)}
+                disabled={busy}
+              />
+              We play the whole team
+            </label>
+          ) : (
+            shownWholeTeam && (
+              <span className="bb-note" data-testid="whole-team-note">
+                {ownerName} plays the whole team
+              </span>
+            )
+          )}
         </div>
 
         {isOwner ? (

@@ -32,6 +32,12 @@
  * symmetric. Both AI sides read the same ordering rule, so a sweep measures the
  * rule and not a bias.
  *
+ * **A team played whole** (écart 66, 2H.41, engine version 12) has no names
+ * on its rungs: it gets one **pick** per active unit, and when the ladder
+ * reaches a pick a human of the team says which of its units still to play
+ * acts now. The side's place on the ladder is unchanged; its inside order is
+ * its humans' to decide, so écarts 55, 58, 62 and 65 do not apply to it.
+ *
  * The ladder stays a **flat queue of one unit each** and the engine walks it
  * with a single index. `blockId` is kept on the slot for the interface and is
  * null everywhere since écart 51: the order inside a role is the point now,
@@ -47,6 +53,7 @@ import {
   TEAMS,
   activeUnitsOf,
   isHuman,
+  playsWhole,
   sparkIsLive,
   type MatchState,
   type TeamId,
@@ -154,6 +161,16 @@ function teamSlots(arena: Arena, state: MatchState, team: TeamId): Omit<TurnSlot
   const units = activeUnitsOf(state, team);
   const out: Omit<TurnSlot, 'rank'>[] = [];
 
+  // Écart 66 (2H.41): a team played whole gets one pick per active unit and
+  // no names. Its humans decide the order rung by rung; écarts 55, 58, 62
+  // and 65 are suspended for it, so neither the relaunch order nor the
+  // d20 applies here. A whole team with nobody left to pick for it (every
+  // human yielded) is laddered seat by seat like any AI side.
+  if (playsWhole(state, team)) {
+    for (let i = 0; i < units.length; i++) out.push({ actor: { kind: 'pick', team }, blockId: null, team });
+    return out;
+  }
+
   // The relaunch (écart 54, reordered by écart 62): the side that conceded
   // after its block had gone plays its next round Trajector, Strikers,
   // keeper, Breakers, so the fresh ball finds somebody within a throw.
@@ -187,7 +204,7 @@ function teamSlots(arena: Arena, state: MatchState, team: TeamId): Omit<TurnSlot
  * within the round. Defending: nearest to the enemy carrier first. Ball loose:
  * nearest to it first. Ties fall to the identifier so a replay is identical.
  */
-function orderBySituation(arena: Arena, state: MatchState, team: TeamId, units: Unit[]): Unit[] {
+export function orderBySituation(arena: Arena, state: MatchState, team: TeamId, units: Unit[]): Unit[] {
   const carrierId = state.payload.carriedBy;
   const carrier = carrierId ? state.units.find((u) => u.id === carrierId) ?? null : null;
   const byId = (a: Unit, b: Unit): number => a.id.localeCompare(b.id);
@@ -301,6 +318,9 @@ function roleBlock(state: MatchState, index: number): number[] {
 export function placementAt(state: MatchState, index: number): { unitId: string; places: number } | null {
   const block = roleBlock(state, index);
   if (block.length < 2) return null;
+  // Écart 66: a whole team orders itself by its picks and is never asked a place.
+  const anchor = state.turnOrder[block[0]!]!;
+  if (anchor.team !== null && playsWhole(state, anchor.team)) return null;
   const units = block.map((i) => {
     const slot = state.turnOrder[i]!;
     const id = (slot.actor as { unitId: string }).unitId;
@@ -393,8 +413,39 @@ export function hasPlayedThisRound(state: MatchState, unitId: string): boolean {
   const at = state.turnOrder.findIndex(
     (slot) => slot.actor.kind === 'unit' && slot.actor.unitId === unitId,
   );
-  if (at < 0) return true;
-  return at < state.turnIndex;
+  if (at >= 0) return at < state.turnIndex;
+  // Écart 66: a unit of a whole team has no slot of its own until it is
+  // picked. While a pick of its side is still ahead, it may yet play.
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit || unit.status !== 'active') return true;
+  return !pickAhead(state, unit.team);
+}
+
+/** Whether a pick of the side sits at or after the cursor this round (écart 66). */
+export function pickAhead(state: MatchState, team: TeamId): boolean {
+  return state.turnOrder.some(
+    (slot, i) => i >= state.turnIndex && slot.actor.kind === 'pick' && slot.actor.team === team,
+  );
+}
+
+/**
+ * The units a pick of `team` may name (écart 66): active, and without a
+ * slot of their own this round, which a unit gets by being picked. In role
+ * order, then by identifier, which is the order the pick row lists them in.
+ * With `humanId`, the Giff of another human is left out: it is its own
+ * human's to play, and nobody else's (`00` C41 point 4).
+ */
+export function pickableUnits(state: MatchState, team: TeamId, humanId: string | null = null): Unit[] {
+  const named = new Set(
+    state.turnOrder.flatMap((slot) => (slot.actor.kind === 'unit' ? [slot.actor.unitId] : [])),
+  );
+  return activeUnitsOf(state, team)
+    .filter((u) => !named.has(u.id))
+    .filter((u) => humanId === null || u.controller.kind !== 'human' || u.controller.humanId === humanId)
+    .sort(
+      (a, b) =>
+        ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.id.localeCompare(b.id),
+    );
 }
 
 /**
@@ -407,7 +458,8 @@ export function ladderRungs(order: readonly TurnSlot[]): {
   rank: number;
   blockId: string | null;
   unitIds: string[];
-  hazard: 'crackers' | 'spark' | null;
+  /** A pick (écart 66) is drawn as a rung with no unit named yet. */
+  hazard: 'crackers' | 'spark' | 'pick' | null;
 }[] {
   const rungs: ReturnType<typeof ladderRungs> = [];
 

@@ -119,7 +119,23 @@ export function sparkIsLive(spark: Spark): boolean {
 export type TurnActor =
   | { readonly kind: 'crackers' }
   | { readonly kind: 'spark' }
-  | { readonly kind: 'unit'; readonly unitId: UnitId };
+  | { readonly kind: 'unit'; readonly unitId: UnitId }
+  /**
+   * A pick (écart 66, 2H.41, engine version 12): one rung of a team played
+   * "whole" by its humans. Nobody is named in advance; when the ladder
+   * reaches it, a human of the team picks which of its units still to play
+   * this round acts now (`pickUnit`), and the slot becomes that unit's. A
+   * whole team gets as many picks as it has active units.
+   */
+  | { readonly kind: 'pick'; readonly team: TeamId };
+
+/**
+ * How a team is played (écart 66, 2H.41): `seat`, each human drives its own
+ * Giff and the AI the rest, in the ladder's order; `whole`, its humans pick
+ * which Giff acts at each of the team's rungs, in the order they choose. For
+ * a whole team écarts 55, 58, 62 and 65 do not apply.
+ */
+export type TeamMode = 'seat' | 'whole';
 
 export interface TurnSlot {
   /**
@@ -189,6 +205,20 @@ export interface TurnState {
    * it, and a turn that ends without throwing loses it.
    */
   readonly freePass: boolean;
+  /**
+   * Écart 66 (2H.41, engine version 12): the human who picked this unit for
+   * this turn, when the turn came from a pick of a whole team; null for a
+   * turn the ladder named in advance. The one who picked is the one who
+   * drives, whoever the unit's controller is, and the one who may hand the
+   * rest of the turn to the AI (`delegateTurn`).
+   */
+  readonly pickedBy: HumanId | null;
+  /**
+   * Écart 66: the rest of this turn is the AI's, by `delegateTurn`, by
+   * `delegateRound`, or because the house resolved the pick itself. The
+   * server's loop plays a delegated turn whoever the unit belongs to.
+   */
+  readonly delegated: boolean;
 }
 
 // -- The match ---------------------------------------------------------------
@@ -233,6 +263,21 @@ export interface MatchState {
    * null.
    */
   readonly relaunch: TeamId | null;
+  /**
+   * How each side is played this round (écart 66, 2H.41, engine version
+   * 12). Read when the ladder is built; a change asked mid-round waits in
+   * `requestedMode` and is applied at the top of the next round.
+   */
+  readonly teamMode: Readonly<Record<TeamId, TeamMode>>;
+  /** The mode asked for the next round by `setTeamMode`, or null. Spent by `startRound`. */
+  readonly requestedMode: Readonly<Record<TeamId, TeamMode | null>>;
+  /**
+   * A whole team that handed the rest of this round to the AI (écart 66,
+   * `delegateRound`, or its clock ran out): every pick of its still ahead
+   * is resolved by the house in the situation's order. Cleared at the top
+   * of the round.
+   */
+  readonly delegatedRound: Readonly<Record<TeamId, boolean>>;
   readonly crackers: readonly Cracker[];
   readonly spark: Spark;
 
@@ -274,4 +319,36 @@ export function unitAt(state: MatchState, x: number, y: number): Unit | undefine
 
 export function isHuman(unit: Unit): boolean {
   return unit.controller.kind === 'human';
+}
+
+/** How a side is played this round (écart 66). A snapshot without the field is played seat by seat. */
+export function modeOf(state: MatchState, team: TeamId): TeamMode {
+  return state.teamMode?.[team] ?? 'seat';
+}
+
+/**
+ * Whether a side has a human to answer its picks: a human controller on any
+ * of its units, on the field or on the bench. A human whose Giff is
+ * evacuated still picks for its whole team; a human who yielded its seat
+ * controls nothing and is not counted.
+ */
+export function hasHuman(state: MatchState, team: TeamId): boolean {
+  return state.units.some((u) => u.team === team && isHuman(u));
+}
+
+/** Whether the side is played whole this round and has somebody to pick for it. */
+export function playsWhole(state: MatchState, team: TeamId): boolean {
+  return modeOf(state, team) === 'whole' && hasHuman(state, team);
+}
+
+/**
+ * The pick the ladder is waiting on, or null: the cursor sits on a pick slot
+ * and no turn is open. Read by the server to know it is a human's moment,
+ * and by the interface to offer the choice.
+ */
+export function pendingPick(state: MatchState): { readonly team: TeamId; readonly index: number } | null {
+  if (state.turn || state.phase === 'finished') return null;
+  const slot = state.turnOrder[state.turnIndex];
+  if (!slot || slot.actor.kind !== 'pick') return null;
+  return { team: slot.actor.team, index: state.turnIndex };
 }

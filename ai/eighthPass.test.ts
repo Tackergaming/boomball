@@ -34,6 +34,8 @@ function giveTurnTo(state: MatchState, unitId: UnitId, extra: Partial<Turn> = {}
       actionUsed: false,
       objectInteractionUsed: false,
       freePass: false,
+      pickedBy: null,
+      delegated: false,
       disengaged: false,
       placing: null,
       shot: false,

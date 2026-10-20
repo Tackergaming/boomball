@@ -69,8 +69,17 @@ export function seatsOf(channel: RealtimeChannel): Seat[] {
   for (const entries of Object.values(channel.presenceState<Seat>())) {
     for (const entry of entries) {
       if (typeof entry.profileId !== 'string') continue;
-      const { profileId, displayName, name, role, ready, owner, tier } = entry;
-      all.set(profileId, { profileId, displayName, name, role, ready, owner, ...(tier ? { tier } : {}) });
+      const { profileId, displayName, name, role, ready, owner, tier, wholeTeam } = entry;
+      all.set(profileId, {
+        profileId,
+        displayName,
+        name,
+        role,
+        ready,
+        owner,
+        ...(tier ? { tier } : {}),
+        ...(wholeTeam ? { wholeTeam: true } : {}),
+      });
     }
   }
   return [...all.values()];

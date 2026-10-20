@@ -62,6 +62,8 @@ export interface LobbyRequest {
    * Absent for self-play.
    */
   readonly roster?: Roster;
+  /** Écart 66 (2H.41): the lobby's "We play the whole team", the owner's call, read by `create-match`. */
+  readonly wholeTeam?: boolean;
 }
 
 /** One `match_participants` row, with the name the engine actually settled on. */
@@ -160,6 +162,7 @@ export function openLobbyMatch(arena: ArenaSpec, request: LobbyRequest): LobbyRe
     humans,
     seed: request.seed,
     ...(request.roster ? { roster: request.roster } : {}),
+    ...(request.wholeTeam ? { wholeTeam: true } : {}),
   });
   const step = openSession(new Arena(arena), state, request.now);
 

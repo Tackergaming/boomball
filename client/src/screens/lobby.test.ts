@@ -17,6 +17,7 @@ import {
   openCount,
   openRoles,
   seatRequests,
+  wholeTeamOf,
   type Seat,
 } from './lobbySeats.js';
 
@@ -55,6 +56,19 @@ describe('when the owner may start (point 3)', () => {
     expect(canStart([owner, seat({ profileId: 'ana' })], 'jerome')).toBe(false);
     expect(canStart([owner, seat({ profileId: 'ana', ready: true })], 'jerome')).toBe(true);
     expect(canStart([owner, seat({ profileId: 'ana', ready: true }), seat({ profileId: 'kai' })], 'jerome')).toBe(false);
+  });
+});
+
+describe('the whole-team box (2H.41, point 8)', () => {
+  it('is read off the owner seat, and only off it', () => {
+    const owner = seat({ profileId: 'jerome', owner: true, ready: true });
+    const ana = seat({ profileId: 'ana', ready: true });
+    expect(wholeTeamOf([])).toBe(false);
+    expect(wholeTeamOf([owner, ana])).toBe(false);
+    expect(wholeTeamOf([{ ...owner, wholeTeam: false }, ana])).toBe(false);
+    expect(wholeTeamOf([{ ...owner, wholeTeam: true }, ana])).toBe(true);
+    // A member's seat never carries the box; a stray flag there counts for nothing.
+    expect(wholeTeamOf([owner, { ...ana, wholeTeam: true }])).toBe(false);
   });
 });
 

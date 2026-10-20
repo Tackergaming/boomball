@@ -102,7 +102,7 @@ export interface MatchView {
    * server put this Giff last of its role (2H.23, C25 1; the server did that
    * since écart 58, the screen just could not tell the two apart).
    */
-  expired: 'turn' | 'place' | null;
+  expired: 'turn' | 'place' | 'round' | null;
   speed: Speed;
   setSpeed: (speed: Speed) => void;
   /** Drops the rest of the replay and jumps to the server's board. */
@@ -127,6 +127,17 @@ export interface MatchView {
    * and the board is simply read again; nothing is shown.
    */
   knock: (unitId: string) => Promise<void>;
+  /**
+   * The whole team (2H.41, `00` C41, écart 66). `pickUnit` names the Giff
+   * that takes the pick the ladder waits on; a pick that lost the race to a
+   * team-mate's (A10, "the board moved on") is read again quietly, nothing
+   * shown. `delegate` hands the rest of the picked turn, or the rest of the
+   * team's round, to the AI; `setTeamMode` asks the mode for the next round,
+   * sent as the player's own Giff (the server checks the owner).
+   */
+  pickUnit: (unitId: string) => Promise<void>;
+  delegate: (scope: 'turn' | 'round', asUnitId: string | null) => Promise<void>;
+  setTeamMode: (asUnitId: string, mode: 'seat' | 'whole') => Promise<void>;
   /** The owner abandoned the match while this client watched (2H.33). Said by the database since 2H.37. */
   abandonedByOwner: boolean;
   /** Posts standing orders to AI team-mates. Spends no turn. */
@@ -231,7 +242,7 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   const [motion, setMotion] = useState<Motion | null>(null);
   const [progress, setProgress] = useState<{ at: number; of: number } | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const [expired, setExpired] = useState<'turn' | 'place' | null>(null);
+  const [expired, setExpired] = useState<'turn' | 'place' | 'round' | null>(null);
   const [skew, setSkew] = useState(0);
   const [speed, setSpeedState] = useState<Speed>(storedSpeed);
   const seqRef = useRef(-1);
@@ -571,10 +582,13 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
             // board is read again. Otherwise a refusal usually means a stale
             // board, so read it again rather than leaving the player looking
             // at the position that produced it; a named unit's request (the
-            // yield) throws so its prompt can show the reason.
-            if (!quiet) setRefusal(reply.reason);
+            // yield) throws so its prompt can show the reason. A pick that
+            // lost the race to a team-mate's (2H.41, A10) is the same as a
+            // knock: the board moved on, read it, say nothing.
+            const lostPick = action.kind === 'pickUnit' && isRaceLost(reply.reason);
+            if (!quiet && !lostPick) setRefusal(reply.reason);
             await load();
-            if (asUnitId && !quiet) throw new Error(reply.reason);
+            if (asUnitId && !quiet && !lostPick) throw new Error(reply.reason);
             return;
           }
 
@@ -596,7 +610,12 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
           // the turn. It is news, not an error, and the screen says so.
           // Which turn it spent is read off the board it was sent from: a place
           // still to choose means the clock chose it, last.
-          if ('expired' in reply && reply.expired && !quiet) setExpired(before.turn?.placing != null ? 'place' : 'turn');
+          // A whole team's clock (2H.41) hands the rest of its round to the
+          // AI: on a pick (no turn open) or on a picked turn.
+          if ('expired' in reply && reply.expired && !quiet) {
+            const whole = !before.turn || (before.turn.pickedBy ?? null) !== null;
+            setExpired(whole ? 'round' : before.turn?.placing != null ? 'place' : 'turn');
+          }
           await play(before, reply.events);
         }
       } catch (failure) {
@@ -613,6 +632,21 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
   const send = useCallback((action: Action) => sendMany([action]), [sendMany]);
   const sendAs = useCallback((unitId: string, action: Action) => sendMany([action], unitId), [sendMany]);
   const knock = useCallback((unitId: string) => sendMany([{ kind: 'endTurn' }], unitId, true), [sendMany]);
+  // The pick's `humanId` is the server's to write off the caller; null here.
+  const pickUnit = useCallback(
+    (unitId: string) => sendMany([{ kind: 'pickUnit', humanId: null }], unitId).catch(() => undefined),
+    [sendMany],
+  );
+  const delegate = useCallback(
+    (scope: 'turn' | 'round', asUnitId: string | null) =>
+      sendMany([scope === 'turn' ? { kind: 'delegateTurn' } : { kind: 'delegateRound' }], asUnitId).catch(() => undefined),
+    [sendMany],
+  );
+  const setTeamMode = useCallback(
+    (asUnitId: string, mode: 'seat' | 'whole') =>
+      sendMany([{ kind: 'setTeamMode', mode }], asUnitId).catch(() => undefined),
+    [sendMany],
+  );
 
   /**
    * Orders go through the same door and come back with nothing to replay, so
@@ -653,6 +687,9 @@ export function useMatch(matchId: string, own: TeamId): MatchView {
     sendMany: (actions: readonly Action[]) => sendMany(actions),
     sendAs,
     knock,
+    pickUnit,
+    delegate,
+    setTeamMode,
     abandonedByOwner,
     order,
     dismissRefusal: () => setRefusal(null),
@@ -680,6 +717,15 @@ function holdFor(beat: Beat, isFirst: boolean): number {
 
 /** How long to let a dropped connection come back before an action is sent again (C21). */
 const RETRY_AFTER_MS = 1500;
+
+/**
+ * A pick refused because a team-mate's landed first (2H.41): the SQL door's
+ * "the board moved on" (A10), or the engine's own words when the client
+ * read the board between the two. Not news, the board is simply read again.
+ */
+function isRaceLost(reason: string): boolean {
+  return reason.includes('the board moved on') || reason.includes('no pick is waiting');
+}
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

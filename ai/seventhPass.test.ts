@@ -63,6 +63,8 @@ function giveTurnTo(state: MatchState, unitId: UnitId): MatchState {
       actionUsed: false,
       objectInteractionUsed: false,
       freePass: false,
+      pickedBy: null,
+      delegated: false,
       disengaged: false,
       placing: null,
       shot: false,

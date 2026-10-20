@@ -161,6 +161,9 @@ export async function waitForHook(page: Page): Promise<void> {
 export interface View {
   seq: number;
   yours: boolean;
+  /** The whole team (2H.41): a pick this client may answer, and who may be named. */
+  picking: boolean;
+  pickable: string[];
   replaying: boolean;
   busy: boolean;
   deadline: number | null;
@@ -181,6 +184,8 @@ export function view(page: Page): Promise<View> {
     return {
       seq: h.seq,
       yours: h.yours,
+      picking: h.picking,
+      pickable: h.pickable,
       replaying: h.replaying,
       busy: h.busy,
       deadline: h.deadline,
@@ -219,6 +224,43 @@ export async function waitForMyTurn(page: Page, timeout = 90_000): Promise<'turn
     () => !window.__boomball || window.__boomball.state?.phase === 'finished',
   );
   return over ? 'finished' : 'turn';
+}
+
+/**
+ * The whole team (2H.41, écart 66): resolves on the next moment that is this
+ * client's, a pick of its side (`pick`), a playable turn (`turn`), or the
+ * final whistle. A spec that plays a whole team answers a pick by clicking
+ * the row's button or the "Take the turn" label on the board, never through
+ * the hook, and `waitForMoment` again for the turn that opens.
+ */
+export async function waitForMoment(page: Page, timeout = 90_000): Promise<'pick' | 'turn' | 'finished'> {
+  await page.waitForFunction(
+    () => {
+      const h = window.__boomball;
+      if (!h) return /full time/i.test(document.body.innerText);
+      if (h.state?.phase === 'finished') return true;
+      if (h.replaying || h.busy) return false;
+      return h.picking || (h.yours && h.legal !== null);
+    },
+    null,
+    { timeout, polling: 250 },
+  );
+  return page.evaluate(() => {
+    const h = window.__boomball;
+    if (!h || h.state?.phase === 'finished') return 'finished';
+    return h.picking ? 'pick' : 'turn';
+  });
+}
+
+/** Clicks the pick row's button of `unitId` and waits for the board to move on. */
+export async function pickFromRow(page: Page, unitId: string): Promise<void> {
+  const seq = (await view(page)).seq;
+  const row = page.getByTestId('pick-row');
+  await row.waitFor({ state: 'visible', timeout: 10_000 });
+  await row.locator(`[data-testid="pick-unit"][data-unit-id="${unitId}"]`).click();
+  await page.waitForFunction((before) => (window.__boomball?.seq ?? before) !== before || !window.__boomball, seq, {
+    timeout: 30_000,
+  });
 }
 
 /**

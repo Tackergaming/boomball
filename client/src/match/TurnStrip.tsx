@@ -22,11 +22,20 @@
  * While the player chooses its place (écart 58), hovering 1st, 2nd or 3rd in
  * the row shows here where the Giff would slot in: `preview` moves it inside
  * its block.
+ *
+ * A team played whole (écart 66, 2H.41, `00` C41 point 8) has no seven named
+ * rungs, only one pick per Giff, so "la bande des tours montre l'équipe
+ * entière comme un seul bloc de pastilles, les jouées éteintes": the team's
+ * run of the ladder is ONE block, one rung of the strip. Inside it the Giffs
+ * already played are dimmed, the one on the clock is big, the ones still to
+ * play are lit, in the order the player may take them (role order). The block
+ * counts as one entry for the cursor, the laptop's cap and the "+N".
  */
 
 import { Fragment } from 'react';
 
-import { unitById, type MatchState, type Unit } from '../../../engine/types.js';
+import { pickableUnits } from '../../../engine/initiative.js';
+import { modeOf, unitById, type MatchState, type Unit } from '../../../engine/types.js';
 
 export const ROLE_LETTER: Record<Unit['role'], string> = { striker: 'S', breaker: 'B', bulwark: 'W', trajector: 'T' };
 
@@ -34,10 +43,22 @@ export const ROLE_LETTER: Record<Unit['role'], string> = { striker: 'S', breaker
 export type ClockTone = 'you' | 'mate' | 'house';
 export const TONE_COLOUR: Record<ClockTone, string> = { you: 'var(--brass)', mate: 'var(--team-own)', house: 'var(--team-foe)' };
 
-type Chip =
+export type Chip =
   | { readonly kind: 'unit'; readonly unitId: string; readonly ghost: boolean }
   | { readonly kind: 'spark' }
-  | { readonly kind: 'crackers' };
+  | { readonly kind: 'crackers' }
+  /**
+   * A whole team's run of the ladder (écart 66): the Giffs already picked,
+   * the one on the clock if the cursor is on one of them, and the ones still
+   * to pick, in role order. Never named in advance, so never in the slots.
+   */
+  | {
+      readonly kind: 'block';
+      readonly team: 'A' | 'B';
+      readonly played: readonly string[];
+      readonly current: string | null;
+      readonly toPlay: readonly string[];
+    };
 
 /**
  * The round's chips in playing order, and the index of the one on the clock.
@@ -49,9 +70,15 @@ export function roundChips(
   preview: { readonly unitId: string; readonly place: number } | null = null,
 ): { chips: Chip[]; current: number } {
   const order = state.turnOrder;
-  const chips: Chip[] = order.map((slot) =>
-    slot.actor.kind === 'unit' ? { kind: 'unit', unitId: slot.actor.unitId, ghost: false } : { kind: slot.actor.kind },
-  );
+  // One chip per slot first, so the place preview can move a Giff inside its
+  // block by slot index; a whole team's runs are folded into one chip after.
+  const slotChips: Chip[] = order.map((slot): Chip => {
+    const actor = slot.actor;
+    if (actor.kind === 'unit') return { kind: 'unit', unitId: actor.unitId, ghost: false };
+    // A pick has no name yet: the fold below turns the run it sits in into a block.
+    if (actor.kind === 'pick') return { kind: 'block', team: actor.team, played: [], current: null, toPlay: [] };
+    return { kind: actor.kind };
+  });
   if (preview) {
     const at = order.findIndex((s) => s.actor.kind === 'unit' && s.actor.unitId === preview.unitId);
     const block = at >= 0 ? order[at]!.blockId : null;
@@ -60,11 +87,44 @@ export function roundChips(
       const ids = slots.map((i) => (order[i]!.actor as { unitId: string }).unitId).filter((id) => id !== preview.unitId);
       ids.splice(Math.max(0, Math.min(ids.length, preview.place - 1)), 0, preview.unitId);
       slots.forEach((i, k) => {
-        chips[i] = { kind: 'unit', unitId: ids[k]!, ghost: ids[k] === preview.unitId };
+        slotChips[i] = { kind: 'unit', unitId: ids[k]!, ghost: ids[k] === preview.unitId };
       });
     }
   }
-  return { chips, current: Math.min(state.turnIndex, chips.length) };
+
+  const chips: Chip[] = [];
+  // The chip each slot ended up in, to put the cursor on the right one.
+  const chipOf: number[] = [];
+  for (let i = 0; i < order.length; ) {
+    const team = order[i]!.team;
+    let end = i + 1;
+    if (team !== null) while (end < order.length && order[end]!.team === team) end++;
+    const run = order.slice(i, end);
+    // A run is a whole team's when a pick is still in it, or when the team is
+    // played whole this round: the last pick has turned into a name, but the
+    // run must not fall back to seven chips under the player's eyes.
+    const whole = team !== null && (run.some((s) => s.actor.kind === 'pick') || modeOf(state, team) === 'whole');
+    if (!whole) {
+      chipOf.push(chips.length);
+      chips.push(slotChips[i]!);
+      i++;
+      continue;
+    }
+    const named = run.flatMap((s, k) => (s.actor.kind === 'unit' ? [{ id: s.actor.unitId, at: i + k }] : []));
+    const cursor = named.find((n) => n.at === state.turnIndex);
+    const queued = named.filter((n) => n.at > state.turnIndex).map((n) => n.id);
+    chips.push({
+      kind: 'block',
+      team: team!,
+      played: named.filter((n) => n.at < state.turnIndex).map((n) => n.id),
+      current: cursor?.id ?? null,
+      // A name given ahead of the cursor (none today) would be lost to the pick list, so it leads.
+      toPlay: [...queued, ...pickableUnits(state, team!).map((u) => u.id)],
+    });
+    for (let k = i; k < end; k++) chipOf.push(chips.length - 1);
+    i = end;
+  }
+  return { chips, current: state.turnIndex >= order.length ? chips.length : chipOf[state.turnIndex]! };
 }
 
 export function TurnStrip({
@@ -100,15 +160,15 @@ export function TurnStrip({
   const rest = Math.max(0, shown.length - cap);
   const next = !compact || rest === 0 ? chips.slice(0, compact ? 2 : 5) : [];
 
-  const render = (chip: Chip, key: string, cls: 'played' | 'cur' | 'next' | '') => {
-    if (chip.kind !== 'unit') {
-      return (
-        <span key={key} className={`bb-chip ${chip.kind === 'spark' ? 'spark' : 'haz'} ${cls}`} style={cls === 'cur' ? curStyle(tone) : undefined}>
-          {chip.kind === 'spark' ? '✦ Spark' : '✸ Crackers'}
-        </span>
-      );
-    }
-    const unit = safeUnit(state, chip.unitId);
+  /** One Giff's chip, alone in the strip or inside a whole team's block. */
+  const unitChip = (
+    unitId: string,
+    key: string,
+    cls: 'played' | 'cur' | 'next' | 'todo' | '',
+    ghost: boolean,
+    inBlock: boolean,
+  ) => {
+    const unit = safeUnit(state, unitId);
     if (!unit) return null;
     const mine = unit.team === own;
     const first = names.get(unit.id);
@@ -116,9 +176,10 @@ export function TurnStrip({
       <button
         key={key}
         type="button"
-        className={`bb-chip ${mine ? 'own' : 'foe'} ${cls}${chip.ghost ? ' ghost' : ''}${unit.status !== 'active' ? ' out' : ''}${highlight === unit.id ? ' lit' : ''}`}
-        style={cls === 'cur' && !chip.ghost ? curStyle(tone) : undefined}
+        className={`bb-chip ${mine ? 'own' : 'foe'} ${cls}${ghost ? ' ghost' : ''}${unit.status !== 'active' ? ' out' : ''}${highlight === unit.id ? ' lit' : ''}`}
+        style={cls === 'cur' && !ghost ? curStyle(tone) : undefined}
         data-chip={unit.id}
+        {...(inBlock ? { 'data-chip-state': cls === 'cur' ? 'current' : cls === 'played' ? 'played' : 'to-play' } : {})}
         title={`${unit.name} · ${unit.role}${unit.status !== 'active' ? ' · off the field' : ''}`}
         onMouseEnter={() => onHover(unit.id)}
         onMouseLeave={() => onHover(null)}
@@ -130,6 +191,39 @@ export function TurnStrip({
         {unit.id !== yoursId && first && <span className="who">{first}</span>}
       </button>
     );
+  };
+
+  const render = (chip: Chip, key: string, cls: 'played' | 'cur' | 'next' | '') => {
+    if (chip.kind === 'block') {
+      const mine = chip.team === own;
+      // The next round's preview shows the team whole again: nobody has played yet.
+      const fresh = cls === 'next';
+      const played = fresh ? [] : chip.played;
+      const cur = fresh ? null : chip.current;
+      const todo = fresh ? [...chip.played, ...(chip.current ? [chip.current] : []), ...chip.toPlay] : chip.toPlay;
+      return (
+        <span
+          key={key}
+          className={`bb-chipblock ${mine ? 'own' : 'foe'} ${cls}`}
+          style={cls === 'cur' ? { borderColor: TONE_COLOUR[tone] } : undefined}
+          data-testid="turn-block"
+          data-team={chip.team}
+          title={`${mine ? 'Your team' : 'The other team'} · ${todo.length} to play`}
+        >
+          {played.map((id) => unitChip(id, `${key}p${id}`, 'played', false, true))}
+          {cur && unitChip(cur, `${key}c${cur}`, 'cur', false, true)}
+          {todo.map((id) => unitChip(id, `${key}t${id}`, 'todo', false, true))}
+        </span>
+      );
+    }
+    if (chip.kind !== 'unit') {
+      return (
+        <span key={key} className={`bb-chip ${chip.kind === 'spark' ? 'spark' : 'haz'} ${cls}`} style={cls === 'cur' ? curStyle(tone) : undefined}>
+          {chip.kind === 'spark' ? '✦ Spark' : '✸ Crackers'}
+        </span>
+      );
+    }
+    return unitChip(chip.unitId, key, cls, chip.ghost, false);
   };
 
   return (

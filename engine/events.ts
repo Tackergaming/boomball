@@ -38,6 +38,23 @@ export type MatchEvent =
    * is the AI's from here. `humanId` says whose seat it was.
    */
   | { readonly kind: 'seatYielded'; readonly unitId: UnitId; readonly humanId: string }
+  /**
+   * Écart 66 (2H.41, engine version 12): a pick of a whole team was taken.
+   * `humanId` is who picked, null when the house resolved it (a delegated
+   * round, or a team with nobody left to pick). A `turnStarted` follows.
+   */
+  | { readonly kind: 'unitPicked'; readonly unitId: UnitId; readonly humanId: string | null; readonly round: number }
+  /** Écart 66: the rest of this picked turn is the AI's ("Let the AI play"). */
+  | { readonly kind: 'turnDelegated'; readonly unitId: UnitId }
+  /**
+   * Écart 66: the team's remaining picks this round are the AI's ("Let the
+   * AI finish the round"), by choice or because the clock ran out.
+   */
+  | { readonly kind: 'roundDelegated'; readonly team: TeamId; readonly round: number }
+  /** Écart 66: the mode asked for the team from the next round on. */
+  | { readonly kind: 'teamModeRequested'; readonly team: TeamId; readonly mode: 'seat' | 'whole'; readonly round: number }
+  /** Écart 66: the mode in force from this round, applied at its top. */
+  | { readonly kind: 'teamModeChanged'; readonly team: TeamId; readonly mode: 'seat' | 'whole'; readonly round: number }
   | {
       readonly kind: 'moved';
       readonly unitId: UnitId;

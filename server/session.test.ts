@@ -27,6 +27,7 @@ import {
 
 const arena = new Arena(KILL_SILO);
 const T0 = 1_700_000_000_000;
+const TIMER = TURN_TIMER_SECONDS * 1000;
 
 const SOLO: HumanSeat[] = [{ humanId: 'jerome', role: 'striker', name: 'Bombast' }];
 const TRIO: HumanSeat[] = [
@@ -470,5 +471,52 @@ describe('three players', () => {
     }
 
     expect([...asked].sort()).toEqual(['ana', 'jerome', 'kai']);
+  });
+});
+
+describe('a whole team on the clock (ecart 66, 2H.41)', () => {
+  // Rule: a pick is a human's moment, so the clock runs; the picked turn gets a clock of its own.
+  it('runs the clock on a pick, then afresh on the picked turn, then on the next pick', () => {
+    const state = createMatch({ arena: KILL_SILO, tier: 'rookie', humans: SOLO, seed: 5, wholeTeam: true });
+    const opened = openSession(arena, state, T0);
+    expect(opened.session.state.turn).toBeNull();
+    expect(opened.session.turnDeadline).toBe(T0 + TIMER);
+
+    const keeper = opened.session.state.units.find((u) => u.team === 'A' && u.role === 'bulwark')!;
+    const picked = submitAction(
+      arena,
+      opened.session,
+      { humanId: 'jerome', unitId: keeper.id, action: { kind: 'pickUnit', humanId: 'jerome' } },
+      T0 + 5_000,
+    );
+    expect(picked.ok).toBe(true);
+    if (!picked.ok) return;
+    expect(picked.step.session.state.turn?.unitId).toBe(keeper.id);
+    expect(picked.step.session.turnDeadline).toBe(T0 + 5_000 + TIMER);
+
+    const ended = submitAction(
+      arena,
+      picked.step.session,
+      { humanId: 'jerome', unitId: keeper.id, action: { kind: 'endTurn' } },
+      T0 + 9_000,
+    );
+    expect(ended.ok).toBe(true);
+    if (!ended.ok) return;
+    expect(ended.step.session.state.turn).toBeNull();
+    expect(ended.step.session.turnDeadline).toBe(T0 + 9_000 + TIMER);
+  });
+
+  // Rule: an overdue pick is settled by whoever knocks, the round goes to the AI, and nothing is dodged.
+  it('settles an overdue pick by handing the round to the AI, with no Dodge', () => {
+    const state = createMatch({ arena: KILL_SILO, tier: 'rookie', humans: SOLO, seed: 5, wholeTeam: true });
+    const opened = openSession(arena, state, T0);
+    expect(isExpired(opened.session, T0 + TIMER)).toBe(true);
+    const settled = expireIfDue(arena, opened.session, T0 + TIMER);
+    expect(settled).not.toBeNull();
+    if (!settled) return;
+    expect(settled.events[0]).toEqual({ kind: 'roundDelegated', team: 'A', round: 1 });
+    expect(settled.events.filter((e) => e.kind === 'unitPicked')).toHaveLength(7);
+    expect(settled.events.some((e) => e.kind === 'dodging' && unitById(state, e.unitId).team === 'A')).toBe(false);
+    expect(settled.session.state.round).toBe(2);
   });
 });

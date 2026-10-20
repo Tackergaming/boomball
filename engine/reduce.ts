@@ -34,7 +34,14 @@ import {
 } from './constants.js';
 import type { MatchEvent } from './events.js';
 import { directionFromD8, distance, lineTo, stepCostFeet, type Point } from './geometry.js';
-import { buildTurnOrder, placeHuman, placeHumans, placementAt, promoteBulwark } from './initiative.js';
+import {
+  buildTurnOrder,
+  pickableUnits,
+  placeHuman,
+  placeHumans,
+  placementAt,
+  promoteBulwark,
+} from './initiative.js';
 import { Rng } from './rng.js';
 import {
   attackMode,
@@ -76,15 +83,21 @@ import { statsFor } from './stats.js';
 import {
   activeUnits,
   activeUnitsOf,
+  modeOf,
   opposingTeam,
+  pendingPick,
+  playsWhole,
   sparkIsLive,
   type Cracker,
+  type HumanId,
   type MatchResult,
   type MatchState,
   type TeamId,
+  type TeamMode,
   type TurnSlot,
   type Unit,
   type UnitId,
+  unitById,
 } from './types.js';
 
 export type ReduceResult =
@@ -113,6 +126,13 @@ export function reduce(arena: Arena, state: MatchState, command: Command): Reduc
   // A seat handed to the house (2H.33) is not a turn action: it is accepted
   // at any moment, on the clock or not, from the unit's own controller.
   if (command.action.kind === 'yieldSeat') return applyYieldSeat(arena, state, command.unitId);
+
+  // Écart 66 (2H.41): three more that do not wait for a turn. The pick is
+  // the moment before a turn; the mode is for the next round; the round
+  // handed to the AI is accepted on a pick as on a picked turn.
+  if (command.action.kind === 'pickUnit') return applyPickUnit(state, command.unitId, command.action.humanId);
+  if (command.action.kind === 'setTeamMode') return applySetTeamMode(state, command.unitId, command.action.mode);
+  if (command.action.kind === 'delegateRound') return applyDelegateRound(state, command.unitId);
 
   const turn = state.turn;
   if (!turn) return { ok: false, reason: 'no turn is in progress' };
@@ -172,10 +192,116 @@ function apply(arena: Arena, state: MatchState, unit: Unit, action: Action): Red
       return applyEndTurn(arena, state, unit);
     case 'choosePlace':
       return { ok: false, reason: 'no place is being chosen' };
+    case 'delegateTurn':
+      return applyDelegateTurn(state, unit);
     case 'yieldSeat':
+    case 'pickUnit':
+    case 'setTeamMode':
+    case 'delegateRound':
       // Handled before the turn checks in `reduce`; unreachable here.
-      return { ok: false, reason: 'a seat is yielded outside the turn' };
+      return { ok: false, reason: `${action.kind} is not a turn action` };
   }
+}
+
+// -- The whole team (écart 66, 2H.41, engine version 12) ----------------------
+
+/**
+ * A pick taken: the slot the ladder waits on becomes the unit's, and its
+ * turn opens at once. The unit must be the team's, active, and without a
+ * turn of its own this round; `humanId` is who picked, and the Giff of
+ * another human is refused (`00` C41 point 4). A pick of a team whose
+ * round is delegated opens a delegated turn, whoever took it; so does a
+ * pick the house took itself (`humanId` null).
+ */
+function applyPickUnit(state: MatchState, unitId: UnitId, humanId: HumanId | null): ReduceResult {
+  const pick = pendingPick(state);
+  if (!pick) return { ok: false, reason: 'no pick is waiting' };
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit) return { ok: false, reason: `no unit with id ${unitId}` };
+  if (unit.team !== pick.team) return { ok: false, reason: `${unit.name} is not on the team whose pick it is` };
+  if (!pickableUnits(state, pick.team).some((u) => u.id === unitId)) {
+    return { ok: false, reason: `${unit.name} cannot be picked: off the field or already played this round` };
+  }
+  if (humanId !== null && unit.controller.kind === 'human' && unit.controller.humanId !== humanId) {
+    return { ok: false, reason: `${unit.name} is ${unit.controller.humanId}'s to play` };
+  }
+
+  const log: MatchEvent[] = [{ kind: 'unitPicked', unitId, humanId, round: state.round }];
+  const slot: TurnSlot = { ...state.turnOrder[pick.index]!, actor: { kind: 'unit', unitId }, team: unit.team };
+  const named: MatchState = {
+    ...state,
+    turnOrder: state.turnOrder.map((s, i) => (i === pick.index ? slot : s)),
+  };
+  const delegated = humanId === null || named.delegatedRound[unit.team];
+  const begun = beginTurn(named, unit, log);
+  return {
+    ok: true,
+    state: { ...begun, turn: { ...begun.turn!, pickedBy: humanId, delegated } },
+    events: log,
+  };
+}
+
+/**
+ * The rest of a picked turn handed to the AI. Only a turn that came from a
+ * pick: a seat-by-seat turn is its human's to the end, as before.
+ */
+function applyDelegateTurn(state: MatchState, unit: Unit): ReduceResult {
+  const turn = state.turn!;
+  if (turn.pickedBy === null) return { ok: false, reason: `${unit.name}'s turn did not come from a pick` };
+  if (turn.delegated) return { ok: false, reason: 'the turn is already the AI\'s' };
+  return {
+    ok: true,
+    state: { ...state, turn: { ...turn, delegated: true } },
+    events: [{ kind: 'turnDelegated', unitId: unit.id }],
+  };
+}
+
+/**
+ * The team's remaining picks this round handed to the AI, and the picked
+ * turn in progress with them. The command unit names the team. Refused for
+ * a team not played whole, and when nothing of the team's is left this
+ * round: a late click on a round that has moved on is a stale board, which
+ * the client already knows how to read.
+ */
+function applyDelegateRound(state: MatchState, unitId: UnitId): ReduceResult {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit) return { ok: false, reason: `no unit with id ${unitId}` };
+  const team = unit.team;
+  if (!playsWhole(state, team)) return { ok: false, reason: 'the team is played seat by seat' };
+  if (state.delegatedRound[team]) return { ok: false, reason: 'the round is already the AI\'s' };
+
+  const onPick = pendingPick(state)?.team === team;
+  const onTurn = state.turn !== null && state.turn.pickedBy !== null && unitById(state, state.turn.unitId).team === team;
+  const ahead = state.turnOrder.some(
+    (slot, i) => i > state.turnIndex && slot.actor.kind === 'pick' && slot.actor.team === team,
+  );
+  if (!onPick && !onTurn && !ahead) return { ok: false, reason: 'nothing of the team is left to play this round' };
+
+  const turn = onTurn && state.turn ? { ...state.turn, delegated: true } : state.turn;
+  return {
+    ok: true,
+    state: { ...state, turn, delegatedRound: { ...state.delegatedRound, [team]: true } },
+    events: [{ kind: 'roundDelegated', team, round: state.round }],
+  };
+}
+
+/**
+ * The mode asked for the command unit's team from the next round on. The
+ * round in progress finishes as it began; `rebuild` applies it. Asking for
+ * the mode already in force withdraws a pending request, so the next round
+ * is what the owner last said.
+ */
+function applySetTeamMode(state: MatchState, unitId: UnitId, mode: TeamMode): ReduceResult {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit) return { ok: false, reason: `no unit with id ${unitId}` };
+  if (mode !== 'seat' && mode !== 'whole') return { ok: false, reason: `there is no such mode as ${String(mode)}` };
+  const team = unit.team;
+  const requested = mode === modeOf(state, team) ? null : mode;
+  return {
+    ok: true,
+    state: { ...state, requestedMode: { ...state.requestedMode, [team]: requested } },
+    events: [{ kind: 'teamModeRequested', team, mode, round: state.round }],
+  };
 }
 
 /**
@@ -200,6 +326,11 @@ function applyYieldSeat(arena: Arena, state: MatchState, unitId: UnitId): Reduce
     const placed = applyChoosePlace(arena, next, yielded, next.turn.placing);
     if (!placed.ok) return placed;
     return { ok: true, state: placed.state, events: [...log, ...placed.events] };
+  }
+  // Écart 66: a picked turn of the yielded unit is the AI's from here, as
+  // the human who picked it controls nothing of it any more.
+  if (next.turn?.unitId === unitId && next.turn.pickedBy !== null) {
+    return { ok: true, state: { ...next, turn: { ...next.turn, delegated: true } }, events: log };
   }
   return { ok: true, state: next, events: log };
 }
@@ -1203,6 +1334,9 @@ function closeBox(ctx: Ctx, state: MatchState, defender: TeamId): MatchState {
  * built with the keeper first (`relaunch`). No keeper on the field, nothing.
  */
 function scheduleRelaunch(arena: Arena, state: MatchState, defender: TeamId): MatchState {
+  // Écart 66: a whole team relaunches by its picks, in the order its humans
+  // choose (`00` C41 point 3); the keeper is not moved up for it.
+  if (playsWhole(state, defender)) return state;
   const keeper = activeUnitsOf(state, defender).find((u) => u.role === 'bulwark');
   if (!keeper) return state;
   const promoted = promoteBulwark(state.turnOrder, state.turnIndex, defender, keeper.id, state.units);
@@ -1355,6 +1489,18 @@ function advance(arena: Arena, state: MatchState, events: MatchEvent[]): ReduceR
       continue;
     }
 
+    // Écart 66: a pick is a question to a human. With somebody still to be
+    // picked, the ladder stops here with no turn open and the server waits,
+    // or answers for the house; with nobody left (evacuations since the
+    // ladder was built), the pick is skipped.
+    if (slot.actor.kind === 'pick') {
+      if (pickableUnits(current, slot.actor.team).length === 0) {
+        current = { ...current, turnIndex: current.turnIndex + 1 };
+        continue;
+      }
+      return { ok: true, state: current, events: log };
+    }
+
     const unit = current.units.find((u) => u.id === (slot.actor as { unitId: UnitId }).unitId);
     if (!unit || unit.status !== 'active') {
       current = { ...current, turnIndex: current.turnIndex + 1 };
@@ -1393,6 +1539,8 @@ function offerPlace(state: MatchState, unitId: UnitId, places: number, log: Matc
       placing: places,
       shot: false,
       freePass: false,
+      pickedBy: null,
+      delegated: false,
     },
   };
 }
@@ -1440,6 +1588,8 @@ function beginTurn(state: MatchState, unit: Unit, log: MatchEvent[]): MatchState
       placing: null,
       shot: false,
       freePass: false,
+      pickedBy: null,
+      delegated: false,
     },
   };
 }
@@ -1500,9 +1650,28 @@ function rebuild(arena: Arena, state: MatchState, log: MatchEvent[]): MatchState
       A: lapsed(restocked, 'A') ? null : restocked.penaltyBox.A,
       B: lapsed(restocked, 'B') ? null : restocked.penaltyBox.B,
     },
+    // A round handed to the AI is over with the round (écart 66).
+    delegatedRound: { A: false, B: false },
   };
+  // The mode asked mid-round takes effect here, before the ladder reads it
+  // (écart 66, `00` C41 point 7: "from next round").
+  const moded = applyRequestedModes(refreshed, log);
   // The relaunch is spent by the ladder it reorders (écart 54).
-  return { ...refreshed, turnOrder: buildTurnOrder(arena, refreshed), relaunch: null };
+  return { ...moded, turnOrder: buildTurnOrder(arena, moded), relaunch: null };
+}
+
+function applyRequestedModes(state: MatchState, log: MatchEvent[]): MatchState {
+  let next = state;
+  for (const team of ['A', 'B'] as const) {
+    const asked = state.requestedMode?.[team] ?? null;
+    if (asked === null) continue;
+    if (asked !== modeOf(next, team)) {
+      log.push({ kind: 'teamModeChanged', team, mode: asked, round: state.round });
+      next = { ...next, teamMode: { ...next.teamMode, [team]: asked } };
+    }
+    next = { ...next, requestedMode: { ...next.requestedMode, [team]: null } };
+  }
+  return next;
 }
 
 function lapsed(state: MatchState, defender: TeamId): boolean {

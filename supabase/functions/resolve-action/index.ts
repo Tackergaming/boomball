@@ -204,6 +204,15 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return reply({ accepted: true, fromSeq: snapshot.seq + 1, events: [], serverNow: Date.now() });
   }
 
+  // The one right the engine cannot know (écart 66, 2H.41): the mode of the
+  // team is the owner's call (`00` C41 point 7), read off `teams.owner`. The
+  // other rights are the session layer's (`rightsRefusal`), checked after an
+  // overdue clock is settled, as every refusal is (A28), and answered 403.
+  if ((action as Action).kind === 'setTeamMode') {
+    const { data: team } = await db.from('teams').select('owner').eq('id', match.team_id as string).single();
+    if (!team || team.owner !== humanId) return refuse('the team mode is the owner\'s call', 403);
+  }
+
   // A turn that ran out while nobody was looking is settled by whoever knocks
   // next, which is what stops a sleeping laptop freezing the other two players.
   // **When it was overdue, the action is not played** (audit line A28): the
@@ -220,7 +229,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     now,
     orders,
   );
-  if (!served.ok) return refuse(served.reason);
+  if (!served.ok) return refuse(served.reason, served.status ?? 400);
 
   const step: SessionStep = served.step;
   const fromSeq = snapshot.seq + 1;

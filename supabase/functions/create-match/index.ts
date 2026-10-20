@@ -81,7 +81,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const callerId = auth?.user?.id;
   if (!callerId) return refuse('not signed in', 401);
 
-  let body: { teamId?: string; seats?: unknown; arenaId?: string; tier?: unknown };
+  let body: { teamId?: string; seats?: unknown; arenaId?: string; tier?: unknown; wholeTeam?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -165,6 +165,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
     if (rosterError) console.warn('the roster was not saved', rosterError);
   }
 
+  // The lobby's "We play the whole team" (écart 66, 2H.41, `00` C41 point
+  // 8): the owner's box, carried in its presence like the league and sent
+  // here by the owner, who alone reaches this line. Anything but `true`
+  // is seat by seat.
   const opened = openLobbyMatch(toArenaSpec(arenaRow), {
     callerId,
     tier,
@@ -172,6 +176,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     seed,
     now: Date.now(),
     roster,
+    wholeTeam: body.wholeTeam === true,
   });
   if (!opened.ok) return refuse(opened.reason);
 

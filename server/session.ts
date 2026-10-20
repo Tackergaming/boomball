@@ -24,8 +24,20 @@ import type { Action } from '../engine/actions.js';
 import type { Arena } from '../engine/arena.js';
 import { ENGINE_VERSION, TURN_TIMER_SECONDS } from '../engine/constants.js';
 import type { MatchEvent } from '../engine/events.js';
+import { orderBySituation, pickableUnits } from '../engine/initiative.js';
 import { openMatch, reduce } from '../engine/reduce.js';
-import { isHuman, unitById, type HumanId, type MatchState, type UnitId } from '../engine/types.js';
+import {
+  hasHuman,
+  isHuman,
+  pendingPick,
+  playsWhole,
+  unitById,
+  type HumanId,
+  type MatchState,
+  type TeamId,
+  type Unit,
+  type UnitId,
+} from '../engine/types.js';
 import { chooseAction } from '../ai/chooseAction.js';
 import type { AllyOrder } from '../ai/orders.js';
 
@@ -61,6 +73,12 @@ export type SessionResult = { readonly ok: true; readonly step: SessionStep } | 
 export interface Refusal {
   readonly ok: false;
   readonly reason: string;
+  /**
+   * The HTTP status the door answers with, when it is not the 400 of a move
+   * the rules refuse: 403 for a request the caller has no right to send
+   * (`rightsRefusal`, 2H.41). Read by `resolve-action`, absent otherwise.
+   */
+  readonly status?: 403;
 }
 
 /**
@@ -120,9 +138,26 @@ export function submitAction(
     const unit = state.units.find((u) => u.id === request.unitId);
     if (!unit) return { ok: false, reason: `no unit with id ${request.unitId}` };
     if (unit.controller.kind !== 'human' || unit.controller.humanId !== request.humanId) {
-      return { ok: false, reason: `${request.humanId} does not control ${request.unitId}` };
+      return { ok: false, reason: `${request.humanId} does not control ${request.unitId}`, status: 403 };
     }
     const result = reduce(arena, state, { unitId: request.unitId, action: request.action });
+    if (!result.ok) return { ok: false, reason: result.reason };
+    return {
+      ok: true,
+      step: advance(arena, { ...session, state: result.state }, [...result.events], now, orders, clockKey(state)),
+    };
+  }
+
+  // Écart 66 (2H.41): the pick, the round handed to the AI and the mode for
+  // the next round do not wait for a turn either. Who may send which is
+  // `rightsRefusal`, shared with the door; the engine reads the rest.
+  const kind = request.action.kind;
+  if (kind === 'pickUnit' || kind === 'delegateRound' || kind === 'setTeamMode') {
+    const refused = rightsRefusal(state, request);
+    if (refused) return { ok: false, reason: refused, status: 403 };
+    // Who picked is the caller, whatever the body said.
+    const action: Action = kind === 'pickUnit' ? { kind, humanId: request.humanId } : request.action;
+    const result = reduce(arena, state, { unitId: request.unitId, action });
     if (!result.ok) return { ok: false, reason: result.reason };
     return {
       ok: true,
@@ -136,10 +171,8 @@ export function submitAction(
     return { ok: false, reason: `it is not ${request.unitId}'s turn` };
   }
 
-  const unit = unitById(state, request.unitId);
-  if (unit.controller.kind !== 'human' || unit.controller.humanId !== request.humanId) {
-    return { ok: false, reason: `${request.humanId} does not control ${request.unitId}` };
-  }
+  const refused = rightsRefusal(state, request);
+  if (refused) return { ok: false, reason: refused, status: 403 };
 
   const result = reduce(arena, state, { unitId: request.unitId, action: request.action });
   if (!result.ok) return { ok: false, reason: result.reason };
@@ -149,6 +182,50 @@ export function submitAction(
     ok: true,
     step: advance(arena, { ...session, state: result.state }, events, now, orders, clockKey(state)),
   };
+}
+
+/**
+ * Why the caller may not send this request, or null. The one statement of
+ * who drives what, read here and by `resolve-action`, which answers it with
+ * a 403:
+ *
+ * - a turn action is the unit's own human's, or, on a turn that came from a
+ *   pick (écart 66), the human who picked;
+ * - `delegateTurn` is the one who picked;
+ * - `pickUnit` is any human of the team, for a unit of the house or its own;
+ * - `delegateRound` is any human of the team;
+ * - `setTeamMode` is any human of the team here; the owner alone at the door,
+ *   which reads `teams.owner`, a thing the engine does not know.
+ *
+ * "Of the team" means controlling a unit of it, on the field or not: a human
+ * who yielded its seat is a spectator and sends nothing.
+ */
+export function rightsRefusal(state: MatchState, request: ActionRequest): string | null {
+  const { humanId, unitId, action } = request;
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit) return `no unit with id ${unitId}`;
+  const owns = unit.controller.kind === 'human' && unit.controller.humanId === humanId;
+  const onTeam = state.units.some(
+    (u) => u.team === unit.team && u.controller.kind === 'human' && u.controller.humanId === humanId,
+  );
+
+  switch (action.kind) {
+    case 'pickUnit':
+      if (!onTeam) return `${humanId} is not on ${unit.name}'s team`;
+      if (unit.controller.kind === 'human' && !owns) return `${unit.name} is ${unit.controller.humanId}'s to play`;
+      return null;
+    case 'delegateRound':
+    case 'setTeamMode':
+      return onTeam ? null : `${humanId} is not on ${unit.name}'s team`;
+    case 'delegateTurn':
+      return state.turn?.unitId === unitId && state.turn.pickedBy === humanId
+        ? null
+        : `${humanId} did not pick ${unit.name}`;
+    default: {
+      const picked = state.turn?.unitId === unitId && state.turn.pickedBy === humanId;
+      return owns || picked ? null : `${humanId} does not control ${unitId}`;
+    }
+  }
 }
 
 /**
@@ -243,7 +320,21 @@ export function expireIfDue(
   if (!isExpired(session, now)) return null;
 
   const { state } = session;
-  if (state.phase === 'finished' || !state.turn) return null;
+  if (state.phase === 'finished') return null;
+
+  // Écart 66 (`00` C41 point 6, Jérôme: "tous les joueurs restant sous son
+  // contrôle doivent repasser pour ce tour à l'IA"): a whole team whose
+  // clock runs out, on a pick or on a picked turn, hands the rest of its
+  // round to the AI. No Dodge: the house plays the turn out properly.
+  const whole = wholeTeamOnClock(state);
+  if (whole !== null) {
+    const anyUnit = state.units.find((u) => u.team === whole)!;
+    const ceded = reduce(arena, state, { unitId: anyUnit.id, action: { kind: 'delegateRound' } });
+    if (!ceded.ok) throw new Error(`a round could not be handed to the AI on the clock: ${ceded.reason}`);
+    return advance(arena, { ...session, state: ceded.state }, [...ceded.events], now, orders, clockKey(state));
+  }
+
+  if (!state.turn) return null;
 
   const unitId = state.turn.unitId;
   const events: MatchEvent[] = [];
@@ -300,13 +391,29 @@ function advance(
   let current = session.state;
   let spent = 0;
 
-  while (current.phase !== 'finished' && current.turn) {
-    const unit = unitById(current, current.turn.unitId);
-    if (isHuman(unit)) break;
-
+  while (current.phase !== 'finished') {
     if (spent++ >= AI_ACTION_LIMIT) {
       throw new Error(`the AI did not reach a human turn within ${AI_ACTION_LIMIT} actions`);
     }
+
+    // Écart 66: a pick nobody human will answer, because the team handed
+    // the round to the AI or has nobody left to pick, is taken by the house
+    // in the order the situation calls for, which is the order an AI side
+    // is laddered in. The turn it opens is delegated and played below.
+    if (!current.turn) {
+      const pick = pendingPick(current);
+      if (!pick || waitingOnHuman(current)) break;
+      const [first] = orderBySituation(arena, current, pick.team, pickableUnits(current, pick.team));
+      if (!first) throw new Error('a pick with nobody to take it was not skipped');
+      const picked = reduce(arena, current, { unitId: first.id, action: { kind: 'pickUnit', humanId: null } });
+      if (!picked.ok) throw new Error(`the house could not take a pick: ${picked.reason}`);
+      events.push(...picked.events);
+      current = picked.state;
+      continue;
+    }
+
+    const unit = unitById(current, current.turn.unitId);
+    if (waitingOnHuman(current)) break;
 
     const action = chooseAction(arena, current, unit.id, orders);
     const result = reduce(arena, current, { unitId: unit.id, action });
@@ -346,8 +453,7 @@ function deadlineFor(
   wasOnClock: string | null,
   standing: number | null,
 ): number | null {
-  if (state.phase === 'finished' || !state.turn) return null;
-  if (!isHuman(unitById(state, state.turn.unitId))) return null;
+  if (!waitingOnHuman(state)) return null;
   // Same unit still on the clock, and it already had a deadline: it is the same
   // turn continuing, so it keeps the time it was given.
   if (standing !== null && wasOnClock === clockKey(state)) return standing;
@@ -355,13 +461,52 @@ function deadlineFor(
 }
 
 /**
+ * Whether the match is waiting on a human: a turn of a human's unit, or
+ * since écart 66 a picked turn not yet handed to the AI, or a pick of a
+ * whole team that still has somebody to answer it and has not ceded the
+ * round. This is what stops the AI loop and what the clock runs for; the
+ * two must never disagree, so they read one function.
+ */
+export function waitingOnHuman(state: MatchState): boolean {
+  if (state.phase === 'finished') return false;
+  const turn = state.turn;
+  if (turn) {
+    if (turn.delegated) return false;
+    return turn.pickedBy !== null || isHuman(unitById(state, turn.unitId));
+  }
+  const pick = pendingPick(state);
+  if (!pick) return false;
+  return hasHuman(state, pick.team) && !state.delegatedRound[pick.team];
+}
+
+/**
+ * The whole team whose clock is running (écart 66): the team of a pending
+ * pick, or of a picked turn still its human's. Null when the clock belongs
+ * to a seat-by-seat turn, or to nobody.
+ */
+function wholeTeamOnClock(state: MatchState): TeamId | null {
+  if (!waitingOnHuman(state)) return null;
+  const turn = state.turn;
+  if (turn) {
+    if (turn.pickedBy === null) return null;
+    const unit: Unit = unitById(state, turn.unitId);
+    return playsWhole(state, unit.team) ? unit.team : null;
+  }
+  return pendingPick(state)?.team ?? null;
+}
+
+/**
  * What the clock is running for: the unit on the turn, and whether it is
  * choosing its place in its role. The choice has its own clock and the turn
  * that follows starts a fresh one, the first place included (écart 58,
- * Jérôme on 2026-10-12).
+ * Jérôme on 2026-10-12). A pick (écart 66) has its own clock too, named by
+ * the round, the team and the rung, and the picked turn starts a fresh one.
  */
 function clockKey(state: MatchState): string | null {
-  if (!state.turn) return null;
+  if (!state.turn) {
+    const pick = pendingPick(state);
+    return pick ? `pick:${pick.team}@${state.round}:${pick.index}` : null;
+  }
   // The round and the cursor are part of the key (2H.13). With the unit alone,
   // a Trajector or a Bulwark, which has no place to choose, read as "the same
   // turn carrying on" round after round and kept its round 1 deadline for the

@@ -31,10 +31,10 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import type { Action } from '../../../engine/actions.js';
 import type { Point } from '../../../engine/geometry.js';
-import { legalActions, onlyEndTurnLeft } from '../../../engine/legalActions.js';
+import { legalActions, onlyEndTurnLeft, pickOptions } from '../../../engine/legalActions.js';
 import { BENCH_SIZE, MATCH_ROUNDS, TURN_TIMER_SECONDS } from '../../../engine/constants.js';
 import { pathTo, safePathTo, safeReachableCells } from '../../../engine/rules/movement.js';
-import { isHuman } from '../../../engine/types.js';
+import { isHuman, modeOf, pendingPick } from '../../../engine/types.js';
 import { arena } from '../lib/arena.js';
 import { HOOK_ENABLED, PATIENT } from '../lib/flags.js';
 import { webglAvailable } from '../lib/webgl.js';
@@ -197,11 +197,28 @@ export function Match({
     )?.id ?? null;
 
   const onClock = state?.turn ? state.units.find((u) => u.id === state.turn!.unitId) ?? null : null;
+  /**
+   * The whole team (2H.41, `00` C41, écart 66). A turn that came from a pick
+   * is the picker's, whoever the Giff belongs to; a turn handed to the AI is
+   * nobody's on this screen. A pending pick of this side is this player's
+   * moment when it has Giffs to send in (`pickOptions`: its own, and those
+   * of the house; a team-mate's never).
+   */
+  const pickedBy = state?.turn?.pickedBy ?? null;
+  const delegated = state?.turn?.delegated ?? false;
   const yours =
     !!onClock &&
-    isHuman(onClock) &&
-    onClock.controller.kind === 'human' &&
-    onClock.controller.humanId === userId;
+    !delegated &&
+    (pickedBy !== null
+      ? pickedBy === userId
+      : isHuman(onClock) && onClock.controller.kind === 'human' && onClock.controller.humanId === userId);
+  const pick = state ? pendingPick(state) : null;
+  const pickable = useMemo(
+    () => (state && pick && pick.team === own ? pickOptions(state, userId) : []),
+    [state, pick, own, userId],
+  );
+  const picking = pickable.length > 0 && !replaying;
+  const canPick = picking && !match.busy && !briefing;
 
   /**
    * Acting is gated on the replay as well as on the turn. During playback the
@@ -285,7 +302,9 @@ export function Match({
    * ten rounds had gone.
    */
   const tookControl = useRef<number | null>(null);
-  const turnKeyNow = yours && !replaying ? `${onClock?.id}@${match.deadline}` : null;
+  // A pick (2H.41) is a moment of its own on the clock, keyed by its rung.
+  const turnKeyNow =
+    yours && !replaying ? `${onClock?.id}@${match.deadline}` : picking && pick ? `pick@${pick.index}@${match.deadline}` : null;
   const turnKeyRef = useRef<string | null>(null);
   if (turnKeyNow && turnKeyRef.current !== turnKeyNow) {
     turnKeyRef.current = turnKeyNow;
@@ -337,18 +356,27 @@ export function Match({
    * Either one alone has taken a turn off Jérôme that he had not been given.
    */
   const knocked = useRef<string | null>(null);
+  const delegateRound = match.delegate;
   useEffect(() => {
     // Development only: a script between two actions is not a player gone
     // quiet, and the server still rules on the deadline when the action lands.
     if (PATIENT) return;
-    if (!yours || replaying || match.busy || !match.deadline || !tookControl.current) return;
+    if (!(yours || picking) || replaying || match.busy || !match.deadline || !tookControl.current) return;
     if (now + match.skew < match.deadline) return;
     if (Date.now() - tookControl.current < TURN_TIMER_SECONDS * 1000) return;
-    const key = `${onClock?.id}@${match.deadline}`;
+    const key = turnKeyNow ?? `${onClock?.id}@${match.deadline}`;
     if (knocked.current === key) return;
     knocked.current = key;
+    // A whole team's clock (2H.41) ends in "Let the AI finish the round",
+    // which is what the server does on the expiry too: the knock sends that
+    // very thing, so a knock a hair early changes nothing the clock would
+    // not have. A seat-by-seat turn knocks with its end, as before.
+    if (picking || pickedBy !== null) {
+      if (mineId) void delegateRound('round', mineId);
+      return;
+    }
     void send({ kind: 'endTurn' });
-  }, [yours, replaying, match.busy, match.deadline, match.skew, now, onClock?.id, send]);
+  }, [yours, picking, pickedBy, mineId, turnKeyNow, replaying, match.busy, match.deadline, match.skew, now, onClock?.id, send, delegateRound]);
 
   /**
    * A team-mate's knock (2H.33, `00` C32 point 5): a seated human whose turn it
@@ -360,13 +388,20 @@ export function Match({
   const teammateKnocked = useRef<string | null>(null);
   useEffect(() => {
     if (PATIENT) return;
-    if (yours || !mineId || !onClock || !isHuman(onClock) || replaying || match.busy) return;
+    if (yours || picking || !mineId || replaying || match.busy) return;
+    // A human's turn, a team-mate's picked turn, or a pick a team-mate alone
+    // can answer (2H.41): all three are a human's clock this client may knock on.
+    const humanMoment = onClock ? isHuman(onClock) || pickedBy !== null : pick !== null && pick.team === own;
+    if (!humanMoment) return;
     if (!teammateKnockDue(match.deadline, match.skew, now)) return;
-    const key = `${onClock.id}@${match.deadline}`;
+    const key = `${onClock?.id ?? `pick@${pick?.index}`}@${match.deadline}`;
     if (teammateKnocked.current === key) return;
     teammateKnocked.current = key;
-    void match.knock(onClock.id);
-  }, [yours, mineId, onClock, replaying, match, now]);
+    // The knock is an end of turn the server refuses unless the clock is
+    // over, in which case it settles the expiry first (A28). On a pick there
+    // is no unit on the clock: the knock goes as this player's own Giff.
+    void match.knock(onClock?.id ?? mineId);
+  }, [yours, picking, pickedBy, pick, own, mineId, onClock, replaying, match, now]);
 
   // The owner abandoned the match while this client watched (2H.33). Since
   // 2H.37 the database says it to everyone on the channel, the owner included:
@@ -394,6 +429,14 @@ export function Match({
       seq: match.seq,
       view,
       yours: canAct,
+      // The whole team (2H.41): the pick, as the row's buttons send it.
+      picking: canPick,
+      pickable: pickable.map((unit) => unit.id),
+      pick: (unitId) => (canPick && pickable.some((unit) => unit.id === unitId) ? match.pickUnit(unitId) : Promise.resolve()),
+      delegate: (scope) => {
+        if (scope === 'turn') return canAct && legal?.canDelegate ? match.delegate('turn', null) : Promise.resolve();
+        return (canAct && legal?.canDelegate) || canPick ? match.delegate('round', mineId) : Promise.resolve();
+      },
       replaying,
       busy: match.busy,
       deadline: match.deadline,
@@ -478,7 +521,7 @@ export function Match({
    * clock spent; the development hook can show either on request, and that
    * request is dropped by the next action sent, like the real one.
    */
-  const [noticeOverride, setNoticeOverride] = useState<'turn' | 'place' | null>(null);
+  const [noticeOverride, setNoticeOverride] = useState<'turn' | 'place' | 'round' | null>(null);
   useEffect(() => {
     if (!HOOK_ENABLED) return;
     fxBridge.notice = (kind) => setNoticeOverride(kind);
@@ -599,6 +642,17 @@ export function Match({
         case 'matchEnded':
           items.push({ kind: 'loud', text: 'Full time', tone: 'neutral' });
           break;
+        case 'teamModeRequested':
+          // The switch (2H.41, `00` C41 point 7): "Whole team from next round".
+          if (event.team === own) {
+            items.push({ kind: 'round', text: event.mode === 'whole' ? 'Whole team from next round' : 'My Giff only from next round', tone: 'own' });
+          }
+          break;
+        case 'teamModeChanged':
+          if (event.team === own) {
+            items.push({ kind: 'round', text: event.mode === 'whole' ? 'Whole team · you pick the order' : 'Each their own Giff', tone: 'own' });
+          }
+          break;
         default:
           break;
       }
@@ -616,11 +670,19 @@ export function Match({
     // player's now, and a queue of old news in front of "your turn" is noise.
     setBanners([{ kind: 'turn', text: `Your turn · ${onClock.name}`, tone: 'own', id: ++bannerId.current }]);
   }, [turnBanner, onClock]);
+  // The pick (2H.41, `00` C41 point 8): "Your team · pick a Giff", once per rung.
+  const pickBanner = picking && pick ? `pick@${pick.index}@${match.deadline}` : null;
+  const pickBannerShown = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pickBanner || pickBannerShown.current === pickBanner) return;
+    pickBannerShown.current = pickBanner;
+    setBanners([{ kind: 'turn', text: 'Your team · pick a Giff', tone: 'own', id: ++bannerId.current }]);
+  }, [pickBanner]);
 
   // Hooks below stay above the early return on `state`: a hook after it
   // changes the hook count between renders, which React refuses.
   const secondsLeft =
-    yours && !replaying && tookControl.current !== null
+    (yours || picking) && !replaying && tookControl.current !== null
       ? Math.min(TURN_TIMER_SECONDS, Math.max(0, TURN_TIMER_SECONDS - Math.floor((now - tookControl.current) / 1000)))
       : null;
   const motionForSound = match.motion;
@@ -809,7 +871,7 @@ export function Match({
   // sampled by the half-second tick and can predate the instant control came
   // back, which read as a hundred and twenty-one on the first render (A14).
   const left =
-    yours && !replaying && tookControl.current !== null
+    (yours || picking) && !replaying && tookControl.current !== null
       ? Math.min(
           TURN_TIMER_SECONDS,
           Math.max(0, TURN_TIMER_SECONDS - Math.floor((now - tookControl.current) / 1000)),
@@ -881,7 +943,18 @@ export function Match({
       tags = tagsFor(tagTarget);
       tagsAnchor = tagTarget;
     }
+  } else if (canPick && tagTarget && pickable.some((unit) => unit.id === tagTarget)) {
+    // The pick (2H.41, `00` C41 point 8): "Take the turn" beside a Giff still
+    // to send in, on hover, clickable; the click on the Giff opens its sheet.
+    const id = tagTarget;
+    tags = [{ key: 'take', label: 'Take the turn', run: () => void match.pickUnit(id) }];
+    tagsAnchor = id;
   }
+
+  /** The pick row (2H.41): one button per Giff this player may send in, in role order. */
+  const pickRow = canPick
+    ? pickable.map((unit) => ({ id: unit.id, name: unit.name, role: unit.role, run: () => void match.pickUnit(unit.id) }))
+    : [];
 
   /**
    * Every action on a target, also in the row, one button per target with its
@@ -960,9 +1033,15 @@ export function Match({
   }
 
   keysRef.current = {
-    myTurn: canAct,
+    // The digits answer the pick too (2H.41, `00` C41 point 8: "touches 1 à 9").
+    myTurn: canAct || canPick,
     run: (command) => {
       if (briefing) return;
+      // On a pick, the digits name a Giff and nothing else of the turn applies.
+      if (canPick && !playing && (command.kind === 'action' || command.kind === 'endTurn')) {
+        if (command.kind === 'action') pickRow[command.index]?.run();
+        return;
+      }
       switch (command.kind) {
         case 'escape':
           if (gearOpen) setGearOpen(false);
@@ -1007,23 +1086,36 @@ export function Match({
   };
 
   // -- Who has the clock (`00` C37 point 10) -----------------------------------------
-  const mate = !!onClock && isHuman(onClock) && onClock.id !== mineId && !yours;
-  const tone: ClockTone = (yours && !replaying) || placing !== null ? 'you' : mate ? 'mate' : 'house';
-  const mateLeft = mate ? clockSecondsLeft(match.deadline, match.skew, now) : null;
+  // A team-mate on the clock: its own Giff, or a Giff it picked (2H.41).
+  const mate = !!onClock && !yours && !delegated && (pickedBy !== null ? pickedBy !== userId : isHuman(onClock) && onClock.id !== mineId);
+  const mateName = onClock ? (pickedBy !== null ? playerNames?.get(pickedBy) : names.get(onClock.id)) ?? 'Team-mate' : 'Team-mate';
+  // A pick of this side that a team-mate alone can answer: every Giff left is theirs.
+  const matePicks = !picking && !!pick && pick.team === own && mineId !== null && !replaying;
+  const tone: ClockTone = (yours && !replaying) || placing !== null || picking ? 'you' : mate || matePicks ? 'mate' : 'house';
+  const mateLeft = mate || matePicks ? clockSecondsLeft(match.deadline, match.skew, now) : null;
   const clock =
     placing !== null && !briefing
       ? { who: 'Choose your place', sub: `${left ?? TURN_TIMER_SECONDS}s · ${roleName} this round`, fraction: (left ?? TURN_TIMER_SECONDS) / TURN_TIMER_SECONDS, testId: 'clock-you' }
+      : picking && !briefing
+        ? { who: 'Pick a Giff', sub: `${left ?? TURN_TIMER_SECONDS}s · your team`, fraction: (left ?? TURN_TIMER_SECONDS) / TURN_TIMER_SECONDS, testId: 'clock-pick' }
       : yours && !replaying
         ? { who: 'Your turn', sub: `${left ?? TURN_TIMER_SECONDS}s · ${onClock?.name ?? ''}`, fraction: (left ?? TURN_TIMER_SECONDS) / TURN_TIMER_SECONDS, testId: 'clock-you' }
         : mineId === null && state.phase !== 'finished'
           ? { who: 'Spectating', sub: onClock ? `${onClock.name} plays` : 'Resolving', fraction: 1, testId: 'watching' }
           : mate && onClock
             ? {
-                who: `${onClock.name.split(' ')[0]} · ${names.get(onClock.id) ?? 'Team-mate'}`,
+                who: `${onClock.name.split(' ')[0]} · ${mateName}`,
                 sub: `${mateLeft !== null ? clockText(mateLeft) : ''} · ${onClock.name} plays`,
                 fraction: mateLeft !== null ? Math.min(1, mateLeft / TURN_TIMER_SECONDS) : 1,
                 testId: 'waiting-for',
               }
+            : matePicks
+              ? {
+                  who: 'Your team picks',
+                  sub: `${mateLeft !== null ? clockText(mateLeft) : ''} · a team-mate sends a Giff in`,
+                  fraction: mateLeft !== null ? Math.min(1, mateLeft / TURN_TIMER_SECONDS) : 1,
+                  testId: 'waiting-pick',
+                }
             : { who: 'The House', sub: beatUnit ? `${beatUnit.name} plays` : onClock ? `${onClock.name} is up` : 'Resolving', fraction: 1, testId: 'clock-house' };
   const clockColour = TONE_COLOUR[tone];
   const seat: 'owner' | 'member' | 'spectator' = isOwner ? 'owner' : mineId !== null ? 'member' : 'spectator';
@@ -1138,6 +1230,19 @@ export function Match({
               : null
           }
           names={names}
+          pick={
+            picking
+              ? {
+                  pickable: new Set(pickable.map((unit) => unit.id)),
+                  // Played this round: a slot of its own behind the cursor (a pick taken earlier).
+                  played: new Set(
+                    state.turnOrder
+                      .slice(0, state.turnIndex)
+                      .flatMap((slot) => (slot.actor.kind === 'unit' && slot.team === own ? [slot.actor.unitId] : [])),
+                  ),
+                }
+              : null
+          }
         />
 
         <div className="bb-clock" style={{ borderLeftColor: clockColour }} data-testid={clock.testId}>
@@ -1162,10 +1267,44 @@ export function Match({
         </button>
 
         <ActionRow
-          mode={placing !== null && !briefing ? 'place' : playing ? 'turn' : 'none'}
+          mode={
+            placing !== null && !briefing
+              ? 'place'
+              : playing
+                ? 'turn'
+                : picking && !briefing
+                  ? 'pick'
+                  : mate && pickedBy !== null && mineId !== null && !briefing
+                    ? 'wait'
+                    : 'none'
+          }
           actions={row}
           onAim={setChipHover}
           busy={match.busy}
+          // The whole team (2H.41, `00` C41 points 5 and 8).
+          pick={
+            picking && !briefing
+              ? {
+                  units: pickRow,
+                  secondsLeft: left,
+                  onRound: () => {
+                    if (mineId && !match.busy) void match.delegate('round', mineId);
+                  },
+                  onAim: setChipHover,
+                }
+              : null
+          }
+          ai={
+            playing && legalView?.canDelegate
+              ? {
+                  onTurn: () => void match.delegate('turn', null),
+                  onRound: () => {
+                    if (mineId) void match.delegate('round', mineId);
+                  },
+                }
+              : null
+          }
+          wait={onClock && mate && pickedBy !== null ? { text: `${onClock.name} · ${mateName} plays · the next pick opens when the turn ends` } : null}
           call={
             mineId !== null
               ? {
@@ -1229,6 +1368,13 @@ export function Match({
           onRules={() => {
             setGearOpen(false);
             setBriefing(true);
+          }}
+          // The switch (2H.41, `00` C41 point 7): the owner's call, for the next round.
+          teamMode={modeOf(state, own)}
+          requestedMode={state.requestedMode?.[own] ?? null}
+          canSetTeamMode={isOwner && mineId !== null}
+          onTeamMode={(mode) => {
+            if (mineId) void match.setTeamMode(mineId, mode);
           }}
           seat={seat}
           onLeave={() => {
@@ -1355,7 +1501,11 @@ function writeStored(key: string, value: string): void {
 }
 
 /** The clock's note, now a line of the feed (`00` C37 point 8); Jérôme's words of C25 1. */
-function noteText(notice: 'turn' | 'place', roleName: string): string {
+function noteText(notice: 'turn' | 'place' | 'round', roleName: string): string {
+  if (notice === 'round') {
+    // 2H.41 (`00` C41 point 6): a whole team's clock hands the rest of its round to the AI.
+    return `The clock ran out. The AI finished the round for your team. You have ${TURN_TIMER_SECONDS} seconds for each pick and each turn, counted from the moment the board is yours again.`;
+  }
   return notice === 'place'
     ? `Default initiative · you go last. The clock ran out before you chose your place: your Giff plays last of the ${roleName} this round.`
     : `The clock ran out. Your Giff took cover and the turn passed. You have ${TURN_TIMER_SECONDS} seconds a turn, counted from the moment the board is yours again.`;

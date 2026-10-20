@@ -46,12 +46,17 @@ export const ARENA_HEIGHT = THIRD_LENGTH * THIRD_COUNT;
  * round (écart 58, `turn.placing`, the `choosePlace` action and two events);
  * version 8 is 2H.13 (écarts 59 to 62, `turn.shot`, `recoilBlocked`); version
  * 9 is 2H.14, decided by Jérôme on 2026-10-14: the free pass after a Shove
- * that took the ball (écart 63, `turn.freePass`).
+ * that took the ball (écart 63, `turn.freePass`); version 10 is 2H.25 (écart
+ * 64, the rebound from the mouth); version 11 is 2H.33 (écart 65, the seat
+ * yielded to the house); version 12 is 2H.41, decided by Jérôme on
+ * 2026-10-20: a team played whole by its humans (écart 66, `teamMode`,
+ * the `pick` rung, `turn.pickedBy` and `turn.delegated`, four actions and
+ * five events).
  * Nothing in the engine reads the version:
  * the server stamps it on `matches` and refuses a mismatch, and the client
  * archives what it cannot play.
  */
-export const ENGINE_VERSION = 11;
+export const ENGINE_VERSION = 12;
 
 // -- The penalty box (écart 53) --------------------------------------------
 

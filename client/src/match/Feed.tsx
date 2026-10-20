@@ -43,7 +43,7 @@ import { label } from './replay.js';
 export interface FeedNote {
   readonly id: string;
   readonly text: string;
-  readonly notice?: 'turn' | 'place';
+  readonly notice?: 'turn' | 'place' | 'round';
 }
 
 /** How long a line stays whole before it starts to fade, then how long the fade takes. */
@@ -114,7 +114,7 @@ interface RibbonItem {
   readonly text: string;
   readonly big: boolean;
   readonly note: boolean;
-  readonly notice?: 'turn' | 'place';
+  readonly notice?: 'turn' | 'place' | 'round';
   readonly out: boolean;
 }
 
@@ -511,6 +511,17 @@ function describe(event: MatchEvent, name: (id: string) => string, free = false)
     case 'seatYielded':
       // 2H.33: a team-mate handed the Giff to the house for the rest of the match.
       return `${name(event.unitId)} is handed to the house for the rest of the match.`;
+    case 'unitPicked':
+      // Écart 66 (2H.41): a pick of the whole team.
+      return event.humanId === null ? `The house sends ${name(event.unitId)}.` : `${name(event.unitId)} is sent in.`;
+    case 'turnDelegated':
+      return `${name(event.unitId)} is left to the AI for the rest of the turn.`;
+    case 'roundDelegated':
+      return `${event.team === 'A' ? 'Your team' : 'The other team'} leaves the rest of the round to the AI.`;
+    case 'teamModeRequested':
+      return event.mode === 'whole' ? 'Whole team from next round.' : 'Your own Giff only from next round.';
+    case 'teamModeChanged':
+      return event.mode === 'whole' ? 'Your team plays as a whole this round.' : 'Each player plays their own Giff this round.';
     case 'scored':
       return `◆ ${event.team === 'A' ? 'Your team' : 'The house'} scores ${event.points}.`;
     case 'matchEnded':

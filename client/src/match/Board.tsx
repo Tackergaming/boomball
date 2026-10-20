@@ -111,6 +111,14 @@ export interface BoardProps {
   onHoverUnit?: ((unitId: UnitId | null) => void) | null;
   /** The action labels beside the hovered target (a unit or a Cracker), drawn on the pitch. */
   tags?: { readonly anchorId: string; readonly node: ReactNode } | null;
+  /**
+   * The pick of a whole team (2H.41, `00` C41 point 8): the Giffs this
+   * player may send in wear a pulsing brass ring, those that have played
+   * this round are dimmed. A click on a ringed Giff still opens its sheet:
+   * the "Take the turn" label beside it, hung through `tags`, is the click
+   * that sends it.
+   */
+  pick?: { readonly pickable: ReadonlySet<string>; readonly played: ReadonlySet<string> } | null;
   /** The first names of the humans driving other Giffs, by unit id. */
   names?: ReadonlyMap<string, string>;
 }
@@ -197,6 +205,7 @@ export function Board({
   onPlotStep = null,
   onHoverUnit = null,
   tags = null,
+  pick = null,
 }: BoardProps) {
   const units = activeUnits(state);
 
@@ -602,6 +611,8 @@ export function Board({
                 px={px}
                 ring={ringFor(unit.id)}
                 ringKind={targetKind ?? (targets?.pass.has(unit.id) ? 'pass' : 'attack')}
+                pickable={pick?.pickable.has(unit.id) ?? false}
+                dim={pick?.played.has(unit.id) ?? false}
                 onClick={() => {
                   // A pending action takes the click when this unit is a target
                   // of it; any other click is a selection, as it always was.
@@ -968,6 +979,8 @@ function UnitMark({
   px,
   ring,
   ringKind,
+  pickable = false,
+  dim = false,
   onClick,
   onHover,
 }: {
@@ -994,6 +1007,10 @@ function UnitMark({
   ring: 'hot' | 'faint' | null;
   /** Which of the three it is a target of, which picks the colour of the ring. */
   ringKind: 'attack' | 'shove' | 'pass';
+  /** The pick of a whole team (2H.41): this Giff may be sent in now (a pulsing brass ring). */
+  pickable?: boolean;
+  /** Has played this round of a whole team (2H.41): drawn dimmed. */
+  dim?: boolean;
   onClick: () => void;
   onHover: (on: boolean) => void;
 }) {
@@ -1011,9 +1028,27 @@ function UnitMark({
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       data-unit={unit.id}
+      data-pickable={pickable ? 'true' : undefined}
+      data-played={dim ? 'true' : undefined}
+      opacity={dim ? 0.45 : 1}
     >
       {/* The whole name, on hover, because the plate only has room for four letters. */}
       <title>{unit.name}</title>
+      {/* The pick of a whole team (2H.41): a brass ring that breathes on every Giff still to send in. */}
+      {pickable && (
+        <rect
+          x={x - 0.14}
+          y={row - 0.14}
+          width={1.28}
+          height={1.28}
+          fill="none"
+          stroke="var(--brass)"
+          strokeWidth={0.1}
+          style={{ pointerEvents: 'none' }}
+        >
+          <animate attributeName="opacity" values="1;0.35;1" dur="1.4s" repeatCount="indefinite" />
+        </rect>
+      )}
       {spotlit && (
         <rect
           x={x - 0.18}

@@ -129,6 +129,7 @@ export function Board3D({
   onHoverUnit = null,
   tags = null,
   names,
+  pick = null,
 }: BoardProps) {
   const units = activeUnits(state);
   const link = useMemo(() => newSceneLink(), []);
@@ -561,6 +562,8 @@ export function Board3D({
             spotlit={spotlight === unit.id || highlight === unit.id}
             ring={ringFor(unit.id)}
             ringKind={targetKind ?? (targets?.pass.has(unit.id) ? 'pass' : 'attack')}
+            pickable={pick?.pickable.has(unit.id) ?? false}
+            dim={pick?.played.has(unit.id) ?? false}
             link={link}
             onClick={() => {
               if (answer(unit.id)) return;

@@ -266,14 +266,17 @@ export function buildBoard(
     const played = hasPlayedThisRound(state, ward.id) || ward.role === 'bulwark';
     const at = { x: ward.x, y: ward.y };
     wardLine = played ? [at] : [at, ...lineTo(at, carriedForward(ward, targetFurnace))];
+    // A pick of our side still ahead (écart 66, a team played whole) is a
+    // team-mate still to play, whoever it turns out to be.
     const afterUs = state.turnOrder.some(
       (slot, i) =>
         i > state.turnIndex &&
-        slot.actor.kind === 'unit' &&
         slot.team === unit.team &&
-        slot.actor.unitId !== ward.id &&
-        slot.actor.unitId !== unit.id &&
-        state.units.some((u) => u.id === (slot.actor as { unitId: UnitId }).unitId && u.status === 'active'),
+        (slot.actor.kind === 'pick' ||
+          (slot.actor.kind === 'unit' &&
+            slot.actor.unitId !== ward.id &&
+            slot.actor.unitId !== unit.id &&
+            state.units.some((u) => u.id === (slot.actor as { unitId: UnitId }).unitId && u.status === 'active'))),
     );
     const lastLink = !played && !afterUs;
     const exception =
@@ -972,7 +975,10 @@ export function nextToPlay(board: Board): Unit | null {
   const { state, unit } = board;
   for (let i = state.turnIndex + 1; i < state.turnOrder.length; i++) {
     const slot = state.turnOrder[i]!;
-    if (slot.actor.kind !== 'unit' || slot.team !== unit.team) continue;
+    if (slot.team !== unit.team) continue;
+    // A pick of our side (écart 66) names nobody yet: who plays next is not known.
+    if (slot.actor.kind === 'pick') return null;
+    if (slot.actor.kind !== 'unit') continue;
     const next = state.units.find((u) => u.id === (slot.actor as { unitId: UnitId }).unitId);
     if (next && next.status === 'active' && next.id !== unit.id) return next;
   }

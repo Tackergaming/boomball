@@ -59,12 +59,16 @@ export interface TokenProps {
   spotlit: boolean;
   ring: 'hot' | 'faint' | null;
   ringKind: 'attack' | 'shove' | 'pass';
+  /** The pick of a whole team (2H.41): this Giff may be sent in now, a brass ring breathes under it. */
+  pickable?: boolean;
+  /** Has played this round of a whole team (2H.41): its base goes dark. */
+  dim?: boolean;
   link: SceneLink;
   onClick: () => void;
   onHover: (unitId: UnitId | null) => void;
 }
 
-export function Token({ unit, own, isYou, selected, onTheClock, spotlit, ring, ringKind, link, onClick, onHover }: TokenProps) {
+export function Token({ unit, own, isYou, selected, onTheClock, spotlit, ring, ringKind, pickable = false, dim = false, link, onClick, onHover }: TokenProps) {
   const colour = shirt(unit.team, own, isYou);
   const key = `u:${unit.id}`;
   const register = useCallback(
@@ -96,10 +100,16 @@ export function Token({ unit, own, isYou, selected, onTheClock, spotlit, ring, r
       {/* The base: a hexagon in the shirt's colour, lit brighter for your own Giff. */}
       <mesh position-y={0.04} receiveShadow>
         <cylinderGeometry args={[0.44, 0.5, 0.08, 6]} />
-        <meshStandardMaterial color={colour} emissive={colour} emissiveIntensity={isYou ? 0.8 : 0.35} roughness={0.5} />
+        <meshStandardMaterial
+          color={dim ? '#3a4044' : colour}
+          emissive={dim ? '#000000' : colour}
+          emissiveIntensity={isYou ? 0.8 : 0.35}
+          roughness={0.5}
+        />
       </mesh>
 
-      {/* Rings on the floor: on the clock, selected, the beat's spotlight, a target. */}
+      {/* Rings on the floor: on the clock, selected, the beat's spotlight, a target, the pick (2H.41). */}
+      {pickable && <PulsingRing colour="#c9b489" />}
       {onTheClock && <FloorRing inner={0.56} outer={0.63} colour={colour} opacity={0.75} />}
       {selected && <FloorRing inner={0.66} outer={0.71} colour="#e9f0f2" opacity={0.6} />}
       {spotlit && <FloorRing inner={0.74} outer={0.82} colour="#c9b489" opacity={0.8} />}

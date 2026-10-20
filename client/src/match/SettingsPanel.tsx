@@ -5,7 +5,9 @@
 // sortie du match) vit ici, derrière l'engrenage au bout de la barre du haut. Le panneau tombe
 // sous la barre, ne bloque pas le jeu et se ferme d'un clic ailleurs. L'engrenage, lui, porte
 // `data-settings-gear` : un clic dessus ne ferme pas ici, c'est lui qui bascule. Échap est géré
-// par le parent. Les confirmations (quitter, rendre son Giff) aussi : ici on appelle seulement
+// par le parent. L'interrupteur « Team » (2H.41, 00 C41 point 7) bascule entre jouer toute l'équipe
+// et jouer son seul Giff : il prend effet au round suivant, et en coop seul le propriétaire le
+// touche. Les confirmations (quitter, rendre son Giff) aussi : ici on appelle seulement
 // le rappel du siège. Les tailles suivent `--u`, posée par le parent (1 sur portable, jusqu'à 1,4).
 
 import { useEffect, useRef } from 'react';
@@ -20,6 +22,13 @@ export interface SettingsPanelProps {
   view: '2d' | '3d';
   hasWebgl: boolean;
   onView: (view: '2d' | '3d') => void;
+  /** Le mode de l'équipe pendant ce round. */
+  teamMode: 'seat' | 'whole';
+  /** Le mode demandé pour le round suivant, null quand rien n'est demandé. */
+  requestedMode: 'seat' | 'whole' | null;
+  /** Le propriétaire seul : en coop, les autres voient l'interrupteur grisé. */
+  canSetTeamMode: boolean;
+  onTeamMode: (mode: 'seat' | 'whole') => void;
   /** De 0 à 1. */
   volumes: Readonly<Record<VolumeChannel, number>>;
   onVolume: (channel: VolumeChannel, value: number) => void;
@@ -137,7 +146,7 @@ const S: Record<string, CSSProperties> = {
 };
 
 const KEYS: ReadonlyArray<readonly [string, string]> = [
-  ['1–9', 'actions'],
+  ['1–9', 'actions, or the Giff to send in'],
   ['E E', 'end turn'],
   ['Esc', 'cancel, close'],
   ['C', 'follow the play'],
@@ -186,7 +195,9 @@ function SegButton(props: {
 }
 
 export function SettingsPanel(props: SettingsPanelProps): ReactElement {
-  const { speed, view, hasWebgl, volumes, seat, onClose } = props;
+  const { speed, view, hasWebgl, volumes, seat, onClose, teamMode, requestedMode, canSetTeamMode } = props;
+  const teamOn = requestedMode ?? teamMode;
+  const teamLocked = canSetTeamMode ? undefined : "The owner's call";
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -236,6 +247,38 @@ export function SettingsPanel(props: SettingsPanelProps): ReactElement {
           />
           <SegButton testId="view-2d" on={view === '2d'} label="2D" onClick={() => props.onView('2d')} />
         </Seg>
+      </div>
+
+      <div style={S.lineTop}>
+        <span style={S.label}>Team</span>
+        <div style={{ display: 'grid', gap: u(4) }}>
+          <Seg>
+            <SegButton
+              testId="team-whole"
+              on={teamOn === 'whole'}
+              label="Whole team"
+              disabled={!canSetTeamMode}
+              title={teamLocked}
+              onClick={() => props.onTeamMode('whole')}
+            />
+            <SegButton
+              testId="team-seat"
+              on={teamOn === 'seat'}
+              label="My Giff only"
+              disabled={!canSetTeamMode}
+              title={teamLocked}
+              onClick={() => props.onTeamMode('seat')}
+            />
+          </Seg>
+          {requestedMode !== null && requestedMode !== teamMode && (
+            <span
+              data-testid="team-mode-note"
+              style={{ fontFamily: MONO, fontSize: u(10), letterSpacing: '.06em', color: 'var(--text-dim)' }}
+            >
+              {requestedMode === 'whole' ? 'Whole team from next round' : 'My Giff only from next round'}
+            </span>
+          )}
+        </div>
       </div>
 
       <div style={S.lineTop}>

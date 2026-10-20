@@ -20,6 +20,8 @@ function withTurn(turn: Partial<TurnState> | null): MatchState {
     placing: null,
     shot: false,
     freePass: false,
+    pickedBy: null,
+    delegated: false,
   };
   return { turn: turn === null ? null : { ...base, ...turn } } as unknown as MatchState;
 }

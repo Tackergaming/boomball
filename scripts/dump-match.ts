@@ -29,12 +29,12 @@ import { join } from 'node:path';
 
 import { Arena } from '../engine/arena.js';
 import { KILL_SILO } from '../engine/arenas/kill-silo.js';
-import type { Action } from '../engine/actions.js';
+import type { Action, Command } from '../engine/actions.js';
 import type { MatchEvent } from '../engine/events.js';
 import type { Point } from '../engine/geometry.js';
 import { legalActions } from '../engine/legalActions.js';
 import { openMatch, reduce } from '../engine/reduce.js';
-import type { MatchState, Unit, UnitId } from '../engine/types.js';
+import type { MatchState, TeamId, Unit, UnitId } from '../engine/types.js';
 import { rankPlans, type Plan } from '../ai/chooseAction.js';
 import type { AllyOrder } from '../ai/orders.js';
 
@@ -380,6 +380,10 @@ function nextAction(unit: UnitId, current: MatchState): Action | null {
         // 2H.33, engine version 11: the human handed the Giff to the house.
         if (e.unitId === unit) return { kind: 'yieldSeat' };
         continue;
+      case 'turnDelegated':
+        // Écart 66, engine version 12: the rest of a picked turn to the AI.
+        if (e.unitId === unit) return { kind: 'delegateTurn' };
+        continue;
       case 'turnStarted':
         // Somebody else's turn began before this unit did anything we can
         // name: the turn ended without a `turnEnded`, which only a mover
@@ -410,8 +414,47 @@ function unitOf(s: MatchState, id: UnitId): Unit {
   return s.units.find((u) => u.id === id)!;
 }
 
+/**
+ * A stored event that is not the turn's unit acting: a pick taken (écart 66),
+ * a round or a mode handed over, a seat yielded off the clock. Replayed as
+ * the command that wrote it, with no decision recorded: there were no plans
+ * to rank. Null when the event at the cursor is the turn's own.
+ */
+function offTurn(current: MatchState): Command | null {
+  const e = stored[cursor];
+  if (!e) return null;
+  const anyOf = (team: TeamId): UnitId => current.units.find((u) => u.team === team)!.id;
+  switch (e.kind) {
+    case 'unitPicked':
+      return { unitId: e.unitId, action: { kind: 'pickUnit', humanId: e.humanId } };
+    case 'roundDelegated':
+      return { unitId: anyOf(e.team), action: { kind: 'delegateRound' } };
+    case 'teamModeRequested':
+      return { unitId: anyOf(e.team), action: { kind: 'setTeamMode', mode: e.mode } };
+    case 'seatYielded':
+      return current.turn?.unitId === e.unitId ? null : { unitId: e.unitId, action: { kind: 'yieldSeat' } };
+    default:
+      return null;
+  }
+}
+
 let guard = 0;
-while (state.phase !== 'finished' && state.turn && cursor < stored.length && guard++ < 5000) {
+while (state.phase !== 'finished' && cursor < stored.length && guard++ < 5000) {
+  const aside = offTurn(state);
+  if (aside) {
+    const result = reduce(arena, state, aside);
+    if (!result.ok) {
+      console.error(`the engine refused ${aside.action.kind} at seq ${cursor}: ${result.reason}`);
+      break;
+    }
+    check(result.events);
+    state = result.state;
+    continue;
+  }
+  if (!state.turn) {
+    console.error(`no turn is open at seq ${cursor} (${stored[cursor]?.kind}) and nothing off the turn to replay`);
+    break;
+  }
   const unitId = state.turn.unitId;
   const action = nextAction(unitId, state);
   if (!action) {
@@ -432,7 +475,8 @@ while (state.phase !== 'finished' && state.turn && cursor < stored.length && gua
     seq: cursor,
     round: state.round,
     unitId,
-    human: humans.has(unitId),
+    // A picked turn still its human's is a human decision, whoever the unit is (écart 66).
+    human: humans.has(unitId) || (state.turn.pickedBy !== null && !state.turn.delegated),
     before: {
       at: { x: unit.x, y: unit.y },
       hp: unit.hp,
@@ -499,6 +543,17 @@ function line(e: MatchEvent): string | null {
       return `${nm(e.unitId)} takes place ${e.place} of its role`;
     case 'seatYielded':
       return `${nm(e.unitId)} is handed to the house`;
+    case 'unitPicked':
+      // Écart 66 (2H.41, engine version 12): a pick of a whole team.
+      return `${nm(e.unitId)} is picked to play now${e.humanId === null ? ' by the house' : ''}`;
+    case 'turnDelegated':
+      return `${nm(e.unitId)}'s turn is handed to the AI`;
+    case 'roundDelegated':
+      return `team ${e.team} hands the rest of round ${e.round} to the AI`;
+    case 'teamModeRequested':
+      return `team ${e.team} asks to play ${e.mode === 'whole' ? 'the whole team' : 'seat by seat'} from round ${e.round + 1}`;
+    case 'teamModeChanged':
+      return `team ${e.team} plays ${e.mode === 'whole' ? 'the whole team' : 'seat by seat'} from round ${e.round}`;
     case 'moved':
       return `${nm(e.unitId)} moves ${e.path.length} to (${e.to.x}, ${e.to.y})`;
     case 'dashed':

@@ -67,6 +67,8 @@ function clockOn(state: MatchState, id: UnitId): MatchState {
       actionUsed: false,
       objectInteractionUsed: false,
       freePass: false,
+      pickedBy: null,
+      delegated: false,
       disengaged: false,
       placing: null,
       shot: false,

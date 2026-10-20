@@ -21,6 +21,11 @@ export interface Seat {
   readonly owner: boolean;
   /** The league, carried by the owner's seat only, so the others can read it. */
   readonly tier?: Tier;
+  /**
+   * "We play the whole team" (2H.41, `00` C41 point 8), carried by the owner's
+   * seat only, like `tier`, so every present member reads it off the same seat.
+   */
+  readonly wholeTeam?: boolean;
 }
 
 export const ROLES: readonly Role[] = ['striker', 'breaker', 'bulwark', 'trajector'];
@@ -45,6 +50,15 @@ export function openRoles(others: readonly Seat[]): Role[] {
 export function canStart(seats: readonly Seat[], ownerId: string): boolean {
   if (!seats.some((seat) => seat.profileId === ownerId)) return false;
   return seats.filter((seat) => seat.profileId !== ownerId).every((seat) => seat.ready);
+}
+
+/**
+ * Whether the owner ticked "We play the whole team". Only the owner's seat is
+ * read: a member's seat never carries the box, and a stray flag on one would
+ * not change what the server does with the owner's.
+ */
+export function wholeTeamOf(seats: readonly Seat[]): boolean {
+  return seats.some((seat) => seat.owner && seat.wholeTeam === true);
 }
 
 /** The seats as `create-match` wants them, the owner first. */

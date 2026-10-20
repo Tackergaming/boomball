@@ -3984,3 +3984,90 @@ abandonne le match e2e en cours, coche la case, joue un round entier (deux prise
 play », un « Let the AI finish the round ») et abandonne ; `coop.spec.ts` étendu, deux humains
 qui se partagent un Giff ; smoke, playthrough, abandon verts. Harnais épinglé à 11 tant que les
 fonctions ne sont pas redéployées.
+
+### Comment 2H.41 est codée
+
+Codée le 2026-10-20 dans le chat suivant, par le fil principal (Fable 5.1) pour le moteur, les
+fonctions, `useMatch`, `Match.tsx`, les plateaux et le harnais, avec deux sous-agents Sonnet 5.5
+effort élevé sur brief fermé et fichiers disjoints : l'un sur la rangée de prise et le bloc de
+pastilles (`ActionRow.tsx`, `TurnStrip.tsx`, `theme.css`, `turnStrip.test.ts`), l'autre sur la case
+du lobby, l'interrupteur et le briefing (`Lobby.tsx`, `lobbySeats.ts`, `useLobbyChannel.ts`,
+`supabase.ts`, `SettingsPanel.tsx`, `Briefing.tsx`, `lobby.test.ts`). **`ENGINE_VERSION` 12.**
+
+**Le moteur.** `MatchState` porte `teamMode` (le mode de chaque camp ce round), `requestedMode` (le
+mode demandé pour le round suivant, ou null) et `delegatedRound` (le camp qui a cédé le reste du
+round) ; `TurnActor` gagne `{ kind: 'pick', team }` ; `TurnState` gagne `pickedBy` (l'humain qui a
+pris, null sur un tour nommé d'avance) et `delegated`. Dans `types.ts`, `modeOf`, `hasHuman` (un
+contrôleur humain sur une unité du camp, sur le terrain ou évacuée : un humain au banc prend
+encore), `playsWhole` (mode entier **et** quelqu'un pour prendre) et `pendingPick` (le curseur sur
+une prise, aucun tour ouvert). `buildTurnOrder` (`initiative.ts`) met pour une équipe entière
+autant de prises que d'unités actives, sans nom, à la place du camp ; une équipe entière dont le
+dernier humain a remis son siège est échelonnée par nom comme un camp IA. `placementAt` ne demande
+jamais de place à une équipe entière ; `hasPlayedThisRound` lit « peut encore être pris » pour une
+unité sans case tant qu'une prise de son camp est devant le curseur (`pickAhead`) ; `pickableUnits`
+(actives, sans case ce round, ordre des rôles puis identifiant, jamais le Giff d'un autre humain
+quand on lui donne l'humain) et `orderBySituation` sont exportés. `reduce` accepte avant les
+contrôles de tour, comme `yieldSeat` : `pickUnit` (la prise devient une case `unit`, `beginTurn`
+ouvre le tour avec `pickedBy` ; délégué d'office si le round est cédé ou si c'est la maison qui prend,
+`humanId` null), `setTeamMode` (écrit `requestedMode`, redemander le mode en vigueur retire la
+demande) et `delegateRound` (refusé hors mode entier ou s'il ne reste rien du camp ce round ; marque
+le tour pris en cours comme délégué) ; `delegateTurn` passe par les contrôles de tour et exige un
+tour venu d'une prise. Dans `advance`, une prise sans unité à prendre est sautée, sinon l'échelle
+s'arrête dessus, `turn` null. `rebuild` remet `delegatedRound` à faux et applique `requestedMode`
+avant de construire l'échelle (`teamModeChanged`). `scheduleRelaunch` ne touche pas à une équipe
+entière : elle rejoue par ses prises, dans l'ordre de l'humain (point 3). `legalActions` gagne
+`canDelegate` (tour pris, pas encore délégué ; jamais dans `simple`, l'IA ne se cède pas un tour) et
+`pickOptions(state, humanId)`. La parade du Breaker reste automatique, comme avant. Cinq
+événements : `unitPicked` (avec `humanId`, null pour la maison), `turnDelegated`, `roundDelegated`,
+`teamModeRequested`, `teamModeChanged` ; `dump-match.ts` les rejoue hors tour (`offTurn`) et les
+dit, le fil aussi. Deux lectures de l'échelle dans `ai/evaluate.ts`, sans poids : une prise de notre
+camp devant le curseur compte comme un coéquipier encore à jouer (`afterUs`), et `nextToPlay` répond
+null quand le prochain rang du camp est une prise.
+
+**La session (`server/session.ts`).** `rightsRefusal` dit en un seul endroit qui a le droit d'envoyer
+quoi (une action de tour : le contrôleur de l'unité, ou celui qui a pris ; `delegateTurn` : celui
+qui a pris ; `pickUnit` : tout humain de l'équipe, sur une unité de la maison ou la sienne, jamais
+celle d'un autre ; `delegateRound` et `setTeamMode` : tout humain de l'équipe, le propriétaire étant
+vérifié à la porte) ; un refus de droit porte `status: 403`. `submitAction` écrit `humanId` dans
+`pickUnit` depuis l'appelant, jamais depuis le corps. `waitingOnHuman` arrête la boucle `advance` et
+fait courir le chrono : un tour humain non délégué, un tour pris non délégué, ou une prise d'un camp
+qui a encore quelqu'un et n'a pas cédé le round ; `advance` prend lui-même une prise que personne
+n'attend (round cédé, plus d'humain) par `orderBySituation`. `clockKey` nomme la prise
+(`pick:A@round:rang`) et le tour pris repart avec un chrono neuf. `expireIfDue` fait
+`delegateRound` pour une équipe entière, sur une prise comme sur un tour pris, plus de Dodge.
+
+**Les fonctions.** `create-match` v28 lit `wholeTeam` dans le corps (le propriétaire seul y
+arrive). `resolve-action` v31 lit `teams.owner` pour `setTeamMode` (403 sinon) et répond le
+`status` du refus de session, après que l'échéance a été réglée (A28). `isActionShaped` connaît
+les quatre formes.
+
+**Le client.** `useMatch` : `pickUnit` (une prise perdue à la course, « the board moved on » ou
+« no pick is waiting », relit sans rien dire), `delegate(scope, asUnitId)`, `setTeamMode`,
+`expired: 'round'`. `Match.tsx` : `yours` vaut aussi pour un tour pris par ce joueur ; `pickable`
+par `pickOptions` ; la rangée en mode `pick` (un bouton par Giff, touches 1 à 9, « Let the AI finish
+the round »), `turn` avec les deux boutons IA quand `legal.canDelegate`, `wait` chez le coéquipier
+pendant un tour pris ; l'étiquette « Take the turn » au survol d'un Giff à prendre ; le bandeau
+« Your team · pick a Giff » ; le coin du chrono « Pick a Giff » (`clock-pick`), « Your team picks »
+(`waiting-pick`) chez le coéquipier sans Giff à prendre, le prénom de celui qui a pris sur un tour
+pris ; le coup à la porte d'une équipe entière envoie `delegateRound`, ce que l'échéance fait ; le
+coup du coéquipier sur une prise part comme son propre Giff ; `Board.tsx` et `Tokens.tsx` prennent
+`pick` (anneau laiton qui respire sur les Giffs à prendre, `data-pickable` ; ternis sur ceux qui ont
+joué, `data-played`) ; `SettingsPanel` reçoit `teamMode`, `requestedMode`, `canSetTeamMode`
+(propriétaire avec un Giff), `onTeamMode` ; les bandeaux « Whole team from next round » et « Whole
+team · you pick the order » sur les deux événements. La rangée et la bande sont du premier
+sous-agent (`PickOption`, `pick`, `ai`, `wait` ; la pastille `block`, `turn-block`,
+`data-chip-state`) ; la case `whole-team`, la note `whole-team-note`, l'interrupteur `team-whole` /
+`team-seat` et sa note `team-mode-note`, `wholeTeamOf` et les deux lignes du briefing du second. Le
+crochet publie `picking`, `pickable`, `pick`, `delegate`.
+
+**La preuve.** `engine/c41.test.ts`, 29 tests : l'échelle, la prise, le Giff d'un autre, la course
+réglée sur le plateau, les deux délégations, les trois chronos, le siège remis, la relance sans
+gardien en tête (un but de la maison fabriqué en marchant les graines), l'interrupteur dans les deux
+sens, deux matchs entiers joués à la main en solo et à deux, le moteur 11 archivé ;
+`session.test.ts` deux cas de plus ; `turnStrip.test.ts` et `lobby.test.ts` par les sous-agents.
+**883 tests sur 51 fichiers.** `e2e/whole.spec.ts` (`npm run e2e:whole`, hors de `npm run e2e`) et
+`e2e/coop-whole.spec.ts` (tag `@coop`) sont écrits et **ne passent qu'avec les fonctions au
+moteur 12** ; smoke et les deux specs coop verts épinglés à 11 sur les fonctions en ligne. Dettes :
+le smoke peut tomber quand le Spark occupe la case la plus lointaine du troisième tour (le cercle
+prend le clic, vu une fois ce jour) ; les vues Own end et Far end ne suivent pas la prise ; en coop,
+un spectateur ne voit pas la rangée d'attente.

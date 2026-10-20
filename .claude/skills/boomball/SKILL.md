@@ -416,15 +416,20 @@ vérifie par whisper (une des six disait « cut » pour « caught »). Les prise
 non relancé ; **commitée (`6159a45`) et en ligne le 2026-10-20 sur son feu vert, `index-D4GRahNO.js`**,
 déployée par le fil principal. **Porte franchie le même jour** : « parfait ça marche bien ». Suite : 2H.41, à cadrer.
 
-**2H.41, toute l'équipe à un humain, cadrée le 2026-10-20 et pas codée** (`00` C41, l'écart 66,
-avec le plan de code à suivre) : une équipe « entière » joue son rang par des prises (`TurnActor`
-`pick`), l'humain choisit à chaque prise quel Giff agit (`pickUnit`), tour entier avant la prise
-suivante, relance après un but dans son ordre, écarts 55, 58, 62 et 65 suspendus pour elle ; en
-coop le Giff d'un humain n'est qu'à lui, les autres au premier clic (A10 tranche) ; `delegateTurn`
-et `delegateRound` (« Let the AI play », « Let the AI finish the round »), l'expiration vaut le
-second, plus de Dodge d'expiration pour cette équipe ; `setTeamMode` au propriétaire, effet au
-round suivant, case du lobby au départ. **`ENGINE_VERSION` 12**, les deux fonctions à redéployer
-sur son feu vert, pas de migration. Deux lots : moteur et fonctions prouvés par les tests
-(`c41.test.ts`, `session.test.ts`), puis l'écran (fil principal plus deux Sonnet 5.5 effort élevé,
-rangée et bande, lobby et ⚙). Harnais : `npm run e2e:whole` à créer, `coop.spec.ts` étendu,
-épingle à 11 tant que les fonctions sont en ligne au moteur 11.
+**2H.41, toute l'équipe à un humain, cadrée et codée le 2026-10-20** (`00` C41, l'écart 66,
+« comment 2H.41 est codée ») : une équipe « entière » joue son rang par des prises (`TurnActor`
+`pick`, sans nom), l'humain choisit à chaque prise quel Giff agit (`pickUnit`, `turn.pickedBy`),
+tour entier avant la prise suivante, relance après un but dans son ordre, écarts 55, 58, 62 et 65
+suspendus pour elle ; en coop le Giff d'un humain n'est qu'à lui, les autres au premier clic (A10
+tranche, une prise perdue relit sans rien dire) ; `delegateTurn` et `delegateRound` (« Let the AI
+play », « Let the AI finish the round »), l'expiration vaut le second, plus de Dodge d'expiration
+pour cette équipe ; `setTeamMode` au propriétaire (`teams.owner` lu par la fonction, 403), effet au
+round suivant (`requestedMode`, appliqué par `rebuild`), case du lobby `wholeTeam` au départ. **Dans
+`session.ts`, `rightsRefusal` dit qui envoie quoi et `waitingOnHuman` ce qui arrête la boucle et
+fait courir le chrono : les deux lisent la même fonction, ne les sépare pas.** Un humain au banc
+prend encore (`hasHuman` lit le contrôleur, pas le statut). **`ENGINE_VERSION` 12**, 883 tests sur
+51 fichiers, fonctions bundlées **et pas déployées**, client pas en ligne : les deux sur son feu
+vert. `npm run e2e:whole` et `e2e/coop-whole.spec.ts` (`@coop`) ne passent qu'avec les fonctions
+au moteur 12 ; smoke et coop d'avant verts épinglés à 11 ; le smoke tombe quand le Spark occupe la
+case lointaine du troisième tour (le cercle prend le clic), relancer. Le crochet publie `picking`,
+`pickable`, `pick`, `delegate` ; `waitForMoment` et `pickFromRow` dans `e2e/harness.ts`.

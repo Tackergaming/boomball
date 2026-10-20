@@ -69,6 +69,17 @@ export interface BoomballHook {
   view: '2d' | '3d';
   /** True when a click on the board would be honoured right now. */
   yours: boolean;
+  /**
+   * The whole team (2H.41, écart 66): true when this client is asked which
+   * Giff takes the pick the ladder waits on; `pickable` is who may be
+   * named, in the pick row's order; `pick` sends the choice as the row's
+   * button would; `delegate` presses "Let the AI play" or "Let the AI finish
+   * the round". A pick resolves when its reply has been replayed.
+   */
+  picking: boolean;
+  pickable: string[];
+  pick(unitId: string): Promise<void>;
+  delegate(scope: 'turn' | 'round'): Promise<void>;
   replaying: boolean;
   busy: boolean;
   /** The server's turn deadline, epoch milliseconds, or null. */

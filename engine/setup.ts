@@ -41,6 +41,12 @@ export interface MatchSetup {
   readonly seed: number;
   /** Team A's standing names by slot. Absent (self-play, old matches): drawn from the pool as before. */
   readonly roster?: Roster;
+  /**
+   * Écart 66 (2H.41): team A played whole from round 1, the lobby's "We play
+   * the whole team". Absent or false, seat by seat. The owner may still
+   * switch it from the settings for the rounds to come (`setTeamMode`).
+   */
+  readonly wholeTeam?: boolean;
 }
 
 export const MAX_HUMANS = 3;
@@ -136,6 +142,9 @@ export function createMatch(setup: MatchSetup): MatchState {
     lastCarrierTeam: null,
     penaltyBox: { A: null, B: null },
     relaunch: null,
+    teamMode: { A: setup.wholeTeam ? 'whole' : 'seat', B: 'seat' },
+    requestedMode: { A: null, B: null },
+    delegatedRound: { A: false, B: false },
     crackers,
     // The Spark stays off the field until the start of round 6.
     spark: { state: 'pending', x: ordnance.x, y: ordnance.y, heading: null },

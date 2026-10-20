@@ -113,13 +113,17 @@ async function callFunction<T>(name: string, body: unknown): Promise<T | Refused
 /**
  * Opens a match. `tier` is the league the player chose in the lobby (2H.27,
  * `00` C28): the team's own Tier or one below it, the server refuses above.
+ * `wholeTeam` is the lobby's "We play the whole team" box (2H.41, `00` C41):
+ * the mode the owner's side starts in, which the settings switch can change
+ * from the next round on.
  */
 export function createMatch(
   teamId: string,
   seats: readonly SeatRequest[],
   tier: Tier,
+  wholeTeam: boolean,
 ): Promise<CreateMatchReply> {
-  return callFunction<CreateMatchReply>('create-match', { teamId, seats, tier });
+  return callFunction<CreateMatchReply>('create-match', { teamId, seats, tier, wholeTeam });
 }
 
 /**

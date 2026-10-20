@@ -110,8 +110,48 @@ export interface YieldSeatAction {
   readonly kind: 'yieldSeat';
 }
 
+/**
+ * Écart 66 (2H.41, engine version 12): a human of a whole team names the
+ * unit that takes the pick the ladder is waiting on. The command's `unitId`
+ * is the unit picked; `humanId` is who picked, written by the server off
+ * the caller's identity, never trusted off the wire; null when the house
+ * resolved the pick itself (a delegated round, a team with nobody to pick).
+ */
+export interface PickUnitAction {
+  readonly kind: 'pickUnit';
+  readonly humanId: string | null;
+}
+
+/** Écart 66: the rest of this picked turn is the AI's. Accepted from the one who picked. */
+export interface DelegateTurnAction {
+  readonly kind: 'delegateTurn';
+}
+
+/**
+ * Écart 66: this turn, if one of the team's picks is open, and every pick of
+ * the team still ahead this round are the AI's. What a clock that runs out
+ * does for a whole team. The command's `unitId` names any unit of the team.
+ */
+export interface DelegateRoundAction {
+  readonly kind: 'delegateRound';
+}
+
+/**
+ * Écart 66: how the command unit's team is played from the next round on.
+ * Accepted at any moment; the round in progress finishes as it began. The
+ * owner's call, which the door checks, not the engine.
+ */
+export interface SetTeamModeAction {
+  readonly kind: 'setTeamMode';
+  readonly mode: 'seat' | 'whole';
+}
+
 export type Action =
   | MoveAction
+  | PickUnitAction
+  | DelegateTurnAction
+  | DelegateRoundAction
+  | SetTeamModeAction
   | DashAction
   | DodgeAction
   | DisengageAction
@@ -150,6 +190,10 @@ export const ACTION_KINDS = {
   brace: true,
   choosePlace: true,
   yieldSeat: true,
+  pickUnit: true,
+  delegateTurn: true,
+  delegateRound: true,
+  setTeamMode: true,
   endTurn: true,
 } as const satisfies Record<ActionKind, true>;
 

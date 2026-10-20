@@ -31,8 +31,17 @@ import {
   visibleRangeToFurnace,
 } from './rules/payload.js';
 import { hasLineOfSight } from './rules/sight.js';
+import { pickableUnits } from './initiative.js';
 import { statsFor } from './stats.js';
-import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from './types.js';
+import {
+  activeUnits,
+  pendingPick,
+  sparkIsLive,
+  type HumanId,
+  type MatchState,
+  type Unit,
+  type UnitId,
+} from './types.js';
 
 /** The d8 rolls, 1..8, derived from the direction table so the two cannot drift. */
 const D8_DIRECTIONS: readonly number[] = DIRECTIONS.map((_, i) => i + 1);
@@ -94,8 +103,30 @@ export interface LegalActions {
    * empty, nothing else is legal, not even ending the turn.
    */
   readonly choosePlace: readonly number[];
+  /**
+   * Écart 66 (2H.41): the turn came from a pick of a whole team and is
+   * still its human's, so "Let the AI play" and "Let the AI finish the
+   * round" are on offer. Not in `simple`, on purpose: the AI enumerates
+   * `simple` and must never hand itself a turn.
+   */
+  readonly canDelegate: boolean;
   /** Every action above that needs no further choice, ready to send as is. */
   readonly simple: readonly Action[];
+}
+
+/**
+ * The units a human may name for the pick the ladder waits on (écart 66),
+ * or empty when no pick is pending, when it is not this human's team's, or
+ * when the team's round is already the AI's. The Giff of another human of
+ * the team is never offered. The one place the interface asks.
+ */
+export function pickOptions(state: MatchState, humanId: HumanId): Unit[] {
+  const pick = pendingPick(state);
+  if (!pick || state.delegatedRound[pick.team]) return [];
+  if (!state.units.some((u) => u.team === pick.team && u.controller.kind === 'human' && u.controller.humanId === humanId)) {
+    return [];
+  }
+  return pickableUnits(state, pick.team, humanId);
 }
 
 /**
@@ -216,6 +247,7 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
       canDisengage: false,
       canBrace: false,
       choosePlace: places,
+      canDelegate: false,
       simple: places.map((place) => ({ kind: 'choosePlace', place })),
     };
   }
@@ -256,6 +288,7 @@ export function legalActions(arena: Arena, state: MatchState): LegalActions | nu
     canDisengage: hasAction,
     canBrace,
     choosePlace: [],
+    canDelegate: turn.pickedBy !== null && !turn.delegated,
     simple,
   };
 }

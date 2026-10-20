@@ -96,6 +96,16 @@ export function Briefing({ onClose }: { onClose: () => void }) {
             body={`One move and one action, in any order, within ${TURN_TIMER_SECONDS} seconds. Run out and the clock takes cover for you and passes the turn on. Asked your place and out of time? You play last of your role this round, and your turn opens later with a full clock. A Bulwark can dig in for its Action: until its next turn, or until it moves, shoving it rolls at disadvantage and minus 3.`}
           />
           <Item
+            mark={<span style={S.shove}>+</span>}
+            title="The whole team"
+            body={`Tick "We play the whole team" in the lobby, or switch it in the settings for the next round, and at every turn of your side you pick which Giff plays, in any order, one whole turn at a time. Your team-mates' Giffs stay theirs; the rest is yours. Your side still plays where it always did on the ladder.`}
+          />
+          <Item
+            mark={<span style={S.shove}>AI</span>}
+            title="Let the AI play"
+            body={`Playing the whole team, two buttons sit at the right of the row: "Let the AI play" hands the rest of this Giff's turn to the AI and gives you the next pick; "Let the AI finish the round" hands this Giff and every one still to play to the AI. Run out of time and the AI finishes the round for you.`}
+          />
+          <Item
             mark={<span style={S.shove}>&times;</span>}
             title="The penalty box"
             body="After a goal, the cells within three of their Furnace are closed to the side that just scored, for that round and the next. Anyone of theirs already inside is moved out for them."
