@@ -1,11 +1,11 @@
 On reprend Boomball, le jeu vidéo. Il vit à la racine de ce workspace.
 Charge le skill boomball, puis lis EN ENTIER docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, **2H.39
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, **2H.40
 est la dernière sous-phase codée, le 2026-10-20** (les phases 3, 4 et 5 sont
 faites par 2H.15, la 6 par 2H.29, la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et
 la limite de présence, 2H.36 le premier lot de la phase 8, 2H.37 les corrections de la revue de
-sécurité, 2H.38 l'écran de match refait, 2H.39 la caméra refaite), 2H.40 et 2H.41 viennent après,
-§9 la parallélisation.
+sécurité, 2H.38 l'écran de match refait, 2H.39 la caméra refaite, 2H.40 la réplique du Spark),
+2H.41 vient après, §9 la parallélisation.
 Lis ensuite la partie C de docs/00-reglement-v2.md : les écarts 27 à 65, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 à C16 les passes suivantes de l'IA (chacune finit par « comment ...
@@ -36,58 +36,74 @@ MATCH REFAIT, CADRÉ PAR MOI LE 2026-10-19 EN DIX POINTS SUR UNE MAQUETTE VALID�
 (`design/2H38-ecran-de-match/index.html`), PUIS CODÉ LE MÊME JOUR** : lis « comment 2H.38 est
 codée » à la fin de C37 avant de toucher à l'écran. **C38 EST MON RETOUR DE PARTIE SUR 2H.38**
 (les actions sur cible au survol et dans la rangée, le clic n'ouvre que la fiche), en ligne, et
-porte mes deux demandes pour après la caméra. **C39 EST 2H.39, LA CAMÉRA REFAITE, CADRÉE PAR MOI
-LE 2026-10-20 EN CHAT SUR DOUZE CAPTURES DE LA VRAIE SCÈNE ET « COMMENT 2H.39 EST CODÉE »** : plus
-de mode libre, quatre vues (Side à 52 degrés, l'arrivée au silo entier ; Top à 85 ; Own end et Far
-end à 40 derrière chaque bouche, figées), la roulette sur Side et Top seulement, Follow the play
-qui part de dix-neuf cases de profondeur (la largeur plus les deux rambardes), le bouton droit qui
-tire le sol à la place de Ctrl, les flèches, quatre boutons sous la minicarte et la touche V, la
-section Camera de ⚙ retirée, la main brute (C20 tient). Ne rediscute rien de C12 à C39.
+porte mes deux demandes d'après la caméra, 2H.40 (faite) et 2H.41. **C39 EST 2H.39, LA CAMÉRA
+REFAITE, CADRÉE PAR MOI LE 2026-10-20 EN CHAT SUR DOUZE CAPTURES DE LA VRAIE SCÈNE ET « COMMENT
+2H.39 EST CODÉE »** : plus de mode libre, quatre vues (Side à 52 degrés, l'arrivée au silo entier ;
+Top à 85 ; Own end et Far end à 40 derrière chaque bouche, figées), la roulette sur Side et Top
+seulement, Follow the play qui part de dix-neuf cases de profondeur, le bouton droit qui tire le
+sol à la place de Ctrl, les flèches, quatre boutons sous la minicarte et la touche V, la section
+Camera de ⚙ retirée, la main brute (C20 tient). **C40 EST 2H.40, LA RÉPLIQUE DU SPARK, CADRÉE PAR
+MOI LE 2026-10-20 EN CHAT, UNE QUESTION PAR MESSAGE, ET « COMMENT 2H.40 EST CODÉE »** : « and it's
+a goal » sur un Spark attrapé ÉTAIT UN DÉFAUT (`motion.ts` faisait un repère de but de tout
+`scored`, source ballon ou Spark), pas une réplique ; ma phrase « And the Spark is caught! Twenty
+points on the board! » dans la voix du but (un clip d'un pack Freesound, PAS ma voix) clonée par
+Chatterbox en local sur ma RTX 4060, ma prise choisie à l'oreille parmi six ; le Spark ne
+déclenche plus rien du but ; la catégorie `spark` de l'annonceur vide et prioritaire. Ne
+rediscute rien de C12 à C40.
 07 §10 porte le journal (2H.15 la 2.5D fichier par fichier, 2H.16 à 2H.20 la caméra, 2H.21 et
 2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31 à
-2H.39). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
+2H.40). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
 2H.8. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend. 10 est le
 rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, n8 est
 dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
 
-Où on en est : **2H.39, LA CAMÉRA REFAITE, EST CODÉE, COMMITÉE (`2d86d39`) ET EN LIGNE LE
-2026-10-20 SUR MON FEU VERT, ET MA PARTIE SUR LES DEUX ÉCRANS L'A VALIDÉE : « TOUT EST PARFAIT.
-J'ADORE, SURTOUT L'OPTION FULL SCREEN »** (les documents qui notent cette porte franchie, 07 §10, 08
-§5, CONTEXT, la skill et ce prompt, ont été modifiés après `2d86d39` : s'ils ne sont pas commités,
-demande-moi « commit ») (git doit être propre et
-`origin/main..main` vide : vérifie-le). **Le classifieur du mode auto a laissé passer
-`node scripts/deploy-vercel.mjs --production` ce jour-là** : le fil principal déploie lui-même sur
-mon feu vert. **847 tests verts sur 50 fichiers**, smoke 2D
-vert en 35 s, `e2e:board3d` vert en 11,5 min au portable et 20,6 min au 27 pouces, neuf captures
-de caméra à chaque taille. Le spec 3D clique désormais une case lointaine SANS Cracker dessus :
-depuis C38 un Cracker est cliquable et prend le clic avant le sol (trois runs rouges avant le vert,
-aucun sur le code). `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
+Où on en est : **2H.40, LA RÉPLIQUE DU SPARK, EST CODÉE LE 2026-10-20 PAR LE FIL PRINCIPAL SEUL**
+(`sound.ts`, `motion.ts`, `announcer.ts`, deux tests, `client/public/sounds/spark.mp3`,
+`scripts/voice/clone-line.py`, `00` C40, `08` §5, `07` §10, `04`, CONTEXT, la skill, ce prompt).
+**Si ce chat commence sans que je l'aie dit, lis `07` §10 pour savoir si 2H.40 est commitée et en
+ligne** (la ligne « En ligne » de son tableau) ; sinon git porte le lot non commité : demande-moi
+« commit », puis le feu vert pour `node scripts/deploy-vercel.mjs --production` (le client est
+construit dans `client/dist/`, bundle `index-D4GRahNO.js` ; reconstruire avant de déployer si
+quoi que ce soit a bougé dans `client/`). Rien à redéployer côté fonctions. **848 tests verts sur
+50 fichiers** (847 avant), smoke 2D vert en 46 s (un premier run rouge parce que le match e2e a
+atteint le round 10 pendant ses trois tours, le cas connu), `e2e:board3d` non relancé
+(`Effects.tsx` ne change pas ; dernier vert le 2026-10-20 en 11,5 min au portable et 20,6 min au
+27 pouces). `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
 `create-match` v27 (si la ligne « reading the match failed » apparaît dans les logs de la
 fonction, dis-le-moi). **LE CLIENT EN LIGNE (https://boomball.vercel.app) EST `index-8Llc-Pv3.js`
-(2H.39)**, construit et déployé par le fil principal le 2026-10-20. `password_min_length` vaut 8,
-`disable_signup` faux. **Le projet Realtime est en `private_only`** : tout nouveau canal doit être
-`private: true` ET avoir une politique sur `realtime.messages`. Migrations appliquées : **0001 à
-0016**. assets/source/ (mes sources) est ignoré par git : ne le commite jamais. `backups/` est
-ignoré par git et contient les codes d'invitation : jamais dans un dossier partagé.
+(2H.39) tant que 2H.40 n'est pas déployée** ; `07` §10 dit s'il l'a été. `password_min_length`
+vaut 8, `disable_signup` faux. **Le projet Realtime est en `private_only`** : tout nouveau canal
+doit être `private: true` ET avoir une politique sur `realtime.messages`. Migrations appliquées :
+**0001 à 0016**. assets/source/ (mes sources, dont `spark.wav` et `spark-takes/`) est ignoré par
+git : ne le commite jamais. `backups/` est ignoré par git et contient les codes d'invitation :
+jamais dans un dossier partagé.
 
-L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (8) FAITS, **(8) étant 2H.39, la caméra refaite
-(`00` C39), codée, commitée et en ligne le 2026-10-20** ; (9) **2H.40, une réplique pour le Spark attrapé**, « à
-créer ou trouver », à la place de « and it's a goal » ; (10) **2H.41, en option, un humain joue
-tous les Giffs de son équipe**, ce qui refait l'ordre et l'initiative de son équipe (moteur,
-fonctions, `ENGINE_VERSION`). 2H.40 et 2H.41 sont notées en `00` C38 et `08` §5, PAS cadrées :
-chacune se cadre en chat, une question par message, la première bornant l'ampleur. Restent aussi,
-sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte
-et joue sans moi (la porte de la phase 8).
+**L'outil de clonage de voix, installé le 2026-10-20** : Chatterbox (`chatterbox-tts` 0.1.7, torch
+2.6.0 cu124) dans un environnement Python 3.10 HORS DÉPÔT,
+`C:\Users\monti\AppData\Local\boomball-tools\chatterbox`, qui tourne sur ma RTX 4060 ;
+`scripts/voice/clone-line.py` dit comment sortir une nouvelle phrase (trois prises par référence,
+à juger à l'oreille, les mots vérifiés par whisper, qui est installé dans le Python 3.10 global).
+La référence est la voix seule découpée (`assets/source/sounds/spark-takes/reference-goal-voice.wav`).
+Une voix clonée sur cinq secondes ressemble, elle n'est pas exacte.
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **cadrer 2H.40**, la réplique du Spark, en chat, une
-question par message, la première bornant l'ampleur (le son est dans `match/sound.ts`, le clip
-`goal`, les repères `sparkCaught` ; C26 et C27 disent comment les répliques sont choisies). **Fermer
-les inscriptions** (`disable_signup`) le jour où je le dis, pas avant. Deux remarques de la
-relecture des captures de 2H.38, sans décision : la maison peut avoir deux pions au même prénom
-(deux « Osric »), que les pastilles et les plaques ne distinguent pas ; le bandeau « Your turn » à
-côté de « Spectating » juste après un siège remis (dette connue). Une de C38 : la fiche, fixée en
-haut à gauche, peut s'ouvrir sur une cible qui se trouve juste dessous et lui faire perdre ses
-étiquettes.
+L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (9) FAITS, **(9) étant 2H.40, la réplique du Spark
+(`00` C40), codée le 2026-10-20** ; (10) **2H.41, en option, un humain joue tous les Giffs de son
+équipe**, ce qui refait l'ordre et l'initiative de son équipe (moteur, fonctions,
+`ENGINE_VERSION`). 2H.41 est notée en `00` C38 et `08` §5, PAS cadrée : elle se cadre en chat,
+une question par message, la première bornant l'ampleur. Restent aussi, sans date : ma partie à
+deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte et joue sans moi (la
+porte de la phase 8).
+
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et l'état de 2H.40 (commitée ? en ligne ?) et me le dire ;
+recueillir ma partie sur 2H.40 (j'attrape un Spark, j'entends la phrase, sans « and it's a goal »
+ni braises) ; puis **cadrer 2H.41** en chat, une question par message, la première bornant
+l'ampleur (l'initiative est dans `engine/` : écarts 51, 55, 58 et 65, `turn`, le siège et
+`seatYielded` de 2H.33 ; les fonctions et `ENGINE_VERSION` bougent). **Fermer les inscriptions**
+(`disable_signup`) le jour où je le dis, pas avant. Deux remarques de la relecture des captures
+de 2H.38, sans décision : la maison peut avoir deux pions au même prénom (deux « Osric »), que les
+pastilles et les plaques ne distinguent pas ; le bandeau « Your turn » à côté de « Spectating »
+juste après un siège remis (dette connue). Une de C38 : la fiche, fixée en haut à gauche, peut
+s'ouvrir sur une cible qui se trouve juste dessous et lui faire perdre ses étiquettes.
 
 **Le classifieur du mode auto** a refusé le PATCH Auth le 2026-10-19. Depuis `09e29aa`,
 `.claude/settings.json` autorise `Bash(npm --prefix client run build)` (le build passe, écris-le
@@ -103,8 +119,8 @@ Ce qu'il faut savoir tout de suite.
 1. Sous-agents comme en 08 §9 : Sonnet pour le facile et le borné, effort précisé, fichiers
    disjoints, brief fermé ; Opus 5.5 ou Fable 5.1 pour ce qui réclame de la qualité (le hub et
    le lobby de 2H.34 sont d'un Opus 5.5 effort élevé sur brief fermé ; la revue de 2H.36 aussi,
-   relue au code par le fil principal). 2H.37 a été faite par le fil principal seul : quatre lots
-   séquentiels, chacun derrière une migration appliquée par moi. Toute matière que tu me présentes
+   relue au code par le fil principal). 2H.37, 2H.39 et 2H.40 ont été faites par le fil principal
+   seul. Toute matière que tu me présentes
    nomme son auteur, agent ou fil principal. Dès que tu as une liste d'actions pour moi, donne-la
    numérotée, une action exacte par ligne, et dis ce qui se passe ensuite. **Je suis dans
    PowerShell** : une commande pour moi ne contient jamais `set -a && . ./.env`, les scripts
@@ -189,7 +205,11 @@ Ce qu'il faut savoir tout de suite.
    un fichier long s'écrit avec l'outil Write, et une série de remplacements avec un script
    Python écrit dans le scratchpad, lancé avec python -I. Jamais Html de drei. La caméra ne passe
    pas par OrbitControls. Le corps du pion est le Giff riggé (giffRig.ts). Les hooks de Match.tsx
-   restent au-dessus du retour anticipé sur state. **La présence Realtime est limitée en débit
+   restent au-dessus du retour anticipé sur state. **Le son (C26, C27, C40)** : `motion.ts` ne fait
+   un repère de but que d'un `scored` de source `payload` ; `SAMPLES` de `sound.ts` porte les
+   enregistrements (`swing`, `goal`, `blast`, `dash`, `sparkCaught`) qui remplacent la synthèse
+   une fois décodés ; `ANNOUNCER_PRIORITY` (`goalOwn`, `goalFoe`, `spark`, `fullTime`, `win`,
+   `loss`) coupe la réplique en cours, une liste vide fait taire sans rien dire. **La présence Realtime est limitée en débit
    par le serveur et la sanction est la fermeture du canal** (C34) : jamais un `track` par touche
    ni par rendu, toujours par `useLobbyChannel.track`. Un module client testé par vitest
    n'importe jamais lib/supabase.ts (il jette sans son environnement) : les parties pures vivent
@@ -216,7 +236,7 @@ Ce qu'il faut savoir tout de suite.
    rebond part de la bouche. Deux faits de règle sans décision : l'équipe qui a l'humain joue
    juste après le Spark à chaque round ; la dérive du Spark traverse les unités. Fait de la
    coop, sans décision : une équipe A dont le dernier humain a remis son siège n'a plus d'humain,
-   et les deux camps alternent de round en round (sideOrder).
+   et les deux camps alternent de round en round (sideOrder). **2H.41 touche à tout ce point.**
 
 9. Les interdits ne changent pas. Jamais le dépôt GitHub sur Vercel. Jamais le .env ni une clé
    dans un commit. Le règlement de table du vault de jarvis-jdr est figé. Ne lis jamais design/Boomball
@@ -225,7 +245,7 @@ Ce qu'il faut savoir tout de suite.
    .env n'a pas le droit de lire les Actions ni les secrets du dépôt : pour le maintien en vie et
    la CI, c'est moi qui regarde l'onglet Actions (vert sur 22564ca le 18 au matin).
 
-10. Les commandes. Depuis la racine du workspace : npm test (847), npm run typecheck, npm run sweep, npm run
+10. Les commandes. Depuis la racine du workspace : npm test (848), npm run typecheck, npm run sweep, npm run
     e2e, e2e:playthrough, e2e:board3d, e2e:abandon, e2e:coop, e2e:account, npm run build:function,
     npm run export:db ; en bash avec le .env chargé : npm run deploy:function (les deux) ou node
     scripts/deploy-edge-function.mjs resolve-action (une seule) ; node scripts/deploy-vercel.mjs
@@ -236,7 +256,7 @@ Ce qu'il faut savoir tout de suite.
     Le cwd de l'outil Bash se réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 65 de 00
-    partie C, et C11 à C39 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
+    partie C, et C11 à C40 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
     des autres pions humains et `onFinished` appelé à chaque rendu. Dette connue : le bandeau
     « Your turn » à revoir avec le coin du chrono (C37 ne l'a pas tranché) ; « Giff picks the league » et « Giff
     starts the match » se répètent dans la barre du membre ; `mergeRoll` reste côté client,

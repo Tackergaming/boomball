@@ -401,3 +401,16 @@ vert ; **en ligne le 2026-10-20 sur son feu vert, `index-8Llc-Pv3.js`, déployé
 principal : le classifieur du mode auto a laissé passer `node scripts/deploy-vercel.mjs
 --production`**. **Porte franchie le même jour** : « tout est parfait. j'adore ». Suite : 2H.40 la
 réplique du Spark, puis 2H.41.
+
+**2H.40, la réplique du Spark, cadrée et codée le 2026-10-20** (`00` C40, « comment 2H.40 est
+codée ») : « and it's a goal » sur un Spark attrapé était un défaut, `motion.ts` faisait un repère
+de but de tout `scored` (source ballon ou Spark) ; désormais seulement de source `payload`. Sa
+phrase « And the Spark is caught! Twenty points on the board! » dans **la voix du but clonée par
+Chatterbox** (le clip du but vient d'un pack Freesound, pas de sa voix) : `spark.mp3` joué par
+l'échantillon `sparkCaught`, la catégorie `spark` de l'annonceur vide et prioritaire. **L'outil de
+clonage** : `scripts/voice/clone-line.py`, environnement Python 3.10 hors dépôt dans
+`C:\Users\monti\AppData\Local\boomball-tools\chatterbox` (torch cu124, `chatterbox-tts`), tourne
+sur sa RTX 4060 ; la référence est la voix seule découpée, une prise se juge à l'oreille et se
+vérifie par whisper (une des six disait « cut » pour « caught »). Les prises non retenues sont dans
+`assets/source/sounds/spark-takes/`, hors git. 848 tests sur 50 fichiers, smoke 2D vert, spec 3D
+non relancé. Suite : 2H.41, à cadrer.

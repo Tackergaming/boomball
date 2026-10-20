@@ -352,7 +352,12 @@ export function motionAndCues(
         break;
       case 'scored':
         // The shot's flight set `ball` on the hatch; the embers come when it lands.
-        cues.push({ kind: 'goal', at: ball, team: event.team === 'A' ? 'B' : 'A', after: steps.length });
+        // 2H.40 (`00` C40): the Spark's twenty points are not a goal. Its catch
+        // already has its flash and its own voice; before this, every `scored`
+        // lit the embers on the ball and played "and it's a goal" over the Spark.
+        if (event.source === 'payload') {
+          cues.push({ kind: 'goal', at: ball, team: event.team === 'A' ? 'B' : 'A', after: steps.length });
+        }
         break;
       case 'sparkMoved':
         if (event.path.length > 0) steps.push({ kind: 'spark', from: spark, path: event.path });

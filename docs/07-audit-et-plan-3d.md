@@ -2183,3 +2183,21 @@ sweep. Détail en `00` C39, « comment 2H.39 est codée ».
 
 **Porte franchie le même jour**, sa partie sur les deux écrans : « tout est parfait. j'adore, surtout
 l'option full screen. magnifique ».
+
+### Sous-phase 2H.40, « la réplique du Spark », codée le 2026-10-20
+
+Par le fil principal (Fable 5.1), seul, à partir de `00` C40, cadré l'après-midi même en chat, une
+question par message : l'ampleur (« petite »), la réplique (aucune trouvée dans les clips, sa phrase
+choisie sur des propositions en trois registres), la voix (celle de « and it's a goal », clip d'un
+pack Freesound, clonée par Chatterbox en local sur sa carte NVIDIA, sa prise choisie à l'oreille
+parmi six), puis « go » sur la reformulation. Rien dans le moteur, l'IA, les fonctions ni la base ;
+`ENGINE_VERSION` reste 11 ; pas de sweep. Détail en `00` C40, « comment 2H.40 est codée ».
+
+| Quoi | État |
+|---|---|
+| Le constat | « And it's a goal » sur un Spark attrapé n'était pas une réplique choisie : `motion.ts` faisait un repère de but de tout `scored`, source ballon ou Spark. Donc l'enregistrement du but par-dessus le ping, les braises sur le ballon, et les deux clips de la catégorie `spark` coupés avant d'être entendus |
+| La voix | « And the Spark is caught! Twenty points on the board! », `assets/source/sounds/spark.wav` (hors git) et `client/public/sounds/spark.mp3` (4,4 s, 128 kbit/s), jouée par l'échantillon `sparkCaught` au gain du but. Chatterbox (`chatterbox-tts` 0.1.7, torch 2.6.0 cu124) dans `C:\Users\monti\AppData\Local\boomball-tools\chatterbox`, Python 3.10, hors dépôt ; `scripts/voice/clone-line.py` dit comment refaire une phrase ; les cinq autres prises dans `assets/source/sounds/spark-takes/` |
+| Le code | `motion.ts` : le repère `goal` seulement si `event.source === 'payload'`. `sound.ts` : `SAMPLES.sparkCaught`. `announcer.ts` : `spark: []`, `'spark'` dans `ANNOUNCER_PRIORITY`. `Match.tsx` ne change pas |
+| Tests | **848 sur 50 fichiers** (847, plus un test de `motion` : un `scored` de source Spark ne donne aucun repère de but ; `admitCue('spark')` répond `cut` dans un test existant) ; typecheck racine, scripts, e2e et client verts |
+| Harnais | **Smoke 2D vert en 46 s** (un premier run rouge : le match e2e a atteint le round 10 pendant ses trois tours, le cas connu) ; le spec 3D non relancé, `Effects.tsx` ne change pas |
+| En ligne | Client à redéployer sur son feu vert ; rien côté fonctions |

@@ -18,14 +18,20 @@ un humain.
 `07-audit-et-plan-3d.md` est l'audit du 2026-10-09, avec les décisions D1 à D11 et le journal des
 phases ; `04-etat-des-lieux.md` est l'historique de ce qui a été construit et pourquoi.
 
+**État au 2026-10-20, après-midi.** **2H.40, la réplique du Spark, est cadrée et codée** (`00` C40) :
+« and it's a goal » sur un Spark attrapé était un défaut de `motion.ts` (tout `scored` faisait un
+but) ; ma phrase « And the Spark is caught! Twenty points on the board! » dans la voix du but clonée
+par Chatterbox sur ma carte, ma prise choisie parmi six ; le Spark ne déclenche plus rien du but,
+l'annonceur se tait pour la laisser parler. 848 tests, smoke vert, rien à redéployer côté fonctions,
+client à mettre en ligne sur mon feu vert. Suite : 2H.41, toute l'équipe à un humain, à cadrer.
+
 **État au 2026-10-20.** **2H.39, la caméra refaite, est cadrée et codée** (`00` C39) : plus de mode
 libre, quatre vues (Side à 52 degrés, Top à 85, Own end et Far end à 40 derrière chaque bouche,
 figées), la roulette sur Side et Top, Follow the play qui part de la largeur plus les deux
 rambardes, le bouton droit qui tire le sol à la place de Ctrl, quatre boutons sous la minicarte et
 la touche V. 847 tests, `e2e:board3d` vert aux deux tailles, smoke vert, **en ligne le même jour sur mon
 feu vert** (`index-8Llc-Pv3.js`). Ma partie sur les deux écrans : « tout est parfait. j'adore ». Suite :
-2H.40, la réplique du Spark, à cadrer. Puis
-2H.40 et 2H.41, à cadrer.
+2H.40, la réplique du Spark, cadrée et codée le même jour.
 
 **État au 2026-10-19 au soir.** Mon retour de partie sur 2H.38 est codé et en ligne (`00` C38) : les
 actions sur une cible au survol et dans la rangée, avec leurs chances, le clic n'ouvre que la

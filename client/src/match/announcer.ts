@@ -12,7 +12,7 @@
  * until the later of its own end and `ANNOUNCER_COOLDOWN_MS`; a line asked for
  * meanwhile is dropped, not queued, because a comment that arrives late is
  * about a moment already gone. The three moments that matter more than any
- * other (`ANNOUNCER_PRIORITY`: a goal either way, the final whistle) cut the
+ * other (`ANNOUNCER_PRIORITY`: a goal either way, the Spark caught, the final whistle) cut the
  * line in progress instead of waiting. A moment may also be commented only
  * some of the time (`ANNOUNCER_CHANCE`, drawn before anything else); since
  * 2H.26 (`00` C27) no moment is, Jérôme wanting every bat and every Shove
@@ -92,8 +92,11 @@ export const ANNOUNCER_LINES = {
   goalFoe: [],
   // The Spark rolls onto the pitch.
   sparkIn: ['dragon-19-i-demand-a-sacrifice.mp3'],
-  // The Spark is caught.
-  spark: ['banter-18-and-that-s-why-i.mp3', 'dragon-14-victor.mp3'],
+  // The Spark is caught: not commented since 2H.40 (`00` C40). The `spark.mp3`
+  // recording, the goal's voice cloned, says "And the Spark is caught! Twenty
+  // points on the board!" as the `sparkCaught` sample. The key stays so the
+  // catch still cuts whatever the announcer was saying, like a goal.
+  spark: [],
   // A Cracker goes off on somebody.
   blast: ['banter-13-i-know-it-s-a.mp3', 'banter-23-this-just-in-the-cleanup.mp3', 'banter-05-oh-my-god-that-definitely.mp3', 'dragon-05-apocalypse.mp3'],
   // The player's clock is down to thirty seconds.
@@ -141,7 +144,7 @@ export const ANNOUNCER_GAIN = 0.9;
 export const ANNOUNCER_COOLDOWN_MS = 2500;
 
 /** The moments that cut the line in progress rather than being dropped. */
-export const ANNOUNCER_PRIORITY: ReadonlySet<AnnouncerCue> = new Set<AnnouncerCue>(['goalOwn', 'goalFoe', 'fullTime', 'win', 'loss']);
+export const ANNOUNCER_PRIORITY: ReadonlySet<AnnouncerCue> = new Set<AnnouncerCue>(['goalOwn', 'goalFoe', 'spark', 'fullTime', 'win', 'loss']);
 
 /**
  * Draws one line at random from `lines`, never `last` when there are at least

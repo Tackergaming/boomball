@@ -179,6 +179,10 @@ const SAMPLES: Partial<Record<SoundKind, { readonly file: string; readonly gain:
   // The Giff wear jetpacks in Jérôme's head: a Dash is a burst of one. The
   // second burst of his jetpack1 recording, 1.6 s, faded out.
   dash: { file: 'dash.mp3', gain: 0.8 },
+  // 2H.40 (`00` C40): "And the Spark is caught! Twenty points on the board!",
+  // the goal's voice cloned by Chatterbox from his `goal.wav` (the recording
+  // is not his own voice), mastered to the goal's level, so the goal's gain.
+  sparkCaught: { file: 'spark.mp3', gain: 0.7 },
 };
 
 /**

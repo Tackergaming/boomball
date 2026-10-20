@@ -345,6 +345,16 @@ describe('what a beat flashes (2H.21)', () => {
     expect(cues[1]).toEqual({ kind: 'goal', at: { x: 6, y: 44 }, team: 'B', after: 1 });
   });
 
+  it("the Spark's points are not a goal: no embers, no goal cue (2H.40)", () => {
+    const { cues } = motionAndCues(base, [
+      { kind: 'sparkEntered', at: { x: 3, y: 20 }, round: 6 },
+      { kind: 'sparkCaught', unitId: A.id, roll: hit, caught: true },
+      { kind: 'scored', team: 'A', points: 20, source: 'spark' },
+    ]);
+    expect(cues.map((c) => c.kind)).toEqual(['sparkIn', 'action', 'sparkCaught']);
+    expect(cues.some((c) => c.kind === 'goal')).toBe(false);
+  });
+
   it('marks the Spark coming down and being caught, a Giff carried off and one coming on', () => {
     const { cues } = motionAndCues(base, [
       { kind: 'sparkEntered', at: { x: 3, y: 20 }, round: 6 },

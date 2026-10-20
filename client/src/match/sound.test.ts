@@ -168,6 +168,8 @@ describe('admitCue and passesChance', () => {
     expect(admitCue('hit', 2, 3)).toBe('drop');
     expect(admitCue('goalOwn', 2, 3)).toBe('cut');
     expect(admitCue('goalFoe', 2, 3)).toBe('cut');
+    // 2H.40 (`00` C40): the Spark caught has its own recording and cuts too.
+    expect(admitCue('spark', 2, 3)).toBe('cut');
     expect(admitCue('fullTime', 2, 3)).toBe('cut');
   });
 

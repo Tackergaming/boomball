@@ -3794,3 +3794,63 @@ sur `[data-board3d]`. **Le harnais** : `board3d.spec.ts` capture l'arrivée, le 
 roulette, le glisser droit, les flèches, puis Top, Own end (roulette et flèches sans effet,
 pas de bouton Follow), Far end, et V qui ramène sur Side ; plus aucun `zoom-close` ni
 `zoom-wide`. 847 tests sur 50 fichiers.
+
+## C40. Décisions du 2026-10-20, **la réplique du Spark, sous-phase 2H.40, cadrée en chat**
+
+> Écrites par le fil principal (Fable 5.1), sur le cadrage en chat de Jérôme le 2026-10-20 après
+> la porte de 2H.39, une question par message, la première bornant l'ampleur, puis sa prise
+> choisie à l'oreille et son « go » sur la reformulation en six paragraphes. Rien dans le moteur,
+> l'IA ni les fonctions, `ENGINE_VERSION` reste 11, aucune constante ne bouge, pas de sweep.
+
+**Le constat, que C38 ne disait pas.** « And it's a goal » sur un Spark attrapé n'était pas une
+réplique choisie, c'était un défaut : le moteur écrit `sparkCaught` puis `scored` avec la source
+`spark`, le bandeau de l'écran filtrait la source, mais `motion.ts` faisait un repère de but de
+tout `scored`. À chaque Spark attrapé, le ping du Spark jouait, puis l'enregistrement du but
+par-dessus, les braises du but s'allumaient sur le ballon, et le but coupait la réplique en cours,
+donc les deux clips prévus pour la catégorie `spark` (« And that's why I love my job! » et
+« Victor! ») n'étaient jamais entendus.
+
+1. **L'ampleur, la petite.** Ses mots : « petite ». Le Spark attrapé ne déclenche plus rien du
+   but, garde son flash, et reçoit une voix à lui. Pas de refonte du moment (son fort, effet 3D,
+   foule).
+2. **Pas de réplique trouvée dans les clips.** Ses mots : « déjà pas les trouvées ». Et sa
+   question : « je ne sais même pas quel genre de réplique collerait bien à la situation, car le
+   Spark ne donne pas la victoire, juste des points, et ce n'est pas un but ». Sur les
+   propositions du fil principal en trois registres (commentateur sportif, sarcastique, voix de
+   gorge), **sa phrase : « And the Spark is caught! Twenty points on the board! »**.
+3. **La voix de « and it's a goal », clonée.** Ses mots : « connais-tu un outil qui permettrait
+   de faire cette phrase avec la voix exacte de "and it's a goal" (parce que ce n'est pas MA
+   voix) ? » Le clip vient d'un pack gratuit sur Freesound, seul et isolé. Trois voies
+   présentées (ElevenLabs, Chatterbox ou F5-TTS en local, XTTS v2), avec l'avertissement que
+   cinq secondes de référence donnent une voix qui ressemble, pas la voix exacte, et que le
+   droit d'utiliser un son d'un pack n'est pas le droit de cloner la voix de l'acteur. **Son
+   choix : Chatterbox, installé et utilisé par le fil principal sur sa RTX 4060.** Six prises
+   (deux références, la voix seule de `goal.wav` brute et débruitée, trois intensités), les mots
+   vérifiés par whisper (une prise disait « cut »), **sa prise : `take3`, référence brute,
+   intensité 0,9**. Elle est `assets/source/sounds/spark.wav` et `client/public/sounds/spark.mp3`.
+4. **Le Spark n'est pas un but.** Le repère de but ne naît plus que d'un `scored` dont la source
+   est le ballon. Disparaissent sur un Spark attrapé : « and it's a goal », les braises, l'éclat
+   de but en 3D. Restent CATCH, le flash blanc, le bandeau « Spark caught · nom », les vingt points.
+5. **L'annonceur se tait pour la laisser parler.** La catégorie `spark` est vide (« Victor! »
+   reste à la victoire), et `spark` est un moment prioritaire : il coupe la réplique en cours
+   comme un but, et le plancher de 2,5 s garde l'annonceur muet pendant que la phrase joue. Un
+   Spark raté ne change pas.
+
+**Ce que ces décisions rouvrent.** `motion.ts`, `sound.ts`, `announcer.ts`, deux tests, un
+fichier son, un script d'outillage. Le client en ligne sur son feu vert.
+
+**Comment 2H.40 est codée** (le 2026-10-20, fil principal Fable 5.1, seul). `sound.ts` : `SAMPLES`
+gagne `sparkCaught: { file: 'spark.mp3', gain: 0.7 }`, le niveau de la prise étant déjà celui du
+but (moyenne −10 dB, crête 0 dB) ; le ping synthétisé ne joue plus que le temps du décodage,
+comme pour le but. `motion.ts` : le cas `scored` ne pousse le repère `goal` que si
+`event.source === 'payload'`. `announcer.ts` : `spark: []` avec son commentaire, `'spark'` dans
+`ANNOUNCER_PRIORITY`. `sayOf` dans `Match.tsx` ne change pas : `sparkCaught` donne `spark`, qui
+fait taire. Tests : `motion.test.ts`, un `scored` de source `spark` après une prise ne donne que
+`sparkIn`, `action`, `sparkCaught`, aucun `goal` ; `sound.test.ts`, `admitCue('spark')` répond
+`cut`. **L'outil** : `scripts/voice/clone-line.py`, Chatterbox (`chatterbox-tts` 0.1.7, torch
+2.6.0 cu124) dans un environnement Python 3.10 hors dépôt,
+`C:\Users\monti\AppData\Local\boomball-tools\chatterbox` ; la référence est la voix seule de
+`goal.wav` (0,8 à 4,2 s, mono 24 kHz), trois prises par référence à intensité croissante, la
+prise se juge à l'oreille et se vérifie par whisper ; les cinq autres prises et la référence
+découpée restent dans `assets/source/sounds/spark-takes/`, hors git. Le MP3 est encodé
+`-ar 44100 -b:a 128k`, 4,4 s. **848 tests sur 50 fichiers** (847 avant), typecheck racine, scripts, e2e et client verts. Le spec 3D n'est pas relancé : `Effects.tsx` ne change pas.
