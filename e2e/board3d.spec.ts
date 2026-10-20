@@ -6,8 +6,9 @@
  * prove the scene is the match and not a picture of it: it asks the hook
  * where a reachable cell is on the screen, which in 3D is the camera's own
  * projection, and clicks there with the mouse, so the floor's raycast and the
- * engine's route agree; then it closes the zoom in and captures again. The
- * captures are the deliverable: they are read, not just taken.
+ * engine's route agree; then it goes round the four camera views (2H.39),
+ * zooms and pans where that is allowed, and captures each. The captures are
+ * the deliverable: they are read, not just taken.
  *
  * Since 2H.21 it also captures the living game: each effect fired on purpose
  * through the hook's development trigger (`fx`), the words that rise, the
@@ -21,7 +22,7 @@ import { expect, test } from '@playwright/test';
 
 import { Shots, act, farthest, report, stamp, state, summary, unitAt, view, waitForArrival, waitForHook, waitForPlayableTurn, watch, setReplay, openSettings, closeSettings, settingsClick } from './harness.js';
 
-test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({ page }, info) => {
+test('the 2.5D board: scene, a click on the floor, four views @board3d', async ({ page }, info) => {
   // The effects and a slow round of the house come on top of the 2.5 minutes
   // the board itself takes under software GL.
   // Twenty minutes since 2H.38 (fourteen measured on the laptop's size): the
@@ -69,7 +70,9 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   // The textures and the Giff model come over the wire, and the camera glides
   // to its first goal: give the scene a moment before it is looked at.
   await page.waitForTimeout(3_000);
-  await shots.take('board3d-wide');
+  // The match opens on the side view, the whole silo (`00` C39, capture A1).
+  await expect(page.locator('[data-board3d][data-view="side"]')).toBeVisible();
+  await shots.take('board3d-side-arrival');
 
   expect(await myTurn()).toBe('turn');
   let at = await view(page);
@@ -85,7 +88,12 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   const legal = await summary(page);
   expect(legal.destinations.length).toBeGreaterThan(0);
   const from = await unitAt(page, legal.unitId);
-  const to = farthest(legal.destinations);
+  // Not a cell a Cracker sits on: the mouse would find the Cracker, whose
+  // click opens its sheet (C38), before the floor tile under it.
+  const crackers = (await state(page)).crackers.filter((c) => c.state === 'live');
+  const open = legal.destinations.filter((d) => !crackers.some((c) => c.x === d.x && c.y === d.y));
+  expect(open.length).toBeGreaterThan(0);
+  const to = farthest(open);
   const point = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
   const box = await page.locator('[data-board3d]').boundingBox();
   expect(point, 'cellToScreen through the 3D camera').not.toBeNull();
@@ -135,52 +143,91 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
     }
   }
 
-  // -- The close zoom, following the play ----------------------------------------
-  await settingsClick(page, 'zoom-close');
-  await expect(page.locator('[data-board3d][data-zoom="close"]')).toBeVisible();
+  // -- Following the play (`00` C39): C hooks the camera back and puts the
+  // zoom at the follow framing, the width with its rails (the own turn does
+  // the same, unless the board opened on it); the cell the unit walked to is
+  // what the camera follows, so its screen point must still be found through it.
+  await page.keyboard.press('c');
+  await expect(page.locator('[data-board3d][data-view="side"][data-camera="following"]')).toBeVisible();
   await page.waitForTimeout(1_500);
-  await shots.take('board3d-close');
+  await shots.take('board3d-side-follow');
+  const cell = () => page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
+  const steady = await cell();
+  expect(steady, 'cellToScreen through the following camera').not.toBeNull();
 
-  // -- The camera in hand (C18): a right-button drag turns it, the wheel zooms ----
-  // The cell the unit walked to is what the close zoom follows, so its screen
-  // point must move with the camera, and it must still be found through it.
-  const steady = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
+  // -- The wheel zooms, in the side view, without letting go of the play --------
   const centre = { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 };
   await page.mouse.move(centre.x, centre.y);
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.move(centre.x + 180, centre.y + 50, { steps: 10 });
-  await page.mouse.up({ button: 'right' });
   await page.mouse.wheel(0, -500);
   await page.waitForTimeout(1_000);
-  await shots.take('board3d-orbit');
-  const turned = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
-  expect(turned, 'cellToScreen through the turned camera').not.toBeNull();
-  expect(turned, 'the camera turned and zoomed').not.toEqual(steady);
-  // Choosing the preset again puts the orbit back.
-  await settingsClick(page, 'zoom-wide');
-  await settingsClick(page, 'zoom-close');
-  await expect(page.locator('[data-board3d][data-zoom="close"]')).toBeVisible();
-  await page.waitForTimeout(1_200);
-  const back = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
-  expect(back).not.toBeNull();
-  expect(Math.abs(back!.x - steady!.x) + Math.abs(back!.y - steady!.y), 'the preset frames as before').toBeLessThan(12);
+  await shots.take('board3d-side-zoomed');
+  const zoomed = await cell();
+  expect(zoomed, 'cellToScreen through the zoomed camera').not.toBeNull();
+  expect(zoomed, 'the camera zoomed').not.toEqual(steady);
+  await expect(page.locator('[data-board3d][data-camera="following"]')).toBeVisible();
+
+  // -- The right button drags the floor (C39) and lets go of the play ------------
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.move(centre.x - 160, centre.y + 40, { steps: 10 });
+  await page.mouse.up({ button: 'right' });
+  await expect(page.locator('[data-board3d][data-camera="free"]')).toBeVisible();
+  await page.waitForTimeout(600);
+  await shots.take('board3d-side-dragged');
+  const dragged = await cell();
+  expect(dragged, 'the cell followed slid with the floor').not.toBeNull();
+  expect(Math.abs(dragged!.x - zoomed!.x), 'the right button moved the camera across').toBeGreaterThan(40);
+  // "Follow the play" hooks it back, at the follow framing again.
+  await page.getByTestId('follow-play').click();
+  await expect(page.locator('[data-board3d][data-camera="following"]')).toBeVisible();
+  await page.waitForTimeout(1_500);
+  const followed = await cell();
+  expect(Math.abs(followed!.x - steady!.x) + Math.abs(followed!.y - steady!.y), 'back on the play, at the follow framing').toBeLessThan(12);
 
   // -- Letting go of the play (C19): the arrow keys pan, the button comes back --
-  await expect(page.locator('[data-board3d][data-camera="following"]')).toBeVisible();
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(700);
   await page.keyboard.up('ArrowRight');
   await expect(page.locator('[data-board3d][data-camera="free"]')).toBeVisible();
   await page.waitForTimeout(800);
-  await shots.take('board3d-panned');
-  const panned = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
+  const panned = await cell();
   expect(panned, 'the cell followed slid out of the centre').not.toBeNull();
-  expect(Math.abs(panned!.x - back!.x), 'the arrow key moved the camera across').toBeGreaterThan(40);
-  await page.getByTestId('follow-play').click();
+  expect(Math.abs(panned!.x - followed!.x), 'the arrow key moved the camera across').toBeGreaterThan(40);
+  await page.keyboard.press('c');
   await expect(page.locator('[data-board3d][data-camera="following"]')).toBeVisible();
   await page.waitForTimeout(1_200);
-  const followed = await page.evaluate(([x, y]) => window.__boomball!.cellToScreen(x, y), [to.x, to.y] as const);
-  expect(Math.abs(followed!.x - back!.x) + Math.abs(followed!.y - back!.y), 'back on the play').toBeLessThan(12);
+
+  // -- The four views (`00` C39): the buttons under the minimap, V goes round --
+  await page.getByTestId('cam-top').click();
+  await expect(page.locator('[data-board3d][data-view="top"][data-camera="following"]')).toBeVisible();
+  await page.waitForTimeout(1_500);
+  await shots.take('board3d-top');
+  const top = await cell();
+  expect(top, 'cellToScreen through the top view').not.toBeNull();
+  expect(top, 'the top view looks from elsewhere').not.toEqual(followed);
+  await page.getByTestId('cam-own').click();
+  await expect(page.locator('[data-board3d][data-view="own"]')).toBeVisible();
+  await page.waitForTimeout(1_800);
+  await shots.take('board3d-own-end');
+  // Fixed: the wheel and the keys change nothing, and there is no play to follow.
+  const own = await cell();
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.wheel(0, -500);
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(500);
+  await page.keyboard.up('ArrowRight');
+  await page.waitForTimeout(500);
+  const still = await cell();
+  expect(Math.abs(still!.x - own!.x) + Math.abs(still!.y - own!.y), 'the end view is fixed').toBeLessThan(0.5);
+  await expect(page.getByTestId('follow-play')).toHaveCount(0);
+  await page.getByTestId('cam-far').click();
+  await expect(page.locator('[data-board3d][data-view="far"]')).toBeVisible();
+  await page.waitForTimeout(1_800);
+  await shots.take('board3d-far-end');
+  await page.keyboard.press('v');
+  await expect(page.locator('[data-board3d][data-view="side"]')).toBeVisible();
+  await expect(page.getByTestId('cam-side')).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(1_500);
 
   // -- The living game (2H.21): each effect fired on purpose, and captured ------
   // The hook's development trigger fires a cue on the mounted board exactly as
@@ -366,10 +413,11 @@ test('the 2.5D board: scene, a click on the floor, two zooms @board3d', async ({
   await shots.take('board3d-house-played');
   expect(await page.evaluate(() => (window as unknown as { __freshSeen?: boolean }).__freshSeen), 'new lines marked in the feed').toBe(true);
 
-  // -- Back to the whole silo, then back to 2D ------------------------------------
-  await settingsClick(page, 'zoom-wide');
+  // -- Back out to the whole silo, then back to 2D --------------------------------
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.wheel(0, 1_500);
   await page.waitForTimeout(1_500);
-  await shots.take('board3d-wide-again');
+  await shots.take('board3d-side-whole-again');
   await settingsClick(page, 'view-2d');
   await expect(page.locator('[data-board-stage]')).toBeVisible();
   await page.waitForFunction(() => window.__boomball?.view === '2d');

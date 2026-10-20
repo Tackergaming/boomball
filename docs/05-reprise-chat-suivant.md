@@ -1,10 +1,11 @@
 On reprend Boomball, le jeu vidéo. Il vit à la racine de ce workspace.
 Charge le skill boomball, puis lis EN ENTIER docs/08-plan-terrain-horizontal.md :
-c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, **2H.38
-est la dernière sous-phase codée, le 2026-10-19, EN LIGNE LE MÊME JOUR** (les phases 3, 4 et 5 sont
+c'est le plan de la décision D11, le terrain horizontal ; §5 porte la feuille de route, **2H.39
+est la dernière sous-phase codée, le 2026-10-20** (les phases 3, 4 et 5 sont
 faites par 2H.15, la 6 par 2H.29, la 7 par 2H.31 à 2H.33, 2H.34 et 2H.35 l'interface d'équipe et
 la limite de présence, 2H.36 le premier lot de la phase 8, 2H.37 les corrections de la revue de
-sécurité, 2H.38 l'écran de match refait), 2H.39 (la caméra) vient après, §9 la parallélisation.
+sécurité, 2H.38 l'écran de match refait, 2H.39 la caméra refaite), 2H.40 et 2H.41 viennent après,
+§9 la parallélisation.
 Lis ensuite la partie C de docs/00-reglement-v2.md : les écarts 27 à 65, plus 40 bis,
 37 bis et 53 bis, priment sur les parties A et B. C10 porte l'IA par rôle en deuxième version,
 C11 le plan de tour, C12 à C16 les passes suivantes de l'IA (chacune finit par « comment ...
@@ -35,56 +36,64 @@ MATCH REFAIT, CADRÉ PAR MOI LE 2026-10-19 EN DIX POINTS SUR UNE MAQUETTE VALID�
 (`design/2H38-ecran-de-match/index.html`), PUIS CODÉ LE MÊME JOUR** : lis « comment 2H.38 est
 codée » à la fin de C37 avant de toucher à l'écran. **C38 EST MON RETOUR DE PARTIE SUR 2H.38**
 (les actions sur cible au survol et dans la rangée, le clic n'ouvre que la fiche), en ligne, et
-porte mes deux demandes pour après la caméra. Ne rediscute rien de C12 à C38.
+porte mes deux demandes pour après la caméra. **C39 EST 2H.39, LA CAMÉRA REFAITE, CADRÉE PAR MOI
+LE 2026-10-20 EN CHAT SUR DOUZE CAPTURES DE LA VRAIE SCÈNE ET « COMMENT 2H.39 EST CODÉE »** : plus
+de mode libre, quatre vues (Side à 52 degrés, l'arrivée au silo entier ; Top à 85 ; Own end et Far
+end à 40 derrière chaque bouche, figées), la roulette sur Side et Top seulement, Follow the play
+qui part de dix-neuf cases de profondeur (la largeur plus les deux rambardes), le bouton droit qui
+tire le sol à la place de Ctrl, les flèches, quatre boutons sous la minicarte et la touche V, la
+section Camera de ⚙ retirée, la main brute (C20 tient). Ne rediscute rien de C12 à C39.
 07 §10 porte le journal (2H.15 la 2.5D fichier par fichier, 2H.16 à 2H.20 la caméra, 2H.21 et
 2H.22 le jeu vivant, 2H.29 la phase 6, 2H.30 les cinq retours, « Le client en ligne », 2H.31 à
-2H.38). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
+2H.39). 09 §12 est le dernier sweep, tranché « rien ne bouge » ; il n'y a pas de sweep depuis
 2H.8. 04 est l'histoire, à lire seulement quand une décision d'ingénierie te surprend. 10 est le
 rapport de la revue de sécurité (agent Opus 5.5) : ses trois majeurs sont fermés par 2H.37, n8 est
 dans le code de 2H.38, lis son §4 (l'état de C1 à C20) si la question touche à l'exploitation.
 
-Où on en est : **2H.38 ET SON RETOUR C38 SONT EN LIGNE ET MA PARTIE EST FAITE : « TOUT EST
-PARFAIT. BRAVO. »** (git doit être propre et `origin/main..main` vide : vérifie-le). C38 : au
-survol d'une cible, ses étiquettes avec leurs chances, cliquables (350 ms pour y passer,
-`TAG_LINGER_MS`) ; dans la rangée, un bouton par couple action et cible ; le clic sur un pion
-n'ouvre que sa fiche ; la 2D a perdu son mode « choisir une cible ». Commit `53a01dc`. **842 tests
-verts sur 50 fichiers**, smoke 2D vert en 55 s, sonde 3D jetable verte ; `e2e:board3d` n'a pas été
-relancé sur C38. `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
+Où on en est : **2H.39, LA CAMÉRA REFAITE, EST CODÉE, COMMITÉE ET EN LIGNE LE 2026-10-20 SUR MON
+FEU VERT ; MA PARTIE SUR LES DEUX ÉCRANS EST LA PORTE** (git doit être propre et
+`origin/main..main` vide : vérifie-le). **Le classifieur du mode auto a laissé passer
+`node scripts/deploy-vercel.mjs --production` ce jour-là** : le fil principal déploie lui-même sur
+mon feu vert. **847 tests verts sur 50 fichiers**, smoke 2D
+vert en 35 s, `e2e:board3d` vert en 11,5 min au portable et 20,6 min au 27 pouces, neuf captures
+de caméra à chaque taille. Le spec 3D clique désormais une case lointaine SANS Cracker dessus :
+depuis C38 un Cracker est cliquable et prend le clic avant le sol (trois runs rouges avant le vert,
+aucun sur le code). `ENGINE_VERSION` toujours 11. Fonctions en ligne : `resolve-action` v30 et
 `create-match` v27 (si la ligne « reading the match failed » apparaît dans les logs de la
-fonction, dis-le-moi). **LE CLIENT EN LIGNE (https://boomball.vercel.app) EST `index-sXBC7HJQ.js`**,
-construit par toi, déployé par moi le 2026-10-19 au soir. `password_min_length` vaut 8,
+fonction, dis-le-moi). **LE CLIENT EN LIGNE (https://boomball.vercel.app) EST `index-8Llc-Pv3.js`
+(2H.39)**, construit et déployé par le fil principal le 2026-10-20. `password_min_length` vaut 8,
 `disable_signup` faux. **Le projet Realtime est en `private_only`** : tout nouveau canal doit être
 `private: true` ET avoir une politique sur `realtime.messages`. Migrations appliquées : **0001 à
-0016**. Vérifier git status et git log origin/main..main en premier et me le dire. assets/source/
-(mes sources) est ignoré par git : ne le commite jamais. `backups/` est ignoré par git et contient
-les codes d'invitation : jamais dans un dossier partagé.
+0016**. assets/source/ (mes sources) est ignoré par git : ne le commite jamais. `backups/` est
+ignoré par git et contient les codes d'invitation : jamais dans un dossier partagé.
 
-L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (7) FAITS, **(7) étant 2H.38, l'écran de match refait
-(`00` C37), et son retour C38, en ligne et validés le 2026-10-19** ; (8) **2H.39, la caméra
-(déplacement, zooms, angles)**, un lot à part à cadrer avec moi dans ce chat ; (9) **2H.40, une
-réplique pour le Spark attrapé**, « à créer ou trouver », à la place de « and it's a goal » ; (10)
-**2H.41, en option, un humain joue tous les Giffs de son équipe**, ce qui refait l'ordre et
-l'initiative de son équipe (moteur, fonctions, `ENGINE_VERSION`). 2H.40 et 2H.41 sont notées en
-`00` C38 et `08` §5, PAS cadrées : chacune se cadre en chat, une question par message, la première
-bornant l'ampleur. Restent aussi, sans date : ma partie à deux sur les canaux privés (la porte de
-2H.37) et un ami qui crée un compte et joue sans moi (la porte de la phase 8).
+L'ORDRE DE LA SUITE, VALIDÉ PAR MOI : (1) à (8) FAITS, **(8) étant 2H.39, la caméra refaite
+(`00` C39), codée, commitée et en ligne le 2026-10-20** ; (9) **2H.40, une réplique pour le Spark attrapé**, « à
+créer ou trouver », à la place de « and it's a goal » ; (10) **2H.41, en option, un humain joue
+tous les Giffs de son équipe**, ce qui refait l'ordre et l'initiative de son équipe (moteur,
+fonctions, `ENGINE_VERSION`). 2H.40 et 2H.41 sont notées en `00` C38 et `08` §5, PAS cadrées :
+chacune se cadre en chat, une question par message, la première bornant l'ampleur. Restent aussi,
+sans date : ma partie à deux sur les canaux privés (la porte de 2H.37) et un ami qui crée un compte
+et joue sans moi (la porte de la phase 8).
 
-LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **cadrer 2H.39, la caméra**, en chat,
-une question par message, la première bornant l'ampleur, en relisant C18 à C22 (dont MON REFUS
-d'une caméra à quatre nombres lissés, C20) et les trois accès de C37 ; une maquette ou un essai en
-jouant avant le code si l'aspect est en jeu. **Fermer les inscriptions** (`disable_signup`) le
-jour où je le dis, pas avant. Deux remarques de la relecture des captures de 2H.38, sans décision :
-la maison peut avoir deux pions au même prénom (deux « Osric »), que les pastilles et les plaques
-ne distinguent pas ; le bandeau « Your turn » à côté de « Spectating » juste après un siège remis
-(dette connue). Une de C38 : la fiche, fixée en haut à gauche, peut s'ouvrir sur une cible qui se
-trouve juste dessous et lui faire perdre ses étiquettes.
+LA TÂCHE DU PROCHAIN CHAT : vérifier git et me le dire ; puis **ma partie sur 2H.39, sur le
+portable et le 27 pouces** : la porte est mon
+verdict sur les quatre vues, le zoom de Follow the play et le bouton droit. Si je donne des retours,
+ils se cadrent en chat avant le code. Puis **cadrer 2H.40**, la réplique du Spark, en chat, une
+question par message, la première bornant l'ampleur (le son est dans `match/sound.ts`, le clip
+`goal`, les repères `sparkCaught` ; C26 et C27 disent comment les répliques sont choisies). **Fermer
+les inscriptions** (`disable_signup`) le jour où je le dis, pas avant. Deux remarques de la
+relecture des captures de 2H.38, sans décision : la maison peut avoir deux pions au même prénom
+(deux « Osric »), que les pastilles et les plaques ne distinguent pas ; le bandeau « Your turn » à
+côté de « Spectating » juste après un siège remis (dette connue). Une de C38 : la fiche, fixée en
+haut à gauche, peut s'ouvrir sur une cible qui se trouve juste dessous et lui faire perdre ses
+étiquettes.
 
-**Le classifieur du mode auto** a refusé le PATCH Auth le 2026-10-19 et refuse
-`node scripts/deploy-vercel.mjs --production` (« Production Deploy »). Depuis `09e29aa`,
+**Le classifieur du mode auto** a refusé le PATCH Auth le 2026-10-19. Depuis `09e29aa`,
 `.claude/settings.json` autorise `Bash(npm --prefix client run build)` (le build passe, écris-le
-EXACTEMENT ainsi, depuis la racine) et `Bash(node scripts/deploy-vercel.mjs:*)` (refusé quand même
-dans la session qui l'a ajouté : RÉESSAIE au prochain déploiement, sur mon feu vert, et dis-moi si
-ça passe ; sinon je déploie, ou je passe en mode par défaut le temps de la commande). Une écriture
+EXACTEMENT ainsi, depuis la racine) et `Bash(node scripts/deploy-vercel.mjs:*)` : **le 2026-10-20
+le déploiement en production est passé par le fil principal**, sur mon feu vert ; s'il est refusé
+un jour, je déploie, ou je passe en mode par défaut le temps de la commande. Une écriture
 de configuration, je la fais moi-même dans PowerShell ou le tableau de bord, et **dans mon
 PowerShell `npm` ne marche pas** (la politique d'exécution bloque `npm.ps1`) : écris-moi
 `npm.cmd`.
@@ -133,16 +142,19 @@ Ce qu'il faut savoir tout de suite.
    ou rejoindre le compte e2e n'est pas destructif, et un compte jetable créé par l'API admin et
    supprimé après non plus (c'est ce que fait `rls-check.py`). `npm run export:db` est une lecture.
 
-6. Le harnais : npm run e2e en 30 à 55 s, e2e:playthrough en 15 à 70 s, **e2e:board3d en 14 min
-   à 1536 × 695 (vingt de marge) et jusqu'à 45 à 2560 × 1271**, e2e:abandon en 10 s, e2e:coop en
+6. Le harnais : npm run e2e en 30 à 55 s, e2e:playthrough en 15 à 70 s, **e2e:board3d en 11,5 min
+   à 1536 × 695 (vingt de marge) et 20,6 à 2560 × 1271 (quarante-cinq de marge)**, e2e:abandon en 10 s, e2e:coop en
    2 à 5 min (deux specs, hors de npm run e2e ; il abandonne le match e2e en cours pour atteindre
    le lobby, et abandonne le match coop qu'il
    ouvre), e2e:account en 8 s (hors de npm run e2e : il change le mot de passe du compte e2e et le
    remet dans un `finally` ; s'il casse entre les deux, le compte garde l'original suivi de
    `-tmp`, à remettre à la main). **Depuis 2H.38 les réglages sont derrière ⚙** : vitesse, vue,
-   préréglage de caméra, volumes, et les boutons « Leave the match », « Hand my Giff to the
+   volumes, et les boutons « Leave the match », « Hand my Giff to the
    house », « Back to the hub » ; le harnais passe par `openSettings`, `closeSettings`,
-   `setReplay`, `settingsClick` (`e2e/harness.ts`). La fenêtre Playwright vaut **1536 × 695 par
+   `setReplay`, `settingsClick` (`e2e/harness.ts`). **Depuis 2H.39 la caméra se pilote sur le
+   plateau** : `cam-side`, `cam-top`, `cam-own`, `cam-far` sous la minicarte, `follow-play`,
+   `[data-board3d][data-view=...]` et `[data-camera=following|free]` ; plus de `zoom-close` ni
+   `zoom-wide`. La fenêtre Playwright vaut **1536 × 695 par
    défaut** et `E2E_VIEWPORT=2560x1271` donne le 27 pouces. Ouvrir ⚙ coûte plusieurs secondes à 2
    images par seconde : un contrôle de quelque chose qui s'efface (bandeau, ligne neuve du fil)
    passe par un observateur posé dans la page, comme dans `board3d.spec.ts`. Le match e2e qui
@@ -169,7 +181,9 @@ Ce qu'il faut savoir tout de suite.
    sont des tableaux `[joinRef, ref, topic, event, payload]`, `phx_join` porte
    `payload.config.private`, la réponse `phx_reply` porte `status` et `response.reason`.
 
-7. useMatch.load porte un compteur de génération, ne l'enlève pas ; useMatch.stateRef est écrit
+7. useMatch.load porte un compteur de génération, ne l'enlève pas ; la caméra 3D n'a plus
+   d'orbite libre (C39) : quatre vues dans `framing.ts`, le rig de `Camera.tsx` lit `hookPulse`
+   pour remettre le zoom de suivi, `link.platesShort` dit aux plaques d'être courtes ; useMatch.stateRef est écrit
    partout où setState l'est ; sendMany(actions, asUnitId, quiet) porte sendAs et knock. Le
    bash de l'outil casse sur les accents graves et les apostrophes dans un heredoc, même cité :
    un fichier long s'écrit avec l'outil Write, et une série de remplacements avec un script
@@ -211,7 +225,7 @@ Ce qu'il faut savoir tout de suite.
    .env n'a pas le droit de lire les Actions ni les secrets du dépôt : pour le maintien en vie et
    la CI, c'est moi qui regarde l'onglet Actions (vert sur 22564ca le 18 au matin).
 
-10. Les commandes. Depuis la racine du workspace : npm test (842), npm run typecheck, npm run sweep, npm run
+10. Les commandes. Depuis la racine du workspace : npm test (847), npm run typecheck, npm run sweep, npm run
     e2e, e2e:playthrough, e2e:board3d, e2e:abandon, e2e:coop, e2e:account, npm run build:function,
     npm run export:db ; en bash avec le .env chargé : npm run deploy:function (les deux) ou node
     scripts/deploy-edge-function.mjs resolve-action (une seule) ; node scripts/deploy-vercel.mjs
@@ -222,7 +236,7 @@ Ce qu'il faut savoir tout de suite.
     Le cwd de l'outil Bash se réinitialise entre deux appels : chemins absolus, ou npm --prefix.
 
 11. Les décisions à ne pas rediscuter sont D1 à D11 dans 07 §1.2, les écarts 27 à 65 de 00
-    partie C, et C11 à C38 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
+    partie C, et C11 à C39 en entier. 2H.38 a soldé le nom du joueur sur la plaque et la pastille
     des autres pions humains et `onFinished` appelé à chaque rendu. Dette connue : le bandeau
     « Your turn » à revoir avec le coin du chrono (C37 ne l'a pas tranché) ; « Giff picks the league » et « Giff
     starts the match » se répètent dans la barre du membre ; `mergeRoll` reste côté client,
@@ -237,10 +251,9 @@ Ce qu'il faut savoir tout de suite.
     rebondir plusieurs rounds dans une poche ; un gardien peut marcher jusqu'à côté d'un receveur
     marqué pour une passe d'une case ; le Shove d'un Bulwark n'est borné que par l'adjacence ; le
     Dash tenu n'existe que côté client ; en 3D, l'orientation du modèle, le noir sous la lèvre
-    avant, l'orbite remise à la vue fixe au retour du 2D, la borne de suivi à l'azimut zéro, la
-    roulette en vue large, le pan sous Ctrl interrompu au-dessus de la minicarte, la largeur
-    garantie à l'inclinaison de départ, la répétition de la foule en vue large, l'effacement des
-    gradins jugé sur la hauteur, la retenue en boîte, les captures des effets courts figées sous le
+    avant, la répétition de la foule en vue large, l'effacement des
+    gradins jugé sur la hauteur, la retenue en boîte, les vues Own end et Far end qui ne suivent
+    pas le jeu, le zoom qui ne survit pas au démontage du plateau (la vue, oui), les captures des effets courts figées sous le
     GL logiciel, le ballon qui ne disparaît pas dans la bouche, pas d'étincelles en 2D, les
     commentaires « 2H.23 » de Tokens.tsx ; du rapport 10 : n12 (le secret JWT dans un transcript,
     à faire tourner si un dossier de transcripts est partagé) et n14 (le roster écrit avant la

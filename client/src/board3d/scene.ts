@@ -95,6 +95,12 @@ export interface SceneLink {
    * a click on a chip of the turn order, or on the minimap. Set by the rig.
    */
   centreOn: ((cell: Point) => void) | null;
+  /**
+   * Whether the plates should be short, the role's letter and the HP (`00`
+   * C37 point 7): true when the camera stands back near the whole silo or
+   * in an end view. Written by the rig once a frame, read by the board.
+   */
+  platesShort: boolean;
 }
 
 export function newSceneLink(): SceneLink {
@@ -115,6 +121,7 @@ export function newSceneLink(): SceneLink {
     carrierGlow: null,
     bottomInset: 0,
     centreOn: null,
+    platesShort: true,
   };
 }
 

@@ -4,8 +4,8 @@
  * the screen row. No text, no hooks.
  *
  * Since 2H.38 (`00` C37 point 7) a click on it moves the camera to that spot
- * of the pitch (`onPick`, the cell under the cursor); folding it away is the
- * board's business.
+ * of the pitch (`onPick`, the cell under the cursor) in the two touchline
+ * views; folding it away is the board's business.
  */
 
 import type { Point } from '../../../engine/geometry.js';

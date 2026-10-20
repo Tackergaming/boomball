@@ -73,7 +73,7 @@ import {
   shoveChance,
   swingChance,
 } from '../match/odds.js';
-import type { Zoom } from '../board3d/framing.js';
+import { isCameraView, nextView, type CameraView } from '../board3d/framing.js';
 import { cellToScreen, publishHook, summarise, withdrawHook } from '../match/testHook.js';
 import { beatHoldMs, useMatch, type Speed } from '../match/useMatch.js';
 
@@ -673,11 +673,16 @@ export function Match({
   const u = viewport.u;
   // The laptop's strip of chips stops after eight; the 27 inch shows the round.
   const compact = viewport.width < 1900;
-  const [zoom, setZoomState] = useState<Zoom>(() => (readStored('boomball.zoom') === 'close' ? 'close' : 'wide'));
-  const setZoom = (next: Zoom) => {
-    setZoomState(next);
-    writeStored('boomball.zoom', next);
-  };
+  // The camera view (2H.39, `00` C39), kept from one match to the next; the
+  // zoom is the board's and opens on the whole silo.
+  const [cameraView, setCameraViewState] = useState<CameraView>(() => {
+    const stored = readStored('boomball.cameraView');
+    return isCameraView(stored) ? stored : 'side';
+  });
+  const setCameraView = useCallback((next: CameraView) => {
+    setCameraViewState(next);
+    writeStored('boomball.cameraView', next);
+  }, []);
   const [mapOpen, setMapOpen] = useState(() => readStored('boomball.minimap') !== 'closed');
   const toggleMap = useCallback(() => {
     setMapOpen((open) => {
@@ -985,6 +990,9 @@ export function Match({
         case 'follow':
           camera.follow?.();
           return;
+        case 'view':
+          if (view === '3d') setCameraView(nextView(cameraView));
+          return;
         case 'log':
           setLogOpen((open) => !open);
           return;
@@ -1106,7 +1114,8 @@ export function Match({
           onAct={canAct ? act : null}
           plot={{ on: plotting && canAct, route }}
           onPlotStep={canAct ? (segment) => setRoute((r) => [...r, ...segment]) : null}
-          zoom={zoom}
+          cameraView={cameraView}
+          onCameraView={setCameraView}
           bottomInset={rowInset}
           camera={camera}
           minimap={{ open: mapOpen, width: Math.round(240 * u), onToggle: toggleMap }}
@@ -1213,8 +1222,6 @@ export function Match({
           onView={(next) => {
             if (next !== view) toggleView();
           }}
-          zoom={view === '3d' ? zoom : null}
-          onZoom={setZoom}
           volumes={volumes}
           onVolume={setVolume}
           fullscreen={fullscreen}

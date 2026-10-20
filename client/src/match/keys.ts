@@ -22,6 +22,7 @@ export type KeyCommand =
   | { kind: 'endTurn' }
   | { kind: 'escape' }
   | { kind: 'follow' }
+  | { kind: 'view' }
   | { kind: 'log' }
   | { kind: 'minimap' }
   | { kind: 'fullscreen' };
@@ -55,6 +56,8 @@ export function commandForKey(input: KeyInput, ctx: { myTurn: boolean }): KeyCom
       return { kind: 'escape' };
     case 'c':
       return { kind: 'follow' };
+    case 'v':
+      return { kind: 'view' };
     case 'l':
       return { kind: 'log' };
     case 'm':

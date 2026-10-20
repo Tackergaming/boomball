@@ -1,7 +1,8 @@
 /**
- * Pure camera geometry for the 3D board (C18): how far a tilted camera must
- * stand to fit the pitch, where the ground it frames is centred, and the
- * bounds of the orbit a player drives with the mouse.
+ * Pure camera geometry for the 3D board (C18, refaite en 2H.39, `00` C39):
+ * the four views a player may choose, how far a tilted camera must stand to
+ * fit what each one claims, where the ground it frames is centred, and the
+ * bounds of the zoom and the pan.
  *
  * No three.js and no React here, so it stays testable. Angles are radians,
  * distances are world units, one cell each.
@@ -9,32 +10,56 @@
 
 import { APRON_HALF, BACK_PLATE_X, PITCH_LENGTH, PITCH_WIDTH, TUBE_TOP } from './layoutGeometry.js';
 
-export type Zoom = 'wide' | 'close';
-
-/** The three-quarter view both presets start from, below the horizon. */
-export const PRESET_TILT = (52 * Math.PI) / 180;
 /**
- * The orbit may not look at the floor from lower than this, nor from straight
- * above. Thirty degrees (C22) keeps the camera above the stands' heads.
+ * The four views (`00` C39): `side` from the touchline at 52 degrees, own
+ * Furnace on the left, where the match opens; `top` from the touchline at 85
+ * degrees; `own` and `far` from behind each Furnace at 40 degrees, fixed.
  */
-export const MIN_TILT = (30 * Math.PI) / 180;
-export const MAX_TILT = (85 * Math.PI) / 180;
-/** The wheel's reach, as a factor over the preset distance; 1.5 (C22) never leaves the silo behind. */
-export const MIN_ZOOM = 0.3;
-export const MAX_ZOOM = 1.5;
+export type CameraView = 'side' | 'top' | 'own' | 'far';
 
-export interface Orbit {
-  /** Around the vertical, 0 being the fixed view of J4: own Furnace on the left. */
-  yaw: number;
-  tilt: number;
-  /** Multiplies the preset distance; 1 is the preset itself. */
-  zoom: number;
+export const VIEWS: readonly CameraView[] = ['side', 'top', 'own', 'far'];
+
+export const isCameraView = (v: unknown): v is CameraView => typeof v === 'string' && (VIEWS as readonly string[]).includes(v);
+
+/** The view after `view` under the V key: round the four. */
+export function nextView(view: CameraView): CameraView {
+  return VIEWS[(VIEWS.indexOf(view) + 1) % VIEWS.length]!;
 }
 
-export const presetOrbit = (): Orbit => ({ yaw: 0, tilt: PRESET_TILT, zoom: 1 });
+const deg = (d: number): number => (d * Math.PI) / 180;
 
-export const clampTilt = (tilt: number): number => Math.max(MIN_TILT, Math.min(MAX_TILT, tilt));
-export const clampZoom = (zoom: number): number => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+/** The three-quarter tilt of the side view, as since 2H.15. */
+export const SIDE_TILT = deg(52);
+/** The top view: as near to straight down as keeps the pieces in relief. */
+export const TOP_TILT = deg(85);
+/** The two end views, the pitch in depth behind a Furnace. */
+export const END_TILT = deg(40);
+
+export interface ViewSpec {
+  /** Around the vertical: 0 is the touchline view of J4, own Furnace on the left. */
+  readonly yaw: number;
+  readonly tilt: number;
+  /** Whether the wheel, the arrow keys and the right-button drag work; the end views are fixed. */
+  readonly zoomable: boolean;
+}
+
+/**
+ * The orbit of a view. The end views look along the pitch from behind the
+ * Furnace of `own` (`ownSign` is the sign of its world x: -1 for the Furnace
+ * at the left of the side view) or of the other side.
+ */
+export function viewSpec(view: CameraView, ownSign: 1 | -1 = -1): ViewSpec {
+  switch (view) {
+    case 'side':
+      return { yaw: 0, tilt: SIDE_TILT, zoomable: true };
+    case 'top':
+      return { yaw: 0, tilt: TOP_TILT, zoomable: true };
+    case 'own':
+      return { yaw: (ownSign * Math.PI) / 2, tilt: END_TILT, zoomable: false };
+    case 'far':
+      return { yaw: (-ownSign * Math.PI) / 2, tilt: END_TILT, zoomable: false };
+  }
+}
 
 const cot = (a: number): number => 1 / Math.tan(a);
 
@@ -76,14 +101,64 @@ export function distanceForSpan(cells: number, aspect: number, fov: number): num
 }
 
 /**
- * The preset distance of a zoom, before the wheel: close fits the pitch's
- * width in the frame's height with a cell to spare (C18); wide fits the whole
- * length across, and the width too when the frame is tall.
+ * The whole silo (`00` C39, capture A1): the pitch's length across the frame
+ * with a cell to spare at each end, and never less than its width down. The
+ * side view opens here.
  */
-export function presetDistance(zoom: Zoom, aspect: number, fov: number, tilt: number): number {
-  const width = distanceForDepth(PITCH_WIDTH + 1, tilt, fov);
-  if (zoom === 'close') return width;
-  return Math.max(distanceForSpan(PITCH_LENGTH + 2, aspect, fov), width);
+export function wholeSiloDistance(aspect: number, fov: number, tilt: number): number {
+  return Math.max(distanceForSpan(PITCH_LENGTH + 2, aspect, fov), distanceForDepth(PITCH_WIDTH + 1, tilt, fov));
+}
+
+/**
+ * Where "Follow the play" starts (`00` C39, his capture): the pitch's width
+ * with the two rails and the first rows of the stands in the frame, nineteen
+ * cells down instead of the sixteen of the old "Close in".
+ */
+export const FOLLOW_DEPTH = PITCH_WIDTH + 4;
+
+export function followDistance(tilt: number, fov: number): number {
+  return distanceForDepth(FOLLOW_DEPTH, tilt, fov);
+}
+
+/** The wheel's reach: out to the silo with its four stands (capture B2) ... */
+export const FARTHEST_OVER_SILO = 1.5;
+/** ... and in to nine cells of depth, about a dozen across on the laptop (capture D3). */
+export const NEAREST_DEPTH = 9;
+
+export interface ZoomBounds {
+  readonly near: number;
+  readonly far: number;
+}
+
+/** The distances the wheel may set in a zoomable view, for this frame's shape. */
+export function zoomBounds(aspect: number, fov: number, tilt: number): ZoomBounds {
+  return {
+    near: distanceForDepth(NEAREST_DEPTH, tilt, fov),
+    far: FARTHEST_OVER_SILO * wholeSiloDistance(aspect, fov, tilt),
+  };
+}
+
+export function clampDistance(distance: number, bounds: ZoomBounds): number {
+  return Math.max(bounds.near, Math.min(bounds.far, distance));
+}
+
+/**
+ * The end views stand where the whole length of the pitch fits the frame's
+ * height, a cell to spare at each end (capture C3), looking at its centre.
+ */
+export function endViewDistance(fov: number): number {
+  return distanceForDepth(PITCH_LENGTH + 2, END_TILT, fov);
+}
+
+/**
+ * The plates shrink to the role's letter and the HP (`00` C37 point 7) when
+ * the camera stands this far, as a share of the whole-silo distance: the
+ * follow framing keeps the full names, the silo entire does not.
+ */
+export const SHORT_PLATES_OVER_SILO = 0.9;
+
+export function platesShort(distance: number, aspect: number, fov: number, tilt: number): boolean {
+  return distance >= SHORT_PLATES_OVER_SILO * wholeSiloDistance(aspect, fov, tilt);
 }
 
 /** How far past the pitch's edges the camera may be panned (C19); one cell since C22. */
@@ -93,7 +168,8 @@ export const PAN_MARGIN = 1;
  * Keeps the camera inside the silo (C22). Below the tube's top the camera
  * stays between the walls and the end plates, so it never looks in from
  * outside or through a plate's back; above the open top it is free, which is
- * where the whole-silo view stands. It never goes under the stands' heads.
+ * where the whole-silo and the end views stand. It never goes under the
+ * stands' heads.
  */
 export function confine(p: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
   const y = Math.max(1.5, p.y);
@@ -111,6 +187,26 @@ export function clampPan(p: { x: number; z: number }): { x: number; z: number } 
 }
 
 /**
+ * Where the hooked camera aims to keep `at` in the frame (C20, C39): the
+ * point itself, pulled back so the frame never looks past the pitch's ends
+ * nor beyond its touchlines plus a cell. Framed whole, the pitch stays
+ * centred and the camera does not move.
+ */
+export function followTarget(
+  at: { x: number; z: number },
+  distance: number,
+  aspect: number,
+  fov: number,
+  tilt: number,
+): { x: number; z: number } {
+  const halfSpan = distance * Math.tan(fov / 2) * aspect;
+  const lx = Math.max(0, PITCH_LENGTH / 2 + PAN_MARGIN - halfSpan);
+  const halfDepth = (distance * groundDepthPerUnit(tilt, fov)) / 2;
+  const lz = Math.max(0, PITCH_WIDTH / 2 + PAN_MARGIN - halfDepth);
+  return { x: Math.max(-lx, Math.min(lx, at.x)), z: Math.max(-lz, Math.min(lz, at.z)) };
+}
+
+/**
  * The flat directions of a camera at `yaw`: `forward` is away from the camera
  * along the floor, `right` is the frame's right. A pan reads the keys and the
  * mouse in these, so "up" is always away whichever way the camera is turned.
@@ -125,8 +221,8 @@ export function viewAxes(yaw: number): { forward: { x: number; z: number }; righ
 /**
  * The lens of a frame whose bottom `inset` pixels are covered (2H.38, `00` C37
  * point 3): the action row lies over the board, and the camera frames the
- * pitch above it. Everything the rig works out (the preset distances, the pan,
- * the centring) uses the `usable` lens, the frame above the row, at the same
+ * pitch above it. Everything the rig works out (the distances, the pan, the
+ * centring) uses the `usable` lens, the frame above the row, at the same
  * pixel scale the whole frame would have at `fov`. The camera itself is given
  * the `virtual` lens: a frame `inset` taller than the canvas whose centre is
  * the usable frame's centre, of which the canvas shows the bottom part
@@ -142,10 +238,10 @@ export function insetLens(fovDeg: number, width: number, height: number, inset: 
   const h = Math.max(1, height);
   const m = Math.max(0, Math.min(inset, h * 0.5));
   const half = Math.tan(((fovDeg * Math.PI) / 180) / 2);
-  const deg = (t: number) => (2 * Math.atan(t) * 180) / Math.PI;
+  const degOf = (t: number) => (2 * Math.atan(t) * 180) / Math.PI;
   return {
-    usable: { fov: deg((half * (h - m)) / h), aspect: width / (h - m) },
-    virtual: { fov: deg((half * (h + m)) / h), aspect: width / (h + m), fullHeight: h + m, offsetY: m },
+    usable: { fov: degOf((half * (h - m)) / h), aspect: width / (h - m) },
+    virtual: { fov: degOf((half * (h + m)) / h), aspect: width / (h + m), fullHeight: h + m, offsetY: m },
   };
 }
 

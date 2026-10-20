@@ -43,6 +43,7 @@ import { fxBridge } from '../match/fxBridge.js';
 import { FLOAT_MS, type Cue, type Motion, type TimedCue } from '../match/motion.js';
 import { planOf, poseAt, type Plan, type Pose } from '../match/pose.js';
 import { Rig } from './Camera.js';
+import { VIEWS, type CameraView } from './framing.js';
 import { Effects } from './Effects.js';
 import { Floaters } from './Floaters.js';
 import { Labels, Tag, type Label } from './Labels.js';
@@ -119,7 +120,8 @@ export function Board3D({
   onAct = null,
   plot = null,
   onPlotStep = null,
-  zoom = 'wide',
+  cameraView = 'side',
+  onCameraView = null,
   bottomInset = 0,
   camera = null,
   minimap = null,
@@ -144,30 +146,60 @@ export function Board3D({
   // Whether the camera follows the play (C19): a pan lets go of it, and it
   // takes hold again when the player's own Giff comes on the clock.
   const [hooked, setHooked] = useState(true);
+  // Each hook on purpose (own turn, "Follow the play", C) is counted, and
+  // the rig puts the zoom at the follow framing on each (2H.39, `00` C39).
+  const [hookPulse, setHookPulse] = useState(0);
+  const hookBack = useCallback(() => {
+    setHooked(true);
+    setHookPulse((n) => n + 1);
+  }, []);
   const onTheClock = state.turn?.unitId ?? null;
+  // Not at the opening, which stays on the whole silo even when the board
+  // mounts on the player's own turn.
+  const opened = useRef(false);
   useEffect(() => {
-    if (onTheClock !== null && onTheClock === yoursId) setHooked(true);
-  }, [onTheClock, yoursId]);
-  // Choosing a preset in the settings takes hold of the play again, as the
-  // board's own button did before 2H.38.
-  const firstZoom = useRef(true);
+    if (!opened.current) {
+      opened.current = true;
+      return;
+    }
+    if (onTheClock !== null && onTheClock === yoursId) hookBack();
+  }, [onTheClock, yoursId, hookBack]);
+  // Choosing a view takes hold of the play again and keeps the zoom.
+  const firstView = useRef(true);
   useEffect(() => {
-    if (firstZoom.current) {
-      firstZoom.current = false;
+    if (firstView.current) {
+      firstView.current = false;
       return;
     }
     setHooked(true);
-  }, [zoom]);
+  }, [cameraView]);
   // The match screen's ways in (2H.38): a chip, the minimap, the C key.
   useEffect(() => {
     if (!camera) return;
     camera.centre = (cell) => link.centreOn?.(cell);
-    camera.follow = () => setHooked(true);
+    camera.follow = hookBack;
     return () => {
       camera.centre = null;
       camera.follow = null;
     };
-  }, [camera, link]);
+  }, [camera, link, hookBack]);
+  // The plates follow the camera's distance (`00` C37 point 7): short near
+  // the whole silo and in the end views, the full name nearer. Read from the
+  // rig once a frame, React told only on a change.
+  const [platesShort, setPlatesShort] = useState(true);
+  useEffect(() => {
+    let shown = link.platesShort;
+    const tick = () => {
+      if (link.platesShort === shown) return;
+      shown = link.platesShort;
+      setPlatesShort(shown);
+    };
+    link.listeners.add(tick);
+    return () => {
+      link.listeners.delete(tick);
+    };
+  }, [link]);
+  const fixedView = cameraView === 'own' || cameraView === 'far';
 
   // -- Routes, as on the SVG board: the engine answers, this file asks ----------
   const canMove = onMove !== null;
@@ -407,7 +439,7 @@ export function Board3D({
             isYou={yoursId === unit.id}
             selected={selected === unit.id}
             onTheClock={state.turn?.unitId === unit.id}
-            wide={zoom === 'wide'}
+            wide={platesShort}
             player={names?.get(unit.id) ?? null}
           />
         ),
@@ -461,7 +493,7 @@ export function Board3D({
   }
 
   return (
-    <div style={S.frame} data-board3d data-zoom={zoom} data-camera={hooked ? 'following' : 'free'}>
+    <div style={S.frame} data-board3d data-view={cameraView} data-camera={hooked ? 'following' : 'free'}>
       <Canvas
         shadows="percentage"
         dpr={[1, 1.5]}
@@ -492,7 +524,14 @@ export function Board3D({
         />
         <directionalLight position={[-14, 18, -10]} intensity={0.7} color="#bcd3e0" />
 
-        <Rig zoom={zoom} link={link} hooked={hooked} onUnhook={() => setHooked(false)} />
+        <Rig
+          view={cameraView}
+          ownSign={own === 'A' ? -1 : 1}
+          link={link}
+          hooked={hooked}
+          hookPulse={hookPulse}
+          onUnhook={() => setHooked(false)}
+        />
 
         <Suspense fallback={null}>
           <Silo own={own} flash={flash} />
@@ -555,8 +594,8 @@ export function Board3D({
       <Floaters link={link} />
 
       {/* The minimap, top right (2H.38, `00` C37 point 7): folds away on a
-          click or M, and a click on it moves the camera there. The presets
-          moved to the settings panel. */}
+          click or M, and a click on it moves the camera there. Under it the
+          four views (2H.39, `00` C39), the one in use lit, V goes round. */}
       <div style={S.hud}>
         {minimap && (
           <button
@@ -573,12 +612,27 @@ export function Board3D({
         {(!minimap || minimap.open) && (
           <Minimap state={state} own={own} yoursId={yoursId} width={minimap?.width ?? 225} onPick={(cell) => link.centreOn?.(cell)} />
         )}
-        {!hooked && (
+        <div style={S.views} role="group" aria-label="Camera view" data-testid="camera-views">
+          {VIEWS.map((v) => (
+            <button
+              key={v}
+              className="ghost"
+              style={{ ...S.viewButton, ...(v === cameraView ? S.viewOn : null) }}
+              data-testid={`cam-${v}`}
+              aria-pressed={v === cameraView}
+              onClick={() => onCameraView?.(v)}
+              title={VIEW_TITLES[v]}
+            >
+              {VIEW_LABELS[v]}
+            </button>
+          ))}
+        </div>
+        {!hooked && !fixedView && (
           <button
             className="ghost"
             style={S.zoomButton}
             data-testid="follow-play"
-            onClick={() => setHooked(true)}
+            onClick={hookBack}
             title="Back on the play (C). The camera follows it again by itself when your Giff comes on the clock."
           >
             Follow the play · C
@@ -868,6 +922,14 @@ function FpsReadout({ link }: { link: SceneLink }) {
   return <span ref={ref} style={S.fps} data-testid="fps" />;
 }
 
+const VIEW_LABELS: Record<CameraView, string> = { side: 'Side', top: 'Top', own: 'Own end', far: 'Far end' };
+const VIEW_TITLES: Record<CameraView, string> = {
+  side: 'From the touchline, three quarters. Wheel to zoom, right button or arrows to move (V goes round the views)',
+  top: 'From the touchline, straight down. Wheel to zoom, right button or arrows to move',
+  own: 'From behind your Furnace, the pitch in depth. Fixed',
+  far: 'From behind the other Furnace, the pitch in depth. Fixed',
+};
+
 const S: Record<string, React.CSSProperties> = {
   frame: {
     flex: 1,
@@ -890,6 +952,16 @@ const S: Record<string, React.CSSProperties> = {
     pointerEvents: 'none',
   },
   zoomButton: { fontSize: 'calc(10px * var(--u, 1))', padding: '4px 9px', pointerEvents: 'auto', background: 'rgba(5,7,10,.8)' },
+  views: { display: 'flex', gap: 2, pointerEvents: 'auto' },
+  viewButton: {
+    fontSize: 'calc(10px * var(--u, 1))',
+    padding: 'calc(3px * var(--u, 1)) calc(7px * var(--u, 1))',
+    background: 'rgb(10 14 17 / 62%)',
+    textTransform: 'none',
+    letterSpacing: '.04em',
+    opacity: 0.75,
+  },
+  viewOn: { opacity: 1, color: BRASS, boxShadow: `inset 0 -2px 0 ${BRASS}` },
   mapTab: {
     fontSize: 'calc(10px * var(--u, 1))',
     padding: 'calc(2px * var(--u, 1)) calc(7px * var(--u, 1))',

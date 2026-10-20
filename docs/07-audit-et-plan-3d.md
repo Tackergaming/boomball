@@ -2165,3 +2165,20 @@ ajoutée à `.claude/settings.json`, `09e29aa`), déployé par Jérôme : le cla
 refusé `deploy-vercel.mjs --production` malgré la règle, peut-être faute d'une session qui l'a
 relue. **Sa partie : « tout est parfait. bravo. »** Deux demandes notées pour après 2H.39, en `08`
 §5 (2H.40, 2H.41).
+
+### Sous-phase 2H.39, « la caméra refaite », codée le 2026-10-20, porte ouverte
+
+Par le fil principal (Fable 5.1), seul, à partir de `00` C39, cadré le matin même en chat (une
+question par message, la première bornant l'ampleur) sur douze captures de la vraie scène prises
+par une spec Playwright jetable et rassemblées dans un artifact privé, puis validé en un lot
+(« go »). Rien dans le moteur, l'IA, les fonctions ni la base ; `ENGINE_VERSION` reste 11 ; pas de
+sweep. Détail en `00` C39, « comment 2H.39 est codée ».
+
+| Quoi | État |
+|---|---|
+| La caméra | Plus de mode libre. **Quatre vues** : Side (la touche à 52 degrés, l'arrivée au silo entier), Top (la touche à 85 degrés), Own end et Far end (derrière chaque bouche à 40 degrés, figées). La roulette sur Side et Top seulement, du silo avec ses quatre gradins à neuf cases de profondeur ; « Follow the play » part de dix-neuf cases de profondeur (la largeur, les deux rambardes et le premier rang des gradins, mesuré sur sa capture du 27 pouces) à chaque raccrochage, l'ouverture restant le silo entier ; **le bouton droit tire le sol** à la place de Ctrl, les flèches restent ; quatre boutons sous la minicarte et la touche V ; la section Camera de ⚙ retirée ; les plaques courtes à partir de 0,9 fois le silo entier (`link.platesShort`) ; la main brute (C20 tient) |
+| Tests | **847 sur 50 fichiers** (842, plus framing récrit de 19 à 24 tests, keys 2 de plus, un test de framing retiré) ; typecheck racine, scripts, e2e et client verts |
+| Harnais | **`e2e:board3d` vert en 11,5 min au portable** (1536 × 695) **et en 20,6 min au 27 pouces** (2560 × 1271), neuf captures de caméra lues : l'arrivée, le suivi après C, la roulette, le glisser droit, Top, Own end, Far end, le retour sur Side par V, le silo entier par la roulette. Trois runs rouges avant lui, aucun sur le code : le match e2e qui finissait au round 10, une case lointaine occupée par un Cracker (le spec choisit désormais une case sans Cracker, puisque C38 a rendu le Cracker cliquable), une égalité stricte sur un flottant. **Smoke 2D vert en 35 s** |
+| En ligne | **Le 2026-10-20 sur son feu vert**, bundle `index-8Llc-Pv3.js`, construit et déployé par le fil principal : **le classifieur du mode auto a laissé passer `node scripts/deploy-vercel.mjs --production`** cette fois, `curl` de la page en ligne relu |
+
+**Porte ouverte** : sa partie sur le portable et sur le 27 pouces.

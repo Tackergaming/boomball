@@ -45,7 +45,7 @@ import {
 import { provokedAlong } from '../../../engine/rules/reactions.js';
 import { activeUnits, sparkIsLive, type MatchState, type Unit, type UnitId } from '../../../engine/types.js';
 import { ARENA_HEIGHT, ARENA_WIDTH, arena, spec } from '../lib/arena.js';
-import type { Zoom } from '../board3d/framing.js';
+import type { CameraView } from '../board3d/framing.js';
 import type { Pending } from './ActionRow.js';
 import type { CameraControl } from './cameraControl.js';
 import { fxBridge } from './fxBridge.js';
@@ -97,8 +97,9 @@ export interface BoardProps {
 
   // -- 2H.38 (`00` C37), read by the 3D board; the flat board reads only the
   // -- last two, the hover and the labels beside a target. --
-  /** The camera preset, chosen in the settings panel. */
-  zoom?: Zoom;
+  /** The camera view (2H.39, `00` C39), remembered by the match screen, and the board's buttons to change it. */
+  cameraView?: CameraView;
+  onCameraView?: ((view: CameraView) => void) | null;
   /** The pixels at the bottom the action row covers: the camera frames the pitch above them. */
   bottomInset?: number;
   /** Filled in by the 3D board: centre on a cell, follow the play. */

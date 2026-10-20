@@ -111,7 +111,7 @@ export async function prefer2D(page: Page): Promise<void> {
 
 /**
  * The settings behind the gear (2H.38, `00` C37 point 4): replay speed, view,
- * camera preset, volumes, and the seat buttons. Opens the panel if it is
+ * volumes, and the seat buttons (the camera views are on the board since 2H.39). Opens the panel if it is
  * shut and returns it; `closeSettings` shuts it again with the gear.
  */
 export async function openSettings(page: Page) {

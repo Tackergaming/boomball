@@ -1,36 +1,37 @@
 /**
- * The camera: three quarters, plunging, in the player's hand (C18, C19, C20).
+ * The camera: four views, no free orbit (2H.39, `00` C39).
  *
- * J4 asked for a frame that holds still; Jérôme's first game in 3D asked for
- * the opposite, and C18 settles it. Two presets, the button on the board:
+ * Jérôme's first games in 3D asked for a camera in hand (C18, C19); his games
+ * on it found "des angles inutiles et injouables", and C39 settles it: the
+ * angle is fixed by the view, the zoom is a starting value the wheel changes.
  *
- * - **wide**: the whole pitch in the frame, centred, whatever the window's
- *   shape: the forty-five cells fit across, and the fifteen fit down.
- * - **close**: the pitch's full width in the frame's height, a cell to spare,
- *   and the camera glides along the pitch after whatever the match is about
- *   (the unit whose beat is playing, the unit on the clock, else the ball),
- *   clamped so it never looks past an end of the silo.
+ * - **side**: from the touchline at 52 degrees, own Furnace on the left. The
+ *   match opens here, on the whole silo (capture A1).
+ * - **top**: from the touchline at 85 degrees, the table's view.
+ * - **own** and **far**: from behind each Furnace at 40 degrees, the pitch in
+ *   depth, fixed: no wheel, no keys, no drag.
  *
- * On top of either preset the player drives the camera, and **the hand is
- * raw** (C20): a drag on the right (or middle) mouse button turns the camera
- * at once around the point it aims at, which does not move by a pixel; the
- * mouse moved with Ctrl held drags the floor along, stuck to the cursor; the
- * arrow keys slide the camera with a short inertia. The wheel sets a distance
- * the camera glides to. The left button stays the game's. A preset's distance
- * is worked out when the preset is chosen and when the frame changes shape,
- * at the preset tilt, and tilting changes nothing but the tilt.
+ * In the two touchline views the wheel sets a distance the camera glides to,
+ * between the silo with its stands and nine cells of depth; the right (or
+ * middle) mouse button drags the floor along, stuck to the cursor, and the
+ * arrow keys slide the camera with a short inertia. **The hand is raw**
+ * (C20): nothing is damped but the wheel's glide and the keys' inertia. The
+ * left button stays the game's.
  *
  * Any pan unhooks the camera from the play (C19); the board hooks it back
- * when the player's own Giff comes on the clock, on "Follow the play", and
- * when a preset is chosen again (which also puts the orbit back). Hooked, the
- * camera is calm: it changes what it follows once per action and no faster
- * than every four tenths of a second, and glides to it.
+ * when the player's own Giff comes on the clock, on "Follow the play" or C,
+ * and when a view is chosen. Each time it hooks back (not at the opening),
+ * the zoom goes to the follow framing: the pitch's width with its two rails
+ * and the first rows of the stands (`FOLLOW_DEPTH`). Hooked, the camera is
+ * calm: it changes what it follows once per action and no faster than every
+ * four tenths of a second, and glides to it, never looking past the pitch.
  *
  * The rig places the camera from the scene's frame loop (`link.camera`),
  * after the pieces are placed and before the labels follow, so the three
  * agree within one frame. It also publishes two projections of the camera:
  * the window-pixel one `cellToScreen` reads (`projection.ts`), and the
- * canvas-relative one the label layer follows (`link.project`).
+ * canvas-relative one the label layer follows (`link.project`); and whether
+ * the plates should be short at this distance (`link.platesShort`).
  */
 
 import { useThree } from '@react-three/fiber';
@@ -39,35 +40,36 @@ import { PerspectiveCamera, Vector3 } from 'three';
 
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../../../engine/constants.js';
 import {
+  clampDistance,
   clampPan,
-  clampTilt,
-  clampZoom,
   confine,
+  endViewDistance,
+  followDistance,
+  followTarget,
   groundCentreOffsetPerUnit,
-  groundDepthPerUnit,
   insetLens,
   orbitPosition,
-  PRESET_TILT,
-  presetDistance,
+  platesShort,
   viewAxes,
-  type Zoom,
+  viewSpec,
+  wholeSiloDistance,
+  zoomBounds,
+  type CameraView,
 } from './framing.js';
-import { cellCentre, PITCH_LENGTH, PITCH_WIDTH } from './layoutGeometry.js';
+import { cellCentre } from './layoutGeometry.js';
 import { setProjector } from './projection.js';
 import type { SceneLink } from './scene.js';
 
-export type { Zoom } from './framing.js';
+export type { CameraView } from './framing.js';
 
 /** The lens the canvas is made with, before the action row's inset (`Board3D.tsx`). */
 const BASE_FOV = 36;
 
-/** Radians of orbit per pixel of drag. */
-const YAW_PER_PX = 0.006;
-const TILT_PER_PX = 0.004;
 /** The wheel's bite: one notch of 100 is about ten per cent of distance. */
 const WHEEL_RATE = 0.001;
-/** Seconds for the distance to settle after the wheel. */
+/** Seconds for the distance to settle after the wheel, and for a view change. */
 const ZOOM_EASE = 0.1;
+const VIEW_EASE = 0.3;
 /** Cells per second under an arrow key, per unit of camera distance, and how long the speed takes to build or die. */
 const KEY_PAN_RATE = 0.5;
 const KEY_EASE = 0.15;
@@ -91,15 +93,22 @@ function typing(target: EventTarget | null): boolean {
 const settle = (delta: number, ease: number): number => 1 - Math.exp(-delta / ease);
 
 export interface RigProps {
-  zoom: Zoom;
+  view: CameraView;
+  /** The sign of own Furnace's world x: the end views look from behind it or the other. */
+  ownSign: 1 | -1;
   link: SceneLink;
   /** True while the camera follows the play; the board owns it. */
   hooked: boolean;
+  /**
+   * Counts the times the board hooked the camera back on purpose (own turn,
+   * "Follow the play", C): each one puts the zoom at the follow framing.
+   */
+  hookPulse: number;
   /** Called once when a pan lets go of the play. */
   onUnhook: () => void;
 }
 
-export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
+export function Rig({ view, ownSign, link, hooked, hookPulse, onUnhook }: RigProps) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const gl = useThree((s) => s.gl);
 
@@ -107,19 +116,19 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
   const cam = useRef({
     /** The ground point centred in the frame. */
     target: { x: 0, z: 0 },
-    yaw: 0,
-    tilt: PRESET_TILT,
-    /** The wheel's factor over the preset distance. */
-    zoom: 1,
-    /** The preset distance, worked out at the preset tilt for the frame's aspect. */
-    preset: 30,
-    presetAspect: 0,
-    /** The distance the camera is actually at, gliding to preset × zoom. */
+    /** The distance the wheel asks for; null until the first frame opens on the whole silo. */
+    wanted: null as number | null,
+    /** The distance the camera is actually at, gliding to `wanted`. */
     distance: 30,
     /** The arrow keys' speed, in the frame's directions. */
     vel: { forward: 0, right: 0 },
     /** What the hooked camera is on, when it got there, and where that is. */
     follow: { key: null as string | null, since: 0, at: { x: 0, z: 0 } },
+    /** The last hook pulse answered. */
+    pulse: hookPulse,
+    /** The last view placed, to glide between two rather than cut. */
+    view: null as CameraView | null,
+    ease: ZOOM_EASE,
     settled: false,
     frames: 0,
     fpsSince: 0,
@@ -134,9 +143,15 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
   const lookAt = useRef(new Vector3());
   const hookedRef = useRef(hooked);
   hookedRef.current = hooked;
-  const zoomRef = useRef(zoom);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const ownRef = useRef(ownSign);
+  ownRef.current = ownSign;
+  const pulseRef = useRef(hookPulse);
+  pulseRef.current = hookPulse;
   const unhookRef = useRef(onUnhook);
   unhookRef.current = onUnhook;
+  const spec = () => viewSpec(viewRef.current, ownRef.current);
 
   // Both projectors are the camera itself, read at the time of the call.
   useEffect(() => {
@@ -161,70 +176,44 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
     };
   }, [camera, gl, link]);
 
-  // Choosing a preset puts the orbit back to the fixed view and asks for the
-  // preset distance again.
-  useEffect(() => {
-    zoomRef.current = zoom;
-    const c = cam.current;
-    c.yaw = 0;
-    c.tilt = PRESET_TILT;
-    c.zoom = 1;
-    c.presetAspect = 0;
-  }, [zoom]);
-
-  // The hand: right or middle button to turn, Ctrl with the mouse to drag the
-  // floor, the arrow keys to slide, the wheel to zoom. All raw but the wheel.
+  // The hand: the wheel to zoom, the right or middle button to drag the
+  // floor, the arrow keys to slide. All raw but the wheel's glide and the
+  // keys' inertia. Nothing in the two end views.
   useEffect(() => {
     const el = gl.domElement;
     let pointer: number | null = null;
     let lastX = 0;
     let lastY = 0;
-    let ctrlX: number | null = null;
-    let ctrlY = 0;
     const letGo = () => {
       if (hookedRef.current) unhookRef.current();
     };
     const down = (e: PointerEvent) => {
       if (e.button !== 2 && e.button !== 1) return;
+      e.preventDefault();
+      if (!spec().zoomable) return;
       pointer = e.pointerId;
       lastX = e.clientX;
       lastY = e.clientY;
-      e.preventDefault();
     };
     const move = (e: PointerEvent) => {
+      if (e.pointerId !== pointer) return;
       const c = cam.current;
-      if (e.pointerId === pointer) {
-        c.yaw -= (e.clientX - lastX) * YAW_PER_PX;
-        c.tilt = clampTilt(c.tilt + (e.clientY - lastY) * TILT_PER_PX);
-        lastX = e.clientX;
-        lastY = e.clientY;
-        return;
-      }
-      // Ctrl with the mouse pans only over the scene itself.
-      if (!e.ctrlKey || e.target !== el) {
-        ctrlX = null;
-        return;
-      }
-      if (ctrlX === null) {
-        ctrlX = e.clientX;
-        ctrlY = e.clientY;
-        return;
-      }
-      const dx = e.clientX - ctrlX;
-      const dy = e.clientY - ctrlY;
-      ctrlX = e.clientX;
-      ctrlY = e.clientY;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
       if (dx === 0 && dy === 0) return;
       letGo();
       // One pixel of the frame is this much floor at the point aimed at,
       // across; along the view the floor is foreshortened by the tilt.
       // The usable lens spans the frame above the row at the same pixel scale.
+      const { yaw, tilt } = spec();
       const fov = lens.current.fov;
       const usableHeight = Math.max(1, el.clientHeight - Math.min(link.bottomInset, el.clientHeight * 0.5));
       const perPx = (2 * c.distance * Math.tan(fov / 2)) / usableHeight;
-      const axes = viewAxes(c.yaw);
+      const axes = viewAxes(yaw);
       const across = -dx * perPx;
-      const along = (dy * perPx) / Math.sin(c.tilt);
+      const along = (dy * perPx) / Math.sin(tilt);
       c.target = clampPan({
         x: c.target.x + axes.right.x * across + axes.forward.x * along,
         z: c.target.z + axes.right.z * across + axes.forward.z * along,
@@ -235,13 +224,17 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
     };
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (!spec().zoomable) return;
       const c = cam.current;
-      c.zoom = clampZoom(c.zoom * Math.exp(e.deltaY * WHEEL_RATE));
+      if (c.wanted === null) return;
+      c.wanted = c.wanted * Math.exp(e.deltaY * WHEEL_RATE);
+      c.ease = ZOOM_EASE;
     };
     const menu = (e: Event) => e.preventDefault();
     const keyDown = (e: KeyboardEvent) => {
       if (!(e.key in PAN_KEYS) || typing(e.target)) return;
       e.preventDefault();
+      if (!spec().zoomable) return;
       keys.current.add(e.key);
       letGo();
     };
@@ -273,8 +266,10 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
 
   // The three ways in from the screen (2H.38, `00` C37): a chip or the
   // minimap puts a cell in the middle of the frame and lets go of the play.
+  // Nothing in the two end views, which do not move.
   useEffect(() => {
     link.centreOn = (cell) => {
+      if (!spec().zoomable) return;
       const c = cellCentre(cell);
       cam.current.target = clampPan({ x: c.x, z: c.z });
       cam.current.vel = { forward: 0, right: 0 };
@@ -289,7 +284,7 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
   useEffect(() => {
     link.camera = (delta: number) => {
       const c = cam.current;
-      const z = zoomRef.current;
+      const { yaw, tilt, zoomable } = spec();
       const now = performance.now();
 
       // The lens above the action row (2H.38). Re-applied whenever the
@@ -309,15 +304,34 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
       const fov = lens.current.fov;
       const aspect = lens.current.aspect;
 
-      // The preset distance, at the preset tilt, for this frame's shape.
-      if (Math.abs(aspect - c.presetAspect) > 1e-6) {
-        c.preset = presetDistance(z, aspect, fov, PRESET_TILT);
-        c.presetAspect = aspect;
+      // The distance asked for: the whole silo at the opening, the follow
+      // framing each time the board hooks the camera back on purpose, the
+      // wheel in between; the end views stand where the length fits.
+      if (c.wanted === null) c.wanted = wholeSiloDistance(aspect, fov, tilt);
+      if (pulseRef.current !== c.pulse) {
+        c.pulse = pulseRef.current;
+        if (zoomable) c.wanted = followDistance(tilt, fov);
+        c.ease = ZOOM_EASE;
       }
-      const wanted = c.preset * c.zoom;
-      c.distance = c.settled ? c.distance + (wanted - c.distance) * settle(delta, ZOOM_EASE) : wanted;
+      if (c.view !== viewRef.current) {
+        c.view = viewRef.current;
+        c.ease = VIEW_EASE;
+      }
+      let wanted: number;
+      if (zoomable) {
+        c.wanted = clampDistance(c.wanted, zoomBounds(aspect, fov, tilt));
+        wanted = c.wanted;
+      } else {
+        wanted = endViewDistance(fov);
+      }
+      c.distance = c.settled ? c.distance + (wanted - c.distance) * settle(delta, c.ease) : wanted;
+      link.platesShort = !zoomable || platesShort(c.distance, aspect, fov, tilt);
 
-      if (hookedRef.current) {
+      if (!zoomable) {
+        // Fixed on the pitch's centre; nothing moves it.
+        c.target = c.settled ? { x: c.target.x * (1 - settle(delta, VIEW_EASE)), z: c.target.z * (1 - settle(delta, VIEW_EASE)) } : { x: 0, z: 0 };
+        c.vel = { forward: 0, right: 0 };
+      } else if (hookedRef.current) {
         // Calm following: a new thing to follow is taken up once the last one
         // has had its moment; the thing followed is tracked as it moves.
         const key = link.focusKey;
@@ -326,25 +340,14 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
           c.follow.since = now;
         }
         if (key === c.follow.key) c.follow.at = { x: link.focus.x, z: link.focus.z };
-
-        let tx = 0;
-        let tz = 0;
-        if (z === 'close') {
-          const halfSpan = c.distance * Math.tan(fov / 2) * aspect;
-          const limit = Math.max(0, PITCH_LENGTH / 2 + 1 - halfSpan);
-          tx = Math.max(-limit, Math.min(limit, c.follow.at.x));
-          // The whole width is in the frame at the preset; nearer than that,
-          // the camera slides across after the play too.
-          const depth = c.distance * groundDepthPerUnit(c.tilt, fov);
-          tz = c.follow.at.z * Math.max(0, 1 - depth / PITCH_WIDTH);
-        }
+        const t = followTarget(c.follow.at, c.distance, aspect, fov, tilt);
         if (c.settled) {
           const k = settle(delta, FOLLOW_EASE);
-          c.target = { x: c.target.x + (tx - c.target.x) * k, z: c.target.z + (tz - c.target.z) * k };
-        } else c.target = { x: tx, z: tz };
+          c.target = { x: c.target.x + (t.x - c.target.x) * k, z: c.target.z + (t.z - c.target.z) * k };
+        } else c.target = t;
         c.vel = { forward: 0, right: 0 };
       } else {
-        // The arrow keys, with a short inertia; Ctrl with the mouse has
+        // The arrow keys, with a short inertia; the right button has
         // already moved the target directly.
         let forward = 0;
         let right = 0;
@@ -360,7 +363,7 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
         c.vel.forward += (forward * speed - c.vel.forward) * k;
         c.vel.right += (right * speed - c.vel.right) * k;
         if (Math.abs(c.vel.forward) > 1e-3 || Math.abs(c.vel.right) > 1e-3) {
-          const axes = viewAxes(c.yaw);
+          const axes = viewAxes(yaw);
           c.target = clampPan({
             x: c.target.x + (axes.forward.x * c.vel.forward + axes.right.x * c.vel.right) * delta,
             z: c.target.z + (axes.forward.z * c.vel.forward + axes.right.z * c.vel.right) * delta,
@@ -371,11 +374,11 @@ export function Rig({ zoom, link, hooked, onUnhook }: RigProps) {
 
       // The frame covers more floor beyond the point looked at than before
       // it: look that much short of the target, along the view, to centre
-      // it. The target itself never moves when the camera turns.
-      const short = c.distance * groundCentreOffsetPerUnit(c.tilt, fov);
-      lookAt.current.set(c.target.x + short * Math.sin(c.yaw), 0, c.target.z + short * Math.cos(c.yaw));
+      // it. The target itself never moves when the view changes.
+      const short = c.distance * groundCentreOffsetPerUnit(tilt, fov);
+      lookAt.current.set(c.target.x + short * Math.sin(yaw), 0, c.target.z + short * Math.cos(yaw));
       // Inside the silo (C22): the walls and the end plates stop the camera.
-      const p = confine(orbitPosition({ x: lookAt.current.x, z: lookAt.current.z }, c, c.distance));
+      const p = confine(orbitPosition({ x: lookAt.current.x, z: lookAt.current.z }, { yaw, tilt }, c.distance));
       camera.position.set(p.x, p.y, p.z);
       camera.lookAt(lookAt.current);
       camera.updateMatrixWorld();

@@ -25,6 +25,7 @@ describe('commandForKey', () => {
     expect(commandForKey({ key: 'e' }, mine)).toEqual({ kind: 'endTurn' });
     expect(commandForKey({ key: 'Escape' }, mine)).toEqual({ kind: 'escape' });
     expect(commandForKey({ key: 'c' }, mine)).toEqual({ kind: 'follow' });
+    expect(commandForKey({ key: 'v' }, mine)).toEqual({ kind: 'view' });
     expect(commandForKey({ key: 'l' }, mine)).toEqual({ kind: 'log' });
     expect(commandForKey({ key: 'm' }, mine)).toEqual({ kind: 'minimap' });
     expect(commandForKey({ key: 'f' }, mine)).toEqual({ kind: 'fullscreen' });
@@ -56,6 +57,7 @@ describe('commandForKey', () => {
     expect(commandForKey({ key: 'e' }, theirs)).toBeNull();
     expect(commandForKey({ key: 'Escape' }, theirs)).toEqual({ kind: 'escape' });
     expect(commandForKey({ key: 'c' }, theirs)).toEqual({ kind: 'follow' });
+    expect(commandForKey({ key: 'v' }, theirs)).toEqual({ kind: 'view' });
     expect(commandForKey({ key: 'l' }, theirs)).toEqual({ kind: 'log' });
     expect(commandForKey({ key: 'm' }, theirs)).toEqual({ kind: 'minimap' });
     expect(commandForKey({ key: 'f' }, theirs)).toEqual({ kind: 'fullscreen' });

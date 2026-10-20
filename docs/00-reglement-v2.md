@@ -3692,3 +3692,105 @@ C38 est franchie sur ses deux écrans.
    chambouler tout l'ordre des joueurs et leurs initiatives pour l'équipe de l'humain ». Touche au
    moteur (l'initiative, écarts 51, 55, 58 et 65, le siège), aux fonctions et à `ENGINE_VERSION` :
    un lot à cadrer en chat, une question par message, la première bornant l'ampleur.
+
+## C39. Décisions du 2026-10-20, **la caméra refaite, sous-phase 2H.39, cadrée en chat sur douze captures**
+
+> Écrites par le fil principal (Fable 5.1) au bout d'un cadrage en chat le 2026-10-20, une
+> question par message, la première bornant l'ampleur, puis sur douze captures de la vraie scène
+> prises par une spec Playwright jetable (artifact privé
+> https://claude.ai/artifact/4USmvh2HpF7BdiCqn7hkmP, familles A de la touche, B du dessus, C de
+> son camp, D rapproché), et validées en un lot (« go »). **Aucun écart de règle, rien dans le
+> moteur, l'IA ni les fonctions, `ENGINE_VERSION` reste 11.** Client seul. C18 à C22 sont
+> remplacés par ce qui suit pour tout ce qui touche à la rotation, à l'inclinaison et au
+> déplacement ; le refus de C20 d'une caméra à quatre nombres lissés tient toujours : la main
+> reste brute.
+
+**Son point de départ, dans ses mots.** « Aujourd'hui la caméra en mode libre permet des angles
+inutiles et injouables. Je pense qu'il faudrait sortir du mode libre et passer à quelques angles
+autorisés seulement en laissant la possibilité de zoomer. Je n'aime pas non plus le niveau de zoom
+du départ et du Follow the play, il est trop bas (trop zoomé), on devrait avoir un zoom plus haut
+qui permet de voir les deux stades dans l'écran. Et déplacer la caméra avec la touche Ctrl n'est
+pas intuitif pour tout le monde, il faudrait autre chose. » Puis, sur les captures : « le truc à
+régler et fixer c'est l'angle autorisé, et le zoom est une valeur de départ mais reste modifiable
+à la roulette. » Sur la vue de son camp à 40 degrés (C3) : « j'aime bien mais on le bloque même au
+zoom et il devrait exister aussi de la vue de la bouche de l'adversaire. »
+
+**Les quatre vues, tranchées par lui.**
+
+1. **Side**, de la touche, inclinaison 52 degrés, sa bouche à gauche (l'azimut zéro de J4). La
+   roulette est permise. **C'est la vue d'arrivée**, au zoom du silo entier (capture A1, l'ancien
+   « Whole silo »). L'ancien « Close in » (D1) n'est que cette vue au zoom proche.
+2. **Top**, de la touche, inclinaison 85 degrés, le dessus (B1 et D2). La roulette est permise.
+3. **Own end**, derrière sa bouche, inclinaison 40 degrés, le terrain en profondeur (C3). **Figée** :
+   ni roulette, ni flèches, ni glisser ; le zoom est celui de C3, la caméra retenue par la plaque du
+   fond (`confine`).
+4. **Far end**, derrière la bouche adverse, inclinaison 40 degrés, symétrique. Figée.
+
+**Le zoom**, sur Side et Top seulement. Les bornes (choix du fil principal, accepté) : au plus
+loin le silo avec ses quatre gradins (B2, une fois et demie le silo entier), au plus près une
+douzaine de cases de large (D3). **Le départ de Follow the play** est la largeur du terrain plus
+les deux rambardes et les premiers rangs des gradins dans l'image (sa capture du 27 pouces,
+mesurée au code : dix-neuf cases de profondeur au lieu des seize de l'ancien Close in,
+`FOLLOW_DEPTH`), et la roulette le change ensuite. Chaque raccrochage sur le jeu (son tour,
+« Follow the play », C) remet ce zoom ; l'ouverture d'un match, elle, est toujours le silo
+entier, même si le plateau s'ouvre sur son tour. Le zoom est gardé tant que le plateau est monté
+(la vue, elle, d'un match à l'autre).
+
+**Le déplacement**, sur Side et Top seulement, tranché par lui dans un choix fermé : **le bouton
+droit tire le sol**, collé au curseur, brut (il ne tourne plus rien), et **les flèches restent**
+avec leur inertie. Bornes d'aujourd'hui, le terrain plus une case. Tout déplacement décroche le
+suivi, comme avant. Ctrl plus la souris disparaît.
+
+**Le suivi.** Sur Side et Top, la caméra glisse après le pion qui agit, calme comme en C20, et
+revient à son tour, par « Follow the play », la touche C, une pastille ou la minicarte. Sur Own
+end et Far end, la caméra ne bouge jamais, et rien ne la ramène sur Side à son tour : la vue reste
+celle qu'il a choisie jusqu'à ce qu'il en change (choix du fil principal, accepté).
+
+**Le passage d'une vue à l'autre**, tranché par lui : **quatre petits boutons sur le plateau**, en
+haut à droite sous la minicarte, celui en cours allumé, et **la touche V** qui fait le tour des
+quatre. Rien dans ⚙ : la section Camera du panneau disparaît. Changer de vue garde le zoom et
+remet la caméra sur le jeu (choix du fil principal, accepté). La vue est gardée d'un match à
+l'autre.
+
+**Ce qui disparaît** : la rotation au bouton droit, l'inclinaison à la main, Ctrl plus la souris,
+les cadrages « Close in » et « Whole silo ».
+
+**Ce que ces décisions rouvrent.** Rien dans les constantes de `00`, rien dans `ai/`, rien dans
+`engine/`. `client/src/board3d/framing.ts` et `Camera.tsx` récrits autour des quatre vues,
+`Board3D.tsx` pour les boutons, `screens/Match.tsx` (la vue à la place du zoom, la touche V),
+`match/SettingsPanel.tsx`, le briefing et la liste des touches, `e2e/board3d.spec.ts` et le
+harnais. Fil principal seul. Pas de sweep.
+
+**Sa porte** : `npm run e2e:board3d` vert avec une capture par vue aux deux tailles, puis sa
+partie sur le portable et le 27 pouces.
+
+**Comment 2H.39 est codée** (le 2026-10-20, fil principal Fable 5.1, seul ; rien dans le moteur,
+l'IA ni les fonctions, `ENGINE_VERSION` 11). **La géométrie** : `framing.ts` récrit autour de
+`CameraView` (`side`, `top`, `own`, `far`), `viewSpec` (azimut, inclinaison, `zoomable` ; les deux
+vues de bout lisent le signe de la bouche du joueur, `ownSign`), `wholeSiloDistance` (l'ouverture),
+`followDistance` et `FOLLOW_DEPTH` (dix-neuf cases), `zoomBounds` (`NEAREST_DEPTH` 9,
+`FARTHEST_OVER_SILO` 1,5), `endViewDistance` (la longueur plus deux dans la hauteur à 40 degrés,
+au-dessus du haut du tube donc jamais retenue par la plaque), `followTarget` (le point suivi, tiré
+en arrière pour ne jamais regarder au-delà du terrain plus une case : au silo entier il vaut zéro
+et la caméra ne bouge pas), `platesShort` (plaques courtes à partir de 0,9 fois le silo entier et
+dans les vues de bout), `nextView` pour V. Disparus : `Orbit`, `presetOrbit`, `clampTilt`,
+`clampZoom`, `MIN_TILT`, `MAX_TILT`, `MIN_ZOOM`, `MAX_ZOOM`, `presetDistance`, `PRESET_TILT`, le
+type `Zoom`. **Le rig** (`Camera.tsx`) : la distance voulue est `null` jusqu'à la première image,
+qui l'ouvre au silo entier ; un compteur `hookPulse` passé par `Board3D` (incrémenté à son tour
+après l'ouverture, sur « Follow the play » et sur C) la remet à `followDistance` ; la roulette la
+multiplie, bornée par `zoomBounds` ; un changement de vue glisse en trois dixièmes
+(`VIEW_EASE`) et garde la distance ; les vues de bout tiennent `endViewDistance` et la cible au
+centre. Le bouton droit (ou du milieu) tire le sol avec la formule de l'ancien Ctrl ; les flèches
+gardent leur inertie ; roulette, flèches, glisser, `centreOn` ne font rien dans une vue de bout.
+Le rig écrit `link.platesShort` à chaque image et `Board3D` le lit par un écouteur de la boucle
+(`setState` sur changement seulement), à la place de `zoom === 'wide'`. **L'écran** : `Match.tsx`
+porte `cameraView` (gardée sous `boomball.cameraView`) à la place de `zoom`, passée au plateau
+avec `onCameraView` ; la touche V (`keys.ts`, `{ kind: 'view' }`) fait `nextView` en 3D ;
+`SettingsPanel` perd ses props `zoom` et `onZoom` et sa ligne Camera, sa liste de touches gagne
+V, le glisser droit et la roulette ; le briefing est récrit. **Le plateau** : quatre boutons
+`cam-side`, `cam-top`, `cam-own`, `cam-far` (`aria-pressed`, groupe `camera-views`) sous la
+minicarte, « Follow the play » caché dans une vue de bout, `data-view` à la place de `data-zoom`
+sur `[data-board3d]`. **Le harnais** : `board3d.spec.ts` capture l'arrivée, le suivi après C, la
+roulette, le glisser droit, les flèches, puis Top, Own end (roulette et flèches sans effet,
+pas de bouton Follow), Far end, et V qui ramène sur Side ; plus aucun `zoom-close` ni
+`zoom-wide`. 847 tests sur 50 fichiers.

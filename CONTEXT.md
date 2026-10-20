@@ -18,6 +18,14 @@ un humain.
 `07-audit-et-plan-3d.md` est l'audit du 2026-10-09, avec les décisions D1 à D11 et le journal des
 phases ; `04-etat-des-lieux.md` est l'historique de ce qui a été construit et pourquoi.
 
+**État au 2026-10-20.** **2H.39, la caméra refaite, est cadrée et codée** (`00` C39) : plus de mode
+libre, quatre vues (Side à 52 degrés, Top à 85, Own end et Far end à 40 derrière chaque bouche,
+figées), la roulette sur Side et Top, Follow the play qui part de la largeur plus les deux
+rambardes, le bouton droit qui tire le sol à la place de Ctrl, quatre boutons sous la minicarte et
+la touche V. 847 tests, `e2e:board3d` vert aux deux tailles, smoke vert, **en ligne le même jour sur mon
+feu vert** (`index-8Llc-Pv3.js`). Reste ma partie sur les deux écrans. Puis
+2H.40 et 2H.41, à cadrer.
+
 **État au 2026-10-19 au soir.** Mon retour de partie sur 2H.38 est codé et en ligne (`00` C38) : les
 actions sur une cible au survol et dans la rangée, avec leurs chances, le clic n'ouvre que la
 fiche. « Tout est parfait. » Suite : 2H.39 la caméra, puis 2H.40 une réplique pour le Spark
@@ -36,7 +44,7 @@ migrations 0013 et 0014 (un déclencheur fige `team_id`, l'insertion est « sa p
 du moteur et de `resolve-action` (v28), M3 et m4 par la migration 0015 (les trois canaux Realtime
 privés, la base diffuse elle-même, `private_only` sur le projet, fonctions v29 et v26), m2, m3,
 m5 acceptés, m6 écrite en 0016 à appliquer, n8 au prochain lot client. Le client de 2H.36 puis
-celui de 2H.37 mis en ligne sur mon feu vert. Le 2026-10-19, 2H.38, l'écran de match refait (`00` C37), est codée et en ligne le même jour avec n8 (mot de passe à 8 caractères). 842 tests. Reste ma partie à deux sur les canaux
+celui de 2H.37 mis en ligne sur mon feu vert. Le 2026-10-19, 2H.38, l'écran de match refait (`00` C37), est codée et en ligne le même jour avec n8 (mot de passe à 8 caractères). Le 2026-10-20, 2H.39, la caméra refaite (`00` C39), est codée. 847 tests. Reste ma partie à deux sur les canaux
 privés, 0016, puis un ami qui joue sans moi. Ce qui suit est dans
 `docs/05-reprise-chat-suivant.md`.
 

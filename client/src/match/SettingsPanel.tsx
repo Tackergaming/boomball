@@ -20,9 +20,6 @@ export interface SettingsPanelProps {
   view: '2d' | '3d';
   hasWebgl: boolean;
   onView: (view: '2d' | '3d') => void;
-  /** null masque la ligne Camera (le plateau 2D n'a pas de caméra). */
-  zoom: 'wide' | 'close' | null;
-  onZoom: (zoom: 'wide' | 'close') => void;
   /** De 0 à 1. */
   volumes: Readonly<Record<VolumeChannel, number>>;
   onVolume: (channel: VolumeChannel, value: number) => void;
@@ -144,10 +141,13 @@ const KEYS: ReadonlyArray<readonly [string, string]> = [
   ['E E', 'end turn'],
   ['Esc', 'cancel, close'],
   ['C', 'follow the play'],
+  ['V', 'next camera view'],
   ['L', 'log'],
   ['M', 'minimap'],
   ['F', 'fullscreen'],
   ['← ↑ → ↓', 'move the camera'],
+  ['right drag', 'move the camera'],
+  ['wheel', 'zoom'],
 ];
 
 const VOLUME_ROWS: ReadonlyArray<readonly [VolumeChannel, string]> = [
@@ -186,7 +186,7 @@ function SegButton(props: {
 }
 
 export function SettingsPanel(props: SettingsPanelProps): ReactElement {
-  const { speed, view, hasWebgl, zoom, volumes, seat, onClose } = props;
+  const { speed, view, hasWebgl, volumes, seat, onClose } = props;
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -237,16 +237,6 @@ export function SettingsPanel(props: SettingsPanelProps): ReactElement {
           <SegButton testId="view-2d" on={view === '2d'} label="2D" onClick={() => props.onView('2d')} />
         </Seg>
       </div>
-
-      {zoom !== null && (
-        <div style={S.line}>
-          <span style={S.label}>Camera</span>
-          <Seg>
-            <SegButton testId="zoom-close" on={zoom === 'close'} label="Close in" onClick={() => props.onZoom('close')} />
-            <SegButton testId="zoom-wide" on={zoom === 'wide'} label="Whole silo" onClick={() => props.onZoom('wide')} />
-          </Seg>
-        </div>
-      )}
 
       <div style={S.lineTop}>
         <span style={S.label}>Sound</span>

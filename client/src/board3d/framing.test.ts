@@ -1,31 +1,41 @@
 /**
- * The camera's framing must fit what it claims (C18): the close preset shows
- * the pitch's width, the wide preset the whole silo, the orbit stays bounded
- * and a camera placed on it looks down at its target from the right side.
+ * The camera's framing must fit what it claims (C18, C39): the side view
+ * opens on the whole silo, "Follow the play" shows the width with its rails
+ * and stands, the end views fit the length, the zoom stays between the
+ * silo's stands and nine cells, the pan stays on the pitch, and a camera
+ * placed on a view looks down at its target from the right side.
  */
 
 import { describe, expect, it } from 'vitest';
 
 import {
-  MAX_TILT,
-  MAX_ZOOM,
-  MIN_TILT,
-  MIN_ZOOM,
+  END_TILT,
+  FARTHEST_OVER_SILO,
+  FOLLOW_DEPTH,
+  NEAREST_DEPTH,
   PAN_MARGIN,
-  PRESET_TILT,
+  SIDE_TILT,
+  TOP_TILT,
+  VIEWS,
+  clampDistance,
   clampPan,
-  clampTilt,
-  clampZoom,
   confine,
   distanceForDepth,
   distanceForSpan,
+  endViewDistance,
+  followDistance,
+  followTarget,
   groundCentreOffsetPerUnit,
   groundDepthPerUnit,
   insetLens,
+  isCameraView,
+  nextView,
   orbitPosition,
-  presetDistance,
-  presetOrbit,
+  platesShort,
   viewAxes,
+  viewSpec,
+  wholeSiloDistance,
+  zoomBounds,
 } from './framing.js';
 import { APRON_HALF, BACK_PLATE_X, PITCH_LENGTH, PITCH_WIDTH, TUBE_TOP } from './layoutGeometry.js';
 
@@ -39,48 +49,120 @@ function floorHit(height: number, angle: number): number {
 describe('ground framing', () => {
   it('covers, per unit of distance, the floor between the frame’s top and bottom edges', () => {
     const half = FOV / 2;
-    const height = Math.sin(PRESET_TILT);
-    const expected = floorHit(height, PRESET_TILT - half) - floorHit(height, PRESET_TILT + half);
-    expect(groundDepthPerUnit(PRESET_TILT, FOV)).toBeCloseTo(expected, 9);
+    const height = Math.sin(SIDE_TILT);
+    const expected = floorHit(height, SIDE_TILT - half) - floorHit(height, SIDE_TILT + half);
+    expect(groundDepthPerUnit(SIDE_TILT, FOV)).toBeCloseTo(expected, 9);
   });
 
   it('frames more floor beyond the point looked at than before it, from three quarters', () => {
-    expect(groundCentreOffsetPerUnit(PRESET_TILT, FOV)).toBeGreaterThan(0);
+    expect(groundCentreOffsetPerUnit(SIDE_TILT, FOV)).toBeGreaterThan(0);
     // Straight down, the frame is symmetric around the point looked at.
     expect(groundCentreOffsetPerUnit(Math.PI / 2 - 0.001, FOV)).toBeCloseTo(0, 3);
   });
 
   it('keeps a finite depth even with the horizon in the frame', () => {
-    expect(Number.isFinite(groundDepthPerUnit(MIN_TILT, (60 * Math.PI) / 180))).toBe(true);
+    expect(Number.isFinite(groundDepthPerUnit(END_TILT, (60 * Math.PI) / 180))).toBe(true);
   });
 
   it('fits exactly the cells asked for', () => {
-    const d = distanceForDepth(16, PRESET_TILT, FOV);
-    expect(d * groundDepthPerUnit(PRESET_TILT, FOV)).toBeCloseTo(16, 9);
+    const d = distanceForDepth(16, SIDE_TILT, FOV);
+    expect(d * groundDepthPerUnit(SIDE_TILT, FOV)).toBeCloseTo(16, 9);
     const s = distanceForSpan(47, 16 / 9, FOV);
     expect(2 * s * Math.tan(FOV / 2) * (16 / 9)).toBeCloseTo(47, 9);
   });
 });
 
-describe('presets', () => {
-  it('close shows the pitch’s width with a cell to spare, whatever the aspect', () => {
-    for (const aspect of [1, 16 / 9, 2.4]) {
-      const d = presetDistance('close', aspect, FOV, PRESET_TILT);
-      expect(d * groundDepthPerUnit(PRESET_TILT, FOV)).toBeCloseTo(PITCH_WIDTH + 1, 9);
+describe('the four views (C39)', () => {
+  it('are side, top, own end and far end, and V goes round them', () => {
+    expect(VIEWS).toEqual(['side', 'top', 'own', 'far']);
+    expect(nextView('side')).toBe('top');
+    expect(nextView('far')).toBe('side');
+    expect(isCameraView('top')).toBe(true);
+    expect(isCameraView('close')).toBe(false);
+    expect(isCameraView(null)).toBe(false);
+  });
+
+  it('fix the angle: 52 and 85 from the touchline, 40 from behind the Furnaces', () => {
+    expect(viewSpec('side')).toEqual({ yaw: 0, tilt: SIDE_TILT, zoomable: true });
+    expect(viewSpec('top')).toEqual({ yaw: 0, tilt: TOP_TILT, zoomable: true });
+    expect(SIDE_TILT).toBeCloseTo((52 * Math.PI) / 180, 9);
+    expect(TOP_TILT).toBeCloseTo((85 * Math.PI) / 180, 9);
+    expect(END_TILT).toBeCloseTo((40 * Math.PI) / 180, 9);
+  });
+
+  it('look from behind own Furnace, whichever end it is, and the far view from the other', () => {
+    // Own Furnace at the left of the side view (world -x): the camera stands at -x.
+    const own = viewSpec('own', -1);
+    expect(own.zoomable).toBe(false);
+    expect(Math.sin(own.yaw)).toBeCloseTo(-1, 9);
+    expect(Math.sin(viewSpec('far', -1).yaw)).toBeCloseTo(1, 9);
+    // The other side's own end is the other Furnace.
+    expect(Math.sin(viewSpec('own', 1).yaw)).toBeCloseTo(1, 9);
+    expect(Math.sin(viewSpec('far', 1).yaw)).toBeCloseTo(-1, 9);
+  });
+});
+
+describe('the distances (C39)', () => {
+  it('open on the whole silo: the length across, and never less than the width down', () => {
+    const landscape = wholeSiloDistance(16 / 9, FOV, SIDE_TILT);
+    expect(2 * landscape * Math.tan(FOV / 2) * (16 / 9)).toBeCloseTo(PITCH_LENGTH + 2, 9);
+    for (const aspect of [0.5, 1, 2.5]) {
+      expect(wholeSiloDistance(aspect, FOV, SIDE_TILT)).toBeGreaterThanOrEqual(distanceForDepth(PITCH_WIDTH + 1, SIDE_TILT, FOV));
     }
   });
 
-  it('close stands further back than the eighteen cells of 2H.15 on a landscape frame', () => {
-    const d = presetDistance('close', 16 / 9, FOV, PRESET_TILT);
-    expect(d).toBeGreaterThan(distanceForSpan(18, 16 / 9, FOV));
+  it('follow the play with the width, the rails and the first rows of the stands: nineteen cells down', () => {
+    expect(FOLLOW_DEPTH).toBe(PITCH_WIDTH + 4);
+    for (const tilt of [SIDE_TILT, TOP_TILT]) {
+      expect(followDistance(tilt, FOV) * groundDepthPerUnit(tilt, FOV)).toBeCloseTo(FOLLOW_DEPTH, 9);
+    }
+    // Nearer than the whole silo on a landscape frame, so the plates keep their names there.
+    expect(followDistance(SIDE_TILT, FOV)).toBeLessThan(wholeSiloDistance(2.5, FOV, SIDE_TILT));
+    expect(platesShort(followDistance(SIDE_TILT, FOV), 2.5, FOV, SIDE_TILT)).toBe(false);
+    expect(platesShort(wholeSiloDistance(2.5, FOV, SIDE_TILT), 2.5, FOV, SIDE_TILT)).toBe(true);
   });
 
-  it('wide shows the whole length across, and never less than the width', () => {
-    const landscape = presetDistance('wide', 16 / 9, FOV, PRESET_TILT);
-    expect(2 * landscape * Math.tan(FOV / 2) * (16 / 9)).toBeCloseTo(PITCH_LENGTH + 2, 9);
-    const tall = presetDistance('wide', 0.5, FOV, PRESET_TILT);
-    expect(tall).toBeGreaterThanOrEqual(presetDistance('close', 0.5, FOV, PRESET_TILT));
-    expect(landscape).toBeGreaterThan(presetDistance('close', 16 / 9, FOV, PRESET_TILT));
+  it('bound the wheel between the silo with its stands and nine cells of depth', () => {
+    expect(FARTHEST_OVER_SILO).toBe(1.5);
+    expect(NEAREST_DEPTH).toBe(9);
+    const b = zoomBounds(2.5, FOV, SIDE_TILT);
+    expect(b.far).toBeCloseTo(1.5 * wholeSiloDistance(2.5, FOV, SIDE_TILT), 9);
+    expect(b.near * groundDepthPerUnit(SIDE_TILT, FOV)).toBeCloseTo(9, 9);
+    expect(clampDistance(0, b)).toBe(b.near);
+    expect(clampDistance(999, b)).toBe(b.far);
+    expect(clampDistance((b.near + b.far) / 2, b)).toBeCloseTo((b.near + b.far) / 2, 9);
+  });
+
+  it('stand the end views where the whole length fits the frame’s height', () => {
+    expect(endViewDistance(FOV) * groundDepthPerUnit(END_TILT, FOV)).toBeCloseTo(PITCH_LENGTH + 2, 9);
+    // High enough to be above the open tube, so the end plate never stops it.
+    expect(endViewDistance(FOV) * Math.sin(END_TILT)).toBeGreaterThan(TUBE_TOP - 1);
+  });
+});
+
+describe('the hooked camera (C20, C39)', () => {
+  it('does not move while the pitch is framed whole', () => {
+    const d = wholeSiloDistance(2.5, FOV, SIDE_TILT);
+    const t = followTarget({ x: 15, z: -6 }, d, 2.5, FOV, SIDE_TILT);
+    expect(t.x).toBeCloseTo(0, 9);
+    expect(t.z).toBeCloseTo(0, 9);
+  });
+
+  it('keeps the thing followed in the frame without looking past the pitch', () => {
+    const d = followDistance(SIDE_TILT, FOV);
+    const t = followTarget({ x: 3, z: 1 }, d, 2.5, FOV, SIDE_TILT);
+    expect(t).toEqual({ x: 3, z: 0 });
+    const end = followTarget({ x: 40, z: 0 }, d, 2.5, FOV, SIDE_TILT);
+    const halfSpan = d * Math.tan(FOV / 2) * 2.5;
+    expect(end.x).toBeCloseTo(PITCH_LENGTH / 2 + PAN_MARGIN - halfSpan, 9);
+    expect(end.x).toBeLessThan(40);
+  });
+
+  it('slides across too once nearer than the width', () => {
+    const b = zoomBounds(2.5, FOV, SIDE_TILT);
+    const t = followTarget({ x: 0, z: 7 }, b.near, 2.5, FOV, SIDE_TILT);
+    expect(t.z).toBeGreaterThan(0);
+    expect(t.z).toBeLessThanOrEqual(PITCH_WIDTH / 2 + PAN_MARGIN);
   });
 });
 
@@ -118,7 +200,7 @@ describe('the silo around the camera (C22)', () => {
     expect(p.y).toBe(8);
   });
 
-  it('leaves a camera above the open top where it is, which is where the wide view stands', () => {
+  it('leaves a camera above the open top where it is, which is where the whole silo stands', () => {
     const p = confine({ x: 0, y: TUBE_TOP + 10, z: 26 });
     expect(p).toEqual({ x: 0, y: TUBE_TOP + 10, z: 26 });
   });
@@ -127,29 +209,14 @@ describe('the silo around the camera (C22)', () => {
     expect(confine({ x: 0, y: -3, z: 0 }).y).toBe(1.5);
   });
 
-  it('bounds the orbit tighter than before: thirty degrees up, one and a half times out', () => {
-    expect(MIN_TILT).toBeCloseTo((30 * Math.PI) / 180, 9);
-    expect(MAX_ZOOM).toBe(1.5);
+  it('pans one cell past the pitch at most', () => {
     expect(PAN_MARGIN).toBe(1);
   });
 });
 
 describe('the orbit', () => {
-  it('starts from the fixed three-quarter view of J4', () => {
-    expect(presetOrbit()).toEqual({ yaw: 0, tilt: PRESET_TILT, zoom: 1 });
-  });
-
-  it('is bounded in tilt and zoom', () => {
-    expect(clampTilt(0)).toBe(MIN_TILT);
-    expect(clampTilt(Math.PI)).toBe(MAX_TILT);
-    expect(clampTilt(PRESET_TILT)).toBe(PRESET_TILT);
-    expect(clampZoom(0)).toBe(MIN_ZOOM);
-    expect(clampZoom(99)).toBe(MAX_ZOOM);
-    expect(clampZoom(1)).toBe(1);
-  });
-
   it('places the camera at the distance asked, above the floor, on the near side at yaw 0', () => {
-    const p = orbitPosition({ x: 3, z: -1 }, { yaw: 0, tilt: PRESET_TILT }, 20);
+    const p = orbitPosition({ x: 3, z: -1 }, { yaw: 0, tilt: SIDE_TILT }, 20);
     expect(Math.hypot(p.x - 3, p.y, p.z + 1)).toBeCloseTo(20, 9);
     expect(p.y).toBeGreaterThan(0);
     expect(p.z).toBeGreaterThan(-1);
@@ -157,9 +224,9 @@ describe('the orbit', () => {
   });
 
   it('goes round the target with the yaw, at the same height', () => {
-    const a = orbitPosition({ x: 0, z: 0 }, { yaw: 0, tilt: PRESET_TILT }, 20);
-    const b = orbitPosition({ x: 0, z: 0 }, { yaw: Math.PI / 2, tilt: PRESET_TILT }, 20);
-    const c = orbitPosition({ x: 0, z: 0 }, { yaw: Math.PI, tilt: PRESET_TILT }, 20);
+    const a = orbitPosition({ x: 0, z: 0 }, { yaw: 0, tilt: SIDE_TILT }, 20);
+    const b = orbitPosition({ x: 0, z: 0 }, { yaw: Math.PI / 2, tilt: SIDE_TILT }, 20);
+    const c = orbitPosition({ x: 0, z: 0 }, { yaw: Math.PI, tilt: SIDE_TILT }, 20);
     expect(b.y).toBeCloseTo(a.y, 9);
     expect(b.x).toBeCloseTo(a.z, 9);
     expect(b.z).toBeCloseTo(0, 9);
@@ -177,14 +244,12 @@ describe('the lens above the action row (2H.38)', () => {
     expect(lens.usable.aspect).toBeCloseTo(1536 / 549, 9);
     expect(lens.virtual.fullHeight).toBe(673);
     expect(lens.virtual.offsetY).toBe(62);
-    // The virtual centre, seen in the canvas, is the usable frame's centre.
-    expect(lens.virtual.fullHeight / 2 - lens.virtual.offsetY).toBe((611 - 62) / 2);
   });
 
-  it('is the bare lens with no inset, and never covers more than half the frame', () => {
-    const bare = insetLens(36, 1000, 500, 0);
-    expect(bare.usable.fov).toBeCloseTo(36, 9);
-    expect(bare.virtual.fov).toBeCloseTo(36, 9);
-    expect(insetLens(36, 1000, 500, 900).virtual.offsetY).toBe(250);
+  it('is the bare lens without an inset', () => {
+    const lens = insetLens(36, 1536, 611, 0);
+    expect(lens.usable.fov).toBeCloseTo(36, 9);
+    expect(lens.virtual.fov).toBeCloseTo(36, 9);
+    expect(lens.virtual.offsetY).toBe(0);
   });
 });

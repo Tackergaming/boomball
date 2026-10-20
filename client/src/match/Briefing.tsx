@@ -109,7 +109,7 @@ export function Briefing({ onClose }: { onClose: () => void }) {
             mark={<span style={S.shove}>3D</span>}
             title="The view"
             body={
-              'The match opens in 3D, in three quarters inside the silo. "Back to 2D" at the top switches to the flat board from above, and the choice is remembered. Right mouse button drag turns around the play, the wheel zooms. Arrow keys, or Ctrl plus mouse drag, move the camera over the field and unhook it from the play; "Follow the play" hooks it back, and so does your own Giff coming onto the clock. "Close in" frames the fifteen cells of the width, "Whole silo" the lot.'
+              'The match opens in 3D, from the touchline, the whole silo in view; the gear switches to the flat board from above, and the choice is remembered. Four views under the minimap, V goes round them: Side and Top from the touchline, where the wheel zooms and the right mouse button or the arrow keys move the camera over the field; Own end and Far end from behind each Furnace, fixed. Moving the camera unhooks it from the play; "Follow the play" or C hooks it back, and so does your own Giff coming onto the clock.'
             }
           />
           <Item

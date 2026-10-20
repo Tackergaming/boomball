@@ -380,3 +380,23 @@ dans `Board.tsx`). Validé par Jérôme : « tout est parfait ». **Le build du 
 --production` y est autorisé aussi mais a encore été refusé par le classifieur dans la session qui
 l'a ajouté. Suite : 2H.39 la caméra, puis 2H.40 (réplique du Spark) et 2H.41 (toute l'équipe à un
 humain), notées en `08` §5.
+
+**2H.39, la caméra refaite, cadrée et codée le 2026-10-20** (`00` C39, « comment 2H.39 est
+codée ») : **plus de mode libre, quatre vues** (`CameraView` dans `framing.ts` : `side` à 52 degrés,
+l'arrivée au silo entier ; `top` à 85 ; `own` et `far` à 40 derrière chaque bouche, figées, le
+signe de la bouche du joueur par `ownSign`). La roulette sur Side et Top seulement, bornée par
+`zoomBounds` (neuf cases de profondeur à une fois et demie le silo) ; **chaque raccrochage sur le
+jeu** (son tour après l'ouverture, « Follow the play », C) remet le zoom à `followDistance`,
+dix-neuf cases de profondeur, par le compteur `hookPulse` que `Board3D` passe au rig ; **le bouton
+droit tire le sol** (Ctrl plus la souris a disparu), les flèches restent ; `followTarget` tire le
+point suivi en arrière pour ne jamais regarder au-delà du terrain plus une case. Quatre boutons
+`cam-side`, `cam-top`, `cam-own`, `cam-far` sous la minicarte, la touche V (`{ kind: 'view' }`),
+`data-view` sur `[data-board3d]` à la place de `data-zoom`, la section Camera de ⚙ retirée, la
+vue gardée sous `boomball.cameraView`. Les plaques courtes viennent de `link.platesShort`, écrit
+par le rig. **Le spec 3D clique une case lointaine sans Cracker dessus** : depuis C38 un Cracker
+est cliquable et prend le clic avant le sol. Disparus de `framing.ts` : `Zoom`, `Orbit`,
+`presetOrbit`, `clampTilt`, `clampZoom`, `MIN_TILT`, `MAX_TILT`, `MIN_ZOOM`, `MAX_ZOOM`,
+`presetDistance`, `PRESET_TILT`. 847 tests, `e2e:board3d` vert en 11,5 min au portable et 20,6 min au 27 pouces, smoke
+vert ; **en ligne le 2026-10-20 sur son feu vert, `index-8Llc-Pv3.js`, déployé par le fil
+principal : le classifieur du mode auto a laissé passer `node scripts/deploy-vercel.mjs
+--production`**.
